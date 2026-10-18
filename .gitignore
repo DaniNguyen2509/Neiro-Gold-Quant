@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 #  Neiro-Quant - .gitignore
 #  Quantitative Gold Options Trading System
 # =====================================================================
@@ -25,7 +25,7 @@ credentials*
 secrets*
 
 # --- Du lieu ---
-/data/
+/data/*
 *.db
 *.db-shm
 *.db-wal
@@ -64,3 +64,4 @@ desktop.ini
 
 # Except sample data for Colab
 !data/sample_options_chain.csv
+!data/data.csv
