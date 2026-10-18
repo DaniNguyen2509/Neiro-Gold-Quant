@@ -65,3 +65,5 @@ desktop.ini
 # Except sample data for Colab
 !data/sample_options_chain.csv
 !data/data.csv
+!data/options_prices.csv
+!data/volatility-greeks.csv
