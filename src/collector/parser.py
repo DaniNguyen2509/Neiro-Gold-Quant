@@ -78,7 +78,7 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
         if k_val is None:
             continue
         k = clean_num(k_val)
-        if k <= 0:
+        if k < 500:  # CME Gold strikes are typically 3,000 - 5,000 USD
             continue
 
         all_strikes.add(k)

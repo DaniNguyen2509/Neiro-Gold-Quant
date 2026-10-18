@@ -94,10 +94,13 @@ def export_quant_chart(
     ax1.text(3, waterfall_trigger - 0.8, "▼ WATERFALL TRIGGER < 4147.5: Thủng đáy -> Bán tháo nhanh về 4135", 
              color='#B71C1C', fontsize=8.0, fontweight='bold', va='top')
 
+    max_abs_gex = max(abs(net_gex.min()), abs(net_gex.max())) if len(net_gex) > 0 else 50.0
+    gex_span = max(max_abs_gex * 1.5, 25.0)
+    ax1.set_xlim(-gex_span, gex_span)
+
     ax1.set_title("Panel 1: Net GEX (Triệu USD) & Mốc Chiến Thuật Vào Lệnh (SL/TP)", fontsize=11, fontweight='bold')
     ax1.set_xlabel("Net GEX (Triệu USD / 1% Biến Động Giá)", fontsize=10)
     ax1.set_ylabel("CME Gold Futures Strike Price ($)", fontsize=10)
-    ax1.set_xlim(-52, 48)
     ax1.set_yticks(strikes)
     ax1.set_yticklabels([f"${s:.0f}" for s in strikes], fontsize=9)
     ax1.grid(True, linestyle=':', alpha=0.6)
@@ -112,26 +115,40 @@ def export_quant_chart(
     ax2.barh(strikes, -put_vol, height=2.2, color='#B71C1C', alpha=0.95, label='Put Volume Hôm Nay (Lực Bán)', edgecolor='black', linewidth=0.6)
     ax2.axvline(0, color='black', linewidth=0.8, linestyle='--')
     
-    vol4200_c = df.loc[df['strike'] == 4200, 'callVolume'].values[0]
-    ax2.text(vol4200_c + 40, 4200, f"[HOT] 646 Vol / 2444 OI\n(TẬP TRUNG 80% VOLUME)", 
-             color='#1B5E20', fontsize=8.2, fontweight='bold', va='center')
-             
-    vol4180_p = df.loc[df['strike'] == 4180, 'putVolume'].values[0]
-    ax2.text(-vol4180_p - 40, 4180, f"63 Put Vol ◄", color='#B71C1C', fontsize=8.0, fontweight='bold', va='center', ha='right')
+    # Dynamically annotate highest volume strike
+    if len(df) > 0 and call_vol.max() > 0:
+        top_call_idx = df['callVolume'].idxmax()
+        top_call_stk = df.loc[top_call_idx, 'strike']
+        top_call_v = df.loc[top_call_idx, 'callVolume']
+        top_call_oi = df.loc[top_call_idx, 'callOpenInterest']
+        ax2.text(top_call_v + 15, top_call_stk, f"Call Vol: {int(top_call_v)} | OI: {int(top_call_oi)}", 
+                 color='#1B5E20', fontsize=8.0, fontweight='bold', va='center')
+                 
+    if len(df) > 0 and put_vol.max() > 0:
+        top_put_idx = df['putVolume'].idxmax()
+        top_put_stk = df.loc[top_put_idx, 'strike']
+        top_put_v = df.loc[top_put_idx, 'putVolume']
+        top_put_oi = df.loc[top_put_idx, 'putOpenInterest']
+        ax2.text(-top_put_v - 15, top_put_stk, f"Put Vol: {int(top_put_v)} | OI: {int(top_put_oi)}", 
+                 color='#B71C1C', fontsize=8.0, fontweight='bold', va='center', ha='right')
 
     ax2.axhline(futures_price, color='#0D47A1', linewidth=2.0, linestyle='-')
     ax2.axhline(call_wall, color='#6A1B9A', linewidth=1.6, linestyle='--')
-    ax2.axhline(4175.0, color='#1B5E20', linewidth=1.6, linestyle='--')
     ax2.axhline(put_wall, color='#E65100', linewidth=1.6, linestyle='-.')
-    ax2.axhline(gamma_flip_floor, color='#C2185B', linewidth=1.2, linestyle=':')
     
+    max_vol_oi = max(call_oi.max() if len(call_oi) else 0, put_oi.max() if len(put_oi) else 0,
+                     call_vol.max() if len(call_vol) else 0, put_vol.max() if len(put_vol) else 0)
+    p2_span = max(max_vol_oi * 1.25, 200.0)
+    ax2.set_xlim(-p2_span, p2_span)
+
     ax2.set_title("Panel 2: Dòng Tiền Thực Chiến (Volume Hôm Nay vs Open Interest Nền)", fontsize=11, fontweight='bold')
     ax2.set_xlabel("Put OI/Vol (-)  |  Call OI/Vol (+)", fontsize=10)
-    ax2.set_xlim(-2800, 3200)
     ax2.legend(loc='lower right', fontsize=8.2, framealpha=0.95)
     ax2.grid(True, linestyle=':', alpha=0.6)
     
-    header_title = f"NEIRO-QUANT: GCZ26 GOLD OPTIONS | Giá Futures: {futures_price:.2f} | Trạng thái: SHORT GAMMA (-53.7M USD - Biên độ lớn) | SL Cứng: 4.0 USD"
+    tot_gex = float(net_gex.sum()) if len(net_gex) else 0.0
+    regime = "LONG GAMMA" if tot_gex > 10 else ("SHORT GAMMA" if tot_gex < -10 else "NEUTRAL")
+    header_title = f"NEIRO-QUANT: GCZ26 GOLD OPTIONS | Giá Futures: {futures_price:.2f} | Trạng thái: {regime} ({tot_gex:+.1f}M USD) | SL Cứng: 4.0 USD"
     fig.suptitle(header_title, fontsize=12, fontweight='bold')
                  
     plt.tight_layout()

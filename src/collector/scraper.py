@@ -44,15 +44,15 @@ async def fetch_barchart_options_playwright(
                 "--disable-dev-shm-usage",
                 "--disable-accelerated-2d-canvas",
                 "--no-first-run",
-                "--no-zygote",
-                "--single-process",
                 "--disable-gpu",
+                "--disable-blink-features=AutomationControlled",
             ],
         )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             viewport={"width": 1920, "height": 1080},
         )
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         page = await context.new_page()
 
         captured_data: list[dict[str, Any]] = []
@@ -72,9 +72,9 @@ async def fetch_barchart_options_playwright(
 
         logger.info("Navigating to: %s", page_url)
         try:
-            await page.goto(page_url, timeout=timeout_ms, wait_until="domcontentloaded")
-            # Brief wait for initial scripts and Cloudflare challenge to pass
-            await asyncio.sleep(4.0)
+            await page.goto(page_url, timeout=timeout_ms, wait_until="commit")
+            # Brief wait for initial challenge redirect and hydration to settle
+            await asyncio.sleep(6.0)
         except Exception as e:
             logger.warning("Page navigation notice (proceeding to evaluate): %s", e)
 
@@ -126,16 +126,31 @@ async def fetch_barchart_options_playwright(
 
 
 def scrape_and_save(output_path: str = "data/options_prices_GCZ26.csv", dry_run: bool = False) -> str:
-    """Scrape Barchart options chain and save to CSV file."""
+    """Scrape Barchart options chain and save to CSV file with weekend/offline fallback."""
     logger.info("Initiating scrape for CME GCZ26 options...")
-    raw_json = asyncio.run(fetch_barchart_options_playwright())
-    df = parse_barchart_json(raw_json)
+    out_file = Path(output_path)
+    df = None
+    try:
+        raw_json = asyncio.run(fetch_barchart_options_playwright())
+        df = parse_barchart_json(raw_json)
+    except Exception as e:
+        if out_file.exists():
+            logger.warning("Live scrape notice (%s). Preserving existing active dataset at %s", e, out_file)
+            drive_data_dir = Path("H:/My Drive/Neiro-Quant/data")
+            if drive_data_dir.exists():
+                try:
+                    import shutil
+                    shutil.copy2(out_file, drive_data_dir / out_file.name)
+                    logger.info("Synced existing valid data to Google Drive: %s", drive_data_dir / out_file.name)
+                except Exception:
+                    pass
+            return str(out_file)
+        raise e
 
     if dry_run:
         logger.info("[DRY RUN] Parsed %d strikes successfully. No file written.", len(df))
         return ""
 
-    out_file = Path(output_path)
     out_file.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_file, index=False)
     logger.info("Saved %d strikes to %s (file size: %d bytes)", len(df), out_file, out_file.stat().st_size)
