@@ -99,7 +99,7 @@ def export_quant_chart(
     
     fig, (ax1, ax2, ax3) = plt.subplots(
         1, 3,
-        figsize=(23.5, 8.5),
+        figsize=(24.0, 9.6),
         dpi=130,
         sharey=True,
         gridspec_kw={'width_ratios': [1.18, 1.0, 1.05]}
@@ -126,28 +126,34 @@ def export_quant_chart(
     # 2. VÙNG BÁN TẠI CALL WALL
     if strikes.min() <= call_wall <= strikes.max():
         ax1.axhline(call_wall, color='#6A1B9A', linewidth=2.0, linestyle='--')
-        ax1.text(-gex_span * 0.96, call_wall + step * 0.40, 
-                 f"▼ CALL WALL {call_wall:.0f} (FADE SELL: {call_wall-1.5:.1f}-{call_wall:.1f} | SL: {call_wall+4:.1f})", 
-                 color='#4A148C', fontsize=7.8, fontweight='bold', va='center', ha='left',
-                 bbox=dict(boxstyle='square,pad=0.2', facecolor='#F3E5F5', edgecolor='#6A1B9A', alpha=0.92))
+        call_wall_oi_matches = plot_df.loc[plot_df['strike'] == call_wall, 'callOpenInterest'].values
+        call_wall_oi_val = int(call_wall_oi_matches[0]) if len(call_wall_oi_matches) else 0
+        call_wall_box = (
+            f"[CALL WALL {call_wall:.0f}] ({call_wall_oi_val} OI - KHÁNG CỰ ĐỈNH MM)\n"
+            f"• Vùng Bán (Fade Sell): {call_wall-1.5:.1f} - {call_wall:.1f} | SL: {call_wall+4:.1f} ($4.0) | TP: {futures_price:.1f}\n"
+            f"• Squeeze Breakout: Vượt > {squeeze_trigger:.1f} -> Cắt Short, Mua Đuổi"
+        )
+        ax1.text(-gex_span * 0.96, call_wall + step * 0.18, call_wall_box, 
+                 color='#4A148C', fontsize=7.2, fontweight='bold', va='bottom', ha='left',
+                 bbox=dict(boxstyle='round,pad=0.25', facecolor='#F3E5F5', edgecolor='#6A1B9A', alpha=0.92, linewidth=1.0))
                  
-        ax1.axhline(squeeze_trigger, color='#00838F', linewidth=1.4, linestyle=':')
-        ax1.text(-gex_span * 0.96, squeeze_trigger + step * 0.40, 
-                 f"▲ SQUEEZE BREAKOUT > {squeeze_trigger:.1f}: Vỡ Call Wall -> MUA ĐUỔI", 
-                 color='#006064', fontsize=7.6, fontweight='bold', va='center', ha='left')
+        ax1.axhline(squeeze_trigger, color='#00838F', linewidth=1.2, linestyle=':')
              
     # 3. VÙNG MUA TẠI PUT WALL
     if strikes.min() <= put_wall <= strikes.max():
         ax1.axhline(put_wall, color='#1B5E20', linewidth=2.0, linestyle='--')
-        ax1.text(gex_span * 0.04, put_wall - step * 0.40, 
-                 f"▲ PUT WALL {put_wall:.0f} (REBOUND BUY: {put_wall:.1f}-{put_wall+1.5:.1f} | SL: {put_wall-4:.1f})", 
-                 color='#1B5E20', fontsize=7.8, fontweight='bold', va='center', ha='left',
-                 bbox=dict(boxstyle='square,pad=0.2', facecolor='#E8F5E9', edgecolor='#1B5E20', alpha=0.92))
+        put_wall_oi_matches = plot_df.loc[plot_df['strike'] == put_wall, 'putOpenInterest'].values
+        put_wall_oi_val = int(put_wall_oi_matches[0]) if len(put_wall_oi_matches) else 0
+        put_wall_box = (
+            f"[MAJOR PUT WALL {put_wall:.0f}] ({put_wall_oi_val} OI - HỖ TRỢ ĐÁY MM)\n"
+            f"• Vùng Mua (Rebound Buy): {put_wall:.1f} - {put_wall+1.5:.1f} | SL: {put_wall-4:.1f} ($4.0) | TP: {futures_price:.1f}\n"
+            f"• Waterfall Breakout: Thủng < {waterfall_trigger:.1f} -> Bán Tháo Nhanh"
+        )
+        ax1.text(gex_span * 0.04, put_wall - step * 0.18, put_wall_box, 
+                 color='#B71C1C', fontsize=7.2, fontweight='bold', va='top', ha='left',
+                 bbox=dict(boxstyle='round,pad=0.25', facecolor='#FFF3E0', edgecolor='#E65100', alpha=0.92, linewidth=1.0))
                  
-        ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.4, linestyle=':')
-        ax1.text(gex_span * 0.04, waterfall_trigger - step * 0.40, 
-                 f"▼ WATERFALL TRIGGER < {waterfall_trigger:.1f}: Thủng đáy -> Bán tháo", 
-                 color='#B71C1C', fontsize=7.6, fontweight='bold', va='center', ha='left')
+        ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.2, linestyle=':')
 
     ax1.set_title("Panel 1: Net GEX ($M) & Mốc Chiến Thuật (SL/TP)", fontsize=11, fontweight='bold')
     ax1.set_xlabel("Net GEX (Triệu USD / 1% Biến Động)", fontsize=9.5)
@@ -216,14 +222,22 @@ def export_quant_chart(
         top_vex_idx = (plot_df['netVEX'].abs()).idxmax()
         top_vex_stk = plot_df.loc[top_vex_idx, 'strike']
         top_vex_val = plot_df.loc[top_vex_idx, 'netVEX']
-        ax3.text(top_vex_val, top_vex_stk + step * 0.16, f"◄ Đỉnh Vanna ({top_vex_val:+.1f}M)", 
-                 color='#E65100', fontsize=7.8, fontweight='bold', va='center')
+        if top_vex_val >= 0:
+            ax3.text(top_vex_val + 0.3, top_vex_stk + step * 0.16, f"◄ Đỉnh Vanna ({top_vex_val:+.1f}M)", 
+                     color='#E65100', fontsize=7.6, fontweight='bold', va='center', ha='left')
+        else:
+            ax3.text(top_vex_val - 0.3, top_vex_stk + step * 0.16, f"Đỉnh Vanna ({top_vex_val:+.1f}M) ►", 
+                     color='#E65100', fontsize=7.6, fontweight='bold', va='center', ha='right')
 
         top_chex_idx = (plot_df['netCHEX'].abs()).idxmax()
         top_chex_stk = plot_df.loc[top_chex_idx, 'strike']
         top_chex_val = plot_df.loc[top_chex_idx, 'netCHEX']
-        ax3.text(top_chex_val, top_chex_stk - step * 0.16, f"◄ Đỉnh Charm ({top_chex_val:+.1f}M)", 
-                 color='#00838F', fontsize=7.8, fontweight='bold', va='center')
+        if top_chex_val >= 0:
+            ax3.text(top_chex_val + 0.3, top_chex_stk - step * 0.16, f"◄ Đỉnh Charm ({top_chex_val:+.1f}M)", 
+                     color='#00838F', fontsize=7.6, fontweight='bold', va='center', ha='left')
+        else:
+            ax3.text(top_chex_val - 0.3, top_chex_stk - step * 0.16, f"Đỉnh Charm ({top_chex_val:+.1f}M) ►", 
+                     color='#00838F', fontsize=7.6, fontweight='bold', va='center', ha='right')
 
     max_vex_chex = max(abs(net_vex.min()) if len(net_vex) else 0, abs(net_vex.max()) if len(net_vex) else 0,
                        abs(net_chex.min()) if len(net_chex) else 0, abs(net_chex.max()) if len(net_chex) else 0)
