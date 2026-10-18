@@ -155,6 +155,34 @@ def export_quant_chart(
                  
         ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.2, linestyle=':')
 
+    # 4. CÁC MỐC CHIẾN THUẬT LƯỚT SÓNG TRONG NGÀY (INTRADAY TACTICAL LEVELS)
+    # Mốc Cửa Ải 4200
+    if strikes.min() <= 4200 <= strikes.max() and call_wall != 4200:
+        ax1.axhline(4200, color='#2E7D32', linewidth=1.1, linestyle=':')
+        gex_4200_matches = plot_df.loc[plot_df['strike'] == 4200, 'netGEX'].values
+        gex_4200_val = gex_4200_matches[0] if len(gex_4200_matches) else 5.0
+        ax1.text(gex_4200_val + 0.6, 4200, "◄ CỬA ẢI 4200 (Squeeze > 4202.5 -> TP 4224)", 
+                 color='#1B5E20', fontsize=7.2, fontweight='bold', va='center', ha='left',
+                 bbox=dict(boxstyle='round,pad=0.2', facecolor='#E8F5E9', edgecolor='#2E7D32', alpha=0.9, linewidth=0.8))
+
+    # Mốc Sàn Đỡ ATM 4175
+    if strikes.min() <= 4175 <= strikes.max() and put_wall != 4175:
+        ax1.axhline(4175, color='#1565C0', linewidth=1.1, linestyle=':')
+        gex_4175_matches = plot_df.loc[plot_df['strike'] == 4175, 'netGEX'].values
+        gex_4175_val = gex_4175_matches[0] if len(gex_4175_matches) else -9.0
+        ax1.text(gex_4175_val - 0.6, 4175, "SÀN ĐỠ ATM 4175 (Rebound: 4175-4176.5) ►", 
+                 color='#0D47A1', fontsize=7.2, fontweight='bold', va='center', ha='right',
+                 bbox=dict(boxstyle='round,pad=0.2', facecolor='#E3F2FD', edgecolor='#1565C0', alpha=0.9, linewidth=0.8))
+
+    # Mốc Trạm Nghỉ 4150
+    if strikes.min() <= 4150 <= strikes.max() and put_wall != 4150:
+        ax1.axhline(4150, color='#C62828', linewidth=1.1, linestyle=':')
+        gex_4150_matches = plot_df.loc[plot_df['strike'] == 4150, 'netGEX'].values
+        gex_4150_val = gex_4150_matches[0] if len(gex_4150_matches) else -5.0
+        ax1.text(gex_4150_val - 0.6, 4150, "TRẠM NGHỈ 4150 (Chốt lời Short / Retest) ►", 
+                 color='#B71C1C', fontsize=7.2, fontweight='bold', va='center', ha='right',
+                 bbox=dict(boxstyle='round,pad=0.2', facecolor='#FFEBEE', edgecolor='#C62828', alpha=0.9, linewidth=0.8))
+
     ax1.set_title("Panel 1: Net GEX ($M) & Mốc Chiến Thuật (SL/TP)", fontsize=11, fontweight='bold')
     ax1.set_xlabel("Net GEX (Triệu USD / 1% Biến Động)", fontsize=9.5)
     ax1.set_ylabel("CME Gold Futures Strike Price ($)", fontsize=9.5)
