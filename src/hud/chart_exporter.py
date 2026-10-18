@@ -155,31 +155,39 @@ def export_quant_chart(
                  
         ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.2, linestyle=':')
 
-    # 4. CÁC MỐC CHIẾN THUẬT LƯỚT SÓNG TRONG NGÀY (INTRADAY TACTICAL LEVELS)
-    # Mốc Cửa Ải 4200
-    if strikes.min() <= 4200 <= strikes.max() and call_wall != 4200:
-        ax1.axhline(4200, color='#2E7D32', linewidth=1.1, linestyle=':')
-        gex_4200_matches = plot_df.loc[plot_df['strike'] == 4200, 'netGEX'].values
-        gex_4200_val = gex_4200_matches[0] if len(gex_4200_matches) else 5.0
-        ax1.text(gex_4200_val + 0.6, 4200, "◄ CỬA ẢI 4200 (Squeeze > 4202.5 -> TP 4224)", 
+    # 4. CÁC MỐC CHIẾN THUẬT LƯỚT SÓNG TRONG NGÀY (100% TỰ ĐỘNG THEO GIÁ SPOT & GEX)
+    strikes_above = strikes[strikes > futures_price]
+    strike_above = float(strikes_above[0]) if len(strikes_above) > 0 else call_wall
+    next_above = float(strikes_above[1]) if len(strikes_above) > 1 else strike_above + step
+
+    strikes_below = strikes[strikes <= futures_price]
+    strike_below = float(strikes_below[-1]) if len(strikes_below) > 0 else put_wall
+    next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else strike_below - step
+
+    # Mốc Cửa Ải Kháng Cự Tiền Tuyến (Strike ngay trên Spot)
+    if strikes.min() <= strike_above <= strikes.max() and strike_above != call_wall:
+        ax1.axhline(strike_above, color='#2E7D32', linewidth=1.1, linestyle=':')
+        gex_above_matches = plot_df.loc[plot_df['strike'] == strike_above, 'netGEX'].values
+        gex_above_val = gex_above_matches[0] if len(gex_above_matches) else 5.0
+        ax1.text(gex_above_val + 0.6, strike_above, f"◄ CỬA ẢI {strike_above:.0f} (Squeeze > {strike_above+2.5:.1f} -> TP {next_above:.0f})", 
                  color='#1B5E20', fontsize=7.2, fontweight='bold', va='center', ha='left',
                  bbox=dict(boxstyle='round,pad=0.2', facecolor='#E8F5E9', edgecolor='#2E7D32', alpha=0.9, linewidth=0.8))
 
-    # Mốc Sàn Đỡ ATM 4175
-    if strikes.min() <= 4175 <= strikes.max() and put_wall != 4175:
-        ax1.axhline(4175, color='#1565C0', linewidth=1.1, linestyle=':')
-        gex_4175_matches = plot_df.loc[plot_df['strike'] == 4175, 'netGEX'].values
-        gex_4175_val = gex_4175_matches[0] if len(gex_4175_matches) else -9.0
-        ax1.text(gex_4175_val - 0.6, 4175, "SÀN ĐỠ ATM 4175 (Rebound: 4175-4176.5) ►", 
+    # Mốc Sàn Đỡ ATM (Strike ngay dưới Spot)
+    if strikes.min() <= strike_below <= strikes.max() and strike_below != put_wall:
+        ax1.axhline(strike_below, color='#1565C0', linewidth=1.1, linestyle=':')
+        gex_below_matches = plot_df.loc[plot_df['strike'] == strike_below, 'netGEX'].values
+        gex_below_val = gex_below_matches[0] if len(gex_below_matches) else -9.0
+        ax1.text(gex_below_val - 0.6, strike_below, f"SÀN ĐỠ ATM {strike_below:.0f} (Rebound: {strike_below:.1f}-{strike_below+1.5:.1f}) ►", 
                  color='#0D47A1', fontsize=7.2, fontweight='bold', va='center', ha='right',
                  bbox=dict(boxstyle='round,pad=0.2', facecolor='#E3F2FD', edgecolor='#1565C0', alpha=0.9, linewidth=0.8))
 
-    # Mốc Trạm Nghỉ 4150
-    if strikes.min() <= 4150 <= strikes.max() and put_wall != 4150:
-        ax1.axhline(4150, color='#C62828', linewidth=1.1, linestyle=':')
-        gex_4150_matches = plot_df.loc[plot_df['strike'] == 4150, 'netGEX'].values
-        gex_4150_val = gex_4150_matches[0] if len(gex_4150_matches) else -5.0
-        ax1.text(gex_4150_val - 0.6, 4150, "TRẠM NGHỈ 4150 (Chốt lời Short / Retest) ►", 
+    # Mốc Trạm Nghỉ Kế Tiếp (Strike nấc 2 dưới Spot)
+    if strikes.min() <= next_below <= strikes.max() and next_below != put_wall:
+        ax1.axhline(next_below, color='#C62828', linewidth=1.1, linestyle=':')
+        gex_next_below_matches = plot_df.loc[plot_df['strike'] == next_below, 'netGEX'].values
+        gex_next_below_val = gex_next_below_matches[0] if len(gex_next_below_matches) else -5.0
+        ax1.text(gex_next_below_val - 0.6, next_below, f"TRẠM NGHỈ {next_below:.0f} (Chốt lời Short / Retest) ►", 
                  color='#B71C1C', fontsize=7.2, fontweight='bold', va='center', ha='right',
                  bbox=dict(boxstyle='round,pad=0.2', facecolor='#FFEBEE', edgecolor='#C62828', alpha=0.9, linewidth=0.8))
 
