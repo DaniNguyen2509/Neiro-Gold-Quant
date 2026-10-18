@@ -67,6 +67,7 @@ desktop.ini
 !data/data.csv
 !data/options_prices.csv
 !data/volatility-greeks.csv
+!data/options_prices_GCZ26.csv
 
 # --- Generated Visualizations & Reports ---
 reports/

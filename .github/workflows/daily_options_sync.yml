@@ -1,0 +1,70 @@
+name: ⚡ CME Gold Options Automated Sync (Neiro-Quant)
+
+on:
+  schedule:
+    # 00:30 UTC = 07:30 Vietnam (Chot Open Interest moi nhat cua CME cho ca ngay)
+    # 07:00 UTC = 14:00 Vietnam (Dau phien Au - London mo cua)
+    # 12:30 UTC = 19:30 Vietnam (Truoc phien My - New York mo cua)
+    # Chay tu Thu 2 den Thu 6 hang tuan
+    - cron: '30 0,7,12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Test mode without committing to repository'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: options-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Scrape and Update GCZ26 Options Chain
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright pandas
+          python -m playwright install chromium --with-deps
+
+      - name: Scrape Options Chain from Barchart
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python -m src.collector.scraper --output data/options_prices_GCZ26.csv --dry-run
+          else
+            python -m src.collector.scraper --output data/options_prices_GCZ26.csv
+          fi
+
+      - name: Verify Generated Options File
+        run: |
+          if [ -f data/options_prices_GCZ26.csv ]; then
+            echo "✅ File data/options_prices_GCZ26.csv generated successfully!"
+            ls -lh data/options_prices_GCZ26.csv
+            head -n 5 data/options_prices_GCZ26.csv
+          else
+            echo "❌ File data/options_prices_GCZ26.csv not found!"
+            exit 1
+          fi
+
+      - name: Commit and Push Changes
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/options_prices_GCZ26.csv
+          git diff --staged --quiet || (git commit -m "chore(data): auto-sync CME Gold GCZ26 options chain [skip ci]" && git push)

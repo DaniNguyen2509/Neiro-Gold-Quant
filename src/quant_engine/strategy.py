@@ -591,10 +591,11 @@ if __name__ == "__main__":
     result = generate_signals(snap)
     elapsed = (time.perf_counter() - t0) * 1000
 
-    print(f"⏱  Execution: {elapsed:.3f} ms")
-    print(f"📊 S_Implied: {result['s_implied']:.2f}")
-    print(f"📈 Regime: {result['regime']}")
-    print(f"🎯 Expected Move: {result['expected_move']}")
-    print(f"🕳  Air Pockets: {result['air_pockets']}")
-    print(f"🚫 Prohibitions: {result['prohibitions']}")
-    print(f"🚀 Runners: {result['runners']}")
+    print(f"[EXEC] Execution: {elapsed:.3f} ms")
+    print(f"[SPOT] S_Implied: {result['s_implied']:.2f}")
+    print(f"[REGIME] Regime: {result['regime']}")
+    print(f"[MOVE] Expected Move: {result['expected_move']}")
+    print(f"[AIR] Air Pockets: {result['air_pockets']}")
+    print(f"[PROHIBIT] Prohibitions: {result['prohibitions']}")
+    print(f"[RUNNER] Runners: {result['runners']}")
+
