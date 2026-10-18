@@ -39,7 +39,7 @@ d_2 &= d_1 - \sigma \sqrt{T}
 | **Delta Call** | $\Delta_{call}$ | $e^{-rT} \cdot N(d_1)$ | Số lượng Hợp đồng Futures Dealer cần phòng hộ khi Long Call |
 | **Delta Put** | $\Delta_{put}$ | $-e^{-rT} \cdot N(-d_1)$ | Số lượng Hợp đồng Futures Dealer cần phòng hộ khi Long Put |
 | **Gamma** | $\Gamma$ | $\frac{e^{-rT} \cdot n(d_1)}{F \cdot \sigma \sqrt{T}}$ | Gia tốc thay đổi của Delta khi giá Futures di chuyển $1 (Dùng tính GEX) |
-| **Theta Call** | $\Theta_{call}$ | $-\frac{F \cdot n(d_1) \cdot \sigma}{2\sqrt{T}} e^{-rT} - r K e^{-rT} N(d_2) + r F e^{-rT} N(d_1)$ | Tốc độ hao mòn giá trị thời gian của Call mỗi ngày |
+| **Theta Call** | $\Theta_{call}$ | $-\frac{F e^{-rT} n(d_1) \sigma}{2\sqrt{T}} - r F e^{-rT} N(d_1) + r K e^{-rT} N(d_2)$ | Tốc độ hao mòn giá trị thời gian của Call mỗi ngày |
 | **Vega** | $\nu$ | $F \cdot e^{-rT} \cdot n(d_1) \cdot \sqrt{T}$ | Độ nhạy của giá option khi IV thay đổi 1% |
 | **Vanna** | $\frac{\partial \Delta}{\partial \sigma}$ | $-e^{-rT} \cdot n(d_1) \cdot \frac{d_2}{\sigma}$ | Độ nhạy của Delta khi IV thay đổi (Dùng tính VEX) |
 | **Charm** | $-\frac{\partial \Delta}{\partial T}$ | $e^{-rT} \left[ n(d_1) \left( \frac{r}{\sigma \sqrt{T}} - \frac{d_2}{2T} \right) - r N(d_1) \right]$ | Tốc độ suy biến của Delta theo thời gian (Dùng tính CHEX) |
@@ -64,7 +64,7 @@ $$Mid = \frac{Bid + Ask}{2}$$
 Dựa trên nguyên lý Ngang giá Quyền chọn (Put-Call Parity):
 - **Bước 1:** Quét bảng tìm Strike $K_{ATM}$ có độ lệch $|Call_{mid} - Put_{mid}|$ nhỏ nhất.
 - **Bước 2:** Tính giá trị trục cân bằng thực tế:
-$$S_{Implied} = K_{ATM} + Call_{mid}(ATM) - Put_{mid}(ATM)$$
+$$S_{Implied} = K_{ATM} + e^{rT} \cdot [Call_{mid}(ATM) - Put_{mid}(ATM)]$$
 
 ### 3. Biên độ Dao động Kỳ vọng (ATM Straddle / Implied Move)
 Tổng chi phí mua bảo hiểm hai đầu tại trục ATM:
