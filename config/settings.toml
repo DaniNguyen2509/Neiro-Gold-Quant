@@ -1,0 +1,28 @@
+﻿# Neiro-Quant Runtime Configuration
+
+[collector]
+interval_minutes = 10
+barchart_symbol = GCZ25
+timeout_seconds = 30
+
+[mt5]
+forward_symbol = XAUUSD-F
+spot_symbol = XAUUSDc
+spot_broker = Exness
+forward_broker = Pepperstone
+
+[engine]
+sigma_factor = 0.85
+air_pocket_threshold = 0.35
+wall_volume_confirm = true
+
+[hud]
+refresh_seconds = 5
+show_futures = true
+show_spot = true
+
+[logging]
+level = INFO
+file = logs/neiro-quant.log
+max_bytes = 10485760
+backup_count = 3

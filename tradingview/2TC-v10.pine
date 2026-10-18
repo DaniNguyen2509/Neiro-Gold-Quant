@@ -1,0 +1,2934 @@
+//@version=6
+// =====================================================================
+// =====================================================================
+//  2TC-v8-Mini — 25-08-2026. BAN MOI SONG SONG, KHONG DE LEN
+//
+//  ===== DOI TEN 26-08 (owner chot) =====
+//  Ten cu: 2TC-v7-Mini  ->  ten moi: 2TC-v8.
+//  Ly do: chu "CRB" trong ten file lan voi CUM CRB (Sweep & Engulf) o
+//  NHOM 9-11 BEN TRONG chinh file nay — hai thu khac han nhau.
+//  DA DOI: tieu de file, indicator() title + shorttitle, va 9 cau alert.
+//  KHONG DOI: moi chu CRB / CRB0 / CRB1* cua cum Sweep & Engulf, va cac
+//  ten bien bhCrb / f_crbPass / crbBoxBuyCol / showCrbBox... — do la ten
+//  cua CUM, khong phai ten file.
+//  CUNG KHONG DOI: 11 cho truy nguyen tro toi FILE KHAC hoac ban tien
+//  nhiem (CRB-Model.pine, CRB-Model-v2.pine, CRB-Model-v3.pine,
+//  mt5/Indicators/CRB-Model-v3.mq5, "KHAC CRB-Model O DAU"...). Doi chung
+//  la lam sai ho so goc: code that su den tu nhung file mang ten do.
+//  CRB-Model-v3.pine (ban owner DANG DANH). v3 giu NGUYEN VAN, khong sua
+//  mot ky tu nao.
+//
+//  ===== TAI CAU TRUC 26-08 (owner chot) =====
+//   1. GO HAN cum Daily Bias: o bat/tat, NHOM input va ca engine.
+//      ⚠ Tien to db_ DUNG CHUNG voi Dashboard — db_posOf / db_sizeOf /
+//      db_jdTxt / db_tsTxt / db_mechCol la cua Dashboard. Phai cat theo
+//      VUNG DONG, tuyet doi khong xoa theo mau ten db_*.
+//   2. Cong tac cum Slope: slOn -> enableSlope, DOI LEN NHOM 1 de NHOM 1
+//      la cho DUY NHAT bat/tat cac cum. Hai cum OLHC va DASHBOARD van giu
+//      cong tac trong NHOM cua chung (owner chua yeu cau doi).
+//   3. FOLLOW BIAS H1 len vi tri 2; BANG HE SO THEO KHUNG len vi tri 3
+//      (bang LAI he so cua Judas/Turtle Soup nen phai dung TRUOC hai cum do).
+//   4. Danh so lai. Anh xa cu -> moi:
+//        2->4  3->5  4->6  5->7  6->go han  7->8  8->9  9->10  10->11
+//        11->3  12->2  13->12  14->13  15->14        (1 giu nguyen)
+//      CHAN DOAN khong con giu duoc so 7 nhu chot truoc: chen BANG HE SO
+//      vao vi tri 3 la moi nhom sau no tut xuong mot bac. Vi tri thi y
+//      nguyen, chi con so doi.
+//      Header/comment thong nhat viet NHOM <so>; tooltip giu tieng Viet
+//      co dau (nhóm 4, bảng 3) vi do la cau van nguoi dung doc.
+//
+//  v5 = v4 + DUNG HAI thu: NHOM 11 · DUONG HOI QUY + PARABOL, va
+//  NHOM 12 · DASHBOARD. Trong do v4 = v3 + NHOM 10 · OLHC — cau truc nen.
+//  Khong doi mot mac dinh nao cua v3 hay v4, khong dong o nao cua chung,
+//  khong sua mot dong logic nao cua chung. Tat ba o enableSlope + olOn + dbShow
+//  di thi v5 chay y het v3.
+//
+//  NHOM 13 — DO DOC. Hoi quy tuyen tinh bac 1 lay do doc ca cua so, hoi
+//  quy bac 2 lay do doc TAI NEN CUOI, ca hai chuan hoa theo ATR. Luat
+//  port NGUYEN VAN tu tradingview/Slope-Meter.pine va dung y het NHOM 9
+//  cua mt5/Experts/CRB-EA-v3.mq5 — sua mot ben la phai mang sang hai ben
+//  kia. Tai lieu: docs/slope-meter.md.
+//
+//  NHOM 14 — DASHBOARD. Bang tom tat o goc chart: doc ket qua NHOM 13
+//  roi in KET LUAN (TANG / GIAM / DI NGANG / DANG CONG / GIA LOAN), them
+//  ba dong JUDAS / T.SOUP / BIAS H1 khi bat o dbMech.
+//
+//  ★ LECH 4 O so voi ban MT5, deu do nen tang — xem khoi chu thich ngay
+//  tren NHOM 13. Ban MT5 co them o CHE DO GON (chan ve NHOM 1..13); Pine
+//  khong co vi plotshape/barcolor ben nay khong xoa lai duoc.
+//
+//  ⚠ DUNG GAN CA v3, v4 LAN v5 len cung mot chart - ba ban ve trung nhau
+//  toan bo cum JUDAS / TURTLE SOUP / CRB. CHI GAN MOT BAN.
+//
+//  Cum OLHC port tu tradingview/OLHC.pine; file do van giu nguyen de thu
+//  rieng, khong co cum nao cua CRB.
+// =====================================================================
+//  ---- nguyen van header cua v3 tu day tro xuong ----
+// =====================================================================
+//  CRB-MODEL-v3 — 23-08-2026 toi. BAN MOI SONG SONG, KHONG DE LEN
+//  CRB-Model-v2.pine (ban owner dang danh). Bang cong tac / luat / mau cua
+//  v2 giu NGUYEN VAN, v3 chi khac dung bon cho:
+//    1. THEM NHOM 2 · FOLLOW BIAS H1 — chay lai chinh engine nay tren du
+//       lieu H1, lay chieu cu JD/TS ra tin hieu gan nhat lam BIAS, roi loc
+//       tin hieu khung dang mo theo bias do. MAC DINH TAT (owner chot 25-08 toi).
+//    2. HE SO be rong khe ho: TS 1,40 -> 0,50 (owner chot 23-08 toi). JD
+//       ha xuong 0,75 roi TRA LAI 1,00 (owner chot 24-08).
+//    3. Hai o he so cua engine H1 mac dinh GHI THANG RA SO: 0,25 / 0,25.
+//    4. Nhom 11 = BANG HE SO THEO KHUNG (25-08, port co che tu ban vendor).
+//       De 0 o o he so NHOM 4 / NHOM 6 / NHOM 2 la GIAO o do cho bang lai
+//       theo khung chart. MAC DINH TAT - ba o do van giu so cu.
+//  Owner ve lai luong ra tin hieu tren so do rieng, day la
+//  ban dung dung theo so do do.
+//
+//  ============ NGUYEN TAC KIEN TRUC (owner chot 23-08) ============
+//  JUDAS va TURTLE SOUP la HAI CO CHE DAC BIET RIENG, DOC LAP HOAN TOAN.
+//  Chung nhau DUNG MOT KHUC GOC roi tach han, khong bao gio doc state cua
+//  nhau, khong dung chung mot o nao trong bang cong tac.
+//
+//    KHUC GOC DUNG CHUNG — KHONG CON O NAO (owner chot 23-08: cua so tim
+//      may CISD -> su kien -> CAY CUC TRI -> cong QUET -> buoc XAC DINH CAY NEO
+//    Het. Tu cay neo tro di moi co che di duong cua no:
+//      JUDAS  (NHOM 4-5): cay neo MSS  -> vach MSS  -> khe ho TUOI ben PHAI
+//      T.SOUP (NHOM 6-7): cay neo CISD -> vach CISD -> khe ho CU ben TRAI
+//
+//    Moi co che co RIENG: o bat/tat, chieu tin hieu, CONG DISPLACEMENT,
+//    NGUONG BE RONG KHE HO
+//    (chu ky ATR + he so rieng), cua so khe ho, cong xac nhan, so cu
+//    giu lai, mau dau, co dau, chu, vach noi, ca bo 4 mau + dai/day/kieu net/
+//    do mo/day chu cua vach, MAU + VIEN HOP KHE HO VAO LENH, va o alert.
+//    Tat mot co che thi co che kia chay y nguyen, khong xe dich mot ly.
+//
+//  ============ KHE HO: MOT KHO, HAI NGUONG (owner chot 23-08) ============
+//  "FVG cua 2 co che cung khac nhau" — nen nguong be rong tach doi han:
+//    - Kho khe ho quet MOT LAN moi nen (khong the quet hai lan cho hai ben,
+//      se ra hai hop chong nhau tren cung mot khe). Mot khe duoc GHI VAO KHO
+//      neu no dat NGUONG LONG HON trong hai nguong.
+//    - Luc CHON VAO LENH thi moi co che ap NGUONG RIENG cua no. Khe lot vao
+//      kho nho nguong ben kia nhung khong dat nguong cua minh thi co che nay
+//      KHONG lay — coi nhu khong ton tai.
+//    - Hop VIEN cua khe VAO LENH ve bang mau/viem rieng cua co che do.
+//    - Lop "hien MOI hop khe ho" (NHOM 8) la lop xem-cho-biet dung chung,
+//      ve dung hop trong kho, mot khe mot hop, khong bao gio chong nhau.
+//
+//  ============ KHAC CRB-Model O DAU ============
+//   1. MOT MAY CISD DUY NHAT. Ban cu co HAI may chay song song (cum ② va
+//      cum ④ voi tien to jd_). Nay hai co che an chung mot su kien, chung
+//      mot cay cuc tri -> khong the lech nhau nua.
+//   2. CONG DISPLACEMENT CO O RIENG CHO TUNG BEN. Ban cu chi TS moi co o
+//      "nen cuc tri phai quet"; nay Judas cung co mot o y het, chinh doc lap.
+//      Ca hai MAC DINH TAT (owner chot 23-08).
+//   3. HAI CAY NEO KHAC NHAU, va CHI Judas co o cua so rieng (jdAncBack):
+//      - cay neo MSS  = cay DAU TIEN thut vao so voi cay ben trai no
+//                       -> vach MSS tai DINH (dao len) / DAY (dao xuong).
+//                       Dem tu nen LIEN TRUOC cuc tri, trong jdAncBack nen.
+//      - cay neo CISD = cay TANG gan nhat (dao xuong) / cay GIAM gan nhat
+//                       (dao len) -> vach CISD tai GIA MO cay do. KHONG co
+//                       o cua so: chuoi dai bao nhieu thi lay bay nhieu, y
+//                       nguyen kent_combo_v9.
+//      Ca hai vach co DU 4 mau chua/da xac nhan x2 chieu, va bo dinh dang
+//      hoan toan rieng.
+//   4. iFVG DINH NGHIA LAI. May iFVG toan cuc cua ban cu (IfvgPending /
+//      IfvgZone / cong iFVG 20 nen) GO HAN. Nay iFVG = "khe ho NGUOC chieu
+//      nam ben TRAI cuc tri, bi lap". Khong con lop nao quet ca chart.
+//
+//  ============ LUONG RA TIN HIEU (vi du chieu BAN) ============
+//  Cuc tri = NEN EXTREME HIGH.
+//    su kien CISD -> cay cuc tri (quet doan goc CISD -> cay pha)
+//      -> moi co che tu hoi CO QUET KHONG? bang O RIENG cua no (owner chot
+//         23-08). Judas truot cong thi Judas bo cu, Turtle Soup van chay.
+//      -> CO CHE JUDAS : cay neo MSS -> vach MSS tai DAY cay do.
+//           khe ho BEARISH TUOI dat nguong cua Judas, cay giua nam trong
+//           jdFvgWin nen tinh tu (cuc tri - 1) sang PHAI. Lay cai DAU TIEN
+//           hinh thanh va con TUOI. MAC DINH TU 25-08 TOI: KHONG doi them gi
+//           nua - khe TUOI dau tien dat nguong la ra tin hieu ngay (o
+//           jdNeedMss da TAT, owner chot 25-08 toi; truoc do BAT tu 23-08).
+//           -> JD: mui ten + nhan tai CAY TAO KHE HO.
+//      -> CO CHE T.SOUP: cay neo CISD -> vach CISD tai GIA MO cay do.
+//           khe ho BULLISH CU dat nguong cua T.Soup, cay giua nam trong
+//           tsFvgWin nen tinh TU CHINH cuc tri sang TRAI. Lay cai BI LAP
+//           SOM NHAT (lap = nen DONG xuyen han mep xa, va nen lap phai nam TU
+//           cuc tri tro di). LUAT GOC = CO CISD + CO khe ho bi lat, the la DU.
+//           MAC DINH (owner chot 23-08 CUOI) con doi them: chinh NEN LAP do
+//           phai DONG CUA xuyen qua vach CISD trong cung mot nen — o tsNeedCisd,
+//           BAT san. Tat o do thi ve dung luat goc.
+//           -> TS: mui ten + nhan tai NEN LAP — dung cay nen cuoi cung lap
+//           xong khe ho (owner xac nhan 23-08).
+//    Chieu MUA lat nguoc y het: cuc tri = EXTREME LOW, Judas an khe ho
+//    BULLISH tuoi ben phai, T.Soup an khe ho BEARISH cu ben trai.
+//
+//  CUA SO 5 NEN — dem theo CAY GIUA cua bo 3 nen, owner chot 23-08:
+//    tuoi (Judas) : cay giua thuoc [cuc tri - 1 .. cuc tri + 3] — bat dau
+//      tai cay LIEN TRUOC cuc tri roi trai sang PHAI.
+//    cu (T.Soup) : cay giua thuoc [cuc tri - 4 .. cuc tri] — bat dau TAI
+//      CHINH cuc tri roi trai sang TRAI. Hai o rieng, chinh doc lap.
+//
+//  GIU NGUYEN VAN tu CRB-Model: cum CRB Sweep&Engulf (se_), lop vach cuc
+//  tri CISD ("CISD Max"), va cua so 1500 nen (inWin).
+//  Cum DAILY BIAS (db_) DA GO HAN 26-08 theo owner.
+//
+//  ============ BANG MAU (owner chot 23-08) ============
+//  JUDAS — hop khe ho TUOI, doc theo chieu CUA CHINH KHE HO:
+//    khe TANG -> XANH LA (cu mua)   |   khe GIAM -> DO (cu ban)
+//
+//  TURTLE SOUP — hop khe ho CU. AN suot luc theo doi, CHI hien ra dung luc
+//  no BI LAP (= luc ra tin hieu TS), va HOP KEO DAI tu cho khe SINH RA toi
+//  dung NEN LAP. Mau ke chuyen BEN NAO VUA THAT BAI:
+//    khe TANG bi lap -> CAM.        Cu mua hong -> tin hieu BAN. Vach CISD cam.
+//    khe GIAM bi lap -> XANH DUONG. Cu ban hong -> tin hieu MUA. Vach CISD xanh.
+//  Nguoc voi quy uoc thuong thay, va dung nhu vay: mau o day noi ve CU VUA
+//  CHET chu khong phai cu sap vao.
+//
+//  ============ BA CHOT 23-08 (muon) ============
+//   1. VACH KHONG PHU THUOC KHE HO. Co cay neo la ve, va chi co DUNG HAI
+//      trang thai: chua qua vach / da qua vach. Hai o DO RO (mssVis/cisdVis)
+//      mac dinh 0 nen vach AN HAN cho toi luc cu RA TIN HIEU. Muon xem ca cu
+//      dang cho thi keo hai o do len tren 0.
+//   2. CHO DAT DAU DO NGUOI DUNG CHON: cay tao/lap khe ho (mac dinh, = cho
+//      vao lenh) hoac NEN CUC TRI. Moi co che mot o rieng.
+//   3. KHONG CON O HAN CHO NAO. Hai chan cu (chan ngoai dem tu cuc tri,
+//      chan gat dem tu cay xuyen vach) DA GO HAN 23-08 cuoi. Nay CUA SO
+//      khe ho chinh la han:
+//        - Judas      : chet khi bar_index > (cuc tri - 1) + jdFvgWin
+//        - Turtle Soup: chet khi bar_index > cuc tri + tsFvgWin
+//      Het han ma chua ra tin hieu -> BO CU, xoa het vach + chu.
+//
+//  Vien hai loai hop de GIONG HET nhau (day 1, net lien, dam 100%), chi khac
+//  mau. Lop "hien MOI hop khe ho" o NHOM 8 mac dinh TAT de khe cua Turtle
+//  Soup that su AN trong luc theo doi.
+//
+//  HAI CO CHE CO BO O VA MAC DINH GIONG HET NHAU (owner chot 23-08), tru
+//  DUNG BA CHO:
+//    a. MAU. Xem bang mau o tren — mau chinh la thu phan biet JD voi TS, va
+//       ben TS con mang y nghia "ai vua that bai".
+//    b. HE SO be rong khe ho: Judas 1,00 / Turtle Soup 0,50 (owner chot
+//       24-08 - LUA CHON CUA OWNER, khong phai ket luan cua phep do nao
+//       vi khong con phep do nao). CHU KY dung chung, ca hai deu ATR 100.
+//    c. O "bat buoc co nen dong cua xuyen qua vach": Judas BAT, Turtle Soup
+//       TAT (owner chot 24-08) — Turtle Soup ve dung luat goc.
+//  Ngoai ba cho do, moi o con lai trung ten, trung thu tu, trung mac dinh —
+//  33 o / 33 o, kiem bang tools/checks/pine_cmp_jd_ts.py.
+//
+//  MAC DINH CUA HAI O DE NHAM:
+//    - "Nen cuc tri — chi nhan cay DA QUET (swept)"  : TAT (jdSweep/tsSweep)
+//    - "Vach MSS — bat buoc co nen dong cua xuyen qua"  : TAT  (jdNeedMss,
+//      owner chot 25-08 toi - truoc do BAT)
+//    - "Vach CISD — bat buoc co nen dong cua xuyen qua" : TAT  (tsNeedCisd,
+//      owner chot 24-08). TU 25-08 TOI HAI BEN CUNG TAT - truoc do chung
+//      lech nhau co y, nay het lech.
+//  Tuc la MOI su kien CISD deu de ra cu (khong co cong displacement gac),
+//  nhung khe ho hop le CHUA du de ra tin hieu: con phai co nen DONG CUA
+//  xuyen qua vach — Judas cho vach MSS, Turtle Soup doi chinh NEN LAP xuyen
+//  vach CISD. CA HAI O DEU DANG TAT nen hien gio khong o nao doi dieu kien
+//  do - bat len thi tin hieu it hon va muon hon, doi lai da co xac nhan.
+//  BON O "DO RO (%)" — so cang CAO cang RO, owner chot 23-08 toi:
+//    - mssVis / cisdVis    = 50 -> VACH hien MO ngay tu luc de cu, ro 100%
+//      khi cu ra tin hieu (owner chot 24-08 toi). Ha ve 0 thi vach chi sinh
+//      ra dung luc ra tin hieu: so vach = so mui ten, nhung mat cu dang cho.
+//    - jdSigVis / tsSigVis = 45 -> MUI TEN vua ra ve mo, tu sang 100% ngay khi
+//      gia dong cua xuyen vach. TU 23-08 CUOI hai o "bat buoc dong qua vach"
+//      BAT san nen tin hieu chi ra SAU khi xuyen -> hai o nay chi con tac dung
+//      khi nguoi dung tu tat cong do.
+//  Ben duoi code van dung mssDim / cisdDim / jdSigDim / tsSigDim (= 100 - Vis)
+//  vi color.new nhan DO MO.
+//
+//  VACH MSS / CISD voi o "dai (nen)" = 0 (mac dinh): vach TU DUNG tai NEN RA
+//  TIN HIEU. Cu con song thi moi nen keo them mot cay (line.set_x2), ra tin
+//  hieu xong la thoi keo -> dau phai vach dung dung cho mui ten. De o do > 0
+//  thi ep dai CO DINH bay nhieu nen ke tu NEN NEO. CHU MSS / CISD bam CAY NEO.
+//
+//  BA THAM SO, MOI MOC DEU LA CAY CUC TRI (owner chot 23-08 CUOI). KHONG con
+//  khai niem "han cho" rieng nua: CUA SO chinh la han.
+//    1. jdAncBack : tu cuc tri xet NGUOC sang TRAI N nen, TINH CA cay cuc
+//       tri -> tim cay neo MSS. Turtle Soup KHONG con o nay (xem duoi).
+//    2. jdFvgWin : tu cay LIEN TRUOC cuc tri trai sang PHAI het N nen
+//       -> tim FVG TUOI cho Judas. Loc be rong ATR 100 x 0,75.
+//    3. tsFvgWin : tu CHINH cuc tri trai sang TRAI het N nen -> tim iFVG cho
+//       Turtle Soup. Loc ATR 100 x 0,50 (o tran da XOA). Cung con so do lam han
+//       cho NEN LAP, dem tu cuc tri sang phai.
+//
+//  QUA CUA SO ma VAN CHUA co nen displacement dong cua qua gia MSS / CISD
+//  (hoac chua co khe ho nao dat nguong) -> BO CU va XOA HET vach + chu.
+//
+//  MAC DINH NGUONG KHE HO CUA BAN v3 (owner chot 23-08 TOI):
+//    khung dang trade : Judas ATR 100 x 0,75  |  Turtle Soup ATR 100 x 0,50
+//    engine H1 (NHOM 2): Judas 0,25  |  Turtle Soup 0,25
+//  BON SO NAY LA LUA CHON CUA OWNER. KHONG CO PHEP DO NAO trong repo:
+//  toan bo docs/research/ va src/research/ da XOA HAN 24-08 vi do sai
+//  (harness port luat tu ban v2, ma v2 lay SAI cay neo CISD). Dung vien
+//  dan con so cu nao — chung da bi rut lai het.
+//  O TRAN cua Turtle Soup (tsFvgMax 0,95) DA XOA HAN 23-08: no la mot cai
+//  bay (dat tran duoi san = chart im lang, Pine khong bao loi).
+//  CHU KY ATR de CHUNG 100 cho ca hai co che, chi tach o HE SO.
+//
+//  BON O LOC — deu GIU LAI lam tuy chon:
+//    - jdSweep / tsSweep      : mac dinh TAT (owner chot 23-08).
+//    - jdNeedMss              : mac dinh TAT tu 25-08 toi theo owner.
+//    - tsNeedCisd             : mac dinh TAT tu 24-08 theo owner — Turtle
+//      Soup chay dung luat goc: co CISD va co khe ho bi lat la du.
+//  ============ CAY NEO CISD — SUA 23-08 TOI ============
+//  Owner: "CISD la cay nen nghich mau DAU TIEN chu khong phai cung mau".
+//  Da doi chieu tradingview/vendor/kent_combo_v9.pine (ban goc tac
+//  gia): ben do vach CISD ve tai `originPrice`, tu `originIndex` toi nen
+//  pha. Hai so do do f_consultCrystalBall / f_archaeologistJones tra ve =
+//  GIA MO CUC TRI cua CHUOI nen cung chieu bias cu:
+//    - dao LEN  (bias cu = -1): gia mo CAO NHAT trong chuoi nen GIAM
+//                               -> cay giam DAU TIEN cua chuoi.
+//    - dao XUONG (bias cu = 1): gia mo THAP NHAT trong chuoi nen TANG
+//                               -> cay tang DAU TIEN cua chuoi.
+//  Tuc la CUNG MOT MUC voi cai kich hoat su kien (close vuot originPrice).
+//  Ban cu cua repo dung ham rieng `f_ancCisd`: dem tu cay cuc tri sang
+//  trai roi dung o cay nghich mau GAN NHAT = cay CUOI chuoi -> SAI. Ham
+//  do va o `tsAncBack` da GO HAN.
+//
+//  HE QUA phai biet:
+//   - Ngay tai nen ra su kien, gia DA dong cua xuyen vach CISD (do chinh
+//     la dinh nghia su kien) -> `r2.brkBar` set ngay. O "Vach CISD — bat
+//     buoc co nen dong cua xuyen qua" gio chi con loc NEN LAP iFVG.
+//   - Vach CISD nam XA hon truoc, thuong cao/thap hon vai nen.
+//   - Moi so do Turtle Soup truoc 23-08 toi deu do voi cay neo CU.
+//
+//  ============ NHOM 2 · FOLLOW BIAS H1 (them o ban v3) ============
+//  MAC DINH TAT. Bat len thi tin hieu JD/TS o khung dang mo CHI hien khi
+//  cung chieu voi BIAS H1.
+//    - BIAS H1 = chieu cua cu JD hoac TS RA TIN HIEU gan nhat tren nen H1
+//      DA DONG. Song VO THOI HAN toi khi co cu H1 nguoc chieu ra tin hieu.
+//      Cung mot nen H1 ma hai cu nguoc chieu cung ra thi cu co CAY CUC TRI
+//      MOI HON thang.
+//    - Engine H1 la CHINH engine nay chay lai tren du lieu H1, khong phai
+//      mot bo luat thu hai: cac ham CISD nhan them tham so `base` (0 = nen
+//      hien tai cho chart, 1 = nen da dong cho engine H1) nen LUAT chi co
+//      MOT ban duy nhat.
+//    - CHUA CO BIAS -> bo loc KHONG chan gi ca (khong phai chan het).
+//    - Khung chart >= H1 -> bo loc TU VO HIEU, bang ghi N/A. Lay bias H1
+//      xuong chinh H1/H4 la nhin trom tuong lai.
+//    - Cum CRB co o RIENG (mac dinh TAT), va co the chi chan CRB0.
+//  CAT RAT MANH: no bo moi tin hieu nguoc chieu bias H1, tuc khoang mot
+//  nua so tin hieu cua khung chart. Mac dinh TAT.
+// =====================================================================
+indicator("2TC-v10", shorttitle="2TC-v10", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
+
+// #####################################################################
+// #                       MASTER TOGGLES (dau file)                   #
+// #####################################################################
+// --------------------------------------------------------------------
+// ★ 1 · BẬT / TẮT
+// --------------------------------------------------------------------
+enableJudas     = input.bool(true, "JUDAS — FVG tươi + vạch MSS", group = "1 · BẬT / TẮT", tooltip="Cơ chế bám FVG còn TƯƠI bên PHẢI nến cực trị, xác nhận bằng vạch MSS.\n\nHoàn toàn độc lập với Turtle Soup: tắt cái này thì cái kia chạy y nguyên, không xê dịch một ly. Hai bên chỉ dùng chung khúc gốc — máy CISD, nến cực trị và kho FVG.\n\n───────────────\n\nBẢNG THUẬT NGỮ — nhãn ô dùng từ ICT, tooltip dùng tiếng Việt dài, đây là chỗ nối hai bên:\n\n• FVG = Fair Value Gap, khe hở giữa nến thứ nhất và nến thứ ba của một bộ 3 nến. Gọi là FVG TƯƠI khi chưa có nến nào đóng cửa xuyên qua mép xa của nó. Cơ chế Judas ăn FVG tươi.\n• iFVG = Inversion FVG: một FVG CŨ, NGƯỢC chiều cú đảo, ĐÃ BỊ LẤP nên lật vai. Cơ chế Turtle Soup ăn iFVG.\n• nến cực trị = đỉnh (cú bán) hoặc đáy (cú mua) của đoạn CISD. MỌI cửa sổ của cả hai cơ chế đều neo vào cây này.\n• swept / displacement = KHÔNG phải tên gọi khác của nến cực trị, mà là một TÙY CHỌN LỌC. Bật lên thì chỉ nhận nến cực trị nào thò râu quét qua đỉnh/đáy nến liền trước rồi kéo THÂN về; tắt thì mọi nến cực trị đều được dùng. Mỗi cơ chế một ô riêng.\n• nến neo = cây mà vạch được kẻ từ đó. Judas neo vạch MSS, Turtle Soup neo vạch CISD — hai cây khác nhau, khác luật tìm, khác vị trí.\n• MSS = Market Structure Shift, vạch tại ĐỈNH / ĐÁY nến neo.\n• CISD = Change in State of Delivery, vạch tại GIÁ MỞ nến neo.\n• cửa sổ CHÍNH LÀ HẠN: hết cửa sổ mà chưa ra được tín hiệu thì bỏ cú, xoá hết vạch và chữ. Không còn ô hạn chờ riêng nào.")
+enableTS        = input.bool(true, "TURTLE SOUP — iFVG + vạch CISD", group = "1 · BẬT / TẮT", tooltip="Cơ chế bám iFVG — FVG CŨ, ngược chiều cú đảo, nằm bên TRÁI nến cực trị và đã bị lấp — xác nhận bằng vạch CISD.\n\nHoàn toàn độc lập với Judas: tắt cái này thì cái kia chạy y nguyên. Bảng thuật ngữ nằm trong tooltip ô JUDAS ngay trên.")
+
+enableSlope     = input.bool(true, "SLOPE — đường hồi quy + parabol", group = "1 · BẬT / TẮT", tooltip="Cụm đo ĐỘ DỐC: hồi quy bậc 1 lấy độ dốc cả cửa sổ, hồi quy bậc 2 lấy độ dốc TẠI NẾN CUỐI cộng GIA TỐC, cả hai chuẩn hoá theo ATR.\n\nCông tắc này trước nằm trong chính nhóm của nó (ô enableSlope); dời lên đây 26-08 để nhóm 1 là chỗ DUY NHẤT bật/tắt các cụm.\n\nTắt đi thì không vẽ đoạn thẳng lẫn đường cong, và dashboard mất phần kết luận độ dốc.\n\n⚠ Hai cụm OLHC và DASHBOARD vẫn giữ công tắc trong nhóm của chúng, chưa dời lên đây.")
+useWin          = input.bool(true, "Chỉ tính N nến gần nhất", inline = "w1", group = "1 · BẬT / TẮT")
+winBars         = input.int(1000, "", minval=200, maxval=5000, inline = "w1", group = "1 · BẬT / TẮT", tooltip="KHỚP VỚI BẢN MT5 (InpWindowBars, cùng mặc định 1500).\n\nLý do phải có: máy CISD là máy TRẠNG THÁI PHỤ THUỘC ĐƯỜNG ĐI — bắt đầu chạy từ chỗ khác nhau thì chuỗi bias và đoạn gốc khác nhau, ra sự kiện khác nhau.\n\nTẮT ô này = tính toàn bộ lịch sử chart (nặng hơn, và sẽ lệch với MT5).")
+
+
+
+
+
+
+
+// --------------------------------------------------------------------
+// 2 · JUDAS — luật (FVG tươi, vạch MSS)
+// --------------------------------------------------------------------
+jdDirVi     = input.string("Cả hai", "Chiều tín hiệu", options = ["Cả hai","Chỉ tăng","Chỉ giảm"], group = "2 · JUDAS — luật (FVG tươi, vạch MSS)", tooltip = "Chỉ của riêng Judas: lọc cú theo chiều đảo. Chỉ tăng = chỉ nhận cú mua (nến cực trị là đáy); Chỉ giảm = chỉ nhận cú bán (nến cực trị là đỉnh).\n\nTurtle Soup có ô chiều riêng trong nhóm luật của nó, hai bên chỉnh độc lập.")
+jdSweep     = input.bool(false, "Nến cực trị — chỉ nhận cây ĐÃ QUÉT (swept)", group = "2 · JUDAS — luật (FVG tươi, vạch MSS)", tooltip = "MẶC ĐỊNH TẮT — không đòi nến cực trị phải quét, mọi nến cực trị đều được dựng cú.\n\nSWEPT (còn gọi là displacement) KHÔNG phải tên gọi khác của nến cực trị — nó là bộ lọc trong chính ô này. Đạt luật swept nghĩa là nến cực trị thò RÂU ra quét qua đỉnh/đáy nến liền trước rồi kéo THÂN về:\n• Đảo lên: đáy nến cực trị thủng xuống dưới đáy nến liền trước, nhưng phần thấp nhất của THÂN (giữa giá mở và giá đóng) vẫn nằm TRÊN đáy nến đó.\n• Đảo xuống lật ngược: đỉnh nến cực trị thò lên trên đỉnh nến liền trước, thân vẫn nằm dưới.\n\nKhông đạt thì Judas bỏ cú đó, không vẽ vạch MSS. Ô RIÊNG của Judas — Turtle Soup có ô giống hệt trong nhóm luật của nó, hai bên chỉnh độc lập.")
+jdFvgAtrLen = input.int(100, "FVG tươi — ATR: chu kỳ, hệ số", minval = 1, maxval = 500, inline = "jg", group = "2 · JUDAS — luật (FVG tươi, vạch MSS)")
+jdFvgMult   = input.float(1.00, "", minval = 0, maxval = 5, step = 0.05, inline = "jg", group = "2 · JUDAS — luật (FVG tươi, vạch MSS)", tooltip = "ĐỂ 0 = GIAO Ô NÀY CHO BẢNG 3 LÁI. Hệ số sẽ tự nhảy theo khung chart đang mở (M1/M5/M15/H1; khung ngoài bảng tụt xuống dòng gần nhất bên dưới). Gõ số khác 0 thì số đó thắng, bảng 3 không đụng tới.\n\nPine KHÔNG cho code ghi ngược vào ô nhập, nên không có cách nào tự đặt ô này về 0 hộ bạn. Bù lại, chính con số 0 nằm đây là dấu hiệu nhìn phát biết ngay ai đang lái. Hàng \"chạy ·\" ở cuối bảng trên chart in số đang thật sự chạy, có dấu ▸ nếu đến từ bảng.\n\nMUỐN BỎ HẲN NGƯỠNG bề rộng thì đặt DÒNG tương ứng của bảng 3 về 0, đừng đặt ô này về 0.\n\nNGƯỠNG BỀ RỘNG RIÊNG của Judas — Turtle Soup có ngưỡng riêng trong nhóm luật của nó, hai bên không dính nhau.\n\nFVG hẹp hơn ATR × hệ số thì Judas coi như không tồn tại: không vào lệnh, không vẽ hộp viền đậm. Hệ số càng CAO thì càng ít tín hiệu và mỗi tín hiệu càng cần một cú đẩy mạnh hơn; càng THẤP thì càng nhiều tín hiệu, nhiều khe hở vụn.\n\nMẶC ĐỊNH 1,00 — owner chốt 24-08, thay cho 0,75. Đây là LỰA CHỌN CỦA OWNER, không phải kết luận của phép đo nào: toàn bộ research đã xoá hẳn 24-08 vì đo sai.\n\nCHU KỲ để 100 và đừng chỉnh — chỉ HỆ SỐ mới là trục thật. Turtle Soup dùng chung chu kỳ này (cũng 100), chỉ khác hệ số.")
+jdFvgWin    = input.int(5, "FVG tươi — N nến từ cực trị sang PHẢI (tính cả cực trị + cây liền trước)", minval = 1, maxval = 30, group = "2 · JUDAS — luật (FVG tươi, vạch MSS)", tooltip = "Đếm CÂY GIỮA của bộ 3 nến tạo ra FVG. Cửa sổ bắt đầu tại nến LIỀN TRƯỚC nến cực trị rồi trải sang PHẢI cho đủ N nến.\n\nMẶC ĐỊNH 15: cây giữa phải nằm trong khoảng từ (cực trị − 1) tới (cực trị + 3). Cây liền trước cũng được tính vì đôi khi chính nến cực trị là cây tạo ra FVG, mà một FVG cần đủ 3 nến.\n\nFVG phải THUẬN chiều cú đảo: đảo lên cần FVG tăng, đảo xuống cần FVG giảm. Tại lúc ra tín hiệu nó còn phải TƯƠI, tức chưa có nến nào đóng cửa xuyên qua mép xa. Trong số các cây hợp lệ, Judas lấy FVG HÌNH THÀNH SỚM NHẤT.\n\nCỬA SỔ NÀY CHÍNH LÀ HẠN — không có ô hạn chờ riêng. Hết cửa sổ mà chưa chọn được FVG nào đạt ngưỡng bề rộng thì Judas bỏ cú, XOÁ HẲN vạch MSS lẫn chữ MSS.")
+jdNeedMss   = input.bool(false, "Vạch MSS — bắt buộc có nến đóng cửa xuyên qua", group = "2 · JUDAS — luật (FVG tươi, vạch MSS)", tooltip = "MẶC ĐỊNH TẮT (owner chốt 25-08 tối) — bật lên thì phải có một nến ĐÓNG CỬA xuyên qua vạch MSS rồi Judas mới ra tín hiệu. Ít tín hiệu hơn và muộn hơn, nhưng cú nào ra cũng đã có xác nhận cấu trúc.\n\nTẮT đi thì FVG tươi đầu tiên đạt ngưỡng là ra tín hiệu ngay, không cần biết vạch đã bị xuyên chưa.\n\nVÌ ĐANG TẮT nên ô ‹Mũi tên — độ RÕ khi chưa qua vạch› bên nhóm hiển thị của Judas CÓ tác dụng: mũi tên vừa ra vẽ mờ, tự sáng 100% khi có nến đóng cửa xuyên vạch MSS. Bật ô này lên thì mũi tên vừa ra đã đủ màu sẵn, ô độ RÕ hết tác dụng.\n\nÔ này song sinh với ô Vạch CISD — bắt buộc có nến đóng cửa xuyên qua của Turtle Soup.")
+jdAncBack   = input.int(6, "Nến neo MSS — N nến từ cực trị sang TRÁI (tính cả cực trị)", minval = 1, maxval = 30, group = "2 · JUDAS — luật (FVG tươi, vạch MSS)", tooltip = "NẾN NEO MSS = cây ĐẦU TIÊN thụt vào so với cây liền bên trái nó — đáy cao hơn khi đảo lên, đỉnh thấp hơn khi đảo xuống. Vạch MSS kẻ tại ĐỈNH (đảo lên) hoặc ĐÁY (đảo xuống) của cây này.\n\nĐếm TỪ CHÍNH nến cực trị rồi lùi sang TRÁI, nên N = 6 (mặc định) là xét nến cực trị cộng 5 nến trước nó. Gặp cây đạt luật đầu tiên là dừng.\n\nĐÂY LÀ CÂY KHÁC HẲN nến neo CISD của Turtle Soup: khác luật tìm, khác vị trí. Hết N nến mà không ra cây nào thì Judas không dựng cú, Turtle Soup vẫn dựng bình thường.\n\nĐÃ ĐO 23-08 (M5, 6.836 sự kiện CISD): nến neo MSS nằm trong 4 nến ở 84% và trong 6 nến ở 95% số cú, trung vị 2 nến. Siết 10 xuống 4 cắt 18% tín hiệu mà chất lượng KHÔNG đổi — đây là ô chặt luật, không phải ô lọc.")
+
+// --------------------------------------------------------------------
+// 3 · JUDAS — hiển thị
+// --------------------------------------------------------------------
+jdKeep      = input.int (20, "Giữ N cú gần nhất (kể cả cú hỏng)", minval = 1, maxval = 100, group = "3 · JUDAS — hiển thị", tooltip = "Cú Judas cũ hơn số này bị xoá khỏi chart cho nhẹ. Không ảnh hưởng gì tới luật, và không đụng tới Turtle Soup.\n\nÔ này đếm bằng HAI đơn vị, cố ý: N CÚ gần nhất còn giữ vạch MSS đang chờ, và N TÍN HIỆU gần nhất còn giữ mũi tên. Cú thì sinh dày hơn tín hiệu rất nhiều nên hai mốc lệch nhau xa — sửa 24-08: vạch của cú ĐÃ RA TÍN HIỆU nay sống đúng bằng tuổi thọ mũi tên của nó, không còn cảnh mũi tên trơ một mình.")
+jdMarkVi    = input.string("Nến giữa FVG", "Mũi tên — đặt tại", options = ["Nến giữa FVG","Nến hoàn tất FVG","Nến cực trị"], group = "3 · JUDAS — hiển thị", tooltip = "Chỗ đặt mũi tên và chữ JD.\n\n• Nến giữa FVG (mặc định) = cây thứ hai của bộ 3 nến, cây TẠO RA khe hở, nằm giữa hai cây biên. Cây này có thể trùng đúng nến cực trị — vẫn nhận, không loại.\n• Nến hoàn tất FVG = cây thứ ba, cây làm FVG thành hình.\n• Nến cực trị = đỉnh/đáy của đoạn CISD. Chọn mục này thì mũi tên về đúng cây cực trị, bất kể ô lọc swept đang bật hay tắt.\n\nHộp FVG tươi vẫn ôm đủ cả bộ 3 nến dù chọn cái nào; vạch nối chấm chạy theo lựa chọn này. Turtle Soup có ô tương ứng trong nhóm hiển thị của nó.")
+jdColBull   = input.color(#26A69A, "Mũi tên — màu mua, bán", inline = "j1", group = "3 · JUDAS — hiển thị")
+jdColBear   = input.color(#EF5350, "",   inline = "j1", group = "3 · JUDAS — hiển thị", tooltip = "Màu của mũi tên, của chữ JD và của vạch nối chấm.")
+jdGap       = input.float(1.8, "Mũi tên — đẩy xa nến, cỡ", minval = 0, maxval = 5, step = 0.05, inline = "j2", group = "3 · JUDAS — hiển thị")
+jdTxSzVi    = input.string("Bình thường", "", options = ["Nhỏ","Bình thường","To"], inline = "j2", group = "3 · JUDAS — hiển thị", tooltip = "Ô đầu = đẩy mũi tên ra xa cây được đánh dấu bao nhiêu lần ATR14, MẶC ĐỊNH 1,80. Ô sau = cỡ chữ.\n\nPhải lớn hơn 0 thì mũi tên mới nhô hẳn ra NGOÀI hộp — để 0 là mũi tên nằm lọt trong hộp, nhìn không ra.\n\nCây được đánh dấu mà nằm trong bề ngang của hộp thì mốc đẩy là MÉP HỘP, không phải đỉnh/đáy cây nến — nhờ vậy mũi tên luôn thoát ra ngoài hộp.")
+jdShowTxt   = input.bool(true, "Mũi tên — hiện chữ JD", group = "3 · JUDAS — hiển thị", tooltip = "Tắt đi thì chỉ còn mũi tên. Mũi tên thì luôn còn — nó chính là chỗ vào lệnh.")
+jdStem      = input.bool(true, "Mũi tên — vạch nối xuống nến", group = "3 · JUDAS — hiển thị", tooltip = "Kẻ một vạch chấm nối từ mốc trên cây được đánh dấu lên tận mũi tên, để luôn biết mũi tên thuộc cây nào.\n\nChỉ có tác dụng khi ô đẩy mũi tên ở trên lớn hơn 0. Để 0 thì mũi tên nằm ngay trên nến rồi, không cần vạch nối.")
+jdSigVis    = input.int(45, "Mũi tên — độ RÕ khi chưa qua vạch (%)", minval = 0, maxval = 100, group = "3 · JUDAS — hiển thị", tooltip = "MẶC ĐỊNH 45 = hiện mờ. Mũi tên của tín hiệu vừa ra lúc giá CHƯA đóng cửa xuyên qua vạch thì vẽ mờ theo ô này, và TỰ SÁNG lên 100% ngay khi vạch bị xuyên.\n\nSỐ CÀNG CAO CÀNG RÕ. Để 0 = giấu hẳn mũi tên cho tới khi vạch bị xuyên.\n\nTỪ 23-08 cuối hai ô bắt buộc có nến đóng cửa xuyên qua vạch MSS / CISD đều BẬT sẵn, nên tín hiệu chỉ ra SAU khi vạch bị xuyên — ô này chỉ còn tác dụng khi bạn tự tắt ô bắt buộc đó.")
+jdBoxBull   = input.color(#26A69A, "Hộp FVG tươi — màu FVG tăng, FVG giảm", inline = "jb1", group = "3 · JUDAS — hiển thị")
+jdBoxBear   = input.color(#EF5350, "",   inline = "jb1", group = "3 · JUDAS — hiển thị", tooltip = "Hộp bao quanh đúng bộ 3 nến của FVG TƯƠI mà Judas chọn vào lệnh. Không kéo dài sang phải.\n\nMàu đọc theo chiều của CHÍNH FVG đó: FVG tăng vẽ XANH LÁ, FVG giảm vẽ ĐỎ. FVG tươi luôn thuận chiều cú đảo nên xanh lá = cú mua, đỏ = cú bán.\n\nBộ màu này tách hẳn khỏi hộp iFVG của Turtle Soup và khỏi lớp hộp FVG chẩn đoán.")
+jdBoxW      = input.int(1, "Hộp FVG tươi — dày, nét, đậm viền, đậm nền (%)", minval = 1, maxval = 5, inline = "jb2", group = "3 · JUDAS — hiển thị")
+jdBoxStyVi  = input.string("Nét liền", "", options = ["Nét liền","Nét đứt","Chấm chấm"], inline = "jb2", group = "3 · JUDAS — hiển thị")
+jdBoxOp     = input.int(100, "", minval = 0, maxval = 100, inline = "jb2", group = "3 · JUDAS — hiển thị")
+jdBoxFill   = input.int(12, "", minval = 0, maxval = 100, inline = "jb2", group = "3 · JUDAS — hiển thị", tooltip = "Bốn ô: độ dày viền, kiểu nét, độ đậm VIỀN, độ đậm NỀN.\n\nNền tô cùng màu với viền nhưng nhạt hơn hẳn, MẶC ĐỊNH 12 nên hộp CÓ nền mờ. Để 0 là không tô nền, chỉ còn viền trơn.\n\nĐộ dày 1 là mỏng nhất TradingView cho phép.")
+mssColBull  = input.color(#4CAF50, "Vạch MSS — màu ĐÃ qua: mua, bán", inline = "m1", group = "3 · JUDAS — hiển thị")
+mssColBear  = input.color(#E53935, "",   inline = "m1", group = "3 · JUDAS — hiển thị")
+mssColBullW = input.color(#A5D6A7, "Vạch MSS — màu CHƯA qua: mua, bán", inline = "m3", group = "3 · JUDAS — hiển thị")
+mssColBearW = input.color(#EF9A9A, "",   inline = "m3", group = "3 · JUDAS — hiển thị", tooltip = "Vạch MSS nằm tại ĐỈNH (đảo lên) hoặc ĐÁY (đảo xuống) của nến neo MSS.\n\nĐÃ QUA = đã có một nến đóng cửa xuyên qua chính mức vạch đó. Xuyên rồi thì vạch tự đổi sang hai màu ở hàng trên — vẫn là cùng một vạch, không vẽ vạch mới.")
+mssLen      = input.int(0, "Vạch MSS — dài (nến), dày, nét", minval = 0, maxval = 500, inline = "m2", group = "3 · JUDAS — hiển thị")
+mssW        = input.int(1, "", minval = 1, maxval = 5, inline = "m2", group = "3 · JUDAS — hiển thị")
+mssStyleVi  = input.string("Nét đứt", "", options = ["Nét đứt","Nét liền","Chấm chấm"], inline = "m2", group = "3 · JUDAS — hiển thị", tooltip = "Ba ô này CHỈ áp cho vạch MSS. Vạch CISD của Turtle Soup có bộ ô riêng trong nhóm hiển thị của nó.\n\nÔ DÀI để 0 (mặc định) = vạch TỰ DỪNG tại NẾN RA TÍN HIỆU. Cú còn sống thì mỗi nến vạch kéo thêm một cây; ra tín hiệu xong là thôi kéo, nên đầu phải của vạch dừng đúng chỗ mũi tên.\n\nĐể LỚN HƠN 0 = ép độ dài CỐ ĐỊNH bấy nhiêu nến kể từ NẾN NEO, không kéo theo giá nữa.\n\nCú nào hết cửa sổ mà vẫn chưa ra được tín hiệu thì bị bỏ, vạch MSS và chữ MSS XOÁ HẲN. Cửa sổ đó là ô FVG tươi — N nến từ cực trị sang PHẢI trong nhóm luật của Judas.")
+mssVis      = input.int (50, "Vạch MSS — độ RÕ khi chưa ra tín hiệu (%)", minval = 0, maxval = 100, group = "3 · JUDAS — hiển thị", tooltip = "MẶC ĐỊNH 50 = HIỆN MỜ (owner chốt 24-08 tối). Vạch và chữ vẽ ngay từ lúc máy CISD đẻ ra cú, mờ một nửa, rồi rõ 100% khi cú ra tín hiệu. Xem được cả cú ĐANG CHỜ lẫn cú HỎNG.\n\nSỐ CÀNG CAO CÀNG RÕ: 100 là rõ hẳn ngay từ đầu, số ở giữa là mờ mờ.\n\nDù để bao nhiêu, vạch vẫn có ĐÚNG HAI trạng thái — chưa qua vạch và đã qua vạch — phân biệt bằng bốn ô màu ở trên. Ô này là trục thứ hai, độc lập với bốn ô màu đó.\n\nHẠ VỀ 0 thì vạch không chỉ vô hình mà còn KHÔNG ĐƯỢC TẠO RA — nó sinh ra đúng khoảnh khắc cú ra tín hiệu. Khi đó số vạch trên chart LUÔN bằng số mũi tên, không có vạch nào đứng lẻ. Đánh đổi: không soi được cú đang chờ và cú hỏng nữa.")
+mssTxtGap   = input.float(0.3, "Vạch MSS — đẩy chữ (× ATR14)", minval = 0, maxval = 5, step = 0.05, group = "3 · JUDAS — hiển thị", tooltip = "Chữ MSS đặt ngay tại NẾN NEO MSS và nhô ra ngoài mức vạch bao nhiêu lần ATR14.\n\nĐể nhỏ hơn ô đẩy mũi tên thì chữ MSS không bao giờ ngang với mũi tên.")
+jdAlert     = input.bool(true, "Alert khi có JD mới", group = "3 · JUDAS — hiển thị", tooltip = "Bắn alert() đúng MỘT lần mỗi khi đóng nến mà có tín hiệu Judas mới. Trong hộp thoại Alert của TradingView chọn Any alert() function call.\n\nNgoài ra file còn 3 alert CÓ TÊN riêng: JD moi / TS moi / JD hoac TS moi.")
+
+// --------------------------------------------------------------------
+// 4 · TURTLE SOUP — luật (iFVG, vạch CISD)
+// --------------------------------------------------------------------
+tsDirVi     = input.string("Cả hai", "Chiều tín hiệu", options = ["Cả hai","Chỉ tăng","Chỉ giảm"], group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)", tooltip = "Chỉ của riêng Turtle Soup: lọc cú theo chiều đảo. Chỉ tăng = chỉ nhận cú mua (nến cực trị là đáy); Chỉ giảm = chỉ nhận cú bán (nến cực trị là đỉnh).\n\nJudas có ô chiều riêng trong nhóm luật của nó, hai bên chỉnh độc lập.")
+tsSweep     = input.bool(false, "Nến cực trị — chỉ nhận cây ĐÃ QUÉT (swept)", group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)", tooltip = "MẶC ĐỊNH TẮT — không đòi nến cực trị phải quét, mọi nến cực trị đều được dựng cú.\n\nSWEPT (còn gọi là displacement) KHÔNG phải tên gọi khác của nến cực trị — nó là bộ lọc trong chính ô này. Đạt luật swept nghĩa là nến cực trị thò RÂU ra quét qua đỉnh/đáy nến liền trước rồi kéo THÂN về:\n• Đảo lên: đáy nến cực trị thủng xuống dưới đáy nến liền trước, nhưng phần thấp nhất của THÂN (giữa giá mở và giá đóng) vẫn nằm TRÊN đáy nến đó.\n• Đảo xuống lật ngược: đỉnh nến cực trị thò lên trên đỉnh nến liền trước, thân vẫn nằm dưới.\n\nKhông đạt thì Turtle Soup bỏ cú đó, không vẽ vạch CISD. Ô RIÊNG của Turtle Soup — Judas có ô giống hệt trong nhóm luật của nó, hai bên chỉnh độc lập.\n\nĐây chính là ô nến cực trị phải quét của bản CRB-Model cũ — bên đó chỉ Turtle Soup mới có, nay Judas cũng có ô của riêng mình.")
+tsFvgAtrLen = input.int(100, "iFVG — ATR: chu kỳ, hệ số", minval = 1, maxval = 500, inline = "tg", group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)")
+tsFvgMult   = input.float(0.50, "", minval = 0, maxval = 5, step = 0.05, inline = "tg", group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)", tooltip = "ĐỂ 0 = GIAO Ô NÀY CHO BẢNG 3 LÁI. Hệ số sẽ tự nhảy theo khung chart đang mở. Gõ số khác 0 thì số đó thắng, bảng 3 không đụng tới. Hai cơ chế ĐỘC LẬP — giao Judas cho bảng mà vẫn giữ tay Turtle Soup cũng được.\n\nMUỐN BỎ HẲN NGƯỠNG bề rộng thì đặt DÒNG tương ứng của bảng 3 về 0, đừng đặt ô này về 0.\n\nNGƯỠNG BỀ RỘNG iFVG, riêng của Turtle Soup — Judas có ngưỡng riêng trong nhóm luật của nó, hai bên không dính nhau. iFVG hẹp hơn ATR × hệ số thì Turtle Soup coi như không tồn tại: dù có bị lấp cũng không ra tín hiệu.\n\nMẶC ĐỊNH ATR 100 × 0,50 — owner chốt 24-08, thay cho 0,25. Đây là LỰA CHỌN CỦA OWNER, không phải kết luận của phép đo nào: toàn bộ research đã xoá hẳn 24-08 vì đo sai.\n\nTRƯỚC ĐÂY CÓ Ô TRẦN đi kèm (tsFvgMax, mặc định 0,95). ĐÃ XOÁ HẲN 23-08 vì nó là một cái bẫy: code kẹp trần lên bằng sàn, nên đặt trần thấp hơn sàn là chart im lặng không vẽ gì và Pine không báo lỗi.\n\nCHU KỲ dùng chung với Judas (cùng 100). Đừng chỉnh chu kỳ — chỉ HỆ SỐ mới là trục thật.")
+tsFvgWin    = input.int(15, "iFVG — N nến từ cực trị sang TRÁI (tính cả cực trị)", minval = 1, maxval = 30, group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)", tooltip = "Đếm CÂY GIỮA của bộ 3 nến tạo ra khe hở. Cửa sổ bắt đầu TẠI CHÍNH nến cực trị rồi trải sang TRÁI cho đủ N nến.\n\nMẶC ĐỊNH 15: cây giữa phải nằm trong khoảng từ (cực trị − 4) tới (cực trị), tính cả nến cực trị.\n\nKhe hở phải NGƯỢC chiều cú đảo: cú BÁN đi tìm khe TĂNG cũ, cú MUA đi tìm khe GIẢM cũ. Đó chính là định nghĩa iFVG — FVG của cú đẩy trước, bị giá quay lại lấp nên lật vai.\n\nLẤP = có nến ĐÓNG CỬA xuyên hẳn qua mép xa của khe. Chạm rồi bật lên không tính. Nến lấp phải nằm TỪ nến cực trị trở đi. Trong số các iFVG hợp lệ, Turtle Soup lấy cái BỊ LẤP SỚM NHẤT.\n\nCÙNG CON SỐ NÀY LÀ HẠN CHỜ NẾN LẤP, đếm từ nến cực trị sang PHẢI — không có ô hạn chờ riêng. Quá N nến mà chưa có iFVG nào bị lấp thì Turtle Soup bỏ cú, XOÁ HẲN vạch CISD lẫn chữ CISD.")
+tsNeedCisd  = input.bool(false, "Vạch CISD — bắt buộc có nến đóng cửa xuyên qua", group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)", tooltip = "MẶC ĐỊNH TẮT (owner chốt 24-08, đảo ngược từ BẬT) — iFVG bị lấp là ra tín hiệu ngay, không cần biết vạch CISD đã bị xuyên chưa. Đó là LUẬT GỐC của Turtle Soup: CÓ CISD và CÓ khe hở bị lật là đủ.\n\nBẬT lên thì thêm một điều kiện: chính cái nến lấp iFVG đó phải đồng thời ĐÓNG CỬA xuyên qua vạch CISD — hai việc trong CÙNG một nến. Râu thò qua rồi kéo về không tính, và giá đã từng xuyên vạch ở một nến khác cũng không tính.\n\nChỗ bật/tắt thật sự khác nhau: luật chỉ đòi khe bị lấp TỪ CÂY CỰC TRỊ TRỞ ĐI, nên cây lấp có thể nằm TRƯỚC nến ra sự kiện CISD — lúc đó nó gần như chắc chắn chưa vượt mức CISD. Bật là loại đúng mấy cú đó, tắt là nhận hết.\n\nVÌ ĐANG TẮT nên ô ‹Mũi tên — độ RÕ khi chưa qua vạch› bên nhóm hiển thị của Turtle Soup có tác dụng trở lại: mũi tên vừa ra vẽ mờ, tự sáng 100% khi giá đóng cửa xuyên vạch CISD.\n\nÔ này song sinh với ô ‹Vạch MSS — bắt buộc có nến đóng cửa xuyên qua› của Judas, và từ 25-08 tối HAI BÊN CÙNG TẮT (owner chốt). Trước đó lệch nhau có ý: Judas BẬT, Turtle Soup TẮT.")
+tsNeedIfvg  = input.bool(true, "Yêu cầu có iFVG (FVG mới đè lên FVG cũ)", group = "4 · TURTLE SOUP — luật (iFVG, vạch CISD)", tooltip = "BẬT: Bắt buộc nhịp giá lấp FVG cũ phải tự tạo ra một FVG mới ngược chiều và đè lên vùng giá của FVG cũ (chuẩn mô hình Inversion FVG mạnh).\nTẮT: Chỉ cần giá đóng cửa lấp qua FVG cũ là đủ điều kiện (luật cũ).")
+
+// --------------------------------------------------------------------
+// 5 · TURTLE SOUP — hiển thị
+// --------------------------------------------------------------------
+tsKeep       = input.int (20, "Giữ N cú gần nhất (kể cả cú hỏng)", minval = 1, maxval = 100, group = "5 · TURTLE SOUP — hiển thị", tooltip = "Cú Turtle Soup cũ hơn số này bị xoá khỏi chart cho nhẹ. Không ảnh hưởng gì tới luật, và không đụng tới Judas.\n\nÔ này đếm bằng HAI đơn vị, cố ý: N CÚ gần nhất còn giữ vạch CISD đang chờ, và N TÍN HIỆU gần nhất còn giữ mũi tên. Cú thì sinh dày hơn tín hiệu rất nhiều nên hai mốc lệch nhau xa — sửa 24-08: vạch của cú ĐÃ RA TÍN HIỆU nay sống đúng bằng tuổi thọ mũi tên của nó, không còn cảnh mũi tên trơ một mình.")
+tsMarkVi     = input.string("Nến lấp iFVG", "Mũi tên — đặt tại", options = ["Nến lấp iFVG","Nến giữa iFVG","Nến cực trị"], group = "5 · TURTLE SOUP — hiển thị", tooltip = "Chỗ đặt mũi tên và chữ TS.\n\n• Nến lấp iFVG (mặc định) = cây nến CUỐI CÙNG lấp xong khe hở cũ, tức chỗ vào lệnh.\n• Nến giữa iFVG = cây thứ hai của bộ 3 nến tạo ra khe hở đó, nằm bên TRÁI nến cực trị.\n• Nến cực trị = đỉnh/đáy của đoạn CISD. Chọn mục này thì mũi tên về đúng cây cực trị, bất kể ô lọc swept đang bật hay tắt.\n\nHộp iFVG vẫn kéo từ chỗ khe hở sinh ra tới nến lấp dù chọn cái nào; vạch nối chấm chạy theo lựa chọn này. Judas có ô tương ứng trong nhóm hiển thị của nó.")
+tsColBull    = input.color(#1E90FF, "Mũi tên — màu mua, bán", inline = "t1", group = "5 · TURTLE SOUP — hiển thị")
+tsColBear    = input.color(#FF8C00, "",   inline = "t1", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Màu của mũi tên, của chữ TS và của vạch nối chấm.")
+tsGap        = input.float(1.8, "Mũi tên — đẩy xa nến, cỡ", minval = 0, maxval = 5, step = 0.05, inline = "t2", group = "5 · TURTLE SOUP — hiển thị")
+tsTxSzVi     = input.string("Bình thường", "", options = ["Nhỏ","Bình thường","To"], inline = "t2", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Ô đầu = đẩy mũi tên ra xa cây được đánh dấu bao nhiêu lần ATR14, MẶC ĐỊNH 1,80. Ô sau = cỡ chữ.\n\nPhải lớn hơn 0 thì mũi tên mới nhô hẳn ra NGOÀI hộp — để 0 là mũi tên nằm lọt trong hộp, nhìn không ra.\n\nCây được đánh dấu mà nằm trong bề ngang của hộp thì mốc đẩy là MÉP HỘP, không phải đỉnh/đáy cây nến — nhờ vậy mũi tên luôn thoát ra ngoài hộp.")
+tsShowTxt    = input.bool(true, "Mũi tên — hiện chữ TS", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Tắt đi thì chỉ còn mũi tên. Mũi tên thì luôn còn — nó chính là chỗ vào lệnh.")
+tsStem       = input.bool(true, "Mũi tên — vạch nối xuống nến", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Kẻ một vạch chấm nối từ mốc trên cây được đánh dấu lên tận mũi tên, để luôn biết mũi tên thuộc cây nào.\n\nChỉ có tác dụng khi ô đẩy mũi tên ở trên lớn hơn 0. Để 0 thì mũi tên nằm ngay trên nến rồi, không cần vạch nối.")
+tsSigVis     = input.int(45, "Mũi tên — độ RÕ khi chưa qua vạch (%)", minval = 0, maxval = 100, group = "5 · TURTLE SOUP — hiển thị", tooltip = "MẶC ĐỊNH 45 = hiện mờ. Mũi tên của tín hiệu vừa ra lúc giá CHƯA đóng cửa xuyên qua vạch thì vẽ mờ theo ô này, và TỰ SÁNG lên 100% ngay khi vạch bị xuyên.\n\nSỐ CÀNG CAO CÀNG RÕ. Để 0 = giấu hẳn mũi tên cho tới khi vạch bị xuyên.\n\nTỪ 23-08 cuối hai ô bắt buộc có nến đóng cửa xuyên qua vạch MSS / CISD đều BẬT sẵn, nên tín hiệu chỉ ra SAU khi vạch bị xuyên — ô này chỉ còn tác dụng khi bạn tự tắt ô bắt buộc đó.")
+tsBoxBull    = input.color(#FF8C00, "Hộp iFVG — màu FVG tăng lật, FVG giảm lật", inline = "tb1", group = "5 · TURTLE SOUP — hiển thị")
+tsBoxBear    = input.color(#1E90FF, "",   inline = "tb1", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Khe hở này ẨN suốt lúc theo dõi, không vẽ gì cả. CHỈ hiện ra đúng lúc nó BỊ LẤP, tức đúng lúc ra tín hiệu TS.\n\nHộp KÉO DÀI từ chỗ khe hở sinh ra tới đúng NẾN LẤP, nên nhìn phát là thấy nó sống được bao lâu.\n\nMàu đọc theo chiều của CHÍNH KHE HỞ vừa chết, kể chuyện bên nào vừa THẤT BẠI:\n\n• khe TĂNG bị lấp → CAM. Cú mua hỏng, nên đây là tín hiệu BÁN. Vạch CISD cũng cam.\n• khe GIẢM bị lấp → XANH DƯƠNG. Cú bán hỏng, nên đây là tín hiệu MUA. Vạch CISD cũng xanh dương.\n\nNgược với quy ước thường thấy, và đúng như vậy: màu ở đây nói về CÚ VỪA CHẾT chứ không phải cú sắp vào.\n\nViền để giống hệt hộp FVG tươi của Judas, chỉ khác màu.")
+tsBoxW       = input.int(1, "Hộp iFVG — dày, nét, đậm viền, đậm nền (%)", minval = 1, maxval = 5, inline = "tb2", group = "5 · TURTLE SOUP — hiển thị")
+tsBoxStyVi   = input.string("Nét liền", "", options = ["Nét liền","Nét đứt","Chấm chấm"], inline = "tb2", group = "5 · TURTLE SOUP — hiển thị")
+tsBoxOp      = input.int(100, "", minval = 0, maxval = 100, inline = "tb2", group = "5 · TURTLE SOUP — hiển thị")
+tsBoxFill    = input.int(12, "", minval = 0, maxval = 100, inline = "tb2", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Bốn ô: độ dày viền, kiểu nét, độ đậm VIỀN, độ đậm NỀN.\n\nNền tô cùng màu với viền nhưng nhạt hơn hẳn, MẶC ĐỊNH 12 nên hộp CÓ nền mờ — hộp iFVG kéo dài từ chỗ khe sinh ra tới nến lấp nên có nền thì nhìn ra vùng đó ngay.\n\nĐể 0 là không tô nền. Độ dày 1 là mỏng nhất TradingView cho phép.")
+cisdColBull  = input.color(#1E90FF, "Vạch CISD — màu ĐÃ qua: mua, bán", inline = "k1", group = "5 · TURTLE SOUP — hiển thị")
+cisdColBear  = input.color(#FF8C00, "",   inline = "k1", group = "5 · TURTLE SOUP — hiển thị")
+cisdColBullW = input.color(#90CAF9, "Vạch CISD — màu CHƯA qua: mua, bán", inline = "k3", group = "5 · TURTLE SOUP — hiển thị")
+cisdColBearW = input.color(#FFCC80, "",   inline = "k3", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Vạch CISD nằm tại GIÁ MỞ của nến neo CISD — cây tăng gần nhất khi đảo xuống, cây giảm gần nhất khi đảo lên.\n\nMặc định đặt theo đúng bộ màu của hộp iFVG: cú MUA (khe giảm chết) vạch XANH DƯƠNG, cú BÁN (khe tăng chết) vạch CAM. Nhìn màu là biết ngay bên nào vừa thất bại.\n\nBốn ô màu chạy y hệt vạch MSS nhưng hoàn toàn tách rời: chưa có nến nào đóng cửa xuyên qua thì dùng hai màu hàng dưới, xuyên rồi đổi lên hai màu hàng trên.")
+cisdLen      = input.int(0, "Vạch CISD — dài (nến), dày, nét", minval = 0, maxval = 500, inline = "k2", group = "5 · TURTLE SOUP — hiển thị")
+cisdW        = input.int(1, "", minval = 1, maxval = 5, inline = "k2", group = "5 · TURTLE SOUP — hiển thị")
+cisdStyleVi  = input.string("Nét đứt", "", options = ["Nét đứt","Nét liền","Chấm chấm"], inline = "k2", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Ba ô này CHỈ áp cho vạch CISD, hoàn toàn tách khỏi vạch MSS của Judas. Mặc định giống hệt vạch MSS (owner chốt 23-08: hai cơ chế phải cùng mặc định). Phân biệt hai vạch bằng MÀU và bằng chữ MSS / CISD.\n\nÔ DÀI để 0 (mặc định) = vạch TỰ DỪNG tại NẾN RA TÍN HIỆU. Cú còn sống thì mỗi nến vạch kéo thêm một cây; ra tín hiệu xong là thôi kéo, nên đầu phải của vạch dừng đúng chỗ mũi tên.\n\nĐể LỚN HƠN 0 = ép độ dài CỐ ĐỊNH bấy nhiêu nến kể từ NẾN NEO, không kéo theo giá nữa.\n\nCú nào hết cửa sổ mà vẫn chưa ra được tín hiệu thì bị bỏ, vạch CISD và chữ CISD XOÁ HẲN. Cửa sổ đó là ô iFVG — N nến từ cực trị sang TRÁI trong nhóm luật của Turtle Soup.")
+cisdVis      = input.int (50, "Vạch CISD — độ RÕ khi chưa ra tín hiệu (%)", minval = 0, maxval = 100, group = "5 · TURTLE SOUP — hiển thị", tooltip = "MẶC ĐỊNH 50 = HIỆN MỜ (owner chốt 24-08 tối). Vạch và chữ vẽ ngay từ lúc máy CISD đẻ ra cú, mờ một nửa, rồi rõ 100% khi cú ra tín hiệu. Xem được cả cú ĐANG CHỜ lẫn cú HỎNG.\n\nSỐ CÀNG CAO CÀNG RÕ: 100 là rõ hẳn ngay từ đầu, số ở giữa là mờ mờ.\n\nDù để bao nhiêu, vạch vẫn có ĐÚNG HAI trạng thái — chưa qua vạch và đã qua vạch — phân biệt bằng bốn ô màu ở trên. Ô này là trục thứ hai, độc lập với bốn ô màu đó.\n\nHẠ VỀ 0 thì vạch không chỉ vô hình mà còn KHÔNG ĐƯỢC TẠO RA — nó sinh ra đúng khoảnh khắc cú ra tín hiệu. Khi đó số vạch trên chart LUÔN bằng số mũi tên, không có vạch nào đứng lẻ. Đánh đổi: không soi được cú đang chờ và cú hỏng nữa.")
+cisdTxtGap   = input.float(0.3, "Vạch CISD — đẩy chữ (× ATR14)", minval = 0, maxval = 5, step = 0.05, group = "5 · TURTLE SOUP — hiển thị", tooltip = "Chữ CISD đặt ngay tại NẾN NEO CISD — cây sinh ra vạch đó — và luôn nằm NGOÀI thân nến, phía đối diện với hướng giá sắp đi:\n\n• Cú BÁN (nến cực trị là đỉnh): chữ nằm dưới ĐÁY nến neo, tức phía DƯỚI đường kẻ.\n• Cú MUA (nến cực trị là đáy): chữ nằm trên ĐỈNH nến neo, tức phía TRÊN đường kẻ.\n\nÔ này = nhô ra ngoài bao nhiêu lần ATR14. Để nhỏ hơn ô đẩy mũi tên thì chữ CISD không bao giờ ngang với mũi tên.")
+tsAlert      = input.bool(true, "Alert khi có TS mới", group = "5 · TURTLE SOUP — hiển thị", tooltip = "Bắn alert() đúng MỘT lần mỗi khi đóng nến mà có tín hiệu Turtle Soup mới. Trong hộp thoại Alert của TradingView chọn Any alert() function call.\n\nÔ này tách riêng khỏi ô alert của Judas.")
+
+// --------------------------------------------------------------------
+// 6 · CHẨN ĐOÁN
+// --------------------------------------------------------------------
+// Lớp xem-cho-biết: vẽ MỌI khe hở đang nằm trong kho. Kho ghi một khe khi nó
+// đạt ngưỡng LỎNG HƠN trong hai ngưỡng của hai cơ chế, nên lớp này đúng bằng
+// hợp của hai bên — một khe một hộp, không bao giờ chồng nhau.
+dgShowAll  = input.bool(true, "Hộp FVG chẩn đoán — hiện MỌI khe trong kho", group = "6 · CHẨN ĐOÁN", tooltip = "MẶC ĐỊNH BẬT (owner chốt 25-08 tối — trước đó bên Pine TẮT còn bên MT5 BẬT, hai bản lệch nhau suốt mà tool kiểm không bắt được). Vẽ viền cho mọi khe hở đang nằm trong kho, kể cả khe không liên quan tới cú nào; hộp mất ngay khi khe bị lấp.\n\nKho ghi một khe khi nó đạt ngưỡng bề rộng LỎNG HƠN trong hai ngưỡng của hai cơ chế, nên lớp này đúng bằng hợp của hai bên — một khe một hộp, không bao giờ chồng nhau.\n\nTắt đi thì chart chỉ còn đúng hai loại hộp: FVG tươi xanh lá / đỏ của Judas, và iFVG đã bị lấp cam / xanh dương của Turtle Soup. iFVG của Turtle Soup ẩn hẳn trong lúc theo dõi, đúng ý owner chốt 23-08.\n\nKhông ảnh hưởng gì tới luật. Bộ màu riêng để không lẫn với hai loại hộp trên.")
+dgKeep     = input.int (50, "Hộp FVG chẩn đoán — giữ N hộp, màu FVG tăng, FVG giảm", minval = 1, maxval = 200, inline = "dg2", group = "6 · CHẨN ĐOÁN")
+dgCBull    = input.color(#45A088, "",   inline = "dg2", group = "6 · CHẨN ĐOÁN")
+dgCBear    = input.color(#C96A6A, "",   inline = "dg2", group = "6 · CHẨN ĐOÁN", tooltip = "Khe hở (FVG) là khoảng trống giữa nến thứ nhất và nến thứ ba của một bộ 3 nến: khe TĂNG khi đáy nến 3 cao hơn đỉnh nến 1, khe GIẢM khi đỉnh nến 3 thấp hơn đáy nến 1.")
+dgBw       = input.int(1, "Hộp FVG chẩn đoán — dày, nét, đậm viền (%)", minval = 1, maxval = 5, inline = "dg3", group = "6 · CHẨN ĐOÁN")
+dgStyleVi  = input.string("Nét liền", "", options = ["Nét liền","Nét đứt","Chấm chấm"], inline = "dg3", group = "6 · CHẨN ĐOÁN")
+dgOp       = input.int(70, "", minval = 0, maxval = 100, inline = "dg3", group = "6 · CHẨN ĐOÁN", tooltip = "Lớp này không tô nền, chỉ có viền. Để nhạt hơn hộp vào lệnh của hai cơ chế thì nhìn phát là biết cái nào là cái được chọn.")
+showExtDot = input.bool(false, "Chấm nến cực trị — hiện, giữ N chấm", inline = "x0", group = "6 · CHẨN ĐOÁN", tooltip = "Chấm tròn bé xíu đặt tại đáy (cú mua) hoặc đỉnh (cú bán) của nến cực trị.\n\nĐây là lớp CHUNG của khúc gốc, không thuộc cơ chế nào — vẽ một lần cho mỗi nến cực trị, độ mờ cố định.")
+extDotKeep = input.int(20, "", minval = 1, maxval = 200, inline = "x0", group = "6 · CHẨN ĐOÁN", tooltip = "Giữ bao nhiêu chấm gần nhất trên chart. Chấm cũ hơn số này bị xoá.")
+extDotVi   = input.string("Chỉ nến cực trị có quét", "Chấm nến cực trị — chấm cây nào, màu", options = ["Chỉ nến cực trị có quét","Mọi nến cực trị CISD"], inline = "x1", group = "6 · CHẨN ĐOÁN", tooltip = "Chỉ nến cực trị có quét (mặc định) = chỉ chấm những nến cực trị đạt luật swept, bất kể hai ô lọc swept bên nhóm luật của Judas và Turtle Soup đang bật hay tắt.\n\nMọi nến cực trị CISD = chấm MỌI nến cực trị máy CISD chọn ra, kể cả cú bị ô lọc swept gạt đi. Đây là chế độ để trả lời câu hỏi vì sao đỉnh này không được xét: có chấm = máy CÓ xét nhưng cực trị không quét, không chấm = đỉnh đó nằm ngoài mọi đoạn CISD.")
+extDotCol  = input.color(color.gray, "", inline = "x1", group = "6 · CHẨN ĐOÁN")
+cisdExtLineShow    = input.bool(false, "CISD Max — vạch tại nến cực trị", group = "1 · BẬT / TẮT", tooltip="Kẻ một vạch ngang tại chính nến cực trị của đoạn CISD, kéo dài sang phải. Cũng là lớp CHUNG của khúc gốc, không thuộc cơ chế nào.\n\nCó nến cực trị MỚI thì vạch cũ bị cho về hưu: đổi màu xám, khoá lại tại cây đó và đổi tên thành P.CISD Max. Giá đóng cửa xuyên qua vạch hiện hành cũng cho nó về hưu.\n\nBa hàng chỉnh số vạch cũ, màu và nét của lớp này nằm trong nhóm CHẨN ĐOÁN.\n\nPort nguyên văn từ bản gốc kent_combo_v9.")
+cisdExtKeepOld     = input.int(3, "CISD Max — giữ N vạch cũ, màu nay, màu cũ", minval=0, maxval=50, inline = "cx1", group = "6 · CHẨN ĐOÁN", tooltip="Số vạch đã về hưu còn giữ lại trên chart. Để 0 = về hưu xong xoá luôn.")
+cisdExtColCur      = input.color(color.orange, "", inline = "cx1", group = "6 · CHẨN ĐOÁN")
+cisdExtColOld      = input.color(color.gray, "", inline = "cx1", group = "6 · CHẨN ĐOÁN")
+cisdExtWidth       = input.int(1, "CISD Max — dày, nét", minval=1, maxval=5, inline = "cx2", group = "6 · CHẨN ĐOÁN")
+cisdExtStyleVi     = input.string("Nét liền", "", options=["Nét liền","Nét đứt","Chấm chấm"], inline = "cx2", group = "6 · CHẨN ĐOÁN")
+
+// --------------------------------------------------------------------
+// NHOM 9-11 · CRB — chep NGUYEN VAN tu CRB-Model.pine (dong 986-1076).
+// Khong doi mot o nao, ke ca so nhom.
+// --------------------------------------------------------------------
+// method txSz: doi chuoi "Tiny/Small/..." -> hang so size.*, cum CRB goi kieu
+// method (seSz.txSz()). Lan truoc chep helper bi SOT dung ham nay.
+method txSz(string s) =>
+    out = switch s
+        "Tiny"   => size.tiny
+        "Small"  => size.small
+        "Normal" => size.normal
+        "Large"  => size.large
+        "Huge"   => size.huge
+
+// ---- HELPER cua cum CRB (chep tu Neiro-ICT: luat gap-3 + 3 bo trim) ----
+nsGap(int off, int dir) =>
+    dir == 1 ? low[off] > high[off + 2] : high[off] < low[off + 2]
+trimLn(a, int keep) =>
+    while array.size(a) > keep
+        x = array.shift(a)
+        if not na(x)
+            line.delete(x)
+trimLb(a, int keep) =>
+    while array.size(a) > keep
+        x = array.shift(a)
+        if not na(x)
+            label.delete(x)
+trimBx(a, int keep) =>
+    while array.size(a) > keep
+        x = array.shift(a)
+        if not na(x)
+            box.delete(x)
+
+
+
+// --------------------------------------------------------------------
+// 7 · OLHC — cấu trúc nến. THỨ DUY NHẤT v4 thêm so với v3.
+// Cụm ĐỘC LẬP HOÀN TOÀN: không đọc state của JUDAS / TURTLE SOUP / CRB,
+// không dùng chung ô nào của chúng, và KHÔNG đi qua bộ lọc BIAS H1 của
+// NHOM 2. Tắt nhóm này thì v4 chạy y hệt v3, không xê dịch một ly.
+//
+// Nguyên tắc: mọi kết luận chỉ rút từ BỐN SỐ của CHÍNH cây nến đó.
+//   UW = high - max(open, close)      upper wick
+//   BD = |close - open|               body
+//   LW = min(open, close) - low       lower wick
+//   UW + BD + LW = high - low         ba gap phủ kín range, tổng = 100%
+// Ngoại lệ duy nhất là ô lọc ATR - ATR bắt buộc phải lấy từ chuỗi nến.
+// --------------------------------------------------------------------
+gOL = "7 · OLHC — cấu trúc nến"
+bool   olOn      = input.bool(true, "OLHC — bật cụm", group = gOL, tooltip = "MẶC ĐỊNH BẬT (owner chốt 25-08).\n\nĐánh dấu hai dạng nến bị TỪ CHỐI GIÁ, đọc từ một cây nến duy nhất:\n\n• OHLC = open → high → low → close. Upper wick dài, giá thọc LÊN rồi bị đẩy ngược → tín hiệu GIẢM.\n• OLHC = open → low → high → close. Lower wick dài, giá thọc XUỐNG rồi bị đẩy ngược → tín hiệu TĂNG.\n\n⚠ Bốn số O/H/L/C KHÔNG chứa thứ tự giá đã đi. Một cây upper wick dài hoàn toàn có thể đã xuống low TRƯỚC rồi mới lên high. Tên OHLC / OLHC ở đây đọc theo HÌNH DẠNG, không phải đường đi đã chứng minh.\n\n⚠ Cụm này chỉ đo hình dạng một cây nến. Nó KHÔNG kiểm tra cây đó có lấy mất một swing high / swing low cũ hay không - nên chưa phải liquidity raid đúng nghĩa ICT. Chữ wick QUÉT chỉ là tên gọi cho cái wick DÀI.")
+float  olGap1    = input.float(45, "GAP 1 · wick QUÉT tối thiểu (%)", minval = 0, maxval = 100, step = 1, group = gOL, tooltip = "Gap DÀI - phía giá thọc vào rồi bị đẩy ngược trở lại. Với OHLC đây là UPPER wick, với OLHC là LOWER wick. Một bộ số tự soi gương cho cả hai cấu trúc.\n\nNâng lên là siết chặt, chỉ còn pin bar thật. Hạ xuống là chart dày dấu.")
+float  olGap2    = input.float(45, "GAP 2 · body tối đa (%)", minval = 0, maxval = 100, step = 1, group = gOL, tooltip = "Thân nến tính theo % range. Body càng nhỏ thì cây càng giống pin bar, và gap 1 càng mang ý nghĩa từ chối giá. Đặt 100 là bỏ hẳn điều kiện body.")
+float  olGap3    = input.float(25, "GAP 3 · wick ĐỐI tối đa (%)", minval = 0, maxval = 100, step = 1, group = gOL, tooltip = "Gap NGẮN, nằm ở phía ĐỐI DIỆN gap 1. Với OHLC đây là lower wick, với OLHC là upper wick.\n\nMục đích: chặn những cây hai đầu đều dài (long-legged doji) - loại đó không nghiêng về bên nào. Đặt 100 là bỏ hẳn điều kiện này.")
+bool   olUseK    = input.bool(true, "Thêm ràng buộc: GAP 1 ≥ K × GAP 3", inline = "ol1", group = gOL)
+float  olK       = input.float(2.0, "", minval = 1, maxval = 10, step = 0.1, inline = "ol1", group = gOL, tooltip = "Ba ô % ở trên đo TỪNG gap so với RANGE của nến - mỗi gap một ngưỡng riêng. Ô này đo TRỰC TIẾP gap 1 với gap 3.\n\nVí dụ gap1 = 46% và gap3 = 24%: cả ba ô % đều đạt, nhưng 46 nhỏ hơn 2 × 24 nên K = 2 loại cây đó ra.\n\nVới mặc định hiện tại nó chỉ siết thêm một viền mỏng (45 chia 25 đã là 1,8). Nó chỉ thật sự có tác dụng khi bạn nới lỏng ba ô %. Đặt K = 1,0 là tắt hẳn.")
+bool   olAtrOn   = input.bool(true, "Lọc nến mạnh: range ≥ ATR × hệ số", inline = "ol2", group = gOL)
+int    olAtrLen  = input.int(14, "", minval = 1, maxval = 500, inline = "ol2", group = gOL)
+float  olAtrMult = input.float(1.0, "", minval = 0.1, maxval = 10, step = 0.1, inline = "ol2", group = gOL, tooltip = "MẶC ĐỊNH BẬT (owner chốt 25-08). Ô bật, chu kỳ ATR và hệ số nằm cùng một dòng.\n\nĐây là ô DUY NHẤT của nhóm 9 phá nguyên tắc một-cây-nến: ATR bắt buộc phải lấy từ chuỗi nến trước đó.\n\nVì sao cần: ba ô % chỉ đo TỶ LỆ, nên một cây bé tí vẫn có thể có tỷ lệ wick rất đẹp và lọt lưới. Lọc này cắt đúng loại đó. Đo bằng ATR chứ không bằng số giá cố định nên nó tự co giãn theo từng phiên và từng mã.\n\n1,0 = nến phải dài bằng một ATR. Nâng lên 1,5 hay 2,0 là chỉ còn những cây thật sự trồi lên khỏi nền.")
+bool   olMark    = input.bool(true, "Tam giác đánh dấu", group = gOL, tooltip = "OHLC: tam giác CHÚI XUỐNG đặt TRÊN nến. OLHC: tam giác CHÚI LÊN đặt DƯỚI nến.\n\nHướng mũi tên và màu đều đi theo TÍN HIỆU, không theo chiều đóng của nến - một cây đóng giảm vẫn có thể là OHLC.\n\nCỡ cố định ở mức nhỏ nhất: Pine bắt cỡ của plotshape phải là hằng số nên không mở ra tuỳ chỉnh được.")
+bool   olLbl     = input.bool(false, "Nhãn OHLC / OLHC", inline = "ol3", group = gOL)
+string olLbSz    = input.string("Vừa", "", options = ["Nhỏ", "Vừa", "To"], inline = "ol3", group = gOL, tooltip = "MẶC ĐỊNH TẮT cho chart đỡ rối. Nhãn chỉ ghi 4 chữ cái; số ba gap kèm cả giá lẫn % nằm trong TOOLTIP của nhãn - rê chuột vào nhãn là thấy.")
+bool   olBar     = input.bool(true, "Tô màu cả cây nến", group = gOL, tooltip = "Tô bao trùm cả body lẫn hai wick. Nến không đạt thì giữ nguyên màu chart.\n\n⚠ Ô này KHÔNG chịu ô giới hạn bên dưới - Pine không xoá lại được màu đã tô lên nến cũ, nên bật lên là mọi cây đạt đều được tô từ đầu lịch sử.")
+int    olKeep    = input.int(50, "Số nhãn giữ lại trên chart", minval = 1, maxval = 200, group = gOL, tooltip = "CHỈ cắt được NHÃN - nhãn là đối tượng vẽ nên xoá lại được.\n\nTam giác (plotshape) và tô màu nến (barcolor) KHÔNG cắt được: Pine không xoá lại được thứ đã vẽ lên nến cũ, nên hai thứ đó phủ hết lịch sử.")
+color  olColBear = input.color(#f23645, "Màu: OHLC giảm, OLHC tăng", inline = "ol4", group = gOL)
+color  olColBull = input.color(#089981, "", inline = "ol4", group = gOL, tooltip = "Lấy đúng bộ đỏ / xanh lá mặc định của TradingView cho quen mắt.\n\nMàu đi theo TÍN HIỆU: OHLC bị từ chối ở TRÊN nên đỏ, OLHC bị từ chối ở DƯỚI nên xanh lá.")
+
+// =====================================================================
+//  NHOM 10 + 11 — RIÊNG CỦA BẢN v5 (25-08)
+//
+//  Owner: "làm cho anh cái version 5, chỉ cần có cái đường kẻ chart và
+//  cái dashboard thôi" -> đường kẻ = ĐƯỜNG HỒI QUY + PARABOL.
+//
+//  Hai nhóm này đặt ở CUỐI theo luật 3 của kho. Chúng KHÔNG đọc một
+//  biến nào của NHOM 1..10, và ngược lại. Tắt enableSlope thì v5 chạy y hệt v4.
+//
+//  Luật và công thức port nguyên văn từ Slope-Meter — sửa bên này thì
+//  phải mang sang bên đó. Tài liệu: docs/slope-meter.md
+//
+//  ★ LỆCH 4 Ô so với bản MT5, đều do nền tảng:
+//     - CHE DO GON (chặn vẽ NHOM 1..10): chỉ MT5 có. Bên Pine
+//       plotshape và barcolor KHÔNG xoá lại được — Pine không xoá được
+//       thứ đã vẽ lên nến cũ — nên chế độ gọn ở đây sẽ gọn nửa vời:
+//       tam giác OLHC và màu nến vẫn còn. Thà không có còn hơn có mà sai.
+//     - Dashboard lệch ngang / lệch dọc: MT5 đặt bảng bằng toạ độ pixel,
+//       Pine chỉ chọn được 1 trong 4 góc qua position.*.
+//     - Dashboard độ trong suốt nền: Pine gộp sẵn alpha vào ô màu nền.
+// =====================================================================
+gSL = "8 · ĐƯỜNG HỒI QUY + PARABOL"
+slTF      = input.timeframe("15", "Khung đọc dữ liệu", group = gSL)
+slLen     = input.int(9, "Hồi quy qua N nến", minval = 3, maxval = 500, group = gSL)
+slSrc     = input.string("WEIGHTED", "Lấy giá nào", options = ["CLOSE", "OPEN", "HIGH", "LOW", "MEDIAN", "TYPICAL", "WEIGHTED"], group = gSL)
+slAtrLen  = input.int(14, "Chuẩn hoá — chu kỳ ATR", minval = 1, maxval = 500, group = gSL)
+slFlat    = input.float(0.10, "Ngưỡng ĐI NGANG (x ATR mỗi nến)", minval = 0.0, step = 0.01, group = gSL)
+
+// ---------------------------------------------------------------------
+//  ĐỘNG NĂNG & THẾ NĂNG (KINEMATICS)
+// ---------------------------------------------------------------------
+slEnergyOn = input.bool(true, "Bật tính Động lực học (Energy)", group = gSL)
+slVolMaLen = input.int(100, "Chu kỳ MA để chuẩn hoá Mass", minval=1, group = gSL)
+slBaseMaLen= input.int(20, "Chu kỳ MA để tính Ep (0 = ép theo N)", minval=0, group = gSL)
+slSeg     = input.bool(true, "Vẽ ĐOẠN THẲNG hồi quy", group = gSL)
+slSegRay  = input.bool(false, "   kéo dài đoạn sang PHẢI", group = gSL)
+slSegW    = input.int(2, "   độ dày đoạn", minval = 1, maxval = 5, group = gSL)
+slSegSty  = input.string("Nét liền", "   kiểu nét đoạn", options = ["Nét liền", "Nét đứt", "Chấm chấm"], group = gSL)
+slColUp   = input.color(#26a69a, "   màu dốc LÊN", group = gSL)
+slColDn   = input.color(#ef5350, "   màu dốc XUỐNG", group = gSL)
+slColFlat = input.color(#787b86, "   màu ĐI NGANG", group = gSL)
+slP2      = input.bool(true, "Vẽ ĐƯỜNG CONG parabol", group = gSL)
+slP2Up    = input.color(#ffc107, "   màu khi CONG LÊN (a > 0)", group = gSL)
+slP2Dn    = input.color(#ba68c8, "   màu khi CONG XUỐNG (a < 0)", group = gSL)
+slP2W     = input.int(2, "   độ dày đường cong", minval = 1, maxval = 5, group = gSL)
+slP2Sty   = input.string("Nét liền", "   kiểu nét đường cong", options = ["Nét liền", "Nét đứt", "Chấm chấm"], group = gSL)
+slR2Min   = input.float(0.30, "Dưới mức khớp này coi là GIÁ LOẠN", minval = 0.0, maxval = 1.0, step = 0.05, group = gSL)
+slR2Gap   = input.float(0.20, "Bậc 2 hơn bậc 1 từ mức này = ĐANG CONG", minval = 0.0, maxval = 1.0, step = 0.05, group = gSL)
+
+gDB = "9 · DASHBOARD"
+dbShow  = input.bool(true, "Hiện dashboard", group = gDB)
+dbPos   = input.string("Dưới · phải", "Góc neo", options = ["Trên · phải", "Trên · trái", "Dưới · phải", "Dưới · trái"], group = gDB)
+dbFont  = input.string("Small", "Cỡ chữ", options = ["Tiny", "Small", "Normal", "Large"], group = gDB)
+dbColBg = input.color(color.new(#161a25, 20), "Màu nền", group = gDB)
+dbColTx = input.color(#c8cdd7, "Màu chữ nhãn", group = gDB)
+dbMech  = input.bool(false, "Thêm ba dòng JUDAS / T.SOUP / BIAS HTF", group = gDB)
+
+// --------------------------------------------------------------------
+// 10 · GANN SWING CONSOLIDATION [F0-F1-SF1]
+// INPUTS
+// =====================================================================
+M_A     = "A · Sóng chồng lấn (F1/SF1)"
+M_B     = "B · Tích lũy trong nhịp điều chỉnh (SF1)"
+M_C     = "C · Nến nén (F0)"
+OV_A    = "(a) Cho phép chồng nhau"
+OV_B    = "(b) Chỉ 1 vùng hoạt động"
+OV_C    = "(c) Vùng lớn nuốt vùng nhỏ"
+DM_OUT  = "Ngoài cùng"
+DM_IN   = "Biên trong"
+DM_BOTH = "Cả hai"
+MODE_A  = "(a) Chặn cả B/O & BAG"
+MODE_B  = "(b) Chỉ chặn nâng cấp BAG"
+
+gGS1 = "10 · GANN CƠ BẢN"
+method  = input.string(M_A, "Cách phát hiện", options = [M_A, M_B, M_C], group = gGS1,
+     tooltip = "A: sóng F1 (hoặc SF1) lên xuống qua lại, chạm trần & sàn đủ số lần.\nB: như A nhưng chỉ tìm khi SF1 đang ở nhịp điều chỉnh (tích lũy giữa xu hướng).\nC: nhìn từng nến (F0) — nhiều nến liên tiếp chạy trong biên độ hẹp.")
+useClosePiv = input.bool(false, "Sử dụng Thân nến (O/C) thay vì Râu (H/L) để dò sóng", group = gGS1, tooltip = "Bật để tránh nhiễu từ các râu quét thanh khoản (Liquidity sweeps). Khi bật, các điểm xoay F0/F1/SF1 sẽ tính dựa trên Open/Close.")
+layer   = input.string("F1", "Tầng khung (chỉ dùng cho Cách A)", options = ["F1", "SF1"], group = gGS1)
+sfTagOn = input.bool(true, "Gắn nhãn breakout theo SF1 (TD / ĐC)", group = gGS1,
+     tooltip = "TD = phá theo hướng xu hướng SF1 trước khi vào vùng (tiếp diễn).\nĐC = phá ngược hướng xu hướng đó (đảo chiều).")
+ovMode  = input.string(OV_C, "Kiểu chồng hộp", options = [OV_A, OV_B, OV_C], group = gGS1)
+sigOn   = input.bool(true, "Hiện nhãn B/O · BAG", group = gGS1)
+btrOn   = input.bool(true, "Hiện nhãn BTR · BTR*", group = gGS1)
+
+gGS2 = "10 · GANN NÂNG CAO"
+minTouch = input.int(2, "Số lần chạm tối thiểu mỗi biên", minval = 1, group = gGS2)
+tolPct   = input.float(20, "Dung sai chạm biên (% chiều cao hộp)", minval = 1, maxval = 45, step = 1, group = gGS2)
+maxAtr   = input.float(3.0, "Chiều cao hộp tối đa (x ATR)", minval = 0.5, step = 0.1, group = gGS2)
+atrLen   = input.int(14, "ATR Length", minval = 1, group = gGS2)
+minBars  = input.int(10, "Số nến tối thiểu của vùng", minval = 2, group = gGS2)
+maxPiv   = input.int(20, "Số điểm swing tối đa xét (Cách A/B)", minval = 4, maxval = 55, group = gGS2)
+maxLook  = input.int(150, "Số nến tối đa xét (Cách C)", minval = 10, maxval = 500, group = gGS2)
+drawMode = input.string(DM_OUT, "Biên vẽ", options = [DM_OUT, DM_IN, DM_BOTH], group = gGS2)
+brkMode  = input.string(DM_OUT, "Biên xét phá", options = [DM_OUT, DM_IN], group = gGS2)
+
+gGS3 = "10 · GANN BỘ LỌC"
+cfOn    = input.bool(false, "Bật bộ lọc", group = gGS3)
+cfClose = input.float(60, "Tỷ lệ nến đóng cửa trong biên trong ≥ %", minval = 0, maxval = 100, group = gGS3)
+cfIB    = input.float(0, "Tỷ lệ inside bar ≥ % (0 = không lọc)", minval = 0, maxval = 100, group = gGS3)
+
+gGS4 = "10 · GANN PHÁ HỘP"
+btrN    = input.int(5, "Cửa sổ BTR (số nến, nến 2 = nến 0)", minval = 1, group = gGS4)
+dBody   = input.float(0.60, "BAG · Thân/Range ≥", minval = 0, maxval = 1, step = 0.05, group = gGS4)
+dClose  = input.float(0.70, "BAG · Vị trí Close ≥", minval = 0, maxval = 1, step = 0.05, group = gGS4)
+dAtr    = input.float(1.20, "BAG · Range nến ≥ x ATR", minval = 0, step = 0.1, group = gGS4)
+volOn   = input.bool(false, "BAG · Filter Volume", inline = "vol", group = gGS4)
+volMult = input.float(1.5, "≥ x TB", minval = 0, step = 0.1, inline = "vol", group = gGS4)
+volLen  = input.int(20, "Kỳ TB", minval = 1, inline = "vol", group = gGS4)
+szOn    = input.bool(true, "Bật Min FVG Size", group = gGS4)
+szMult  = input.float(0.30, "Chiều cao FVG ≥ x ATR", minval = 0, step = 0.05, group = gGS4)
+szMode  = input.string(MODE_B, "Hình thức áp dụng", options = [MODE_A, MODE_B], group = gGS4)
+
+gGS5 = "10 · GANN HIỂN THỊ"
+cBorder   = input.color(color.new(#00bcd4, 0), "Hộp · Viền", inline = "bx", group = gGS5)
+cFill     = input.color(color.new(#00bcd4, 88), "Nền", inline = "bx", group = gGS5)
+cInner    = input.color(color.new(#ff9800, 0), "Biên trong", inline = "bx", group = gGS5)
+cBOBuy    = input.color(color.new(#26a69a, 0), "B/O Buy", inline = "l1", group = gGS5)
+cBOSell   = input.color(color.new(#ef5350, 0), "B/O Sell", inline = "l1", group = gGS5)
+cBAGBuy   = input.color(color.new(#00e676, 0), "BAG Buy", inline = "l2", group = gGS5)
+cBAGSell  = input.color(color.new(#ff1744, 0), "BAG Sell", inline = "l2", group = gGS5)
+cBTRBuy   = input.color(color.new(#42a5f5, 0), "BTR Buy", inline = "l3", group = gGS5)
+cBTRSell  = input.color(color.new(#ffa726, 0), "BTR Sell", inline = "l3", group = gGS5)
+cBTRsBuy  = input.color(color.new(#1565c0, 0), "BTR* Buy", inline = "l4", group = gGS5)
+cBTRsSell = input.color(color.new(#e65100, 0), "BTR* Sell", inline = "l4", group = gGS5)
+showF1    = input.bool(false, "Vẽ sóng F1", inline = "f1", group = gGS5)
+cF1       = input.color(color.aqua, "", inline = "f1", group = gGS5)
+showSF    = input.bool(false, "Vẽ sóng SF1", inline = "sf", group = gGS5)
+cSF       = input.color(color.yellow, "", inline = "sf", group = gGS5)
+
+// ---- Bien DAN XUAT tu input: gom het o day, SAU khi moi o input da khai bao.
+//      Pine bat buoc khai truoc dung sau — de lan giua cac nhom input la
+//      "Undeclared identifier" ngay.
+bool inWin       = useWin ? (bar_index > last_bar_index - winBars) : true
+bool anyMech     = enableJudas or enableTS
+// --- rieng cua co che JUDAS ---
+string jdTxSz    = jdTxSzVi == "Nhỏ" ? size.small : jdTxSzVi == "To" ? size.large : size.normal
+string mssStyle  = mssStyleVi == "Nét liền" ? line.style_solid : mssStyleVi == "Chấm chấm" ? line.style_dotted : line.style_dashed
+string jdBoxSty  = jdBoxStyVi == "Nét đứt" ? line.style_dashed : jdBoxStyVi == "Chấm chấm" ? line.style_dotted : line.style_solid
+int    jdDir     = jdDirVi == "Chỉ tăng" ? 1 : jdDirVi == "Chỉ giảm" ? -1 : 0
+// 1 = cay GIUA cua bo 3 (MAC DINH, owner chot), 0 = cay HOAN TAT (cay thu 3),
+// 2 = cay CUC TRI. Cay giua CO THE trung dung cay cuc tri — owner chap nhan.
+int    jdMark    = jdMarkVi == "Nến cực trị" ? 2 : jdMarkVi == "Nến hoàn tất FVG" ? 0 : 1
+// --- rieng cua co che TURTLE SOUP ---
+string tsTxSz    = tsTxSzVi == "Nhỏ" ? size.small : tsTxSzVi == "To" ? size.large : size.normal
+string cisdStyle = cisdStyleVi == "Nét liền" ? line.style_solid : cisdStyleVi == "Chấm chấm" ? line.style_dotted : line.style_dashed
+string tsBoxSty  = tsBoxStyVi == "Nét đứt" ? line.style_dashed : tsBoxStyVi == "Chấm chấm" ? line.style_dotted : line.style_solid
+int    tsDir     = tsDirVi == "Chỉ tăng" ? 1 : tsDirVi == "Chỉ giảm" ? -1 : 0
+// 0 = cay LAP khe ho, 1 = cay GIUA cua bo 3, 2 = cay CUC TRI
+int    tsMark    = tsMarkVi == "Nến cực trị" ? 2 : tsMarkVi == "Nến giữa iFVG" ? 1 : 0
+// BON O DO RO -> suy nguoc ra DO MO cho color.new (owner chot 23-08 toi: so
+// cang CAO cang RO, mac dinh 0 = an han).
+int    mssDim    = 100 - mssVis
+int    cisdDim   = 100 - cisdVis
+int    jdSigDim  = 100 - jdSigVis
+int    tsSigDim  = 100 - tsSigVis
+// --- lop chan doan chung ---
+string dgStyle   = dgStyleVi == "Nét đứt" ? line.style_dashed : dgStyleVi == "Chấm chấm" ? line.style_dotted : line.style_solid
+bool   extDotAll = extDotVi == "Mọi nến cực trị CISD"
+cisdExtStyleV    = cisdExtStyleVi == "Nét liền" ? line.style_solid : cisdExtStyleVi == "Nét đứt" ? line.style_dashed : line.style_dotted
+
+// ta.atr PHAI goi o global scope (moi nen) — dung de day mui ten/chu ra khoi nen.
+float sAtr = nz(ta.atr(14), high - low)
+
+// HAI NGUONG BE RONG KHE HO, TACH HAN NHAU. Moi co che mot chu ky ATR + he so.
+float jdFvgAtr = nz(ta.atr(jdFvgAtrLen), high - low)
+float tsFvgAtr = nz(ta.atr(tsFvgAtrLen), high - low)
+
+float jdMultEff = jdFvgMult
+float tsMultEff = tsFvgMult
+
+float jdNeedW  = jdFvgAtr * jdMultEff
+float tsNeedW  = tsFvgAtr * tsMultEff
+// Kho khe ho quet MOT LAN moi nen -> phai ghi theo nguong LONG HON trong hai
+// cai, roi luc CHON moi co che ap nguong rieng cua no. Neu ghi theo nguong
+// gat hon thi ben long hon se mat ung vien vinh vien.
+float storeNeedW = math.min(jdNeedW, tsNeedW)
+
+// Ro khe ho phai giu du lau: co che TURTLE SOUP di tim khe CU nam ben TRAI
+// cuc tri, ma su kien CISD co the no ra rat lau sau cuc tri. De sat dgKeep
+// la mat ung vien -> san so ban ghi len it nhat 120. Ban ghi re, chi cai HOP
+// moi an vao tran 500 hinh, ma hop chi ton tai khi khe con TUOI.
+int fvgKeepEff = math.max(dgKeep, 120)
+
+// #####################################################################
+// #                                                                   #
+// #   KHUC GOC DUNG CHUNG: may CISD -> CAY CUC TRI -> buoc xac dinh   #
+// #   CAY NEO. Het phan chung o day.                                  #
+// #   Cong displacement KHONG con dung chung: moi co che mot o rieng   #
+// #   (jdSweep / tsSweep), chi ham do f_swept la dung chung.           #
+// #                                                                   #
+// #####################################################################
+
+// =====================================================================
+// ============ MAY CISD (nguyen van tu CRB-Model) =====================
+// =====================================================================
+// THAM SO `base` (them 23-08 cho tinh nang Follow BIAS H1):
+//   base = 0 -> doc nen HIEN TAI. Moi cho goi cu deu truyen 0 -> hanh vi
+//               KHONG doi mot ly so voi truoc.
+//   base = 1 -> doc nen DA DONG. Chi engine H1 trong request.security dung,
+//               vi trong do phai tranh nen dang hinh thanh.
+// Nho tham so nay ma LUAT chi co MOT ban duy nhat, khong phai chep doi cho
+// engine H1 — dung tinh than 33 o / 33 o cua file.
+f_candleAttitude(int offset, int base) =>
+    o = open[offset + base]
+    c = close[offset + base]
+    c > o ? 1 : (c < o ? -1 : 0)
+
+f_consultCrystalBall(int biasIn, int base) =>
+    float extreme = open[base]
+    int extremeOffset = 0
+    int att0 = f_candleAttitude(0, base)
+    if att0 != 0 and att0 == biasIn
+        for i = 1 to 500
+            int att = f_candleAttitude(i, base)
+            if att != 0
+                if att != biasIn
+                    break
+                else
+                    if biasIn == 1
+                        if open[i + base] < extreme
+                            extreme := open[i + base]
+                            extremeOffset := i
+                    else
+                        if open[i + base] > extreme
+                            extreme := open[i + base]
+                            extremeOffset := i
+    [extreme, bar_index - base - extremeOffset]
+
+f_archaeologistJones(int biasIn, int base) =>
+    bool artifactFound = false
+    int maxOffset = -1
+    float extreme = 0.0
+    for j = 1 to 500
+        int att = f_candleAttitude(j, base)
+        if att != 0
+            bool correctEra = att == biasIn
+            if not artifactFound
+                if correctEra
+                    artifactFound := true
+                    maxOffset := j
+                    extreme := open[j + base]
+            else
+                if not correctEra
+                    break
+                maxOffset := j
+                if biasIn == 1
+                    if open[j + base] < extreme
+                        extreme := open[j + base]
+                else
+                    if open[j + base] > extreme
+                        extreme := open[j + base]
+    float outExtreme = na
+    int outAbsIdx = na
+    if maxOffset < 0
+        outExtreme := open[base]
+        outAbsIdx := bar_index - base
+    else
+        int extremeOffset = maxOffset
+        for k = maxOffset to 1
+            if open[k + base] == extreme
+                extremeOffset := k
+                break
+        outExtreme := extreme
+        outAbsIdx := bar_index - base - extremeOffset
+    [outExtreme, outAbsIdx]
+
+// CISD: dir=1 -> LOW thap nhat, dir=-1 -> HIGH cao nhat.
+f_findExtremeBar(int dir, int fromAbs, int toAbs, int base) =>
+    int vIdx = bar_index - base
+    int offsetFrom = vIdx - fromAbs
+    int offsetTo   = vIdx - toAbs
+    int bestOffset = offsetFrom
+    float bestVal  = dir == 1 ? low[offsetFrom + base] : high[offsetFrom + base]
+    if offsetFrom - 1 >= offsetTo
+        for off = offsetFrom - 1 to offsetTo
+            if dir == 1
+                if low[off + base] < bestVal
+                    bestVal := low[off + base]
+                    bestOffset := off
+            else
+                if high[off + base] > bestVal
+                    bestVal := high[off + base]
+                    bestOffset := off
+    vIdx - bestOffset
+
+// LUAT DISPLACEMENT: cay cuc tri phai tho rau qua nen lien truoc roi keo THAN
+// ve. Nguyen van luat displacementFilter cua ban cu. Ham do MOT LAN moi su kien,
+// roi tung co che tu quyet co ap hay khong bang o rieng cua no (jdSweep/tsSweep).
+f_swept(int dir, int extAbs, int base) =>
+    bool ok = false
+    int vIdx = bar_index - base
+    int o = vIdx - extAbs
+    if o >= 0 and extAbs - 1 >= 0
+        int p = o + 1
+        if dir == 1
+            float bodyLow = math.min(open[o + base], close[o + base])
+            ok := low[o + base] < low[p + base] and bodyLow > low[p + base]
+        else
+            float bodyHigh = math.max(open[o + base], close[o + base])
+            ok := high[o + base] > high[p + base] and bodyHigh < high[p + base]
+    ok
+
+// CAY NEO cua JUDAS: tu cuc tri dem NGUOC sang trai i-1..i-N, lay cay DAU
+// TIEN "thut" so voi cay ben trai lien ke cua no.
+f_ancMss(int dir, int extAbs, int base) =>
+    int vIdx = bar_index - base
+    int res = -1
+    // Owner 23-08: xet NGUOC sang trai dung jdAncBack nen, TINH CA cay cuc
+    // tri (j = 0). Truoc day bat dau tu j = 1 nen bo qua chinh cay cuc tri.
+    for j = 0 to jdAncBack - 1
+        if extAbs - j - 1 >= 0
+            int o = vIdx - extAbs + j
+            if (dir == 1 ? low[o + base] > low[o + 1 + base] : high[o + base] < high[o + 1 + base])
+                res := extAbs - j
+                break
+    res
+
+// CAY NEO cua TURTLE SOUP: KHONG con ham rieng nua (owner 23-08 toi).
+// Vach CISD = originPrice / originIndex ma chinh may CISD o tren da tinh —
+// xem khoi chu thich tai cho dung, trong nhanh TURTLE SOUP.
+
+// =====================================================================
+// ============================ KIEU DU LIEU ===========================
+// =====================================================================
+// KHO KHE HO DUNG CHUNG. midAbs = cay GIUA — cay tao ra khe ho. w = BE RONG
+// khe (moi co che tu ap nguong rieng len con so nay luc CHON vao lenh).
+// fillAbs = nen DONG xuyen han mep xa (= luc khe hoa thanh iFVG).
+type FvgZ
+    bool  bull
+    float top
+    float btm
+    float w
+    int   midAbs
+    float hiM
+    float loM
+    float hi3     // dinh/day CAY THU BA — cay lam khe ho THANH HINH
+    float lo3
+    bool  alive
+    int   fillAbs
+    float fillCls
+    float fillHi
+    float fillLo
+    box   bx
+
+// Mot cu cua CO CHE JUDAS. Song hoan toan rieng, khong biet MechRec ton tai.
+type MechRec
+    int   dir
+    int   extAbs
+    float extPx
+    int   ancAbs
+    float lvl
+    int   brkBar
+    bool  done
+    bool  dead
+    line  ln
+    label lb
+    label sLb
+    line  sSt
+    box   sBx
+
+// Mot cu cua CO CHE TURTLE SOUP. Song hoan toan rieng, khong biet MechRec.
+
+// Hinh ve cua MOT tin hieu da ban. Moi co che giu mot mang rieng.
+type SigSet
+    label lb
+    line  stem
+    box   bx
+    // 24-08: bo hinh tin hieu GIU LUON vach MSS / CISD cua chinh cu do. Truoc
+    // day vach nam trong MechRec/MechRec nen bi xoa theo mang CU (20 cu = vai gio),
+    // trong khi mui ten song theo mang TIN HIEU (20 tin hieu = nhieu ngay) ->
+    // mui ten tro tro mot minh, khong con vach.
+    line  vLn
+    label vLb
+
+// Vach cuc tri CISD ("CISD Max") — lop chan doan chung, nguyen van kent_v9.
+type ExtLine
+    line  ln
+    label lb
+    int   dir
+    float px
+    bool  active
+
+
+
+// =====================================================================
+// ============================ TRANG THAI =============================
+// =====================================================================
+// --- khuc goc chung ---
+var int   bias             = 0
+var float originPrice      = 0.0
+var int   originIndex      = -1
+var float extremeThreshold = 0.0
+var bool  initialized      = false
+var array<FvgZ>  fvgArr    = array.new<FvgZ>()
+var array<label> extDots   = array.new<label>()
+var ExtLine        cisdCurExt = na
+var array<ExtLine> cisdOldExt = array.new<ExtLine>()
+// --- co che JUDAS ---
+var array<MechRec>  jdArr    = array.new<MechRec>()
+var array<SigSet> jdSigArr = array.new<SigSet>()
+// --- co che TURTLE SOUP ---
+var array<MechRec>  tsArr    = array.new<MechRec>()
+var array<SigSet> tsSigArr = array.new<SigSet>()
+
+// Co bao tin hieu moi trong nen nay. KHONG co `var` -> moi nen tu ve false.
+bool alJd = false
+bool alTs = false
+
+// =====================================================================
+// ============================ HAM PHU ================================
+// =====================================================================
+// Mau vach MSS (cua Judas). okBrk = da co nen DONG xuyen qua vach chua.
+f_mssCol(int dir, bool okBrk, int transp) =>
+    color c = okBrk ? (dir == 1 ? mssColBull : mssColBear) : (dir == 1 ? mssColBullW : mssColBearW)
+    color.new(c, transp)
+
+// Mau vach CISD (cua Turtle Soup). Bo mau TACH HAN khoi vach MSS.
+f_cisdCol(int dir, bool okBrk, int transp) =>
+    color c = okBrk ? (dir == 1 ? cisdColBull : cisdColBear) : (dir == 1 ? cisdColBullW : cisdColBearW)
+    color.new(c, transp)
+
+// Bien 1 vach cuc tri hien hanh thanh "cu". Nguyen van kent_combo_v9.
+f_retireExt(ExtLine e, string prefixP, color colOld, array<ExtLine> oldArr, int keepOld, int lockX) =>
+    if not na(e) and not na(e.ln)
+        e.active := false
+        line.set_color(e.ln, colOld)
+        if lockX > 0
+            line.set_x2(e.ln, lockX)
+        if not na(e.lb)
+            label.set_textcolor(e.lb, colOld)
+            label.set_text(e.lb, "P." + prefixP)
+        array.push(oldArr, e)
+        while array.size(oldArr) > keepOld
+            ExtLine ed = array.shift(oldArr)
+            if not na(ed.ln)
+                line.delete(ed.ln)
+            if not na(ed.lb)
+                label.delete(ed.lb)
+
+// Xóa sạch các object của một tín hiệu (dùng chung cho JD và TS)
+f_killMech(MechRec r) =>
+    if not na(r.ln)
+        line.delete(r.ln)
+    if not na(r.lb)
+        label.delete(r.lb)
+    if not na(r.sLb)
+        label.delete(r.sLb)
+    if not na(r.sSt)
+        line.delete(r.sSt)
+    if not na(r.sBx)
+        box.delete(r.sBx)
+
+// TO MAU HINH TIN HIEU theo trang thai vach: vach CHUA bi xuyen -> ve MO theo
+// o do mo cua co che; xuyen roi -> ro 100%. Goi lai duoc nhieu lan, khong ve lai
+// hinh nao, chi doi mau tai cho (owner chot 23-08).
+f_jdPaint(MechRec r) =>
+    if not na(r.sLb)
+        color cJ = r.dir == 1 ? jdColBull : jdColBear
+        color cB = r.dir == 1 ? jdBoxBull : jdBoxBear
+        float tr = r.brkBar >= 0 ? 0.0 : jdSigDim
+        float k  = (100.0 - tr) / 100.0
+        label.set_textcolor(r.sLb, color.new(cJ, tr))
+        if not na(r.sSt)
+            line.set_color(r.sSt, color.new(cJ, tr))
+        if not na(r.sBx)
+            box.set_border_color(r.sBx, color.new(cB, 100.0 - jdBoxOp * k))
+            box.set_bgcolor(r.sBx, jdBoxFill > 0 ? color.new(cB, 100.0 - jdBoxFill * k) : na)
+
+f_tsPaint(MechRec r) =>
+    if not na(r.sLb)
+        color cT = r.dir == 1 ? tsColBull : tsColBear
+        color cB = r.dir == -1 ? tsBoxBull : tsBoxBear
+        float tr = r.brkBar >= 0 ? 0.0 : tsSigDim
+        float k  = (100.0 - tr) / 100.0
+        label.set_textcolor(r.sLb, color.new(cT, tr))
+        if not na(r.sSt)
+            line.set_color(r.sSt, color.new(cT, tr))
+        if not na(r.sBx)
+            box.set_border_color(r.sBx, color.new(cB, 100.0 - tsBoxOp * k))
+            box.set_bgcolor(r.sBx, tsBoxFill > 0 ? color.new(cB, 100.0 - tsBoxFill * k) : na)
+
+// Day mot bo hinh tin hieu vao mang cua CO CHE do + cat bot cho nhe chart.
+f_pushSig(array<SigSet> arr, label lb, line st, box bx, line vLn, label vLb, int keep) =>
+    array.push(arr, SigSet.new(lb, st, bx, vLn, vLb))
+    while array.size(arr) > keep
+        SigSet sd = array.shift(arr)
+        if not na(sd.lb)
+            label.delete(sd.lb)
+        if not na(sd.stem)
+            line.delete(sd.stem)
+        if not na(sd.bx)
+            box.delete(sd.bx)
+        // vach di theo mui ten, khong di theo cu (24-08)
+        if not na(sd.vLn)
+            line.delete(sd.vLn)
+        if not na(sd.vLb)
+            label.delete(sd.vLb)
+
+// =====================================================================
+//  KHO KHE HO (du lieu chung) — chay TRUOC may CISD trong cung nen, de khe
+//  ho vua hoan tat tren chinh cay nay da dung duoc ngay.
+//  Ghi theo NGUONG LONG HON trong hai nguong; moi co che ap nguong rieng
+//  cua no luc CHON vao lenh.
+// =====================================================================
+if anyMech and inWin and barstate.isconfirmed and bar_index >= 2
+    // 1) khe ho bi LAP: THAN nen DONG xuyen qua mep XA. Ban ghi VAN GIU LAI
+    //    (co che Turtle Soup song bang chinh may cai da bi lap), chi xoa hop.
+    if array.size(fvgArr) > 0
+        for gi = array.size(fvgArr) - 1 to 0
+            FvgZ z = array.get(fvgArr, gi)
+            if z.alive
+                if (z.bull ? close < z.btm : close > z.top)
+                    z.alive   := false
+                    z.fillAbs := bar_index
+                    z.fillCls := close
+                    z.fillHi  := high
+                    z.fillLo  := low
+                    if not na(z.bx)
+                        box.delete(z.bx)
+                        z.bx := na
+    // 2) khe ho moi tai nen vua dong (cay 3 = offset 0, cay 1 = offset 2)
+    bool gapUp = low[0]  > high[2]
+    bool gapDn = high[0] < low[2]
+    if gapUp or gapDn
+        float tG = gapUp ? low[0]  : low[2]
+        float bG = gapUp ? high[2] : high[0]
+        float wG = tG - bG
+        if wG >= storeNeedW
+            box bxG = na
+            if dgShowAll
+                bxG := box.new(left = bar_index - 2, top = tG, right = bar_index, bottom = bG, xloc = xloc.bar_index, border_color = color.new(gapUp ? dgCBull : dgCBear, 100 - dgOp), bgcolor = na, border_width = dgBw, border_style = dgStyle)
+            array.push(fvgArr, FvgZ.new(gapUp, tG, bG, wG, bar_index - 1, high[1], low[1], high[0], low[0], true, -1, na, na, na, bxG))
+            while array.size(fvgArr) > fvgKeepEff
+                FvgZ zd = array.shift(fvgArr)
+                if not na(zd.bx)
+                    box.delete(zd.bx)
+
+// =====================================================================
+//  MAY CISD -> su kien -> cay cuc tri -> cong quet -> DE RA CU CHO CA HAI
+//  CO CHE. Hai co che duoc de ra DOC LAP: mot ben khong ra duoc thi ben kia
+//  van ra binh thuong.
+// =====================================================================
+if anyMech and inWin and barstate.isconfirmed and bar_index >= 11
+    if bias == 0
+        int firstImpression = f_candleAttitude(0, 0)
+        if firstImpression == 0
+            for k = 1 to 50
+                int att = f_candleAttitude(k, 0)
+                if att != 0
+                    firstImpression := att
+                    break
+        if firstImpression != 0
+            bias := firstImpression
+            [op, oi] = f_consultCrystalBall(firstImpression, 0)
+            originPrice := op
+            originIndex := oi
+            extremeThreshold := firstImpression == 1 ? high[0] : low[0]
+            initialized := true
+
+    if initialized
+        int candlePersonality = f_candleAttitude(0, 0)
+
+        if bias == 1
+            if high[0] > extremeThreshold
+                extremeThreshold := high[0]
+                float freshPrice = na
+                int   freshIdx = na
+                if candlePersonality == 1
+                    [fp, fi] = f_consultCrystalBall(1, 0)
+                    freshPrice := fp
+                    freshIdx := fi
+                else
+                    [fp, fi] = f_archaeologistJones(1, 0)
+                    freshPrice := fp
+                    freshIdx := fi
+                originPrice := freshPrice
+                originIndex := freshIdx
+        else if bias == -1
+            if low[0] < extremeThreshold
+                extremeThreshold := low[0]
+                float freshPrice2 = na
+                int   freshIdx2 = na
+                if candlePersonality == -1
+                    [fp2, fi2] = f_consultCrystalBall(-1, 0)
+                    freshPrice2 := fp2
+                    freshIdx2 := fi2
+                else
+                    [fp2, fi2] = f_archaeologistJones(-1, 0)
+                    freshPrice2 := fp2
+                    freshIdx2 := fi2
+                originPrice := freshPrice2
+                originIndex := freshIdx2
+
+        bool shortsSqueezed = bias == -1 and close[0] > originPrice
+        bool longsRekt      = bias == 1  and close[0] < originPrice
+
+        if shortsSqueezed or longsRekt
+            int   dir    = shortsSqueezed ? 1 : -1
+            int   extAbs = f_findExtremeBar(dir, originIndex, bar_index, 0)
+            int   eOff   = bar_index - extAbs
+            float extPx  = dir == 1 ? low[eOff] : high[eOff]
+
+            // Lop soi: cham MOI cuc tri, ke ca cai sap bi cong quet loai.
+            if showExtDot and extDotAll
+                array.push(extDots, label.new(x = extAbs, y = extPx, text = "•", xloc = xloc.bar_index, style = label.style_none, textcolor = color.new(extDotCol, 50), size = size.tiny))
+                while array.size(extDots) > extDotKeep
+                    label dDel = array.shift(extDots)
+                    if not na(dDel)
+                        label.delete(dDel)
+
+            // Do MOT LAN roi moi co che tu quyet co dung hay khong — hai o
+            // jdSweep / tsSweep hoan toan doc lap (owner chot 23-08).
+            bool swept = f_swept(dir, extAbs, 0)
+
+            if showExtDot and not extDotAll and swept
+                array.push(extDots, label.new(x = extAbs, y = extPx, text = "•", xloc = xloc.bar_index, style = label.style_none, textcolor = color.new(extDotCol, 50), size = size.tiny))
+                while array.size(extDots) > extDotKeep
+                    label dDel2 = array.shift(extDots)
+                    if not na(dDel2)
+                        label.delete(dDel2)
+
+            // ---------- CO CHE JUDAS: cong displacement RIENG ----------
+            if enableJudas and (jdDir == 0 or jdDir == dir) and (not jdSweep or swept)
+                int aM = f_ancMss(dir, extAbs, 0)
+                if aM >= 0
+                    int   oM  = bar_index - aM
+                    float lvl = dir == 1 ? high[oM] : low[oM]
+                    color cm  = f_mssCol(dir, false, mssDim)
+                    // mssLen == 0 -> vach BO theo tung nen roi dung tai nen ra tin
+                    // hieu; vong bao tri ghi de x2 ngay trong cung nen nay.
+                    int   xE  = mssLen > 0 ? aM + mssLen : bar_index
+                    // mssVis > 0 (MAC DINH 50) -> ve vach ngay tu day, soi duoc
+                    // ca cu dang cho lan cu hong. Ha o ve 0 thi KHONG ve gi o
+                    // day; vach sinh ra dung luc cu ra tin hieu, o duoi - khi do
+                    // SO VACH = SO MUI TEN.
+                    line  ln  = na
+                    label lb  = na
+                    if mssVis > 0
+                        ln := line.new(x1 = aM, y1 = lvl, x2 = xE, y2 = lvl, xloc = xloc.bar_index, extend = extend.none, color = cm, style = mssStyle, width = mssW)
+                        lb := label.new(x = aM, y = dir == 1 ? lvl + sAtr * mssTxtGap : lvl - sAtr * mssTxtGap, text = "MSS", xloc = xloc.bar_index, style = label.style_none, textcolor = cm, size = size.small)
+                    array.push(jdArr, MechRec.new(dir, extAbs, extPx, aM, lvl, -1, false, false, ln, lb, na, na, na))
+                    while array.size(jdArr) > jdKeep
+                        MechRec rd = array.shift(jdArr)
+                        // Cu DA RA TIN HIEU -> vach da sang tay jdSigArr, xoa o
+                        // day la mui ten con ma vach mat (loi owner bao 24-08).
+                        if not rd.done
+                            f_killMech(rd)
+
+            // ---------- CO CHE TURTLE SOUP: cong displacement RIENG ----------
+            if enableTS and (tsDir == 0 or tsDir == dir) and (not tsSweep or swept)
+                // ===== LUAT CAY NEO CISD (sua 23-08 toi, khop kent_combo_v9) =====
+                // Vach CISD = originPrice: GIA MO cuc tri cua CHUOI nen cung
+                // chieu bias CU — tuc la cay NGHICH MAU DAU TIEN cua chuoi
+                // (dao len thi la cay GIAM cao nhat cua chuoi giam; dao xuong
+                // thi la cay TANG thap nhat cua chuoi tang). Chinh may CISD o
+                // tren da tinh san hai so nay de BAT su kien, khong tinh lai.
+                //
+                // BAN CU LAY SAI: f_ancCisd dem tu cay cuc tri sang trai roi
+                // dung o cay nghich mau GAN NHAT — tuc cay CUOI chuoi, khong
+                // phai cay dau. Ham do da GO HAN cung o `tsAncBack`.
+                //
+                // originPrice / originIndex o day VAN LA GIA TRI TRUOC KHI DAO:
+                // khuc `bias := dir` nam BEN DUOI khoi nay.
+                int aC = originIndex
+                if aC >= 0
+                    int   oC   = bar_index - aC
+                    float lvl2 = originPrice
+                    color cc   = f_cisdCol(dir, false, cisdDim)
+                    // cisdLen == 0 -> nhu ben Judas, vach bo theo nen.
+                    int   xE2  = cisdLen > 0 ? aC + cisdLen : bar_index
+                    // SO VACH = SO TIN HIEU (owner chot 24-08) — y het ben Judas.
+                    line  ln2  = na
+                    if cisdVis > 0
+                        ln2 := line.new(x1 = aC, y1 = lvl2, x2 = xE2, y2 = lvl2, xloc = xloc.bar_index, extend = extend.none, color = cc, style = cisdStyle, width = cisdW)
+                    // Chu CISD dat NGAY TAI CAY NEO, luon nam NGOAI cay nen, phia doi
+                    // dien voi huong gia sap di (owner chot 23-08):
+                    //   cu BAN (cuc tri la dinh) -> duoi DAY cay neo, duoi duong ke
+                    //   cu MUA (cuc tri la day)  -> tren DINH cay neo, tren duong ke
+                    float cY   = dir == 1 ? high[oC] + sAtr * cisdTxtGap : low[oC] - sAtr * cisdTxtGap
+                    label lb2  = na
+                    if cisdVis > 0
+                        lb2 := label.new(x = aC, y = cY, text = "CISD", xloc = xloc.bar_index, style = label.style_none, textcolor = cc, size = size.small)
+                    array.push(tsArr, MechRec.new(dir, extAbs, extPx, aC, lvl2, -1, false, false, ln2, lb2, na, na, na))
+                    while array.size(tsArr) > tsKeep
+                        MechRec rd2 = array.shift(tsArr)
+                        // Y het Judas: cu da ra tin hieu thi vach thuoc tsSigArr.
+                        if not rd2.done
+                            f_killMech(rd2)
+
+            // ---------- Vach cuc tri CISD (chan doan chung) ----------
+            // Ve cho MOI su kien CISD, khong con gac bang cong quet — no la
+            // vach cua doan CISD chu khong thuoc co che nao.
+            if cisdExtLineShow
+                if not na(cisdCurExt)
+                    f_retireExt(cisdCurExt, "CISD Max", cisdExtColOld, cisdOldExt, cisdExtKeepOld, bar_index)
+                line  nl  = line.new(x1=extAbs, y1=extPx, x2=bar_index, y2=extPx, xloc=xloc.bar_index, extend=extend.none, color=cisdExtColCur, style=cisdExtStyleV, width=cisdExtWidth)
+                label nlb = label.new(x=extAbs, y=extPx, text="CISD Max", xloc=xloc.bar_index, style=label.style_none, textcolor=cisdExtColCur, size=size.small)
+                cisdCurExt := ExtLine.new(nl, nlb, dir, extPx, true)
+
+            bias := dir
+            [rp, ri] = f_consultCrystalBall(dir, 0)
+            originPrice := rp
+            originIndex := ri
+            extremeThreshold := dir == 1 ? high[0] : low[0]
+
+// #####################################################################
+// #                                                                   #
+// #   CO CHE ① : JUDAS — vach MSS + khe ho TUOI ben PHAI cuc tri      #
+// #   Khong doc mot bien nao cua co che Turtle Soup.                  #
+// #                                                                   #
+// #####################################################################
+if enableJudas and inWin and barstate.isconfirmed and array.size(jdArr) > 0
+    for i = array.size(jdArr) - 1 to 0
+        MechRec r = array.get(jdArr, i)
+        // --- 1) vach MSS: keo dai + xet nen dong xuyen qua ---
+        // O 'Vach MSS — dai (nen)' = 0 nghia la vach TU DUNG tai NEN RA
+        // TIN HIEU: cu con song thi moi nen keo them mot cay, den luc
+        // r.done thi thoi keo -> dau phai vach dung dung o mui ten.
+        // Buoc keo dai phai chay TRUOC buoc tim khe ho ben duoi, nen
+        // ngay chinh nen ra tin hieu vach van kip toi noi.
+        if not na(r.ln) and mssLen == 0 and not r.done
+            line.set_x2(r.ln, bar_index)
+        // ⚠ KHUC DANH DAU 'DA XUYEN VACH' PHAI NAM NGOAI `if not na(r.ln)`.
+        // Khi nguoi dung ha mssVis ve 0, vach chi sinh ra luc ra tin hieu nen
+        // luc dang cho r.ln con na — de khuc nay ben trong la brkBar khong bao
+        // gio duoc set, cong jdNeedMss khoa cung va KHONG CU NAO ra tin hieu.
+        if r.brkBar < 0
+            if (r.dir == 1 ? close > r.lvl : close < r.lvl)
+                r.brkBar := bar_index
+                if not na(r.ln)
+                    color cOk = f_mssCol(r.dir, true, r.done ? 0 : mssDim)
+                    line.set_color(r.ln, cOk)
+                    if not na(r.lb)
+                        label.set_textcolor(r.lb, cOk)
+                // Vach vua duoc xac nhan -> hinh tin hieu da ban truoc do TU
+                // SANG LEN du mau, khong ve lai gi.
+                f_jdPaint(r)
+        // --- 2) di tim khe ho TUOI thuan chieu DAT NGUONG CUA JUDAS, cay giua
+        //        nam trong [cuc tri - 1 .. cuc tri - 2 + jdFvgWin] ---
+        if not r.done and not r.dead
+            // KHONG CON O HAN CHO nao: cua so FVG CHINH LA han (owner chot
+            // 23-08 cuoi). Hai chan cu (chan ngoai / chan gat) da go han.
+            // HET HAN = HET CUA SO FVG (owner chot 23-08 cuoi). Cua so keo tu
+            // cay LIEN TRUOC cuc tri sang phai het jdFvgWin nen; cay giua cuoi
+            // cung la extAbs - 2 + jdFvgWin, ma khe chi HOAN TAT o cay ngay sau
+            // no -> song them dung mot nen nua roi chet. Qua do khong co FVG
+            // nao dat -> XOA LUON VACH MSS (f_killMech o cuoi vong).
+            if bar_index > r.extAbs - 1 + jdFvgWin
+                r.dead := true
+            else if not jdNeedMss or r.brkBar >= 0
+                int loW = r.extAbs - 1
+                int hiW = r.extAbs - 2 + jdFvgWin
+                int pick = -1
+                if array.size(fvgArr) > 0
+                    for k = 0 to array.size(fvgArr) - 1
+                        FvgZ z = array.get(fvgArr, k)
+                        if z.alive and z.bull == (r.dir == 1) and z.midAbs >= loW and z.midAbs <= hiW and z.w >= jdNeedW
+                            pick := k
+                            break
+                if pick >= 0
+                    FvgZ  zf = array.get(fvgArr, pick)
+                    color cJ = r.dir == 1 ? jdColBull : jdColBear
+                    float aOff = sAtr * jdGap
+                    // Cho dat dau, 3 lua chon. MAC DINH = CAY GIUA cua bo 3 nen —
+                    // cay TAO RA khe ho (owner chot 23-08). Cay nay CO THE trung dung
+                    // cay cuc tri, owner da xac nhan van nhan, khong loai.
+                    int   mkAbs = jdMark == 2 ? r.extAbs : jdMark == 1 ? zf.midAbs : zf.midAbs + 1
+                    float mkPx  = jdMark == 2 ? r.extPx : jdMark == 1 ? (r.dir == 1 ? zf.loM : zf.hiM) : (r.dir == 1 ? zf.lo3 : zf.hi3)
+                    // RA NGOAI HOP (owner chot 23-08 cuoi): cay dat dau mac dinh nam
+                    // dung trong be ngang cua hop khe ho, de nguyen thi mui ten va chu
+                    // chim vao nen hop. Nam trong hop thi lay MEP HOP lam moc day ra.
+                    if jdMark != 2 and mkAbs >= zf.midAbs - 1 and mkAbs <= zf.midAbs + 1
+                        mkPx := r.dir == 1 ? math.min(mkPx, zf.btm) : math.max(mkPx, zf.top)
+                    float mY    = r.dir == 1 ? mkPx - aOff : mkPx + aOff
+                    string tx  = r.dir == 1 ? (jdShowTxt ? "▲\nJD" : "▲") : (jdShowTxt ? "JD\n▼" : "▼")
+                    label lb   = label.new(x = mkAbs, y = mY, text = tx, xloc = xloc.bar_index, style = label.style_none, textcolor = cJ, size = jdTxSz)
+                    line  st   = na
+                    if jdStem and aOff != 0
+                        st := line.new(mkAbs, mkPx, mkAbs, mY, xloc = xloc.bar_index, color = cJ, style = line.style_dotted, width = 1)
+                    color cBx = zf.bull ? jdBoxBull : jdBoxBear
+                    box bx = box.new(left = zf.midAbs - 1, top = zf.top, right = zf.midAbs + 1, bottom = zf.btm, xloc = xloc.bar_index, border_color = color.new(cBx, 100 - jdBoxOp), bgcolor = jdBoxFill > 0 ? color.new(cBx, 100 - jdBoxFill) : na, border_width = jdBoxW, border_style = jdBoxSty)
+                    // VE VACH MSS DUNG BAY GIO neu chua ton tai (khi mssVis = 0).
+                    // Tu cay neo toi nen ra tin hieu, ro 100%.
+                    if na(r.ln)
+                        color cmS = f_mssCol(r.dir, r.brkBar >= 0, 0)
+                        int   xES = mssLen > 0 ? r.ancAbs + mssLen : bar_index
+                        r.ln := line.new(x1 = r.ancAbs, y1 = r.lvl, x2 = xES, y2 = r.lvl, xloc = xloc.bar_index, extend = extend.none, color = cmS, style = mssStyle, width = mssW)
+                        r.lb := label.new(x = r.ancAbs, y = r.dir == 1 ? r.lvl + sAtr * mssTxtGap : r.lvl - sAtr * mssTxtGap, text = "MSS", xloc = xloc.bar_index, style = label.style_none, textcolor = cmS, size = size.small)
+                    f_pushSig(jdSigArr, lb, st, bx, r.ln, r.lb, jdKeep)
+                    r.sLb := lb
+                    r.sSt := st
+                    r.sBx := bx
+                    f_jdPaint(r)
+                    r.done := true
+                    alJd := true
+
+                    // Ra tin hieu -> vach MSS het mo. KHONG dung toi vach CISD.
+                    if not na(r.ln)
+                        color cF = f_mssCol(r.dir, r.brkBar >= 0, 0)
+                        line.set_color(r.ln, cF)
+                        if not na(r.lb)
+                            label.set_textcolor(r.lb, cF)
+        // --- 3) cu hong -> xoa vach MSS. Vach CISD cua cu cung nen KHONG dinh ---
+        if r.dead and not r.done
+            f_killMech(r)
+
+// #####################################################################
+// #                                                                   #
+// #   CO CHE ② : TURTLE SOUP — vach CISD + khe ho CU ben TRAI bi lap  #
+// #   Khong doc mot bien nao cua co che Judas.                        #
+// #                                                                   #
+// #####################################################################
+if enableTS and inWin and barstate.isconfirmed and array.size(tsArr) > 0
+    for i2 = array.size(tsArr) - 1 to 0
+        MechRec r2 = array.get(tsArr, i2)
+        // --- 1) vach CISD: keo dai + chu bam dau phai + xet nen dong xuyen ---
+        // Giong het Judas: o 'Vach CISD — dai (nen)' = 0 thi vach TU DUNG
+        // tai NEN RA TIN HIEU. CHU CISD van bam CAY NEO, khong dong toi.
+        if not na(r2.ln) and cisdLen == 0 and not r2.done
+            line.set_x2(r2.ln, bar_index)
+        // ⚠ Y het Judas: khuc danh dau 'da xuyen vach' NAM NGOAI `if not na`.
+        if r2.brkBar < 0
+            if (r2.dir == 1 ? close > r2.lvl : close < r2.lvl)
+                r2.brkBar := bar_index
+                if not na(r2.ln)
+                    color cOk2 = f_cisdCol(r2.dir, true, r2.done ? 0 : cisdDim)
+                    line.set_color(r2.ln, cOk2)
+                    if not na(r2.lb)
+                        label.set_textcolor(r2.lb, cOk2)
+                // Vach vua duoc xac nhan -> hinh tin hieu TU SANG LEN du mau.
+                f_tsPaint(r2)
+        // --- 2) di tim khe ho NGUOC chieu DA BI LAP, DAT NGUONG CUA T.SOUP,
+        //        cay giua nam trong [cuc tri - tsFvgWin + 1 .. cuc tri].
+        //        LUAT CUNG: chinh nen lap phai dong cua xuyen qua vach CISD —
+        //        khong co CISD thi khong phai Turtle Soup (owner chot 23-08).
+        //        Trong so may cai hop le, lay cai BI LAP SOM NHAT. ---
+        if not r2.done and not r2.dead
+            // KHONG CON O HAN CHO nao, giong het Judas: cua so iFVG CHINH LA
+            // han. Hai chan cu (chan ngoai / chan gat) da go han 23-08 cuoi.
+            // HET HAN (owner chot 23-08 cuoi): iFVG cua Turtle Soup nam SAN ben
+            // TRAI cuc tri roi, cai phai cho la NEN LAP. Cho dung tsFvgWin nen
+            // ke tu cuc tri sang phai -- lay lai chinh con so cua so, khong de
+            // mot o rieng. Qua do chua co khe nao bi lap -> XOA LUON VACH CISD.
+            if bar_index > r2.extAbs + tsFvgWin
+                r2.dead := true
+            else
+                // Owner 23-08: TINH CA cay cuc tri -> mep phai la extAbs, va
+                // dung tsFvgWin nen ke ca no.
+                int loW2 = r2.extAbs - tsFvgWin + 1
+                int hiW2 = r2.extAbs
+                int pick2 = -1
+                int best  = -1
+                if array.size(fvgArr) > 0
+                    for k2 = 0 to array.size(fvgArr) - 1
+                        FvgZ z2 = array.get(fvgArr, k2)
+                        if z2.bull == (r2.dir == -1) and z2.midAbs >= loW2 and z2.midAbs <= hiW2 and z2.w >= tsNeedW and z2.fillAbs >= r2.extAbs
+                            if not tsNeedCisd or (r2.dir == 1 ? z2.fillCls > r2.lvl : z2.fillCls < r2.lvl)
+                                // --- NEW TS FILTER: FVG MUST BE FILLED BY AN OPPOSITE FVG ---
+                                bool filledByOpposite = false
+                                if tsNeedIfvg
+                                    for kn = 0 to array.size(fvgArr) - 1
+                                        FvgZ zn = array.get(fvgArr, kn)
+                                        if zn.bull == (r2.dir == 1) and zn.midAbs > r2.extAbs
+                                            if zn.btm <= z2.top and zn.top >= z2.btm
+                                                filledByOpposite := true
+                                                break
+                                else
+                                    filledByOpposite := true
+                                if filledByOpposite
+                                    if pick2 < 0 or z2.fillAbs < best
+                                        best  := z2.fillAbs
+                                        pick2 := k2
+                if pick2 >= 0
+                    FvgZ  zt = array.get(fvgArr, pick2)
+                    color cT = r2.dir == 1 ? tsColBull : tsColBear
+                    float aOff2 = sAtr * tsGap
+                    // Cho dat dau, 3 lua chon. MAC DINH = CAY LAP khe ho.
+                    int   mkAbs2 = tsMark == 2 ? r2.extAbs : tsMark == 1 ? zt.midAbs : zt.fillAbs
+                    float mkPx2  = tsMark == 2 ? r2.extPx : tsMark == 1 ? (r2.dir == 1 ? zt.loM : zt.hiM) : (r2.dir == 1 ? zt.fillLo : zt.fillHi)
+                    // RA NGOAI HOP (owner chot 23-08 cuoi: "chu TS hay bi lan trong
+                    // box"). Hop TS keo tu cay 1 cua bo 3 nen toi dung NEN LAP, ma dau
+                    // mac dinh dat o NEN LAP -> luon nam trong hop. Nam trong hop thi
+                    // lay MEP HOP lam moc day ra, khong lay dinh/day cay nen.
+                    if tsMark != 2 and mkAbs2 >= zt.midAbs - 1 and mkAbs2 <= math.max(zt.fillAbs, zt.midAbs + 1)
+                        mkPx2 := r2.dir == 1 ? math.min(mkPx2, zt.btm) : math.max(mkPx2, zt.top)
+                    float mY2    = r2.dir == 1 ? mkPx2 - aOff2 : mkPx2 + aOff2
+                    string tx2  = r2.dir == 1 ? (tsShowTxt ? "▲\nTS" : "▲") : (tsShowTxt ? "TS\n▼" : "▼")
+                    label lbT   = label.new(x = mkAbs2, y = mY2, text = tx2, xloc = xloc.bar_index, style = label.style_none, textcolor = cT, size = tsTxSz)
+                    line  stT   = na
+                    if tsStem and aOff2 != 0
+                        stT := line.new(mkAbs2, mkPx2, mkAbs2, mY2, xloc = xloc.bar_index, color = cT, style = line.style_dotted, width = 1)
+                    // Hop KEO DAI tu cay 1 cua bo 3 nen (luc khe SINH RA) toi dung
+                    // NEN LAP (luc khe CHET) — owner chot 23-08. Nho vay hop tu no
+                    // noi lien cho sinh voi cho vao lenh, khong can doc vach noi.
+                    color cBxT = zt.bull ? tsBoxBull : tsBoxBear
+                    box bxT = box.new(left = zt.midAbs - 1, top = zt.top, right = math.max(zt.fillAbs, zt.midAbs + 1), bottom = zt.btm, xloc = xloc.bar_index, border_color = color.new(cBxT, 100 - tsBoxOp), bgcolor = tsBoxFill > 0 ? color.new(cBxT, 100 - tsBoxFill) : na, border_width = tsBoxW, border_style = tsBoxSty)
+                    // VE VACH CISD DUNG BAY GIO neu chua ton tai (khi cisdVis = 0).
+                    if na(r2.ln)
+                        color ccS = f_cisdCol(r2.dir, r2.brkBar >= 0, 0)
+                        int   oCS = bar_index - r2.ancAbs
+                        int   xES2 = cisdLen > 0 ? r2.ancAbs + cisdLen : bar_index
+                        r2.ln := line.new(x1 = r2.ancAbs, y1 = r2.lvl, x2 = xES2, y2 = r2.lvl, xloc = xloc.bar_index, extend = extend.none, color = ccS, style = cisdStyle, width = cisdW)
+                        r2.lb := label.new(x = r2.ancAbs, y = r2.dir == 1 ? high[oCS] + sAtr * cisdTxtGap : low[oCS] - sAtr * cisdTxtGap, text = "CISD", xloc = xloc.bar_index, style = label.style_none, textcolor = ccS, size = size.small)
+                    f_pushSig(tsSigArr, lbT, stT, bxT, r2.ln, r2.lb, tsKeep)
+                    r2.sLb := lbT
+                    r2.sSt := stT
+                    r2.sBx := bxT
+                    f_tsPaint(r2)
+                    r2.done := true
+                    alTs := true
+
+                    // Ra tin hieu -> vach CISD het mo. KHONG dung toi vach MSS.
+                    if not na(r2.ln)
+                        color cF2 = f_cisdCol(r2.dir, r2.brkBar >= 0, 0)
+                        line.set_color(r2.ln, cF2)
+                        if not na(r2.lb)
+                            label.set_textcolor(r2.lb, cF2)
+        // --- 3) cu hong -> xoa vach CISD. Vach MSS cua cu cung nen KHONG dinh ---
+        if r2.dead and not r2.done
+            f_killMech(r2)
+
+// =====================================================================
+//  VACH CUC TRI CISD (chan doan chung): keo dai + xet pha vo. Nguyen van
+//  kent_combo_v9, tru viec RETIRE chi lam khi NEN DONG (Pine khong rollback
+//  MANG tren nen realtime).
+// =====================================================================
+if not na(cisdCurExt)
+    if not cisdExtLineShow
+        if not na(cisdCurExt.ln)
+            line.delete(cisdCurExt.ln)
+        if not na(cisdCurExt.lb)
+            label.delete(cisdCurExt.lb)
+        cisdCurExt := na
+    else if cisdCurExt.active
+        if not na(cisdCurExt.ln)
+            line.set_x2(cisdCurExt.ln, bar_index)
+        if barstate.isconfirmed
+            if (cisdCurExt.dir == 1 ? close < cisdCurExt.px : close > cisdCurExt.px)
+                f_retireExt(cisdCurExt, "CISD Max", cisdExtColOld, cisdOldExt, cisdExtKeepOld, bar_index)
+                cisdCurExt := na
+
+// =====================================================================
+//  ALERT — de NGOAI than ham: Pine chan mot so ham co tac dung phu trong
+//  local scope. Hai o alert TACH RIENG theo tung co che.
+// =====================================================================
+if (jdAlert and alJd) or (tsAlert and alTs)
+    bool bJ = jdAlert and alJd
+    bool bT = tsAlert and alTs
+    string aMsg = bJ and bT ? "JD + TS" : bJ ? "JD" : "TS"
+    alert("2TC-v10 [" + syminfo.ticker + " " + timeframe.period + "]: " + aMsg + " moi", alert.freq_once_per_bar_close)
+alertcondition(alJd,           title = "JD moi",           message = "2TC-v10: co tin hieu Judas moi")
+alertcondition(alTs,           title = "TS moi",           message = "2TC-v10: co tin hieu Turtle Soup moi")
+alertcondition(alJd or alTs,   title = "JD hoac TS moi",   message = "2TC-v10: co JD hoac TS moi")
+
+// #####################################################################
+// #   CUM CRB (Sweep & Engulf) — NGUYEN VAN tu CRB-Model.pine          #
+// #####################################################################
+//  SWEEP & ENGULF + FVG (Pyramiding CRB0..CRBn)  — MPL-2.0, merge boi Neiro
+//  Tin hieu Sweep+Engulf 2 nen + FVG nen C -> danh so CRB0/CRB1*..., SL chung
+//  chuoi, phu nen bo nen A&B, alert dong. Bien 'atr' -> 'se_atr' (tranh BigBeluga).
+
+// =====================================================================
+// NHOM 13 - FVG MULTI-TIMEFRAME (độc lập, không filter)
+gFM = "11 · FVG MULTI-TIMEFRAME"
+fvgOn    = input.bool(true, "Bật FVG MTF", group = gFM)
+fvgN     = input.int(100, "Number of FVGs", minval = 1, maxval = 120, inline = "f0", group = gFM)
+htfStyS  = input.string("dashed", "HTF FVG Style", options = ["solid", "dashed", "dotted"], inline = "f0", group = gFM)
+extOn    = input.bool(false, "Kéo dài FVG đến khi bị lấp", group = gFM, tooltip = "Tắt: chỉ vẽ vùng FVG từ nến 1 đến nến 3. Bật: kéo dài vùng sang phải đến khi giá lấp hết FVG.")
+hideFill = input.bool(false, "Ẩn FVG đã lấp", group = gFM)
+ctfOn    = input.bool(false, "ChartTF FVG", inline = "ctf", group = gFM)
+bullClr  = input.color(color.new(color.green, 70),  "BullFVG Clr", inline = "ctf", group = gFM)
+bearClr  = input.color(color.new(color.orange, 70), "BearFVG Clr", inline = "ctf", group = gFM)
+
+h1On  = input.bool(false, "HTF-1", inline = "h1", group = gFM)
+h1Tf  = input.timeframe("15", "", inline = "h1", group = gFM)
+h1Clr = input.color(color.gray, "BorderClr", inline = "h1", group = gFM)
+h1W   = input.int(1, "Width", minval = 1, maxval = 5, inline = "h1", group = gFM)
+h2On  = input.bool(false, "HTF-2", inline = "h2", group = gFM)
+h2Tf  = input.timeframe("60", "", inline = "h2", group = gFM)
+h2Clr = input.color(color.gray, "BorderClr", inline = "h2", group = gFM)
+h2W   = input.int(1, "Width", minval = 1, maxval = 5, inline = "h2", group = gFM)
+h3On  = input.bool(false, "HTF-3", inline = "h3", group = gFM)
+h3Tf  = input.timeframe("240", "", inline = "h3", group = gFM)
+h3Clr = input.color(color.gray, "BorderClr", inline = "h3", group = gFM)
+h3W   = input.int(1, "Width", minval = 1, maxval = 5, inline = "h3", group = gFM)
+
+htfSty = htfStyS == "solid" ? line.style_solid : htfStyS == "dotted" ? line.style_dotted : line.style_dashed
+
+type MtfFvg
+    box   b
+    float top
+    float bot
+    int   dir
+    bool  done
+
+var array<MtfFvg> zC = array.new<MtfFvg>()
+var array<MtfFvg> z1 = array.new<MtfFvg>()
+var array<MtfFvg> z2 = array.new<MtfFvg>()
+var array<MtfFvg> z3 = array.new<MtfFvg>()
+
+addZone(array<MtfFvg> arr, MtfFvg z, int maxN) =>
+    arr.push(z)
+    if arr.size() > maxN
+        MtfFvg old = arr.shift()
+        old.b.delete()
+
+updZones(array<MtfFvg> arr, bool hide, bool useTime, bool ext) =>
+    if arr.size() > 0
+        for i = arr.size() - 1 to 0
+            MtfFvg z = arr.get(i)
+            if not z.done
+                if ext
+                    if useTime
+                        z.b.set_right(time)
+                    else
+                        z.b.set_right(bar_index)
+                bool filled = z.dir == 1 ? low <= z.bot : high >= z.top
+                if filled
+                    z.done := true
+                    if hide
+                        z.b.delete()
+                        arr.remove(i)
+
+tfTxt(string tf) =>
+    int s = timeframe.in_seconds(tf)
+    s < 3600 ? str.tostring(math.round(s / 60)) + "m" : s < 86400 ? str.tostring(math.round(s / 3600)) + "h" : tf
+
+validTf(string tf) => timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
+
+// Dữ liệu HTF: chỉ lấy nến HTF đã đóng (không repaint)
+[a_h3, a_l3, a_h1, a_l1, a_t1, a_t3, a_tc] = request.security(syminfo.tickerid, h1Tf, [high[1], low[1], high[3], low[3], time[3], time[1], time_close[1]], lookahead = barmerge.lookahead_on)
+[b_h3, b_l3, b_h1, b_l1, b_t1, b_t3, b_tc] = request.security(syminfo.tickerid, h2Tf, [high[1], low[1], high[3], low[3], time[3], time[1], time_close[1]], lookahead = barmerge.lookahead_on)
+[c_h3, c_l3, c_h1, c_l1, c_t1, c_t3, c_tc] = request.security(syminfo.tickerid, h3Tf, [high[1], low[1], high[3], low[3], time[3], time[1], time_close[1]], lookahead = barmerge.lookahead_on)
+newA = a_t3 != a_t3[1]
+newB = b_t3 != b_t3[1]
+newC = c_t3 != c_t3[1]
+
+newHtf(array<MtfFvg> arr, bool isNew, float h3, float l3, float h1, float l1, int t1, int tc, string tf, color bc, int w, int maxN) =>
+    if isNew and not na(h1)
+        if l3 > h1
+            addZone(arr, MtfFvg.new(box.new(t1, l3, extOn ? time : tc, h1, xloc = xloc.bar_time, border_color = bc, border_width = w, border_style = htfSty, bgcolor = color(na), text = tfTxt(tf), text_size = size.tiny, text_color = bc, text_halign = text.align_right, text_valign = text.align_top), l3, h1, 1, false), maxN)
+        else if h3 < l1
+            addZone(arr, MtfFvg.new(box.new(t1, l1, extOn ? time : tc, h3, xloc = xloc.bar_time, border_color = bc, border_width = w, border_style = htfSty, bgcolor = color(na), text = tfTxt(tf), text_size = size.tiny, text_color = bc, text_halign = text.align_right, text_valign = text.align_bottom), l1, h3, -1, false), maxN)
+
+if fvgOn and barstate.isconfirmed
+    // cập nhật (kéo dài / đánh dấu lấp) trước khi thêm FVG mới
+    updZones(zC, hideFill, false, extOn)
+    updZones(z1, hideFill, true, extOn)
+    updZones(z2, hideFill, true, extOn)
+    updZones(z3, hideFill, true, extOn)
+
+    if ctfOn
+        if low > high[2]
+            addZone(zC, MtfFvg.new(box.new(bar_index - 2, low, bar_index, high[2], border_color = color(na), bgcolor = bullClr), low, high[2], 1, false), fvgN)
+        else if high < low[2]
+            addZone(zC, MtfFvg.new(box.new(bar_index - 2, low[2], bar_index, high, border_color = color(na), bgcolor = bearClr), low[2], high, -1, false), fvgN)
+
+    if h1On and validTf(h1Tf)
+        newHtf(z1, newA, a_h3, a_l3, a_h1, a_l1, a_t1, a_tc, h1Tf, h1Clr, h1W, fvgN)
+    if h2On and validTf(h2Tf)
+        newHtf(z2, newB, b_h3, b_l3, b_h1, b_l1, b_t1, b_tc, h2Tf, h2Clr, h2W, fvgN)
+    if h3On and validTf(h3Tf)
+        newHtf(z3, newC, c_h3, c_l3, c_h1, c_l1, c_t1, c_tc, h3Tf, h3Clr, h3W, fvgN)
+
+// =====================================================================
+// 10 · GANN SWING CONSOLIDATION [F0-F1-SF1]
+// =====================================================================
+// SERIES DÙNG CHUNG
+// =====================================================================
+atrV   = ta.atr(atrLen)
+volSma = ta.sma(volume, volLen)
+
+// =====================================================================
+// ENGINE GANN: F0 → F1 → SF1 (port nguyên logic gốc, X = bar_index)
+// =====================================================================
+var f0x    = array.new_int(5, 0)
+var f0y    = array.new_float(5, close)
+var f1x    = array.new_int(5, 0)
+var f1y    = array.new_float(5, close)
+var sfx    = array.new_int(5, 0)
+var sfy    = array.new_float(5, close)
+var sfMark = array.new_float(1, 0.0)   // > 0 : SF1 đang Pending (nhịp điều chỉnh)
+var sfPend = array.new_int(1, 0)       // bar_index của cực trị S1 lúc vào Pending
+var lnF1   = array.new_line(1)
+var lnSF   = array.new_line(1)
+
+f_cap(array<int> ax, array<float> ay, int cap) =>
+    if ax.size() > cap
+        ax.pop()
+        ay.pop()
+
+// F1 Gann — kết quả 1: điểm mới (đảo chiều) · 2: kéo dài cực trị · 0: không đổi
+f_calcF1(int px, float py) =>
+    int r = 0
+    float a0 = f1y.get(0)
+    float a1 = f1y.get(1)
+    float n0 = f0y.get(0)
+    float n1 = f0y.get(1)
+    float n2 = f0y.get(2)
+    float n3 = f0y.get(3)
+    if (a0 >= a1 and n0 < a1) or (a0 <= a1 and n0 > a1)
+        f1x.unshift(px)
+        f1y.unshift(py)
+        r := 1
+    else if a0 >= a1 and n0 < n1 and n0 < n2 and n1 < n3 and n2 < n3
+        f1x.unshift(px)
+        f1y.unshift(py)
+        r := 1
+    else if a0 <= a1 and n0 > n1 and n0 > n2 and n1 > n3 and n2 > n3
+        f1x.unshift(px)
+        f1y.unshift(py)
+        r := 1
+    else if a0 >= a1 and py >= a0
+        f1x.set(0, px)
+        f1y.set(0, py)
+        r := 2
+    else if a0 <= a1 and py <= a0
+        f1x.set(0, px)
+        f1y.set(0, py)
+        r := 2
+    f_cap(f1x, f1y, 60)
+    r
+
+// SF1 Gann — máy trạng thái Normal / Pending
+f_calcSF1(int px, float py) =>
+    int r = 0
+    float m  = sfMark.get(0)
+    float s0 = sfy.get(0)
+    float s1 = sfy.get(1)
+    float s2 = sfy.get(2)
+    bool up = s0 >= s1
+    bool dn = s0 <= s1
+    if m == 0
+        if (up and py >= s0) or (dn and py <= s0)
+            sfx.set(0, px)
+            sfy.set(0, py)
+            r := 2
+        else if (up and py < s1) or (dn and py > s1)
+            sfx.unshift(px)
+            sfy.unshift(py)
+            r := 1
+        else if (up and py < s0 and py > s1) or (dn and py > s0 and py < s1)
+            sfx.unshift(px)
+            sfy.unshift(py)
+            sfMark.set(0, py)
+            sfPend.set(0, sfx.get(1))
+            r := 1
+    else if m > 0
+        if (up and py < s1) or (dn and py > s1)
+            sfx.unshift(px)
+            sfy.unshift(py)
+            sfMark.set(0, 0.0)
+            r := 1
+        else if (up and py > s2) or (dn and py < s2)
+            sfx.set(0, px)
+            sfy.set(0, py)
+            sfMark.set(0, 0.0)
+            r := 2
+        else if (up and py <= s2 and py >= s0) or (dn and py >= s2 and py <= s0)
+            sfx.set(0, px)
+            sfy.set(0, py)
+            sfMark.set(0, py)
+            r := 2
+    f_cap(sfx, sfy, 60)
+    r
+
+f_point(int px, float py) =>
+    f0x.unshift(px)
+    f0y.unshift(py)
+    f_cap(f0x, f0y, 10)
+    int d1 = f_calcF1(px, py)
+    if d1 > 0
+        if showF1
+            if d1 == 1
+                lnF1.set(0, line.new(f1x.get(1), f1y.get(1), f1x.get(0), f1y.get(0), color = cF1, style = line.style_dotted))
+            else if not na(lnF1.get(0))
+                line.set_xy2(lnF1.get(0), f1x.get(0), f1y.get(0))
+        int ds = f_calcSF1(px, py)
+        if ds > 0 and showSF
+            if ds == 1
+                lnSF.set(0, line.new(sfx.get(1), sfy.get(1), sfx.get(0), sfy.get(0), color = cSF))
+            else if not na(lnSF.get(0))
+                line.set_xy2(lnSF.get(0), sfx.get(0), sfy.get(0))
+    d1
+
+f_feed(float y1, float y2) =>
+    float last = f0y.get(0)
+    if (last > y1 and last > y2) or (last < y1 and last < y2)
+        f_point(bar_index, f0y.get(1))
+    f_point(bar_index, y1)
+    f_point(bar_index, y2)
+
+// Tham chiếu nến trước (inside bar giữ High/Low nến mẹ)
+float p_high = useClosePiv ? math.max(open, close) : high
+float p_low  = useClosePiv ? math.min(open, close) : low
+
+float gs_highPrev = p_high
+float gs_lowPrev  = p_low
+bool isIB = not na(gs_highPrev[1]) and p_high <= gs_highPrev[1] and p_low >= gs_lowPrev[1]
+if isIB
+    gs_highPrev := gs_highPrev[1]
+    gs_lowPrev  := gs_lowPrev[1]
+
+if barstate.isconfirmed and not na(gs_highPrev[1])
+    float hp = gs_highPrev[1]
+    float lp = gs_lowPrev[1]
+    if p_high > hp and p_low > lp
+        f_feed(p_low, p_high)
+    else if p_high < hp and p_low < lp
+        f_feed(p_high, p_low)
+    else if (p_high >= hp and p_low < lp) or (p_high > hp and p_low <= lp)
+        if close > open
+            f_feed(p_low, p_high)
+        else
+            f_feed(p_high, p_low)
+
+// Xu hướng SF1 trước vùng: Pending → hướng chân S2→S1, Normal → hướng chân hiện tại
+f_trend() =>
+    sfMark.get(0) > 0 ? (sfy.get(1) > sfy.get(2) ? 1 : -1) : (sfy.get(0) >= sfy.get(1) ? 1 : -1)
+
+// =====================================================================
+// PHÁT HIỆN ỨNG VIÊN
+// =====================================================================
+// Cách A / B: dùng các điểm swing đã xác nhận (index ≥ 1)
+f_candPiv(bool en, bool useSF, int minX) =>
+    bool  ok = false
+    int   oL = na
+    float oT = na
+    float oB = na
+    float oIT = na
+    float oIB = na
+    if en
+        array<int>   xs = useSF ? sfx : f1x
+        array<float> ys = useSF ? sfy : f1y
+        int kMax = math.min(ys.size() - 1, maxPiv)
+        int kMin = minTouch * 2
+        float lim = maxAtr * atrV
+        if kMax >= kMin
+            for k = kMax to kMin
+                int lx = xs.get(k)
+                if lx < minX or bar_index - lx + 1 < minBars or bar_index - lx > 900
+                    continue
+                float t = ys.get(1)
+                float b = ys.get(1)
+                for j = 2 to k
+                    t := math.max(t, ys.get(j))
+                    b := math.min(b, ys.get(j))
+                float h = t - b
+                if h <= 0 or h > lim or close > t or close < b
+                    continue
+                float tv = h * tolPct / 100
+                int nt = 0
+                int nb = 0
+                float st = 0.0
+                float sb = 0.0
+                for j = 1 to k
+                    float v = ys.get(j)
+                    if v >= t - tv
+                        nt += 1
+                        st += v
+                    else if v <= b + tv
+                        nb += 1
+                        sb += v
+                if nt >= minTouch and nb >= minTouch
+                    ok  := true
+                    oL  := lx
+                    oT  := t
+                    oB  := b
+                    oIT := st / nt
+                    oIB := sb / nb
+                    break
+    [ok, oL, oT, oB, oIT, oIB]
+
+// Cách C: cửa sổ nến dài nhất có biên độ ≤ giới hạn, đếm lượt chạm xen kẽ (bỏ inside bar)
+f_candC(bool en) =>
+    bool  ok = false
+    int   oL = na
+    float oT = na
+    float oB = na
+    float oIT = na
+    float oIB = na
+    if en
+        float lim = maxAtr * atrV
+        float hi = high
+        float lo = low
+        int L = 1
+        int look = math.min(maxLook, bar_index)
+        if look > 1
+            for j = 1 to look - 1
+                float nh = math.max(hi, high[j])
+                float nl = math.min(lo, low[j])
+                if nh - nl > lim
+                    break
+                hi := nh
+                lo := nl
+                L  := j + 1
+        if L >= minBars and hi > lo
+            float tv = (hi - lo) * tolPct / 100
+            int last = 0
+            int nt = 0
+            int nb = 0
+            float st = 0.0
+            float sb = 0.0
+            for j = L - 1 to 0
+                if not isIB[j]
+                    if high[j] >= hi - tv and last != 1
+                        nt += 1
+                        st += high[j]
+                        last := 1
+                    else if low[j] <= lo + tv and last != -1
+                        nb += 1
+                        sb += low[j]
+                        last := -1
+            if nt >= minTouch and nb >= minTouch
+                ok  := true
+                oL  := bar_index - L + 1
+                oT  := hi
+                oB  := lo
+                oIT := st / nt
+                oIB := sb / nb
+    [ok, oL, oT, oB, oIT, oIB]
+
+// Bộ lọc kiểu C cho Cách A/B
+f_cFilter(int left, float it, float ib) =>
+    int span = bar_index - left + 1
+    int inC = 0
+    int nIB = 0
+    for j = 0 to span - 1
+        if close[j] <= it and close[j] >= ib
+            inC += 1
+        if isIB[j]
+            nIB += 1
+    inC * 100.0 / span >= cfClose and nIB * 100.0 / span >= cfIB
+
+// =====================================================================
+// HỘP CONSOLIDATION
+// =====================================================================
+type CBox
+    int   left
+    float top
+    float bot
+    float inTop
+    float inBot
+    int   trend
+    int   state  = 1      // 1: đang sống · 2: đã phá, chờ BTR · 3: kết thúc
+    int   endBar
+    int   brBar           // nến 2 của bộ FVG phá
+    int   brDir
+    float fvgFar          // mép xa FVG: Buy = High nến 1, Sell = Low nến 1
+    bool  szOk   = true
+    bool  btrHit = false
+    int   btrBar
+    int   btrDir
+    box   bxO
+    box   bxI
+    label lbBO
+    label lbBTR
+
+var boxes = array.new<CBox>()
+
+f_setRight(CBox b, int r) =>
+    if not na(b.bxO)
+        box.set_right(b.bxO, r)
+    if not na(b.bxI)
+        box.set_right(b.bxI, r)
+
+f_mkBoxes(int l, float t, float b, float it, float ib) =>
+    box bo = na
+    box bi = na
+    if drawMode != DM_IN
+        bo := box.new(l, t, bar_index, b, border_color = cBorder, bgcolor = cFill, border_width = 1)
+    if drawMode != DM_OUT
+        bi := box.new(l, it, bar_index, ib, border_color = cInner, bgcolor = drawMode == DM_IN ? cFill : color.new(color.white, 100), border_width = 1, border_style = line.style_dashed)
+    [bo, bi]
+
+f_lbl(int x, int d, string txt, color col, string sz) =>
+    label.new(x, close, txt, yloc = d == 1 ? yloc.belowbar : yloc.abovebar, style = d == 1 ? label.style_label_up : label.style_label_down, color = col, textcolor = color.white, size = sz,
+         tooltip = "TD = tiếp diễn xu hướng SF1 · ĐC = đảo chiều")
+
+f_tag(int d, int trend) =>
+    sfTagOn ? (d == trend ? " TD" : " ĐC") : ""
+
+// Cờ sự kiện cho alert
+bool evDet  = false
+bool evBO   = false
+bool evBAG  = false
+bool evBTR  = false
+bool evBTRs = false
+bool evEnd  = false
+string msg  = ""
+
+// ---------------------------------------------------------------------
+// 1) CẬP NHẬT CÁC HỘP (xét nến c = nến trước, nến hiện tại là nến 3 của FVG)
+// ---------------------------------------------------------------------
+if barstate.isconfirmed and boxes.size() > 0
+    for i = boxes.size() - 1 to 0
+        CBox b = boxes.get(i)
+        int c = bar_index - 1
+
+        // Nâng cấp BTR → BTR* (nến invert là nến 2 của FVG ngược chiều)
+        if not na(b.btrBar) and bar_index == b.btrBar + 1
+            bool star = b.btrDir == -1 ? high < low[2] : low > high[2]
+            if star
+                if not na(b.lbBTR)
+                    label.set_text(b.lbBTR, "BTR*")
+                    label.set_color(b.lbBTR, b.btrDir == 1 ? cBTRsBuy : cBTRsSell)
+                    label.set_size(b.lbBTR, size.normal)
+                evBTRs := true
+                msg += "BTR* " + (b.btrDir == 1 ? "BUY" : "SELL") + " | "
+
+        if b.state == 1
+            float brT = brkMode == DM_IN ? b.inTop : b.top
+            float brB = brkMode == DM_IN ? b.inBot : b.bot
+            float gUp = low - high[2]
+            float gDn = low[2] - high
+            float refA = atrV[2]
+            bool okUp = not szOn or gUp >= szMult * refA
+            bool okDn = not szOn or gDn >= szMult * refA
+            bool blkA = szOn and szMode == MODE_A
+            bool boUp = c > b.left and close[1] > brT and gUp > 0 and (not blkA or okUp)
+            bool boDn = c > b.left and close[1] < brB and gDn > 0 and (not blkA or okDn)
+            if boUp or boDn
+                int d = boUp ? 1 : -1
+                b.state  := 2
+                b.brBar  := c
+                b.brDir  := d
+                b.fvgFar := boUp ? high[2] : low[2]
+                b.szOk   := boUp ? okUp : okDn
+                b.btrHit := false
+                f_setRight(b, c)
+                if sigOn
+                    b.lbBO := f_lbl(c, d, "B/O" + f_tag(d, b.trend), d == 1 ? cBOBuy : cBOSell, size.small)
+                evBO  := true
+                evEnd := true
+                msg += "B/O " + (d == 1 ? "BUY" : "SELL") + f_tag(d, b.trend) + " | "
+            else
+                float h1 = high[1]
+                float l1 = low[1]
+                if h1 > b.top or l1 < b.bot
+                    float nt = math.max(b.top, h1)
+                    float nb = math.min(b.bot, l1)
+                    if nt - nb <= maxAtr * atrV
+                        // Giãn hộp (vượt biên nhưng không có FVG, vẫn trong giới hạn ATR)
+                        b.top := nt
+                        b.bot := nb
+                        if not na(b.bxO)
+                            box.set_top(b.bxO, nt)
+                            box.set_bottom(b.bxO, nb)
+                        f_setRight(b, bar_index)
+                    else
+                        // Trôi ra quá giới hạn mà không có FVG → kết thúc im lặng
+                        b.state  := 3
+                        b.endBar := math.max(b.left, c - 1)
+                        f_setRight(b, b.endBar)
+                        evEnd := true
+                        msg += "Consolidation Ended | "
+                else
+                    f_setRight(b, bar_index)
+
+        else if b.state == 2
+            int k = bar_index - b.brBar
+            int d = b.brDir
+            // Nâng cấp B/O → BAG khi nến 4 đóng
+            if k == 2
+                float r2  = high[2] - low[2]
+                float bd2 = math.abs(close[2] - open[2])
+                float ps2 = r2 > 0 ? (d == 1 ? (close[2] - low[2]) / r2 : (high[2] - close[2]) / r2) : 0.0
+                bool disp = r2 > 0 and bd2 / r2 >= dBody and ps2 >= dClose and r2 >= dAtr * atrV[3] and (not volOn or volume[2] >= volMult * volSma[3])
+                bool c4   = d == 1 ? low > low[1] : high < high[1]
+                bool szB  = not (szOn and szMode == MODE_B) or b.szOk
+                if disp and c4 and szB
+                    if not na(b.lbBO)
+                        label.set_text(b.lbBO, "BAG" + f_tag(d, b.trend))
+                        label.set_color(b.lbBO, d == 1 ? cBAGBuy : cBAGSell)
+                        label.set_size(b.lbBO, size.normal)
+                    evBAG := true
+                    msg += "BAG " + (d == 1 ? "BUY" : "SELL") + f_tag(d, b.trend) + " | "
+            // BTR: FVG phá bị invert (close vượt mép xa) trong N nến
+            if k >= 1 and k <= btrN and not b.btrHit
+                bool inv = d == 1 ? close < b.fvgFar : close > b.fvgFar
+                if inv
+                    b.btrHit := true
+                    b.btrBar := bar_index
+                    b.btrDir := -d
+                    if btrOn
+                        label.delete(b.lbBO)
+                        b.lbBO  := na
+                        b.lbBTR := f_lbl(bar_index, -d, "BTR", -d == 1 ? cBTRBuy : cBTRSell, size.small)
+                    evBTR := true
+                    msg += "BTR " + (-d == 1 ? "BUY" : "SELL") + " | "
+                    if close <= b.top and close >= b.bot
+                        // Giá đóng lại vào trong hộp → hộp sống lại (lần phá vừa rồi là phá giả)
+                        b.state := 1
+                        f_setRight(b, bar_index)
+                    else
+                        b.state  := 3
+                        b.endBar := b.brBar
+            if b.state == 2 and k >= math.max(btrN, 2)
+                b.state  := 3
+                b.endBar := b.brBar
+
+    // Dọn bớt hộp đã kết thúc (giữ tối đa 40 hộp gần nhất để chống vẽ lại)
+    int n3 = 0
+    for b in boxes
+        if b.state == 3
+            n3 += 1
+    if n3 > 40
+        for i = 0 to boxes.size() - 1
+            if boxes.get(i).state == 3
+                boxes.remove(i)
+                break
+
+// ---------------------------------------------------------------------
+// 2) PHÁT HIỆN VÙNG MỚI
+// ---------------------------------------------------------------------
+if barstate.isconfirmed and not na(atrV) and bar_index > 5
+    bool useC  = method == M_C
+    bool useB  = method == M_B
+    bool pendB = sfMark.get(0) > 0
+    [pO, pL, pT, pB, pIT, pIB] = f_candPiv(not useC and (not useB or pendB), method == M_A and layer == "SF1", useB ? sfPend.get(0) : 0)
+    [qO, qL, qT, qB, qIT, qIB] = f_candC(useC)
+    bool  ok  = useC ? qO : pO
+    int   cL  = useC ? qL : pL
+    float cT  = useC ? qT : pT
+    float cB  = useC ? qB : pB
+    float cIT = useC ? qIT : pIT
+    float cIB = useC ? qIB : pIB
+
+    if ok and cfOn and not useC
+        ok := f_cFilter(cL, cIT, cIB)
+
+    if ok
+        float eps = syminfo.mintick
+        bool skip = false
+        array<int> covIdx = array.new_int()
+        if boxes.size() > 0
+            for i = 0 to boxes.size() - 1
+                CBox b = boxes.get(i)
+                if b.state == 1
+                    bool inside = cT <= b.top + eps and cB >= b.bot - eps
+                    bool covers = cT >= b.top - eps and cB <= b.bot + eps
+                    if ovMode == OV_B
+                        skip := true
+                    else if ovMode == OV_C and covers
+                        covIdx.push(i)
+                    else if inside
+                        skip := true
+                    else if covers
+                        bool bigger = cT > b.top + eps or cB < b.bot - eps
+                        if not bigger
+                            skip := true
+                else
+                    // Vùng mới phải bắt đầu sau khi vùng cũ (cùng khu vực giá) đã bị phá / kết thúc
+                    int eX = b.state == 2 ? b.brBar : b.endBar
+                    if cL <= eX and cT > b.bot and cB < b.top
+                        skip := true
+
+        if not skip
+            if covIdx.size() > 0
+                // (c) Vùng lớn nuốt vùng nhỏ: gộp vào hộp đầu tiên, xóa các hộp nhỏ còn lại
+                CBox t0 = boxes.get(covIdx.get(0))
+                t0.left  := math.min(t0.left, cL)
+                t0.top   := cT
+                t0.bot   := cB
+                t0.inTop := cIT
+                t0.inBot := cIB
+                if not na(t0.bxO)
+                    box.set_left(t0.bxO, t0.left)
+                    box.set_top(t0.bxO, cT)
+                    box.set_bottom(t0.bxO, cB)
+                if not na(t0.bxI)
+                    box.set_left(t0.bxI, t0.left)
+                    box.set_top(t0.bxI, cIT)
+                    box.set_bottom(t0.bxI, cIB)
+                if covIdx.size() > 1
+                    for j = covIdx.size() - 1 to 1
+                        int idx = covIdx.get(j)
+                        CBox bd = boxes.get(idx)
+                        box.delete(bd.bxO)
+                        box.delete(bd.bxI)
+                        boxes.remove(idx)
+            else
+                CBox nbx = CBox.new(left = cL, top = cT, bot = cB, inTop = cIT, inBot = cIB, trend = f_trend())
+                [bo, bi] = f_mkBoxes(cL, cT, cB, cIT, cIB)
+                nbx.bxO := bo
+                nbx.bxI := bi
+                boxes.push(nbx)
+                evDet := true
+                msg += "Consolidation Detected | "
+
+// =====================================================================
+// ALERTS
+// =====================================================================
+alertcondition(evDet,  "Consolidation Detected", "Phát hiện vùng Consolidation mới")
+alertcondition(evEnd,  "Consolidation Ended",    "Vùng Consolidation kết thúc (B/O hoặc trôi ra)")
+alertcondition(evBO,   "B/O",  "Phá hộp Consolidation bằng FVG (B/O)")
+alertcondition(evBAG,  "BAG",  "Phá hộp nâng cao (BAG)")
+alertcondition(evBTR,  "BTR",  "Phá giả — FVG phá bị invert (BTR)")
+alertcondition(evBTRs, "BTR*", "Phá giả mạnh — invert tạo FVG ngược chiều (BTR*)")
+if msg != ""
+    alert(syminfo.ticker + " " + timeframe.period + " | " + msg, alert.freq_once_per_bar_close)
+// ====================================================================
+//  7 · OLHC — CẤU TRÚC NẾN   (thứ duy nhất v4 thêm so với v3)
+//  Cụm ĐỘC LẬP: chỉ đọc O/H/L/C của chính cây nến đang xét. Không đi qua
+//  bộ lọc BIAS H1, không đọc state của JUDAS / TURTLE SOUP / CRB. Chỉ vẽ
+//  trên nến ĐÃ ĐÓNG - nến đang chạy còn đổi số thì phân loại còn nhảy.
+// ====================================================================
+float olUw = high - math.max(open, close)
+float olBd = math.abs(close - open)
+float olLw = math.min(open, close) - low
+float olRg = high - low
+
+float olPu = olRg > 0.0 ? olUw / olRg * 100.0 : 0.0
+float olPb = olRg > 0.0 ? olBd / olRg * 100.0 : 0.0
+float olPl = olRg > 0.0 ? olLw / olRg * 100.0 : 0.0
+
+float olAtrV   = ta.atr(olAtrLen)
+bool  olStrong = not olAtrOn or (not na(olAtrV) and olRg >= olAtrV * olAtrMult)
+
+bool olShBear = olPu >= olGap1 and olPb <= olGap2 and olPl <= olGap3
+bool olShBull = olPl >= olGap1 and olPb <= olGap2 and olPu <= olGap3
+bool olKBear  = not olUseK or olUw >= olK * olLw
+bool olKBull  = not olUseK or olLw >= olK * olUw
+
+// Ca hai cung dat thi bo - cay do khong nghieng han ve ben nao.
+bool olOneSide = olRg > 0.0 and (olShBear or olShBull) and not (olShBear and olShBull)
+
+bool olOhlcRaw = olOn and olOneSide and olShBear and olKBear and olStrong and barstate.isconfirmed
+bool olOlhcRaw = olOn and olOneSide and olShBull and olKBull and olStrong and barstate.isconfirmed
+
+// HAI CONG BIAS (26-08). OHLC = upper wick dai = tin hieu GIAM (-1);
+// OLHC = lower wick dai = tin hieu TANG (+1). Phan TINH TOAN o tren khong bi
+// dong toi mot dau cham nao — cong chi gac o day.
+bool olOhlc = olOhlcRaw
+bool olOlhc = olOlhcRaw
+
+plotshape(olMark and olOhlc, "OLHC · OHLC tín hiệu GIẢM", shape.triangledown, location.abovebar, olColBear, size = size.tiny)
+plotshape(olMark and olOlhc, "OLHC · OLHC tín hiệu TĂNG", shape.triangleup, location.belowbar, olColBull, size = size.tiny)
+barcolor(olBar and olOhlc ? olColBear : (olBar and olOlhc ? olColBull : na), title = "OLHC · tô màu cả cây nến")
+
+// Nhan la doi tuong ve nen xoa lai duoc -> cat theo o "so nhan giu lai".
+var array<label> olPool = array.new<label>()
+
+olTrim(pool, lb) =>
+    array.push(pool, lb)
+    while array.size(pool) > olKeep
+        label.delete(array.shift(pool))
+
+string olLbSize = olLbSz == "Nhỏ" ? size.small : olLbSz == "To" ? size.large : size.normal
+
+if olLbl and (olOhlc or olOlhc)
+    string olTip = (olOhlc ? "OHLC — TÍN HIỆU GIẢM" : "OLHC — TÍN HIỆU TĂNG") + "\nupper wick " + str.tostring(olUw, format.mintick) + "   " + str.tostring(olPu, "#.0") + "%" + "\nbody       " + str.tostring(olBd, format.mintick) + "   " + str.tostring(olPb, "#.0") + "%" + "\nlower wick " + str.tostring(olLw, format.mintick) + "   " + str.tostring(olPl, "#.0") + "%" + "\nrange      " + str.tostring(olRg, format.mintick) + "   ATR " + str.tostring(olAtrV, format.mintick)
+    label olLb = label.new(bar_index, olOhlc ? high : low, olOhlc ? "OHLC" : "OLHC", style = olOhlc ? label.style_label_down : label.style_label_up, color = color.new(chart.bg_color, 15), textcolor = olOhlc ? olColBear : olColBull, size = olLbSize, tooltip = olTip)
+    olTrim(olPool, olLb)
+
+alertcondition(olOhlc, title = "OLHC · nến OHLC — tín hiệu GIẢM", message = "2TC-v10: nen OHLC - tin hieu giam")
+alertcondition(olOlhc, title = "OLHC · nến OLHC — tín hiệu TĂNG", message = "2TC-v10: nen OLHC - tin hieu tang")
+
+// =====================================================================
+//  NHOM 13 — ĐƯỜNG HỒI QUY + PARABOL   (riêng bản v5, 25-08)
+//
+//  Bậc 1:  b = ( N*SUM(x*y) - SUM(x)*SUM(y) ) / ( N*SUM(x^2) - SUM(x)^2 )
+//  Bậc 2:  y(x) = c + b*x + a*x^2, với x ĐẶT Ở TÂM cửa sổ nên SUM(x) = 0
+//          và SUM(x^3) = 0 — hệ chuẩn tắc 3x3 rã thành hai mảnh rời,
+//          không phải giải định thức, và ổn định số học hơn hẳn.
+//
+//  y'' = 2a = GIA TỐC — thứ đường thẳng không bao giờ thấy được.
+//
+//  Số điểm vẽ đường cong CHỐT Ở 31 (30 đoạn), đúng con số của bản MT5
+//  và của Slope-Meter, để ba bản vẽ trùng khít.
+// =====================================================================
+sl_srcOf(s) =>
+    s == "OPEN" ? open : s == "HIGH" ? high : s == "LOW" ? low : s == "MEDIAN" ? hl2 : s == "TYPICAL" ? hlc3 : s == "WEIGHTED" ? hlcc4 : close
+
+sl_calc(N, sName, aLen, eOn, vMaLen, bMaLen) =>
+    src = sl_srcOf(sName)
+    sx  = N * (N - 1) / 2.0
+    sxx = (N - 1) * N * (2.0 * N - 1) / 6.0
+    den = N * sxx - sx * sx
+    sy  = 0.0
+    sxy = 0.0
+    for k = 0 to N - 1
+        y = src[N - 1 - k]
+        sy  += y
+        sxy += k * y
+    b = den == 0.0 ? 0.0 : (N * sxy - sx * sy) / den
+    a = (sy - b * sx) / N
+    ybar = sy / N
+    ssTot = 0.0
+    ssRes = 0.0
+    for k = 0 to N - 1
+        y = src[N - 1 - k]
+        r = y - (a + b * k)
+        ssTot += (y - ybar) * (y - ybar)
+        ssRes += r * r
+    r2 = ssTot > 1e-12 ? math.max(0.0, 1.0 - ssRes / ssTot) : 0.0
+    av = ta.atr(aLen)
+    bn = av > 0.0 ? b / av : 0.0
+    
+    mass = 1.0
+    ek = 0.0
+    ep = 0.0
+    mom = 0.0
+    if eOn
+        avgV = ta.sma(volume, N)
+        avgMA = ta.sma(volume, vMaLen)
+        mass := avgMA > 0 ? (avgV / avgMA) : 1.0
+        if mass > 3.0
+            mass := 3.0
+        ek := 0.5 * mass * bn * math.abs(bn) * 100.0
+        mom := mass * bn
+        bMA = bMaLen <= 0 ? N : bMaLen
+        avgBase = ta.sma(src, bMA)
+        omega = bMA > 0 ? (2.0 * math.pi / bMA) : 1.0
+        ycenter = a + b * (N - 1.0) / 2.0
+        x = av > 0.0 ? (ycenter - avgBase) / av : 0.0
+        ep := 0.5 * mass * math.pow(omega * x, 2) * 100.0
+
+    [b, bn, r2, a, a + b * (N - 1), time[N - 1], time, mass, ek, ep, mom]
+
+sl_curve(N, sName, aLen, pts) =>
+    src = sl_srcOf(sName)
+    dN  = N * 1.0
+    S2  = (dN * dN * dN - dN) / 12.0
+    S4  = dN * (dN * dN - 1.0) * (3.0 * dN * dN - 7.0) / 240.0
+    den = dN * S4 - S2 * S2
+    half = (dN - 1.0) / 2.0
+    T0 = 0.0
+    T1 = 0.0
+    T2 = 0.0
+    for k = 0 to N - 1
+        x = k - half
+        y = src[N - 1 - k]
+        T0 += y
+        T1 += x * y
+        T2 += x * x * y
+    b = S2 > 0.0 ? T1 / S2 : 0.0
+    a = math.abs(den) > 1e-12 ? (dN * T2 - S2 * T0) / den : 0.0
+    c = (T0 - S2 * a) / dN
+    ybar = T0 / dN
+    ssTot = 0.0
+    ssRes = 0.0
+    for k = 0 to N - 1
+        x = k - half
+        y = src[N - 1 - k]
+        r = y - (c + b * x + a * x * x)
+        ssTot += (y - ybar) * (y - ybar)
+        ssRes += r * r
+    r2 = ssTot > 1e-12 ? math.max(0.0, 1.0 - ssRes / ssTot) : 0.0
+    av = ta.atr(aLen)
+    accv = av > 0.0 ? 2.0 * a / av : 0.0
+    sEnd = av > 0.0 ? (b + a * (dN - 1.0)) / av : 0.0
+    P = math.min(N, pts)
+    arrY = array.new<float>(0)
+    arrT = array.new<int>(0)
+    for i = 0 to P - 1
+        kk = int(math.round(i * (N - 1) / (P - 1)))
+        xx = kk - half
+        array.push(arrY, c + b * xx + a * xx * xx)
+        array.push(arrT, time[N - 1 - kk])
+    [a, r2, accv, sEnd, arrY, arrT]
+
+// Gọi vô điều kiện: Pine không cho gọi request.security trong nhánh if.
+// Tắt enableSlope thì kết quả đơn giản là không được dùng vào đâu cả.
+[slRaw, slNorm, slR2, slInt, slY1raw, slT0, slT1, slMass, slEk, slEp, slMom] = request.security(syminfo.tickerid, slTF, sl_calc(slLen, slSrc, slAtrLen, slEnergyOn, slVolMaLen, slBaseMaLen))
+[slP2a, slP2r2, slAccV, slP2Slp, slP2Y, slP2T] = request.security(syminfo.tickerid, slTF, sl_curve(slLen, slSrc, slAtrLen, 31))
+
+sl_styOf(s) =>
+    s == "Nét đứt" ? line.style_dashed : s == "Chấm chấm" ? line.style_dotted : line.style_solid
+
+slSegCol = na(slNorm) ? slColFlat : slNorm > slFlat ? slColUp : slNorm < -slFlat ? slColDn : slColFlat
+slCurCol = slP2a >= 0.0 ? slP2Up : slP2Dn
+slSegExt = slSegRay ? extend.right : extend.none
+slNSeg   = 30
+
+var line slSegLn = na
+var array<line> slCurLn = array.new<line>(0)
+
+if enableSlope and slSeg and not na(slRaw) and not na(slT0) and barstate.islast
+    if na(slSegLn)
+        slSegLn := line.new(slT0, slInt, slT1, slY1raw, xloc = xloc.bar_time)
+    line.set_xy1(slSegLn, slT0, slInt)
+    line.set_xy2(slSegLn, slT1, slY1raw)
+    line.set_color(slSegLn, slSegCol)
+    line.set_width(slSegLn, slSegW)
+    line.set_style(slSegLn, sl_styOf(slSegSty))
+    line.set_extend(slSegLn, slSegExt)
+
+// 30 đoạn nối thành đường cong. Tạo MỘT LẦN rồi chỉ set toạ độ: line không
+// rollback trên nến realtime nên tuyệt đối không tạo mới theo nến.
+if enableSlope and slP2 and barstate.islast
+    if array.size(slCurLn) == 0
+        for i = 0 to slNSeg - 1
+            array.push(slCurLn, line.new(time, close, time, close, xloc = xloc.bar_time))
+    
+    if array.size(slCurLn) > 0 and not na(slP2T)
+        nSeg = array.size(slP2T) - 1
+        for i = 0 to slNSeg - 1
+            ln = array.get(slCurLn, i)
+            if i < nSeg
+                line.set_xy1(ln, array.get(slP2T, i), array.get(slP2Y, i))
+                line.set_xy2(ln, array.get(slP2T, i + 1), array.get(slP2Y, i + 1))
+                line.set_color(ln, slCurCol)
+                line.set_width(ln, slP2W)
+                line.set_style(ln, sl_styOf(slP2Sty))
+            else
+                line.set_color(ln, color.new(color.black, 100))
+
+// =====================================================================
+//  NHOM 14 — DASHBOARD
+//
+//  KẾT LUẬN xét ĐỦ BA THỨ chứ không mỗi độ dốc: đường cong khớp hơn hẳn
+//  -> ĐANG CONG (đừng đọc độ dốc); cả hai không khớp -> GIÁ LOẠN; đường
+//  thẳng khớp tốt -> mới đọc hướng, và còn so DỐC LÚC NÀY với ngưỡng đi
+//  ngang để biết đà còn sức không.
+// =====================================================================
+db_posOf(s) =>
+    s == "Trên · trái" ? position.top_left : s == "Dưới · phải" ? position.bottom_right : s == "Dưới · trái" ? position.bottom_left : position.top_right
+
+db_sizeOf(s) =>
+    s == "Tiny" ? size.tiny : s == "Small" ? size.small : s == "Large" ? size.large : size.normal
+
+// Cú gần nhất của một cơ chế, dạng chuỗi để in ra bảng.
+db_jdTxt() =>
+    string s = "chưa có"
+    if array.size(jdArr) > 0
+        MechRec r = array.get(jdArr, array.size(jdArr) - 1)
+        s := (r.dir == 1 ? "BUY" : "SELL") + (r.dead ? " hỏng" : r.done ? " xong" : " chờ")
+    s
+
+db_tsTxt() =>
+    string s = "chưa có"
+    if array.size(tsArr) > 0
+        MechRec r = array.get(tsArr, array.size(tsArr) - 1)
+        s := (r.dir == 1 ? "BUY" : "SELL") + (r.dead ? " hỏng" : r.done ? " xong" : " chờ")
+    s
+
+db_mechCol(txt) =>
+    str.contains(txt, "hỏng") ? slColFlat : str.startswith(txt, "BUY") ? slColUp : str.startswith(txt, "SELL") ? slColDn : slColFlat
+
+dbHaveP2 = enableSlope and not na(slP2a)
+dbLoan   = na(slRaw) ? false : slR2 < slR2Min and (not dbHaveP2 or slP2r2 < slR2Min)
+dbCong   = dbHaveP2 and slP2r2 >= slR2Min and (slP2r2 - slR2) >= slR2Gap
+
+isUptrend = slNorm > 0
+isBraking = dbHaveP2 and ((isUptrend and slAccV < 0) or (not isUptrend and slAccV > 0))
+epDominates = math.abs(slEp) >= math.abs(slEk)
+isP2Flip = dbHaveP2 and ((isUptrend and slP2Slp < 0) or (not isUptrend and slP2Slp > 0))
+
+dbSta = "CHỜ NẾN"
+dbStaDesc = "Chưa đủ dữ liệu nến"
+dbStaAct = "Đứng ngoài chờ nến"
+dbCol = slColFlat
+
+if not na(slRaw)
+    if dbLoan
+        dbSta := "NHIỄU LOẠN"
+        dbStaDesc := "Hành vi giá nhiễu loạn (Choppy)"
+        dbStaAct := "Không giao dịch (No Trade Zone)"
+        dbCol := slColFlat
+    else if slR2 >= slR2Min and slEnergyOn and math.abs(slNorm) > slFlat
+        if isBraking
+            if epDominates
+                if isP2Flip
+                    dbSta := "ĐẢO CHIỀU XÁC NHẬN"
+                    dbStaDesc := "Gia tốc đảo chiều. Cấu trúc giá thay đổi"
+                    dbStaAct := "Tìm kiếm Entry đảo chiều (Reversal)"
+                    dbCol := isUptrend ? slP2Dn : slP2Up
+                else
+                    dbSta := "KIỆT SỨC (CĂNG MAX)"
+                    dbStaDesc := "Đà giá mở rộng quá mức (Overextended)"
+                    dbStaAct := "Chuẩn bị kịch bản đảo chiều (Reversal)"
+                    dbCol := color.orange
+            else
+                if isP2Flip
+                    dbSta := "PULLBACK SÂU"
+                    dbStaDesc := "Retracement sâu về Discount/Premium"
+                    dbStaAct := "Tìm kiếm Entry thuận xu hướng"
+                    dbCol := color.orange
+                else
+                    dbSta := "PULLBACK NHẸ"
+                    dbStaDesc := "Nhịp hồi ngắn. Xung lượng chính vẫn mạnh"
+                    dbStaAct := "Chốt lời ngắn. KHÔNG bắt đỉnh/đáy"
+                    dbCol := isUptrend ? slColUp : slColDn
+        else
+            if not epDominates
+                dbSta := "BÙNG NỔ THỰC SỰ"
+                dbStaDesc := "Đột phá động lượng, Volume YẾU"
+                dbStaAct := "Cảnh giác Fakeout/Stop Hunt. Scalp hoặc Nghỉ"
+                dbCol := isUptrend ? slColUp : slColDn
+            else
+                if slMass > 1.5
+                    dbSta := "QUÁN TÍNH (" + (isUptrend ? "TĂNG" : "GIẢM") + ")"
+                    dbStaDesc := "Động lượng duy trì, Volume dồi dào"
+                    dbStaAct := "Nắm giữ lệnh thuận xu hướng"
+                    dbCol := isUptrend ? slColUp : slColDn
+                else
+                    dbSta := "TÍCH LŨY (NÉN)"
+                    dbStaDesc := "Giá nén chặt trong biên độ hẹp (Consolidation)"
+                    dbStaAct := "Chờ đợi Breakout xác nhận"
+                    dbCol := color.new(#ff00ff, 0)
+    else if dbCong
+        dbSta := slP2a >= 0.0 ? "CHUYỂN HƯỚNG TĂNG" : "CHUYỂN HƯỚNG GIẢM"
+        dbStaDesc := "Cấu trúc giá chuyển pha, chưa rõ xu hướng"
+        dbStaAct := "Đứng ngoài quan sát"
+        dbCol := slP2a >= 0.0 ? slP2Up : slP2Dn
+    else if slR2 >= slR2Min and slNorm > slFlat
+        dbSta := isBraking ? "KIỆT SỨC (TĂNG)" : "TĂNG"
+        dbStaDesc := isBraking ? "Xung lượng Tăng suy yếu dần" : "Xu hướng Tăng ổn định"
+        dbStaAct := isBraking ? "Canh chốt lời (Take Profit)" : "Follow Trend"
+        dbCol := isBraking ? slP2Dn : slColUp
+    else if slR2 >= slR2Min and slNorm < -slFlat
+        dbSta := isBraking ? "KIỆT SỨC (GIẢM)" : "GIẢM"
+        dbStaDesc := isBraking ? "Xung lượng Giảm suy yếu dần" : "Xu hướng Giảm ổn định"
+        dbStaAct := isBraking ? "Canh chốt lời (Take Profit)" : "Follow Trend"
+        dbCol := isBraking ? slP2Up : slColDn
+    else
+        dbSta := "TÍCH LŨY (NÉN)"
+        dbStaDesc := "Giá đi ngang (Ranging)"
+        dbStaAct := "Không giao dịch (No Trade Zone)"
+        dbCol := slColFlat
+
+
+dbJd  = db_jdTxt()
+dbTs  = db_tsTxt()
+// BIAS removed
+// dbBh / dbBhC removed
+
+dbR2C  = not na(slR2) and slR2 < slR2Min ? slColDn : dbColTx
+dbR22C = not na(slP2r2) and slP2r2 < slR2Min ? slColDn : dbColTx
+dbSlpC = na(slP2Slp) ? slColFlat : slP2Slp > slFlat ? slColUp : slP2Slp < -slFlat ? slColDn : slColFlat
+dbAccC = na(slAccV) ? slColFlat : slAccV > 0.0 ? slP2Up : slAccV < 0.0 ? slP2Dn : slColFlat
+
+dbTfTx = slTF == "" ? "chart" : slTF
+dbVWin = dbTfTx + " x " + str.tostring(slLen)
+dbVSlp = na(slNorm) ? "—" : str.tostring(slNorm, "+0.00;-0.00") + " ATR"
+dbVRaw = na(slRaw) ? "—" : str.tostring(slRaw, format.mintick)
+dbVR2  = na(slR2) ? "—" : str.tostring(slR2, "0.00")
+dbVP2S = na(slP2Slp) ? "—" : str.tostring(slP2Slp, "+0.00;-0.00") + " ATR"
+dbAccDir = na(slAccV) or na(slAccV[1]) ? "" : (math.abs(slAccV) > math.abs(slAccV[1]) ? " (Tăng)" : (math.abs(slAccV) < math.abs(slAccV[1]) ? " (Giảm)" : ""))
+dbVAcc = na(slAccV) ? "—" : (na(slAccV[1]) ? str.tostring(slAccV, "+0.000;-0.000") : str.tostring(slAccV[1], "+0.000;-0.000") + " -> " + str.tostring(slAccV, "+0.000;-0.000")) + dbAccDir
+dbVR22 = na(slP2r2) ? "—" : str.tostring(slP2r2, "0.00")
+
+dbVMass = na(slMass) ? "—" : str.tostring(slMass, "0.00") + "x"
+dbVMom  = na(slMom) ? "—" : str.tostring(slMom, "+0.00;-0.00")
+dbVEk   = na(slEk) ? "—" : str.tostring(slEk, "0.00")
+dbVEp   = na(slEp) ? "—" : str.tostring(slEp, "0.00")
+
+dbRows = (dbMech ? 7 : 5)
+
+var table dbTbl = na
+
+if dbShow and barstate.islast
+    if na(dbTbl)
+        dbTbl := table.new(db_posOf(dbPos), 2, dbRows, bgcolor = dbColBg, border_width = 0)
+    dbFz = db_sizeOf(dbFont)
+    table.cell(dbTbl, 0, 0, "Đo trên", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+    table.cell(dbTbl, 1, 0, dbVWin, text_color = dbColTx, text_size = dbFz, text_halign = text.align_right)
+    
+    table.cell(dbTbl, 0, 1, "Gia tốc", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+    table.cell(dbTbl, 1, 1, dbVAcc, text_color = dbAccC, text_size = dbFz, text_halign = text.align_right)
+    
+    table.cell(dbTbl, 0, 2, "TÍN HIỆU", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+    table.cell(dbTbl, 1, 2, dbSta, text_color = dbCol, text_size = dbFz, text_halign = text.align_right)
+    
+    table.cell(dbTbl, 0, 3, "TRẠNG THÁI", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+    table.cell(dbTbl, 1, 3, dbStaDesc, text_color = dbColTx, text_size = dbFz, text_halign = text.align_right)
+    
+    table.cell(dbTbl, 0, 4, "ACTION", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+    table.cell(dbTbl, 1, 4, dbStaAct, text_color = color.yellow, text_size = dbFz, text_halign = text.align_right)
+    
+    curr_row = 5
+    if dbMech
+        table.cell(dbTbl, 0, curr_row, "JUDAS", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+        table.cell(dbTbl, 1, curr_row, dbJd, text_color = db_mechCol(dbJd), text_size = dbFz, text_halign = text.align_right)
+        curr_row += 1
+        table.cell(dbTbl, 0, curr_row, "T.SOUP", text_color = dbColTx, text_size = dbFz, text_halign = text.align_left)
+        table.cell(dbTbl, 1, curr_row, dbTs, text_color = db_mechCol(dbTs), text_size = dbFz, text_halign = text.align_right)
+        // BIAS row removed from dashboard
+
+
+// =====================================================================
+// MÃ NGUỒN GSC.txt ĐƯỢC THÊM VÀO DƯỚI ĐÂY
+// =====================================================================
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © meomeo105
+// Gann Swing Chart version 3.0
+// MT5 version : www.mql5.com/en/market/product/112401
+
+DefaultGannMLSetting = "12 · GANN SWING CHART"
+showF1GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF1GannML")
+showSF1GannML = input.bool(true,"F1", group = DefaultGannMLSetting,inline = "showF1GannML")
+colorF1GannML = input.color(color.aqua, '', group = DefaultGannMLSetting,inline = "showF1GannML")
+showChoChF1GannML = input.bool(false,"", group = DefaultGannMLSetting,inline = "showF1GannML")
+showChoChSF1GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF1GannML")
+
+showF2GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF2GannML")
+showSF2GannML = input.bool(true,"F2", group = DefaultGannMLSetting,inline = "showF2GannML")
+colorF2GannML = input.color(color.yellow, '', group = DefaultGannMLSetting,inline = "showF2GannML")
+showChoChF2GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF2GannML")
+showChoChSF2GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF2GannML")
+
+showF3GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF3GannML")
+showSF3GannML = input.bool(true,"F3", group = DefaultGannMLSetting,inline = "showF3GannML")
+colorF3GannML = input.color(color.purple, '', group = DefaultGannMLSetting,inline = "showF3GannML")
+showChoChF3GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF3GannML")
+showChoChSF3GannML = input.bool(true,"", group = DefaultGannMLSetting,inline = "showF3GannML")
+
+f_CalculateF0(_pointX,_pointY,arrayX0,arrayY0)=>
+	array.unshift(arrayX0,_pointX)
+	array.unshift(arrayY0,_pointY)
+	[1]
+
+f_CalculateFn1(_pointX,_pointY,arrayXn,arrayYn,arrayXFn1,arrayYFn1)=>
+	//_resultdraw 2:Tiếp tục 1:Đảo chiều
+	int _resultdraw = 0
+	//OSB pha dinh/day
+	if((array.get(arrayYFn1,0) >= array.get(arrayYFn1,1) and array.get(arrayYn,0) < array.get(arrayYFn1,1)) or (array.get(arrayYFn1,0) <= array.get(arrayYFn1,1) and array.get(arrayYn,0) > array.get(arrayYFn1,1)))
+		array.unshift(arrayXFn1,_pointX)
+	    array.unshift(arrayYFn1,_pointY)
+		_resultdraw := 1
+	//Dao chieu sang giam
+	else if(array.get(arrayYFn1,0) >= array.get(arrayYFn1,1) and (array.get(arrayYn,0) < array.get(arrayYn,1) and array.get(arrayYn,0) < array.get(arrayYn,2) and array.get(arrayYn,1) < array.get(arrayYn,3)) and array.get(arrayYn,2) < array.get(arrayYn,3))
+		array.unshift(arrayXFn1,_pointX)
+	    array.unshift(arrayYFn1,_pointY)
+		_resultdraw := 1
+	//Dao chieu sang tang
+	else if(array.get(arrayYFn1,0) <= array.get(arrayYFn1,1) and (array.get(arrayYn,0) > array.get(arrayYn,1) and array.get(arrayYn,0) > array.get(arrayYn,2) and array.get(arrayYn,1) > array.get(arrayYn,3)) and array.get(arrayYn,2) > array.get(arrayYn,3))
+		array.unshift(arrayXFn1,_pointX)
+	    array.unshift(arrayYFn1,_pointY)
+		_resultdraw := 1
+	else if(array.get(arrayYFn1,0) >= array.get(arrayYFn1,1) and _pointY >= array.get(arrayYFn1,0) and (_pointY >= array.get(arrayYFn1,0) or (array.get(arrayYn,0) > array.get(arrayYn,2) and array.get(arrayYn,2) > array.get(arrayYn,1)) or (array.get(arrayYn,0) > array.get(arrayYn,1) and array.get(arrayYn,1) > array.get(arrayYn,2) and array.get(arrayYn,2) > array.get(arrayYn,3))))
+		array.set(arrayXFn1, 0, _pointX)
+		array.set(arrayYFn1, 0, _pointY)
+		_resultdraw := 2
+	else if(array.get(arrayYFn1,0) <= array.get(arrayYFn1,1) and _pointY <= array.get(arrayYFn1,0) and (_pointY <= array.get(arrayYFn1,0) or (array.get(arrayYn,0) < array.get(arrayYn,2) and array.get(arrayYn,2) < array.get(arrayYn,1)) or (array.get(arrayYn,0) < array.get(arrayYn,1) and array.get(arrayYn,1) < array.get(arrayYn,2) and array.get(arrayYn,2) < array.get(arrayYn,3))))
+		array.set(arrayXFn1, 0, _pointX)
+		array.set(arrayYFn1, 0, _pointY)
+		_resultdraw := 2
+	[_resultdraw]
+
+f_CalculateSFn1(_pointX,_pointY,_arrayMark,_mIdxMark,arraySXFn1,arraySYFn1)=>
+	int _resultdraw = 0
+	if(array.get(_arrayMark,_mIdxMark) == 0)
+		if((array.get(arraySYFn1,0) >= array.get(arraySYFn1,1) and _pointY >= array.get(arraySYFn1,0)) or (array.get(arraySYFn1,0) <= array.get(arraySYFn1,1) and _pointY <= array.get(arraySYFn1,0)))
+			array.set(arraySXFn1, 0, _pointX)
+			array.set(arraySYFn1, 0, _pointY)
+			_resultdraw := 2
+		else if((array.get(arraySYFn1,0) >= array.get(arraySYFn1,1) and _pointY < array.get(arraySYFn1,1)) or (array.get(arraySYFn1,0) <= array.get(arraySYFn1,1) and _pointY > array.get(arraySYFn1,1)))
+			array.unshift(arraySXFn1,_pointX)
+			array.unshift(arraySYFn1,_pointY)
+			_resultdraw := 1
+		else if((array.get(arraySYFn1,0) >= array.get(arraySYFn1,1) and _pointY < array.get(arraySYFn1,0) and _pointY > array.get(arraySYFn1,1)) or (array.get(arraySYFn1,0) <= array.get(arraySYFn1,1) and _pointY > array.get(arraySYFn1,0) and _pointY < array.get(arraySYFn1,1)))
+			array.unshift(arraySXFn1,_pointX)
+			array.unshift(arraySYFn1,_pointY)
+			array.set(_arrayMark,_mIdxMark,_pointY)
+			_resultdraw := 1
+	else if(array.get(_arrayMark,_mIdxMark) > 0)
+		if((array.get(arraySYFn1,0) >= array.get(arraySYFn1,1) and _pointY < array.get(arraySYFn1,1)) or (array.get(arraySYFn1,0) <= array.get(arraySYFn1,1) and _pointY > array.get(arraySYFn1,1)))
+			array.unshift(arraySXFn1,_pointX)
+			array.unshift(arraySYFn1,_pointY)
+			array.set(_arrayMark,_mIdxMark,0)
+			_resultdraw := 1
+		else if((array.get(arraySYFn1,0) >= array.get(arraySYFn1,1) and _pointY > array.get(arraySYFn1,2)) or (array.get(arraySYFn1,0) <= array.get(arraySYFn1,1) and _pointY < array.get(arraySYFn1,2)))
+			array.set(arraySXFn1, 0, _pointX)
+			array.set(arraySYFn1, 0, _pointY)
+			array.set(_arrayMark,_mIdxMark,0)
+			_resultdraw := 2
+		else if((array.get(arraySYFn1,0) >= array.get(arraySYFn1,1) and _pointY <= array.get(arraySYFn1,2) and _pointY >= array.get(arraySYFn1,0)) or (array.get(arraySYFn1,0) <= array.get(arraySYFn1,1) and _pointY >= array.get(arraySYFn1,2) and _pointY <= array.get(arraySYFn1,0)))
+			array.set(arraySXFn1, 0, _pointX)
+			array.set(arraySYFn1, 0, _pointY)
+			array.set(_arrayMark,_mIdxMark,_pointY)
+			_resultdraw := 2
+
+	[_resultdraw]
+
+f_CalculateRemoveDuplicateLine(arrayLine,arraySLine)=>
+	if(array.size(arraySLine) > 1 and array.size(arrayLine) >1)
+		if(line.get_y1(array.get(arraySLine,1)) == line.get_y1(array.get(arrayLine,1)) and line.get_y2(array.get(arraySLine,1)) == line.get_y2(array.get(arrayLine,1))and line.get_x1(array.get(arraySLine,1)) == line.get_x1(array.get(arrayLine,1)) and line.get_x2(array.get(arraySLine,1)) == line.get_x2(array.get(arrayLine,1)))
+			line.delete(array.get(arrayLine,1))
+			array.remove(arrayLine,1)
+
+f_CalculateChoCh(arraySXFn1,arraySYFn1) =>
+	int _X = 0
+	float _Y = 0
+	// ChoCh Trường hợp chữ N ngược, chữ N
+	if((array.get(arraySYFn1,3) > array.get(arraySYFn1,2) and array.get(arraySYFn1,3) < array.get(arraySYFn1,1) and array.get(arraySYFn1,0) < array.get(arraySYFn1,2)) or (array.get(arraySYFn1,3) < array.get(arraySYFn1,2) and array.get(arraySYFn1,3) > array.get(arraySYFn1,1) and array.get(arraySYFn1,0) > array.get(arraySYFn1,2)))
+		_X := array.get(arraySXFn1,2)
+		_Y := array.get(arraySYFn1,2)
+	[_X,_Y]
+
+f_CalculateDrawF(_drawF,_showSF,arrayLine,arrayX,arrayY,showChoCh,arrayMChoCh,idxChoCh,_color) =>
+	if(_drawF > 0)
+		if(_drawF == 1)
+			array.unshift(arrayLine,line.new(array.get(arrayX,1),array.get(arrayY,1),array.get(arrayX,0),array.get(arrayY,0), color = _color,xloc = xloc.bar_time,width = 1,style = line.style_dotted))
+		else if(_drawF == 2 and array.size(arrayLine) >0)
+			line.set_xy2(array.get(arrayLine,0),array.get(arrayX,0),array.get(arrayY,0))
+		[XChoCh,YChoCh] = f_CalculateChoCh(arrayX,arrayY)
+		if(showChoCh and YChoCh >0 and array.get(arrayMChoCh,idxChoCh) != YChoCh)
+			array.set(arrayMChoCh,idxChoCh,YChoCh)
+			line.new(XChoCh,YChoCh,time,YChoCh, color = _color,xloc = xloc.bar_time,width = 1,style = line.style_dotted)
+	
+f_CalculateDrawSF(_drawSF,arrayLine,arraySLine,arraySX,arraySY,showChoCh,arrayMChoCh,idxChoCh,_color) =>
+	if(_drawSF > 0)
+		if(_drawSF == 1)
+			array.unshift(arraySLine,line.new(array.get(arraySX,1),array.get(arraySY,1),array.get(arraySX,0),array.get(arraySY,0), color = _color,xloc = xloc.bar_time,width = 1))
+		else if(_drawSF == 2 and array.size(arraySLine) >0)
+			line.set_xy2(array.get(arraySLine,0),array.get(arraySX,0),array.get(arraySY,0))
+		f_CalculateRemoveDuplicateLine(arrayLine,arraySLine)
+		[XChoChS,YChoChS] = f_CalculateChoCh(arraySX,arraySY)
+		if(showChoCh and YChoChS >0 and array.get(arrayMChoCh,idxChoCh) != YChoChS)
+			array.set(arrayMChoCh,idxChoCh,YChoChS)
+			line.new(XChoChS,YChoChS,time,YChoChS, color = _color,xloc = xloc.bar_time,width = 1,style = line.style_dashed)
+
+var arrayMarkGannML = array.new_float(3,0)
+var arrayMarkChoChGannML = array.new_float(6,0)
+var arrayXF0GannML = array.new_int(5,time)
+var arrayYF0GannML = array.new_float(5,close)
+var arrayXF1GannML = array.new_int(5,time)
+var arrayYF1GannML = array.new_float(5,close)
+var arrayLineF1GannML = array.new_line()
+var arraySXF1GannML = array.new_int(5,time)
+var arraySYF1GannML = array.new_float(5,close)
+var arraySLineF1GannML = array.new_line()
+var arrayXF2GannML = array.new_int(5,time)
+var arrayYF2GannML = array.new_float(5,close)
+var arrayLineF2GannML = array.new_line()
+var arraySXF2GannML = array.new_int(5,time)
+var arraySYF2GannML = array.new_float(5,close)
+var arraySLineF2GannML = array.new_line()
+var arrayXF3GannML = array.new_int(5,time)
+var arrayYF3GannML = array.new_float(5,close)
+var arrayLineF3GannML = array.new_line()
+var arraySXF3GannML = array.new_int(5,time)
+var arraySYF3GannML = array.new_float(5,close)
+var arraySLineF3GannML = array.new_line()
+f_CalculateAndDrawFn1(_pointX,_pointY) =>
+	//F0 : Song cua nen
+	array.unshift(arrayXF0GannML,_pointX)
+	array.unshift(arrayYF0GannML,_pointY)
+	//F1,F2,...: Song cua song theo Gann
+	if(showF1GannML or showF2GannML or showF3GannML or showSF1GannML or showSF2GannML or showSF3GannML)
+		[drawF1] = f_CalculateFn1(_pointX,_pointY,arrayXF0GannML,arrayYF0GannML,arrayXF1GannML,arrayYF1GannML)
+		f_CalculateDrawF(showF1GannML?drawF1:0,showSF1GannML,arrayLineF1GannML,arrayXF1GannML,arrayYF1GannML,showChoChF1GannML,arrayMarkChoChGannML,0,colorF1GannML)
+		if(drawF1 > 0 and (showF2GannML or showF3GannML or showSF1GannML or showSF2GannML or showSF3GannML))
+			[drawSF1] = f_CalculateSFn1(_pointX,_pointY,arrayMarkGannML,0,arraySXF1GannML,arraySYF1GannML)
+			f_CalculateDrawSF(showSF1GannML?drawSF1:0,arrayLineF1GannML,arraySLineF1GannML,arraySXF1GannML,arraySYF1GannML,showChoChSF1GannML,arrayMarkChoChGannML,1,colorF1GannML)
+			if(drawSF1 > 0 and (showF2GannML or showF3GannML or showSF2GannML or showSF3GannML))
+				[drawF2] = f_CalculateFn1(_pointX,_pointY,arraySXF1GannML,arraySYF1GannML,arrayXF2GannML,arrayYF2GannML)
+				f_CalculateDrawF(showF2GannML?drawF2:0,showSF2GannML,arrayLineF2GannML,arrayXF2GannML,arrayYF2GannML,showChoChF2GannML,arrayMarkChoChGannML,2,colorF2GannML)
+				if(drawF2 > 0 and (showF3GannML or showSF2GannML or showSF3GannML))
+					[drawSF2] = f_CalculateSFn1(_pointX,_pointY,arrayMarkGannML,1,arraySXF2GannML,arraySYF2GannML)
+					f_CalculateDrawSF(showSF2GannML?drawSF2:0,arrayLineF2GannML,arraySLineF2GannML,arraySXF2GannML,arraySYF2GannML,showChoChSF2GannML,arrayMarkChoChGannML,3,colorF2GannML)
+					if(drawSF2 > 0 and (showF3GannML or showSF3GannML))
+						[drawF3] = f_CalculateFn1(_pointX,_pointY,arraySXF2GannML,arraySYF2GannML,arrayXF3GannML,arrayYF3GannML)
+						f_CalculateDrawF(showF3GannML?drawF3:0,showSF3GannML,arrayLineF3GannML,arrayXF3GannML,arrayYF3GannML,showChoChF3GannML,arrayMarkChoChGannML,4,colorF3GannML)
+						if(drawF3 > 0 and (showSF3GannML))
+							[drawSF3] = f_CalculateSFn1(_pointX,_pointY,arrayMarkGannML,2,arraySXF3GannML,arraySYF3GannML)
+							f_CalculateDrawSF(showSF3GannML?drawSF3:0,arrayLineF3GannML,arraySLineF3GannML,arraySXF3GannML,arraySYF3GannML,showChoChSF3GannML,arrayMarkChoChGannML,5,colorF3GannML)
+
+f_CalculateAndDraw(_pointX,_pointY1,_pointY2) =>
+	if((array.get(arrayYF0GannML,0) > _pointY1 and array.get(arrayYF0GannML,0) > _pointY2) or (array.get(arrayYF0GannML,0) < _pointY1 and array.get(arrayYF0GannML,0) < _pointY2))
+		f_CalculateAndDrawFn1(time,array.get(arrayYF0GannML,1))
+	f_CalculateAndDrawFn1(time,_pointY1)
+	f_CalculateAndDrawFn1(time,_pointY2)
+	
+highPrev = high
+lowPrev = low
+if(barstate.isconfirmed)
+	if(high > highPrev[1] and low > lowPrev[1])
+		f_CalculateAndDraw(time,low,high)
+	else if(high < highPrev[1] and low < lowPrev[1])
+		f_CalculateAndDraw(time,high,low)
+	else if((high >= highPrev[1] and low < lowPrev[1]) or (high > highPrev[1] and low <= lowPrev[1]))
+		if(close > open)
+			f_CalculateAndDraw(time,low,high)
+		else
+			f_CalculateAndDraw(time,high,low)
+	else if(high[0] <= highPrev[1] and low[0] >= lowPrev[1])
+		highPrev := highPrev[1]
+		lowPrev := lowPrev[1]
+
+// =====================================================================
+// BỘ LỌC BẮT DISPLACEMENT SỚM (V7 - LIVE TICK)
+// =====================================================================
+bool enableDisp = input.bool(true, "BẬT CẢNH BÁO DISPLACEMENT SỚM", group="15 · DISPLACEMENT SỚM (V7)", tooltip="Tô màu nến và hiện mũi tên ngay khi nến đang chạy thỏa mãn điều kiện bùng nổ, không cần đợi nến 3 tạo FVG.")
+float dispAtrMult = input.float(1.5, "Ngưỡng thân nến (x ATR)", step=0.1, group="15 · DISPLACEMENT SỚM (V7)", tooltip="Thân nến phải lớn hơn mức này nhân với ATR 14. Mặc định 1.5.")
+float dispVolMult = input.float(1.5, "Ngưỡng khối lượng (x Trung bình 20)", step=0.1, group="15 · DISPLACEMENT SỚM (V7)", tooltip="Tick volume phải lớn hơn mức này nhân với MA 20 Volume. Mặc định 1.5.")
+float dispWickPct = input.float(0.2, "Râu ngược tối đa (% thân nến)", step=0.05, group="15 · DISPLACEMENT SỚM (V7)", tooltip="Râu ngược chiều không được vượt quá % này so với độ dài thân nến. Râu càng ngắn lực đẩy càng dứt khoát. Mặc định 0.2 (20%).")
+
+bool dispUseAcc = input.bool(true, "Kết hợp Gia Tốc", group="15 · DISPLACEMENT SỚM (V7)", inline="acc1", tooltip="Chỉ báo tín hiệu khi cây nến bùng nổ CÓ CÙNG CHIỀU GIA TỐC với Physics Engine.")
+bool dispAccSurging = input.bool(true, "Bắt buộc Gia tốc tăng vọt", group="15 · DISPLACEMENT SỚM (V7)", inline="acc1", tooltip="Gia tốc nến hiện tại phải đạp lút cán mạnh hơn nến liền trước.")
+
+bool dispShowBarColor = input.bool(true, "Tô màu nến", inline="disp_col", group="15 · DISPLACEMENT SỚM (V7)")
+bool dispShowShape = input.bool(true, "Hiện mũi tên", inline="disp_col", group="15 · DISPLACEMENT SỚM (V7)")
+color dispColBuy = input.color(color.blue, "Màu Mua", inline="disp_col2", group="15 · DISPLACEMENT SỚM (V7)")
+color dispColSell = input.color(color.orange, "Màu Bán", inline="disp_col2", group="15 · DISPLACEMENT SỚM (V7)")
+
+float myAtr14 = ta.atr(14)
+float avgVol20 = ta.sma(volume, 20)
+
+float bodySize = math.abs(close - open)
+float topWick  = high - math.max(close, open)
+float btmWick  = math.min(close, open) - low
+
+// Kiểm tra Gia Tốc (Từ biến slAccV của Physics Engine)
+bool accSurging = not dispAccSurging or (not na(slAccV) and not na(slAccV[1]) and math.abs(slAccV) > math.abs(slAccV[1]))
+bool accBuyOk  = not dispUseAcc or (not na(slAccV) and slAccV > 0 and accSurging)
+bool accSellOk = not dispUseAcc or (not na(slAccV) and slAccV < 0 and accSurging)
+
+bool isDispBuy = enableDisp and (close > open) and (bodySize > dispAtrMult * myAtr14) and (volume > dispVolMult * avgVol20) and (topWick < dispWickPct * bodySize) and accBuyOk
+bool isDispSell = enableDisp and (close < open) and (bodySize > dispAtrMult * myAtr14) and (volume > dispVolMult * avgVol20) and (btmWick < dispWickPct * bodySize) and accSellOk
+
+barcolor((dispShowBarColor and isDispBuy) ? color.new(dispColBuy, 0) : na, title="Displacement Buy Color")
+barcolor((dispShowBarColor and isDispSell) ? color.new(dispColSell, 0) : na, title="Displacement Sell Color")
+
+plotshape((dispShowShape and isDispBuy), title="Displacement Buy", style=shape.triangleup, location=location.belowbar, color=dispColBuy, size=size.small)
+plotshape((dispShowShape and isDispSell), title="Displacement Sell", style=shape.triangledown, location=location.abovebar, color=dispColSell, size=size.small)
+
+// =====================================================================
+// 16 · INSIDE BAR AND OUTSIDE BAR
+// =====================================================================
+bool enableInOut = input.bool(true, "BẬT CHỈ BÁO INSIDE/OUTSIDE BAR", group="16 · INSIDE & OUTSIDE BAR")
+
+bool showInside = input.bool(true, "Hiện chữ I", inline="inout_1", group="16 · INSIDE & OUTSIDE BAR")
+bool showOutside = input.bool(true, "Hiện chữ O", inline="inout_1", group="16 · INSIDE & OUTSIDE BAR")
+
+color colInBuy = input.color(color.green, "Màu Mua", inline="inout_2", group="16 · INSIDE & OUTSIDE BAR")
+color colInSell = input.color(color.red, "Màu Bán", inline="inout_2", group="16 · INSIDE & OUTSIDE BAR")
+
+bool insidebuybar = enableInOut and showInside and close > open and high <= high[1] and low >= low[1] and barstate.isconfirmed
+bool insidesellbar = enableInOut and showInside and close < open and high <= high[1] and low >= low[1] and barstate.isconfirmed
+bool outsidebuybar = enableInOut and showOutside and close > open and high > high[1] and low < low[1] and barstate.isconfirmed
+bool outsidesellbar = enableInOut and showOutside and close < open and high > high[1] and low < low[1] and barstate.isconfirmed
+
+plotshape(insidebuybar, title="I Buy", style=shape.arrowup, location=location.belowbar, size=size.tiny, text="I", color=colInBuy, offset=0)
+plotshape(insidesellbar, title="I Sell", style=shape.arrowdown, location=location.abovebar, size=size.tiny, text="I", color=colInSell, offset=0)
+plotshape(outsidebuybar, title="O Buy", style=shape.arrowup, location=location.belowbar, size=size.tiny, text="O", color=colInBuy, offset=0)
+plotshape(outsidesellbar, title="O Sell", style=shape.arrowdown, location=location.abovebar, size=size.tiny, text="O", color=colInSell, offset=0)
+
+
+
+// =====================================================================
+// 15 — MOTHER BAR BREAKOUT
+// =====================================================================
+bool enableMb = input.bool(true, "BẬT CƠ CHẾ MOTHER BAR", group="17 — MOTHER BAR BREAKOUT", tooltip="Cơ chế Mother Bar: tìm nến mẹ lớn → đếm nến con nằm trong → chờ Breakout.\n\nSố nến con tối thiểu tự co giãn theo ATR (Adaptive): nến mẹ càng lớn so với ATR → cần càng nhiều nến tích lũy.\n\nTín hiệu chia 3 loại:\n• B/O = Breakout đơn thuần (nến phá nhưng thân yếu).\n• BAG = Breakout mạnh (thân dày, range lớn, volume cao).\n• BTR* = Continuation: sau B/O hoặc BAG, nến kế tạo FVG xác nhận chiều.")
+
+float mbIbAtrK  = input.float(1.0, "Adaptive ATR — Hệ số K (MinIb)", step=0.1, group="17 — MOTHER BAR BREAKOUT", tooltip="Số nến Inside Bar tối thiểu = floor(Range Nến Mẹ / ATR × K).\n\nK = 1.0: nến mẹ dài bằng 2 lần ATR → cần 2 nến con.\nK = 0.5: nến mẹ dài bằng 2 lần ATR → chỉ cần 1 nến con.\n\nLuôn tối thiểu 1 nến con.")
+int   mbAtrLen  = input.int(14, "Chu kỳ ATR", minval=1, group="17 — MOTHER BAR BREAKOUT")
+float mbDBody   = input.float(0.60, "BAG — Thân/Range >=", minval=0.0, maxval=1.0, step=0.05, group="17 — MOTHER BAR BREAKOUT", tooltip="Nến breakout phải có thân chiếm ít nhất bao nhiêu % tổng range. 0.60 = 60%.")
+float mbDClose  = input.float(0.70, "BAG — Vị trí Close >=", minval=0.0, maxval=1.0, step=0.05, group="17 — MOTHER BAR BREAKOUT", tooltip="Close phải nằm trong top/bottom bao nhiêu % range của nến. 0.70 = top 30% (mua) hoặc bottom 30% (bán).")
+float mbDAtr    = input.float(1.20, "BAG — Range >= x ATR", step=0.1, group="17 — MOTHER BAR BREAKOUT", tooltip="Range nến breakout phải lớn hơn bao nhiêu lần ATR. 1.20 = 120% ATR.")
+
+bool  mbFltOn   = input.bool(true, "Bật lọc Kích thước Nến Mẹ (Size Filter)", group="17 — MOTHER BAR BREAKOUT", tooltip="Bỏ qua các Nến Mẹ quá nhỏ (thị trường ngủ gật, dễ sinh tín hiệu nhiễu) hoặc quá to (nến tin tức quét 2 đầu).")
+float mbMinMbAtr= input.float(0.8, "Min Size (x ATR)", step=0.1, group="17 — MOTHER BAR BREAKOUT")
+float mbMaxMbAtr= input.float(3.0, "Max Size (x ATR)", step=0.1, group="17 — MOTHER BAR BREAKOUT")
+
+bool  mbVolOn   = input.bool(false, "Bật lọc Volume", group="17 — MOTHER BAR BREAKOUT")
+float mbVolMult = input.float(1.5, "Volume >= x TB", step=0.1, group="17 — MOTHER BAR BREAKOUT")
+int   mbVolLen  = input.int(20, "Chu kỳ TB Volume", minval=1, group="17 — MOTHER BAR BREAKOUT")
+
+bool  mbSzOn    = input.bool(true, "Bật lọc Min Breakout Size", group="17 — MOTHER BAR BREAKOUT", tooltip="Nến B/O phải phá qua biên Mother Bar ít nhất x ATR. Tránh Breakout giả râu vượt biên nhẹ.")
+float mbSzMult  = input.float(0.30, "Phá qua biên >= x ATR", step=0.05, group="17 — MOTHER BAR BREAKOUT")
+
+bool  mbBtrOn   = input.bool(true, "Bật BTR*", group="17 — MOTHER BAR BREAKOUT", tooltip="BTR* (Breakout Then Retest Star): sau nến Breakout, nếu nến kế tiếp tạo FVG cùng chiều (Low > High[2] khi mua, High < Low[2] khi bán) → xác nhận continuation mạnh.")
+
+color colMbBox  = input.color(color.new(#ff9800, 80), "Màu Hộp Mother Bar", group="17 — MOTHER BAR BREAKOUT", tooltip="Hộp bao quanh nến mẹ — mặc định Cam nhạt để phân biệt với hộp Gann (Xanh Cyan).")
+color colMbBoBuy  = input.color(color.new(#ffd600, 0), "Màu B/O Mua, Bán", inline="mbo1", group="17 — MOTHER BAR BREAKOUT")
+color colMbBoSell = input.color(color.new(#aa00ff, 0), "", inline="mbo1", group="17 — MOTHER BAR BREAKOUT")
+color colMbBagBuy  = input.color(color.new(#ffab00, 0), "Màu BAG Mua, Bán", inline="mbo2", group="17 — MOTHER BAR BREAKOUT")
+color colMbBagSell = input.color(color.new(#7b1fa2, 0), "", inline="mbo2", group="17 — MOTHER BAR BREAKOUT")
+color colMbBtrBuy  = input.color(color.new(#fff176, 0), "Màu BTR* Mua, Bán", inline="mbo3", group="17 — MOTHER BAR BREAKOUT")
+color colMbBtrSell = input.color(color.new(#e040fb, 0), "", inline="mbo3", group="17 — MOTHER BAR BREAKOUT")
+
+// --- State Machine ---
+var int   mbSt = 0       // 0: Init, 1: Tracking, 2: Ready
+var float mbMH = na
+var float mbML = na
+var int   mbMIdx = 0
+var int   mbIbCnt = 0
+var int   mbMinIb = 1
+var box   mbBox = na
+
+// BTR* state: chiều breakout vừa xảy ra, sống đúng 1 nến sau breakout
+var int   mbBDir = 0     // 0: không chờ, 1: buy BTR*, -1: sell BTR*
+var float mbPMH = na     // Mother Bar High lúc breakout
+var float mbPML = na     // Mother Bar Low lúc breakout
+
+float mbAtr = ta.atr(mbAtrLen)
+float mbAvgVol = ta.sma(volume, mbVolLen)
+
+// --- Signal flags (global scope, per-bar reset) ---
+bool sigBagBuy  = false
+bool sigBagSell = false
+bool sigBoBuy   = false
+bool sigBoSell  = false
+bool sigBtrBuy  = false
+bool sigBtrSell = false
+
+// --- Helper: tính MinIb an toàn (guard na + ép int) ---
+f_mbCalcMinIb(float mh, float ml, float atr, float k) =>
+    int result = 1
+    if not na(atr) and atr > 0
+        result := int(math.max(1, math.floor((mh - ml) / atr * k)))
+    result
+
+if enableMb
+    bool mbInside = mbSt != 0 and high <= mbMH and low >= mbML
+
+    // (0) BTR*: chỉ sống đúng 1 nến sau breakout
+    if mbBDir != 0 and mbBtrOn
+        bool okBtr = (mbBDir == 1) ? (low > high[2]) : (high < low[2])
+        if okBtr
+            if mbBDir == 1
+                sigBtrBuy := true
+            else
+                sigBtrSell := true
+        mbBDir := 0  // hết 1 nến, dù có BTR* hay không
+
+    // (1) State machine
+    if mbSt == 0
+        float rng = high - low
+        bool sizeOk = not mbFltOn or na(mbAtr) or (rng >= mbMinMbAtr * mbAtr and rng <= mbMaxMbAtr * mbAtr)
+        if sizeOk
+            mbSt := 1
+            mbMH := high
+            mbML := low
+            mbMIdx := bar_index
+            mbIbCnt := 0
+            mbMinIb := f_mbCalcMinIb(high, low, mbAtr, mbIbAtrK)
+            if not na(mbBox)
+                box.delete(mbBox)
+            mbBox := box.new(left=bar_index, top=mbMH, right=bar_index, bottom=mbML, border_color=color.new(#ff9800, 50), border_style=line.style_dashed, bgcolor=colMbBox)
+
+    else if mbSt == 1
+        if mbInside
+            mbIbCnt += 1
+            if mbIbCnt >= mbMinIb
+                mbSt := 2
+        else
+            // Nến không nằm trong → reset, hộp này hỏng nên xóa đi
+            if not na(mbBox)
+                box.delete(mbBox)
+                
+            float rng = high - low
+            bool sizeOk = not mbFltOn or na(mbAtr) or (rng >= mbMinMbAtr * mbAtr and rng <= mbMaxMbAtr * mbAtr)
+            if sizeOk
+                mbSt := 1
+                mbMH := high
+                mbML := low
+                mbMIdx := bar_index
+                mbIbCnt := 0
+                mbMinIb := f_mbCalcMinIb(high, low, mbAtr, mbIbAtrK)
+                mbBox := box.new(left=bar_index, top=mbMH, right=bar_index, bottom=mbML, border_color=color.new(#ff9800, 50), border_style=line.style_dashed, bgcolor=colMbBox)
+            else
+                mbSt := 0
+
+    else if mbSt == 2
+        if mbInside
+            // Vẫn nằm trong → tiếp tục chờ
+            mbIbCnt += 1
+        else
+            // BREAKOUT
+            bool isBuy = close > mbMH
+            bool isSell = close < mbML
+
+            if isBuy or isSell
+                float rng = high - low
+                float bd  = math.abs(close - open)
+                bool volOk = not mbVolOn or (not na(mbAvgVol) and volume >= mbVolMult * mbAvgVol)
+                bool dispOk = (rng > 0) and (bd/rng >= mbDBody) and (not na(mbAtr) and rng >= mbDAtr * mbAtr) and volOk
+
+                float pos = rng > 0 ? (isBuy ? (close - low)/rng : (high - close)/rng) : 0.0
+                bool closeOk = pos >= mbDClose
+
+                bool isBagB = isBuy and dispOk and closeOk
+                bool isBagS = isSell and dispOk and closeOk
+
+                bool isBoB = isBuy and not isBagB
+                bool isBoS = isSell and not isBagS
+
+                // Lọc min breakout size: nến phải phá qua biên ít nhất x ATR
+                if mbSzOn and not na(mbAtr)
+                    if isBoB and (close - mbMH) < mbSzMult * mbAtr
+                        isBoB := false
+                    if isBoS and (mbML - close) < mbSzMult * mbAtr
+                        isBoS := false
+
+                // Gán tín hiệu
+                if isBagB
+                    sigBagBuy := true
+                else if isBagS
+                    sigBagSell := true
+                else if isBoB
+                    sigBoBuy := true
+                else if isBoS
+                    sigBoSell := true
+
+                // Chuẩn bị BTR* cho nến kế tiếp
+                if mbBtrOn and (isBagB or isBoB or isBagS or isBoS)
+                    mbBDir := isBuy ? 1 : -1
+                    mbPMH := mbMH
+                    mbPML := mbML
+
+            // Xong breakout → Giữ nguyên hộp cũ trên chart (không delete)
+            // Tạo hộp mới cho nến phá vỡ này (nó thành Mother Bar mới)
+            float rng2 = high - low
+            bool sizeOk = not mbFltOn or na(mbAtr) or (rng2 >= mbMinMbAtr * mbAtr and rng2 <= mbMaxMbAtr * mbAtr)
+            if sizeOk
+                mbSt := 1
+                mbMH := high
+                mbML := low
+                mbMIdx := bar_index
+                mbIbCnt := 0
+                mbMinIb := f_mbCalcMinIb(high, low, mbAtr, mbIbAtrK)
+                mbBox := box.new(left=bar_index, top=mbMH, right=bar_index, bottom=mbML, border_color=color.new(#ff9800, 50), border_style=line.style_dashed, bgcolor=colMbBox)
+            else
+                mbSt := 0
+
+    // Cập nhật cạnh phải của box ĐANG THEO DÕI
+    if not na(mbBox)
+        box.set_right(mbBox, bar_index)
+
+// --- Vẽ tín hiệu ở GLOBAL SCOPE (fix plotshape trong if) ---
+plotshape(sigBagBuy,  title="MB BAG Buy",  style=shape.labelup,   location=location.belowbar, color=colMbBagBuy,  text="BAG", textcolor=color.white, size=size.small)
+plotshape(sigBagSell, title="MB BAG Sell", style=shape.labeldown, location=location.abovebar, color=colMbBagSell, text="BAG", textcolor=color.white, size=size.small)
+plotshape(sigBoBuy,   title="MB B/O Buy",  style=shape.labelup,   location=location.belowbar, color=colMbBoBuy,   text="B/O", textcolor=color.white, size=size.small)
+plotshape(sigBoSell,  title="MB B/O Sell", style=shape.labeldown, location=location.abovebar, color=colMbBoSell,  text="B/O", textcolor=color.white, size=size.small)
+plotshape(sigBtrBuy,  title="MB BTR* Buy",  style=shape.labelup,   location=location.belowbar, color=colMbBtrBuy,  text="BTR*", textcolor=color.black, size=size.small)
+plotshape(sigBtrSell, title="MB BTR* Sell", style=shape.labeldown, location=location.abovebar, color=colMbBtrSell, text="BTR*", textcolor=color.white, size=size.small)
+
+// --- Alert ---
+alertcondition(sigBagBuy or sigBagSell, title="MB BAG mới", message="Mother Bar BAG: {{ticker}} {{interval}}")
+alertcondition(sigBoBuy or sigBoSell, title="MB B/O mới", message="Mother Bar Breakout: {{ticker}} {{interval}}")
+alertcondition(sigBtrBuy or sigBtrSell, title="MB BTR* mới", message="Mother Bar BTR*: {{ticker}} {{interval}}")
+

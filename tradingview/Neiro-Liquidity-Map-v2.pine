@@ -1,0 +1,1657 @@
+//@version=6
+// =====================================================================
+//  NEIRO LIQUIDITY MAP  v2   -   GTRADER EDITION
+//  Every level = one horizontal line drawn from the candle that created it,
+//  extended to the right, with a price label. Sessions, daily / weekly
+//  extremes, equal highs & lows, intraday pivots and swept-liquidity memory.
+//
+//  BAN SONG SONG cua Neiro-Liquidity-Map.pine. Khac dung hai diem:
+//    1. THEM lop ICT MACROS port tu "GTrader-ICT All In One - Comumnity
+//       Version" - 5 cua so macro, vach tren + vach duoi + nhan.
+//       va DUNG LAI lop Projection Candles theo "cau tao nen" cua ban goc:
+//         than / vien / rau ba mau rieng, khoang cach giua cac cum khung,
+//         cho dat + can nhan, dem nguoc, moc ngay, nhan gia, vach trace.
+//       File goc: tradingview/vendor/Gtrader-ICT.txt  (CHI DOC).
+//    2. BO HAN lop Premium & Discount (PD array) cua ban 1.0 - ca ba box
+//       premium / equilibrium / discount lan hang RANGE tren dashboard.
+//
+//  Lop KILLZONES cua GTrader tung nam o day, da GO 22-08 theo owner: box to
+//  mau bao range phien khong khac gi lop "Session Ranges" san co cua Neiro -
+//  ca hai deu chi la khung cao-thap cua phien, khong co than / rau gi de phan
+//  biet. Muon lay lai: git show <commit truoc do>:tradingview/Neiro-Liquidity-Map-v2.pine
+//
+//  All time anchors use America/New_York (auto DST). No orders are placed.
+// =====================================================================
+indicator("Neiro Liquidity Map", "Neiro LM", overlay = true, max_labels_count = 500, max_lines_count = 500, max_boxes_count = 500)
+
+// Hien tren dashboard. Nguoi mua bao loi thi doc duoc ngay dang chay ban nao.
+NL_VER = "2.0"
+
+TZ = "America/New_York"
+
+// =====================================================================
+//  GENERAL
+// =====================================================================
+gGen = "General"
+preset = input.string("Custom", "Preset (overrides the switches)", options = ["Custom", "Minimal", "Day Trading", "Full ICT"], group = gGen, tooltip = "Custom - every layer follows its own checkbox below.\nMinimal - only the levels price reacts to most: ATH, PDH/PDL, HOD/LOD and the live session.\nDay Trading - adds previous week, current week, midnight open, previous sessions and equal highs/lows.\nFull ICT - everything, including H1 and M15 pivots.\n\nA preset OVERRIDES the checkboxes. Switch back to Custom to use them again.")
+eqDays = input.int(10, "History depth (days)", minval = 1, maxval = 30, group = gGen, tooltip = "How far back the indicator looks for sessions, equal highs/lows and intraday pivots. Larger = more levels on screen, not more accuracy.")
+scaleMode = input.string("Volatility (ATR)", "Scale thresholds to symbol", options = ["Price", "Volatility (ATR)", "Off (gold dollars)"], group = gGen, tooltip = "Every dollar threshold in this indicator was tuned on gold. On EURUSD a 1.5 dollar merge gap swallows the whole price range; on BTC it merges nothing. This rescales them for whatever symbol the chart is on.\n\nVolatility (ATR) - scales by how far the symbol actually moves in a day, using a 200 period ATR on the daily timeframe. This is the dimensionally correct unit and it is the only mode that is right on forex, where the daily range is small relative to the price level. Measured over 460 days of gold it held a 1.8x band and moved 0.31% a day.\n\nPrice - scales by price level only. Over the same 460 days it held a 1.9x band and moved 0.98% a day, so it is marginally less steady than the ATR mode and it does not know about volatility at all: on forex majors it merges roughly three times more aggressively than it does on gold.\n\nOff - takes the numbers literally. Correct on gold, wrong everywhere else.\n\nCalibrated so that on gold the factor is 1.00 - the defaults behave the same under any mode.")
+dayTZsel = input.string("New York (ICT)", "Day boundary", options = ["New York (ICT)", "Broker / EET (GMT+2, +3 summer)", "London", "UTC", "Tokyo", "Sydney"], group = gGen, tooltip = "Where the trading DAY is cut. Everything dated by day follows this: previous day high/low, two days ago, today high/low, the midnight open line, the daily projection candle, and the rule that drops a swept previous-week level at the next midnight.\n\nBroker / EET is the default to match standard forex daily candles. Pick New York if you follow the strict ICT convention of midnight NY time.\n\nThe five SESSION windows are NOT affected. London opens when London opens, whatever clock your broker keeps - so their times stay on New York and you do not have to re-enter ten fields.")
+dayTZ = dayTZsel == "Broker / EET (GMT+2, +3 summer)" ? "Europe/Athens" : dayTZsel == "London" ? "Europe/London" : dayTZsel == "UTC" ? "UTC" : dayTZsel == "Tokyo" ? "Asia/Tokyo" : dayTZsel == "Sydney" ? "Australia/Sydney" : "America/New_York"
+dayHour = input.int(0, "Day starts at (hour)", minval = 0, maxval = 23, group = gGen, tooltip = "The hour the day flips over, inside the zone chosen above. 0 = midnight, the ICT convention.\n\nSet New York + 17 for the classic forex day: 17:00 New York is the rollover, which is where most brokers open their daily candle. Broker / EET + 0 lands on the same instant most of the year and is the simpler way to say it.\n\nIt moves the whole day-based set together - previous day, two days ago, today, the open line and the daily projection candle - so they always agree with each other.")
+
+// =====================================================================
+//  DAILY & WEEKLY LEVELS   -   one row per layer: [on] name | colour | line
+// =====================================================================
+gDW = "Daily & Weekly Levels"
+showATH = input.bool(true, "", inline = "ath", group = gDW)
+athC    = input.color(#FFD700, "All-Time High", inline = "ath", group = gDW)
+athS    = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "ath", group = gDW)
+
+showPW = input.bool(true, "", inline = "pw", group = gDW)
+pwC    = input.color(#9575CD, "Previous Week H/L", inline = "pw", group = gDW)
+pwS    = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "pw", group = gDW, tooltip = "Once PWH or PWL is swept it stays visible in grey only until the next day boundary, then it is dropped for good. The day boundary is the one set at the top, so this follows your clock, not New York, if you changed it.")
+
+showHOW = input.bool(true, "", inline = "how", group = gDW)
+wkC     = input.color(#5C6BC0, "Current Week H/L", inline = "how", group = gDW)
+wkS     = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "how", group = gDW)
+
+showPD = input.bool(true, "", inline = "pd", group = gDW)
+pdC    = input.color(#FFC107, "Previous Day H/L", inline = "pd", group = gDW)
+pdS    = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "pd", group = gDW)
+
+showBPD = input.bool(false, "", inline = "bpd", group = gDW)
+bpdC    = input.color(#FFE082, "Two Days Ago H/L", inline = "bpd", group = gDW)
+bpdS    = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "bpd", group = gDW)
+
+showDay = input.bool(true, "", inline = "day", group = gDW)
+dayC    = input.color(#26C6DA, "Today H/L", inline = "day", group = gDW)
+dayS    = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "day", group = gDW)
+
+showMNO = input.bool(true, "", inline = "mno", group = gDW)
+mnoC    = input.color(color.gray, "Midnight Open", inline = "mno", group = gDW)
+mnoS    = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "mno", group = gDW, tooltip = "Opening price of the first candle of the day, as cut by the Day boundary and Day starts at settings - the ICT reference for intraday premium / discount. Left on New York at hour 0 this is the classic midnight open, which is what MNO stands for.")
+
+// =====================================================================
+//  SESSION LEVELS   -   one row per session: [on] name | live | previous
+// =====================================================================
+gSes = "Session Levels"
+showTokyo = input.bool(true, "", inline = "tk", group = gSes)
+sTokyo    = input.session("0000-0200", "Tokyo", inline = "tk", group = gSes, tooltip = "Window in New York time. The first colour is the session running now, the second is every earlier session of the same name inside the history window.")
+tkC       = input.color(#FF9800, "", inline = "tk", group = gSes)
+btkC      = input.color(#FFCC80, "", inline = "tk", group = gSes)
+
+showLondon = input.bool(true, "", inline = "lo", group = gSes)
+sLondon    = input.session("0200-0930", "London", inline = "lo", group = gSes, tooltip = "Window in New York time. The first colour is the session running now, the second is every earlier session of the same name inside the history window.")
+loC        = input.color(#2962FF, "", inline = "lo", group = gSes)
+bloC       = input.color(#90CAF9, "", inline = "lo", group = gSes)
+
+showNyAm = input.bool(true, "", inline = "am", group = gSes)
+sNyAm    = input.session("0930-1100", "NY AM", inline = "am", group = gSes, tooltip = "Window in New York time. The first colour is the session running now, the second is every earlier session of the same name inside the history window.")
+amC      = input.color(#E53935, "", inline = "am", group = gSes)
+bamC     = input.color(#EF9A9A, "", inline = "am", group = gSes)
+
+showLunch = input.bool(false, "", inline = "lu", group = gSes)
+sLunch    = input.session("1100-1300", "NY Lunch", inline = "lu", group = gSes, tooltip = "Window in New York time. The first colour is the session running now, the second is every earlier session of the same name inside the history window.\n\n11:00 to 13:00 - the lull that starts as the AM session winds down and runs to the PM open. Its high and low are worth having precisely because volume drains out of it: the range is narrow, and the move that leaves it is usually the one that matters.")
+luC       = input.color(#8D6E63, "", inline = "lu", group = gSes)
+bluC      = input.color(#BCAAA4, "", inline = "lu", group = gSes)
+
+showNyPm = input.bool(true, "", inline = "pm", group = gSes)
+sNyPm    = input.session("1330-1600", "NY PM", inline = "pm", group = gSes, tooltip = "Window in New York time. The first colour is the session running now, the second is every earlier session of the same name inside the history window.")
+pmC      = input.color(#8E24AA, "", inline = "pm", group = gSes)
+bpmC     = input.color(#CE93D8, "", inline = "pm", group = gSes)
+
+showPrevSess = input.bool(true, "Show earlier sessions", group = gSes, tooltip = "Every completed session inside the history window keeps its own high and low. They carry a p prefix - pLondon-H is the high of an earlier London session.")
+sessS        = input.string("Solid", "Live session line", options = ["Solid", "Dashed", "Dotted"], inline = "ss", group = gSes)
+bsessS       = input.string("Dashed", "Previous", options = ["Solid", "Dashed", "Dotted"], inline = "ss", group = gSes)
+
+// =====================================================================
+//  SESSION RANGES (boxes)
+// =====================================================================
+gZ = "Session Ranges"
+showSessZoneIn = input.bool(true, "Draw session range box", group = gZ, tooltip = "Master switch for the range boxes - the rectangle drawn around the high and low of a session.\n\nBorder and Fill right below decide what a box looks like; the five rows under them decide which sessions get one and in what colour. A box needs at least one of Border or Fill on to be visible.\n\nThe session HIGH and LOW lines are a different layer with its own switches in Session Levels.")
+// 23-08: hai cong tac cua CA LOP, dat ngay duoi cong tac tong. Truoc do chung nam
+// duoi cung nhom, cach nam hang mau mot doan - owner doi mau nen roi tuong la hong
+// vi khong thay o Fill. Hai o nay la hinh dang CHUNG; mau thi moi box mot bo rieng
+// o nam hang ben duoi.
+sessZoneBrd   = input.bool(true, "Border", inline = "zbd", group = gZ)
+sessZoneBrdW  = input.int(1, "", minval = 1, maxval = 4, inline = "zbd", group = gZ)
+sessZoneBrdS  = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], inline = "zbd", group = gZ, tooltip = "Draw the outline or not, then how thick it is and what line style it uses. These two apply to all five boxes; the COLOUR of each border, and its transparency, are set per session in the rows below.\n\nTurn the border off and a box is fill only.")
+sessZoneFill  = input.bool(true, "Fill the boxes", group = gZ, tooltip = "Shade the inside of the boxes, each session in its own fill colour from the rows below.\n\nEach fill ships at 90 percent transparent, which tints the session without burying the candles. The opacity slider lives in the colour picker itself, so push it up or down per session.\n\nLondon runs seven and a half hours: on M1 its box alone tints most of the screen. If the chart starts to feel heavy, raise the transparency rather than switching the whole layer off.")
+
+// 23-08: moi phien mot hang - [x] ten | mau VIEN | mau NEN. Mac dinh mau vien = dung
+// mau phien ben Session Levels; nen cung mau nhung 90% trong suot. 23-08 owner chot BAT
+// nen tu dau: o mau da co san thanh opacity nen bat truoc cho nguoi dung thay, ai thay
+// nang thi keo trong suot len chu khong phai di tim cong tac.
+zTok  = input.bool(true,  "Tokyo", inline = "zw1", group = gZ)
+zTokB = input.color(#FF9800, "", inline = "zw1", group = gZ)
+zTokF = input.color(color.new(#FF9800, 90), "", inline = "zw1", group = gZ)
+zLon  = input.bool(true,  "London", inline = "zw2", group = gZ)
+zLonB = input.color(#2962FF, "", inline = "zw2", group = gZ)
+zLonF = input.color(color.new(#2962FF, 90), "", inline = "zw2", group = gZ)
+zAm   = input.bool(true,  "NY AM", inline = "zw3", group = gZ)
+zAmB  = input.color(#E53935, "", inline = "zw3", group = gZ)
+zAmF  = input.color(color.new(#E53935, 90), "", inline = "zw3", group = gZ)
+zLu   = input.bool(false, "NY Lunch", inline = "zw4", group = gZ)
+zLuB  = input.color(#8D6E63, "", inline = "zw4", group = gZ)
+zLuF  = input.color(color.new(#8D6E63, 90), "", inline = "zw4", group = gZ)
+zPm   = input.bool(false, "NY PM", inline = "zw5", group = gZ)
+zPmB  = input.color(#8E24AA, "", inline = "zw5", group = gZ)
+zPmF  = input.color(color.new(#8E24AA, 90), "", inline = "zw5", group = gZ, tooltip = "Which of the five sessions gets a box, and what colour that box is. Two swatches per row: the FIRST is the border, the SECOND is the fill.\n\nEach picker carries its own opacity slider, so the transparency of the border and of the fill are set right there. The fill ships at 90 percent transparent. The Fill switch above turns the whole shading layer off in one click if you want outlines only.\n\nFive boxes stacked across a New York afternoon is a lot of rectangles over the same price - NY Lunch and NY PM are off by default. The master switch above turns the whole layer off; these pick which sessions it draws. The session HIGH and LOW lines are not affected either way - they have their own switches in Session Levels.")
+sessZoneDays   = input.int(3, "Boxes kept per session", minval = 1, maxval = 20, group = gZ)
+sessZoneLbl    = input.bool(true, "Session name on the box", group = gZ)
+sessZoneOpen   = input.bool(false, "Session opening price line", group = gZ)
+sessTfMin      = input.timeframe("1", "Draw between", inline = "tf", group = gZ)
+sessTfMax      = input.timeframe("M", "and", inline = "tf", group = gZ, tooltip = "Range boxes are drawn only when the chart timeframe sits inside this band. Nothing else is affected.\n\nOn H4 and above a single candle swallows a whole session and the boxes turn into noise - set the upper bound to 60 (H1) if that bothers you.")
+sessTfOk       = timeframe.in_seconds(timeframe.period) >= timeframe.in_seconds(sessTfMin) and timeframe.in_seconds(timeframe.period) <= timeframe.in_seconds(sessTfMax)
+
+// =====================================================================
+//  EQUAL HIGHS & LOWS
+// =====================================================================
+gEq = "Equal Highs & Lows"
+showEq = input.bool(true, "", inline = "eq", group = gEq)
+eqC    = input.color(#00B0FF, "EQH / EQL", inline = "eq", group = gEq)
+eqS    = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "eq", group = gEq)
+eqRelIn = input.float(0.25, "Treat as equal when within (gold $)", minval = 0.0, step = 0.05, group = gEq, tooltip = "EQH / EQL  = pivots at the EXACT same quoted price.\nrEQH / rEQL = pivots within this distance of each other.\n\nSet to 0 to keep exact matches only.")
+
+// =====================================================================
+//  INTRADAY PIVOTS
+// =====================================================================
+gPv = "Intraday Pivots"
+showPivH1 = input.bool(true, "", inline = "h1", group = gPv)
+pvh1C     = input.color(#78909C, "H1 pivots (unswept)", inline = "h1", group = gPv)
+pvh1S     = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], inline = "h1", group = gPv)
+
+showPivM15 = input.bool(false, "", inline = "m15", group = gPv)
+pvm15C     = input.color(#B0BEC5, "M15 pivots (unswept)", inline = "m15", group = gPv)
+pvm15S     = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "m15", group = gPv, tooltip = "M15 pivots are off by default - on a low timeframe chart they alone can fill the screen.")
+
+// =====================================================================
+//  SWEPT LEVELS
+// =====================================================================
+gSw = "Swept Levels"
+sweptCol   = input.color(color.gray, "Swept colour", group = gSw, tooltip = "A swept level turns this colour and switches to a dashed line.")
+swHistDays = input.int(3, "Swept history depth (days)", minval = 1, maxval = 30, group = gSw, tooltip = "How far back swept levels are kept when the switch above is on. Separate from History depth, which governs live levels.\n\nThis exists because the full window can produce well over a thousand lines against a TradingView ceiling of 500 - past that the oldest ones vanish with no warning. Three days keeps a session review readable and stays inside the limit.")
+showSwHist = input.bool(false, "Keep every swept level on the chart", group = gSw, tooltip = "OFF (default) - each timeframe keeps only its most recent swept high and its most recent swept low. This is what keeps the chart readable.\n\nON - every level swept inside the history window stays visible. Good for reviewing a session afterwards.\n\nCAUTION: with M15 pivots also on, 20 days of gold produces roughly 1500 lines against a TradingView ceiling of 500 - the oldest ones are silently dropped and the map looks incomplete. Shorten History depth or turn M15 pivots off before switching this on.")
+
+// =====================================================================
+//  DASHBOARD
+// =====================================================================
+gHud = "Dashboard"
+showHud  = input.bool(false, "Show dashboard", group = gHud, tooltip = "A read-out of where the nearest untouched liquidity sits, updated on the last bar.\n\nBSL - buy-side liquidity: the closest level ABOVE price that has not been swept, with its distance.\nSSL - sell-side liquidity: the closest one BELOW.\nDRAW - which of the two is nearer, i.e. the side price has less work to reach.\nSWEPT - the most recent level taken out, and when.\nSESSION - the live session and the current New York time.")
+hudPos   = input.string("Top right", "Position", options = ["Top right", "Top left", "Bottom right", "Bottom left", "Middle right", "Middle left"], group = gHud)
+hudTheme = input.string("Dark", "Theme", options = ["Dark", "Light"], group = gHud)
+hudSize  = input.string("Small", "Size", options = ["Tiny", "Small", "Normal", "Large"], group = gHud)
+hudSess  = input.bool(true, "Session row", inline = "hr", group = gHud)
+hudSwept = input.bool(true, "Last-swept row", inline = "hr", group = gHud)
+
+// =====================================================================
+//  LINES & LABELS
+// =====================================================================
+gLine = "Lines & Labels"
+lineW        = input.int(1, "Line width", minval = 1, maxval = 5, group = gLine)
+txtSize      = input.string("Small", "Label text size", options = ["Tiny", "Small", "Normal", "Large"], group = gLine)
+keySize      = input.string("Normal", "All-time-high text size", options = ["Tiny", "Small", "Normal", "Large"], group = gLine, tooltip = "The all-time high is the one level worth keeping readable when zoomed out, so it gets its own size.")
+labelBack    = input.int(5, "Label offset from the live candle (bars)", minval = 0, group = gLine)
+mergeGapIn   = input.float(1.5, "Merge levels closer than (gold $)", minval = 0.0, step = 0.5, group = gLine, tooltip = "Levels on the same side within this distance collapse into one line. The survivor is the more significant one - the all-time high beats previous week, which beats previous day, and so on down to M15 pivots.\n\nSet to 0 to keep every level separate.")
+labelCrowd   = input.string("Stagger into columns", "When labels crowd", options = ["Stagger into columns", "Keep the strongest only", "Show all, overlapping"], group = gLine, tooltip = "What to do when two levels sit too close for their labels to both fit.\n\nStagger into columns - the second label steps to the right. Nothing is hidden, but a busy chart grows a few columns of text.\n\nKeep the strongest only - one label per cluster, the most significant level wins: all-time high, then previous week, previous day, two days ago, this week, today, sessions, equal highs/lows, H1, M15. THE LINES ARE ALL STILL DRAWN - only the redundant labels go.\n\nShow all, overlapping - every label at the same column, stacked on top of each other. Densest, and honest about it.\n\nTwo levels count as crowded when they are closer than the gap set below.")
+labelGapIn   = input.float(2.0, "Separate labels closer than (gold $)", minval = 0.01, step = 0.5, group = gLine)
+labelColBars = input.int(20, "Label column step (bars)", minval = 1, group = gLine, tooltip = "How far right the next column of labels sits when two levels are too close to share one column. Lower it if the far columns end up off screen, raise it if the labels still overlap.")
+
+// =====================================================================
+//  ALERTS
+// =====================================================================
+gAl = "Alerts"
+ncAlert   = input.bool(true, "Alert when liquidity is swept", group = gAl, tooltip = "On TradingView create the alert with the condition set to Any alert() function call.")
+alertNear = input.bool(false, "Alert when price approaches a level", inline = "an", group = gAl)
+nearDistIn = input.float(3.0, "within (gold $)", minval = 0.1, step = 0.5, inline = "an", group = gAl)
+
+// =====================================================================
+//  PROJECTION CANDLES  (W -> D -> H4 -> H1, drawn in the right margin)
+// =====================================================================
+gDc = "Projection Candles"
+showWkCandle  = input.bool(false, "Weekly", inline = "cw", group = gDc, tooltip = "Uses the real 1W candle - the same source as the previous / current week levels, so its high and low always line up with them.\n\n1 = the running week only. More than that and earlier weeks stack to the left, labelled 1W-1, 1W-2...")
+wcNum         = input.int(1, "bars", minval = 1, maxval = 4, inline = "cw", group = gDc)
+showDayCandle = input.bool(false, "Daily", inline = "cd", group = gDc, tooltip = "Aggregates the whole trading day as cut by the Day boundary setting: body = day open to current price, wicks = the day extremes. Follows DST for whichever zone is selected.\n\nThis is the only cluster built by hand from chart candles, so it is meaningful on H1 and below only.")
+dcNum         = input.int(1, "bars", minval = 1, maxval = 6, inline = "cd", group = gDc)
+showH4Candle  = input.bool(false, "H4", inline = "c4", group = gDc)
+h4Num         = input.int(1, "bars", minval = 1, maxval = 6, inline = "c4", group = gDc)
+showH1Candle  = input.bool(false, "H1", inline = "c1", group = gDc, tooltip = "Taken straight from the TradingView H1 candle, so it always matches an H1 chart. Labels are in New York time.")
+h1Num         = input.int(2, "bars", minval = 1, maxval = 6, inline = "c1", group = gDc)
+dcOffset      = input.int(40, "Distance from the live candle (bars)", minval = 1, group = gDc)
+dcGap         = input.int(5, "Gap between bars", minval = 2, group = gDc)
+dcBody        = input.int(1, "Body width (bars)", minval = 1, group = gDc)
+cDcBull       = input.color(#089981, "Up", inline = "dcc", group = gDc)
+cDcBear       = input.color(#F23645, "Down", inline = "dcc", group = gDc)
+cDcText       = input.color(#787B86, "Label", inline = "dcc", group = gDc)
+// --- Cau tao nen, tham khao nhom "5.HTF Candles" cua GTrader-ICT --------------
+// Ban goc tach THAN / VIEN / RAU thanh ba cap mau rieng, chua khoang trong giua
+// cac cum khung, va cho chon cho dat nhan + can nhan. Mac dinh o day de trung
+// mau than nen bat len khong doi gi cho toi khi tu doi.
+dcBullBd      = input.color(#089981, "Border", inline = "dcbd", group = gDc)
+dcBearBd      = input.color(#F23645, "", inline = "dcbd", group = gDc)
+dcBullWk      = input.color(#089981, "Wick", inline = "dcwk", group = gDc)
+dcBearWk      = input.color(#F23645, "", inline = "dcwk", group = gDc)
+dcGrpGap      = input.int(10, "Gap between timeframe groups (bars)", minval = 0, group = gDc, tooltip = "Extra space inserted between one cluster and the next - weekly, then daily, then H4, then H1. 0 puts them one normal candle gap apart, which is how version 1.0 drew them.")
+dcLblPos      = input.string("Top", "Name label", options = ["Top", "Bottom", "Both", "Off"], inline = "dclb", group = gDc)
+dcLblAlign    = input.string("Follow candles", "", options = ["Follow candles", "Align"], inline = "dclb", group = gDc, tooltip = "Follow candles - each label sits on its own candle's high or low, so the row of labels is as ragged as the candles.\n\nAlign - every label in one cluster sits at the same level, taken from the highest high and the lowest low of that cluster.")
+dcTimer       = input.bool(false, "Countdown", inline = "dcex", group = gDc)
+dcIntvl       = input.bool(false, "Date", inline = "dcex", group = gDc)
+dcPxLbl       = input.bool(false, "Price", inline = "dcex", group = gDc, tooltip = "Countdown - time left on the candle still running, written under its name. The daily cluster has none: it is aggregated by hand from the chart candles, so there is no exact close time to count down to.\n\nDate - weekday for the daily cluster, day/month for the weekly, opening time for H4 and H1. Sits under the candle. All three are read in New York time, whatever the Day boundary at the top is set to.\n\nPrice - the candle's close, written to the right of its body.")
+dcTrace       = input.bool(false, "Trace lines back to the live candle", group = gDc, tooltip = "Horizontal lines run from the live candle across the empty margin to the projected candle, one for each of its open, high, low and close - so a level read off the cluster can be followed back to price.\n\nOnly the candle still running in each cluster gets them.")
+dcTrOOn       = input.bool(true, "", inline = "dtro", group = gDc)
+dcTrOC        = input.color(#787B86, "Open ", inline = "dtro", group = gDc)
+dcTrOS        = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "dtro", group = gDc)
+dcTrCOn       = input.bool(true, "", inline = "dtrc", group = gDc)
+dcTrCC        = input.color(#787B86, "Close", inline = "dtrc", group = gDc)
+dcTrCS        = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "dtrc", group = gDc)
+dcTrHOn       = input.bool(true, "", inline = "dtrh", group = gDc)
+dcTrHC        = input.color(#787B86, "High ", inline = "dtrh", group = gDc)
+dcTrHS        = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "dtrh", group = gDc)
+dcTrLOn       = input.bool(true, "", inline = "dtrl", group = gDc)
+dcTrLC        = input.color(#787B86, "Low  ", inline = "dtrl", group = gDc)
+dcTrLS        = input.string("Dotted", "", options = ["Solid", "Dashed", "Dotted"], inline = "dtrl", group = gDc)
+
+// =====================================================================
+//  ICT MACROS   (port tu GTrader-ICT All In One - Community Version)
+//  Moi macro = mot cua so 20 phut. Ve vach TREN (cuc dai) + vach DUOI
+//  (cuc tieu) chay dan theo gia trong suot cua so, cong mot nhan "MACRO".
+//  Do la LOP DUY NHAT cua GTrader ma Neiro chua he co.
+//  LUU Y: day thuan tuy la lop HIEN THI - no khong sinh tin hieu nao.
+// =====================================================================
+gMC = "ICT Macros"
+mcOn     = input.bool(true, "Macro windows", group = gMC, tooltip = "The ICT macro windows: a 20 minute box either side of the hour where price is expected to run for liquidity.\n\nDrawn as two lines that trail the running high and low of the window, plus a MACRO label.")
+mcTfLim  = input.int(3, "Only draw at or below (minutes)", minval = 1, maxval = 240, group = gMC, tooltip = "A macro is 20 minutes long. On M15 that is barely one candle, so the original refuses to draw above M3. Raise it if you want them on M5 or M15 anyway.")
+mcDistIn = input.float(2.0, "Line offset from the extreme (gold $)", minval = 0.0, step = 0.1, group = gMC, tooltip = "How far outside the macro high and low the two lines sit, so they do not sit exactly on the wicks. The original ships 0.5; this build defaults to 2 so the lines clear gold's wicks. It is in dollars - it is rescaled by the Scale thresholds to symbol setting at the top, like every other dollar figure here.")
+mcCol    = input.color(#787B86, "Lines & label", group = gMC, tooltip = "The original paints these with the chart foreground colour, which is black on a light chart and white on a dark one. Default here is the neutral grey used by the rest of this indicator, so the macro reads the same on either background.\n\nSwitch it to white if you want the macro to shout on a dark chart, or black on a light one.")
+mcKeep   = input.int(1, "Macros kept per window", minval = 1, maxval = 20, group = gMC, tooltip = "How many past occurrences of EACH macro window stay on the chart. The original ships with 1 - only the one running now, or the last one that ran.")
+mcTZ     = input.string("America/New_York", "Timezone", options = ["America/New_York","GMT-12","GMT-11","GMT-10","GMT-9","GMT-8","GMT-7","GMT-6","GMT-5","GMT-4","GMT-3","GMT-2","GMT-1","GMT+0","GMT+1","GMT+2","GMT+3","GMT+4","GMT+5","GMT+6","GMT+7","GMT+8","GMT+9","GMT+10","GMT+11","GMT+12","GMT+13","GMT+14"], group = gMC, tooltip = "Clock the macro windows are read in. GMT entries are NOT adjusted for daylight saving - that is the original's own note.\n\nSeparate from the Day boundary at the top: it moves the macros, nothing else.")
+
+mc1On = input.bool(true, "", inline = "mc1", group = gMC)
+mc1S  = input.string("09:50", "", inline = "mc1", group = gMC)
+mc1E  = input.string("10:10", "", inline = "mc1", group = gMC)
+mc1T  = input.bool(true, "top", inline = "mc1", group = gMC)
+mc1B  = input.bool(false, "bottom", inline = "mc1", group = gMC)
+
+mc2On = input.bool(true, "", inline = "mc2", group = gMC)
+mc2S  = input.string("10:50", "", inline = "mc2", group = gMC)
+mc2E  = input.string("11:10", "", inline = "mc2", group = gMC)
+mc2T  = input.bool(true, "top", inline = "mc2", group = gMC)
+mc2B  = input.bool(false, "bottom", inline = "mc2", group = gMC)
+
+mc3On = input.bool(true, "", inline = "mc3", group = gMC)
+mc3S  = input.string("02:50", "", inline = "mc3", group = gMC)
+mc3E  = input.string("03:10", "", inline = "mc3", group = gMC)
+mc3T  = input.bool(true, "top", inline = "mc3", group = gMC)
+mc3B  = input.bool(false, "bottom", inline = "mc3", group = gMC)
+
+mc4On = input.bool(true, "", inline = "mc4", group = gMC)
+mc4S  = input.string("03:50", "", inline = "mc4", group = gMC)
+mc4E  = input.string("04:10", "", inline = "mc4", group = gMC)
+mc4T  = input.bool(true, "top", inline = "mc4", group = gMC)
+mc4B  = input.bool(false, "bottom", inline = "mc4", group = gMC)
+
+mc5On = input.bool(true, "", inline = "mc5", group = gMC)
+mc5S  = input.string("06:50", "", inline = "mc5", group = gMC)
+mc5E  = input.string("07:10", "", inline = "mc5", group = gMC)
+mc5T  = input.bool(true, "top", inline = "mc5", group = gMC)
+mc5B  = input.bool(false, "bottom", inline = "mc5", group = gMC)
+
+// =====================================================================
+//  CB MOR (CENTRAL BANK MULTIPLES OF RANGE / PROJECTIONS)
+// =====================================================================
+gCB = "CB MOR (Projections)"
+cbOn        = input.bool(true, "Show CB MOR Projections", group = gCB, tooltip = "Plots +R and -R standard deviation lines.")
+cbSess      = input.session("0000-0900", "Session Window", group = gCB)
+cbDayMode   = input.string("Today", "Session Day", options = ["Today", "Yesterday"], group = gCB, tooltip = "Use Today's NY session or Yesterday's NY session (on Monday, Yesterday automatically uses Friday).")
+cbTZ        = input.string("America/New_York", "Timezone", options = ["America/New_York","Europe/London","UTC"], group = gCB)
+cbLevels    = input.int(3, "Number of R levels (1-5)", minval=1, maxval=5, group = gCB)
+cbStepMode  = input.string("Half Range (Standard)", "Step Size Mode", options = ["Half Range (Standard)", "Full Range (ICT)"], group = gCB)
+cbShowEQ    = input.bool(true, "Draw Midpoint (EQ / Base Open)", group = gCB)
+cbCol    = input.color(#787B86, "Base Open Color", group = gCB)
+cbR1Col  = input.color(#089981, "R1 Color", group = gCB)
+cbR2Col  = input.color(#FF9800, "R2 Color", group = gCB)
+cbR3Col  = input.color(#F23645, "R3 Color", group = gCB)
+cbR4Col  = input.color(#9C27B0, "R4 Color", group = gCB)
+cbR5Col  = input.color(#2962FF, "R5 Color", group = gCB)
+cbStyle  = input.string("Dashed", "R-Lines Style", options = ["Solid", "Dashed", "Dotted"], group = gCB)
+
+// =====================================================================
+//  PRESET RESOLUTION
+//  tier 1 = core, 2 = day-trading, 3 = full. A preset overrides the boxes.
+// =====================================================================
+f_on(bool userToggle, int tier) =>
+    preset == "Custom" ? userToggle : preset == "Minimal" ? tier <= 1 : preset == "Day Trading" ? tier <= 2 : true
+
+showTokyoR    = f_on(showTokyo,  1)
+showLondonR   = f_on(showLondon, 1)
+showNyAmR     = f_on(showNyAm,   1)
+showLunchR    = f_on(showLunch,  1)
+showNyPmR     = f_on(showNyPm,   1)
+showPrevSessR = f_on(showPrevSess, 2)
+showATHR      = f_on(showATH, 1)
+showPDR       = f_on(showPD,  1)
+showDayR      = f_on(showDay, 1)
+showPWR       = f_on(showPW,  2)
+showHOWR      = f_on(showHOW, 2)
+showMNOR      = f_on(showMNO, 2)
+showBPDR      = f_on(showBPD, 3)
+showEqR       = f_on(showEq,  2)
+showPivH1R    = f_on(showPivH1,  3)
+showPivM15R   = f_on(showPivM15, 3)
+showSessZone  = f_on(showSessZoneIn, 2) and sessTfOk
+mcOnR         = f_on(mcOn, 3)
+cbOnR         = f_on(cbOn, 2)
+
+// =====================================================================
+//  THRESHOLD SCALING
+//  The dollar thresholds were tuned on gold. REF_PRICE / REF_ATR are the
+//  gold readings they were tuned against (20-08-2026: price 4483, D1 ATR
+//  88.5), so on gold the factor lands on 1.00 and nothing changes. Every
+//  other symbol gets the same threshold expressed in ITS units.
+// =====================================================================
+REF_PRICE = 4500.0
+REF_ATR   = 88.0
+// ATR period is 200, not 14. Over 460 days of gold, ATR(14) swung across a 7.4x
+// band and moved 2.85% a day - the chart changed character week to week. ATR(200)
+// holds 1.8x and 0.31%, steadier than the price factor (1.9x / 0.98%) while still
+// being the dimensionally correct unit. ATR(200) on gold reads 89.3, so REF_ATR 88
+// stays valid to within 1.5%.
+atrD1 = request.security(syminfo.tickerid, "D", ta.atr(200), lookahead = barmerge.lookahead_off)
+byPrice = close / REF_PRICE
+// ATR needs history; before it exists fall back to the price factor rather
+// than to 1.0, which would be the gold-only number on a non-gold symbol.
+byAtr = na(atrD1) or atrD1 <= 0 ? byPrice : atrD1 / REF_ATR
+scaleF = scaleMode == "Off (gold dollars)" ? 1.0 : scaleMode == "Volatility (ATR)" ? byAtr : byPrice
+
+mergeGapUSD = mergeGapIn  * scaleF
+labelGapUSD = labelGapIn  * scaleF
+eqRel       = eqRelIn     * scaleF
+eqThr       = math.max(eqRel, syminfo.mintick * 0.5)
+nearDist    = nearDistIn  * scaleF
+mcDist      = mcDistIn    * scaleF
+
+// Per-layer text size is deliberately NOT exposed fifteen times over - one size
+// for everything, one for the all-time high. More than that is configuration
+// for its own sake.
+tkZ = txtSize
+btkZ = txtSize
+loZ = txtSize
+bloZ = txtSize
+amZ = txtSize
+bamZ = txtSize
+luZ = txtSize
+bluZ = txtSize
+pmZ = txtSize
+bpmZ = txtSize
+pdZ = txtSize
+bpdZ = txtSize
+dayZ = txtSize
+pwZ = txtSize
+wkZ = txtSize
+mnoZ = txtSize
+eqZ = txtSize
+pvh1Z = txtSize
+pvm15Z = txtSize
+dcZ = txtSize
+athZ = keySize
+cbZ = txtSize
+
+// A session is a session - one line style for the live ones, one for the rest.
+tkS = sessS
+loS = sessS
+amS = sessS
+pmS = sessS
+btkS = bsessS
+bloS = bsessS
+bamS = bsessS
+luS = sessS
+bluS = bsessS
+bpmS = bsessS
+
+// ------------------------------ Helpers ------------------------------
+// The dropdowns store their own label, so these two read the label directly.
+f_lst(string s) => s == "Dashed" ? line.style_dashed : s == "Dotted" ? line.style_dotted : line.style_solid
+f_sz(string s)  => s == "Tiny" ? size.tiny : s == "Normal" ? size.normal : s == "Large" ? size.large : size.small
+
+// uu tien type (nho = cao) tu ten muc; va phia dinh/day
+// ATH > PW(tuan truoc) > PD(hom qua) > BPD(lui 2) > HOW/LOW(tuan nay) > HOD/LOD(hom nay) > Session > EQ > H1 > M15
+f_prio(string nm) =>
+    nm == "ATH"                  ? 0 :
+     str.startswith(nm, "PW")    ? 1 :          // PWH/PWL (tuan truoc)
+     str.startswith(nm, "BPD")   ? 3 :          // BPDH/BPDL (lui 2 ngay) - BPD ko startswith "PD" nen an toan
+     str.startswith(nm, "PD")    ? 2 :          // PDH/PDL (hom qua)
+     nm == "HOW" or nm == "LOW"  ? 4 :          // High/Low of Week (tuan nay)
+     nm == "HOD" or nm == "LOD"  ? 5 :          // High/Low of Day (hom nay)
+     str.contains(nm, "EQ")      ? 7 :          // EQH/EQL + rEQH/rEQL
+     str.startswith(nm, "H1")    ? 8 :          // H1-H/H1-L
+     str.startswith(nm, "M15")   ? 9 : 6        // M15; con lai = Session (6)
+f_isHigh(string nm) => str.endswith(nm, "-H") or str.contains(nm, "High") or nm == "PDH" or nm == "PWH" or nm == "BPDH" or nm == "HOD" or nm == "HOW" or nm == "ATH" or str.contains(nm, "EQH")
+
+// timeframe/nhom cua tung muc: moi TF giu 1 vach xam DINH + 1 vach xam DAY rieng
+//   (chi mat khi muc KHAC cung TF, CUNG PHIA bi quet)
+// 0=Phien 1=Ngay 2=Tuan 3=H1 4=M15 5=EQ (Equal High/Low - loai rieng)
+f_tf(string nm) =>
+    str.contains(nm, "EQ")   ? 5 :
+     str.contains(nm, "M15")  ? 4 :
+     str.contains(nm, "H1")   ? 3 :
+     (nm == "PWH" or nm == "PWL" or nm == "HOW" or nm == "LOW")                                     ? 2 :
+     (nm == "PDH" or nm == "PDL" or nm == "BPDH" or nm == "BPDL" or nm == "HOD" or nm == "LOD")     ? 1 : 0
+
+type Piv
+    float price
+    int   t
+    int   swT      // na = chua quet; != na = gio (time) bi quet dau tien
+
+type SPiv
+    float price
+    int   t
+    int   swT      // na = chua quet; != na = gio bi quet
+    bool  isHigh
+
+type PLvl
+    float  price
+    string name
+    color  col
+    string lst
+    string tsz
+    int    t0
+    int    swT     // na = chua quet; != na = gio bi quet
+
+var array<line>  ncLines = array.new<line>()
+var array<label> ncLabs  = array.new<label>()
+var array<PLvl>  pend    = array.new<PLvl>()   // gom muc truoc, ve sau (de gan cot chong chen)
+
+// diem cuoi duong = thoi diem (nen realtime + labelBack) o LE PHAI (tuong lai).
+// tinh o scope toan cuc; period ms = timeframe.in_seconds()*1000.
+int gXfut = time + labelBack * timeframe.in_seconds() * 1000
+
+// 1 muc = GOM vao pend (ve o cuoi). swT: na = chua quet, != na = gio bi quet (feed maxSw toan cuc).
+drawLvl(float price, string name, color col, string lst, string tsz, int t0, int swT) =>
+    if not na(price)
+        pend.push(PLvl.new(price, name, col, lst, tsz, t0, swT))
+
+// ================= PHIEN: cur (dang chay, sang) + lich su 10 ngay (BP, chi chua quet) =================
+// - cH/cL = lan xuat hien MOI NHAT cua phien (ve sang, luon hien).
+// - hist  = moi lan da hoan tat trong 10 ngay -> ve nhat (BP), CHI ve neu chua quet.
+nc_sess(bool inS) =>
+    var array<SPiv> hist = array.new<SPiv>()
+    // `started` dung suot ca nen realtime dau phien, ma Pine KHONG rollback array -> khong
+    // khoa thi moi tick lai day them mot cap BP (dinh/day phien truoc). Moc nen da day nam
+    // trong mot mang 1 o: mang song sot qua rollback nen la cho duy nhat giu duoc trang thai
+    // giua cac tick cua cung mot nen.
+    var array<int>  pushT = array.new_int(1, 0)
+    started = inS and not inS[1]
+    var float cH = na
+    var float cL = na
+    var int   cHt = na
+    var int   cLt = na
+    var int   cHsw = na            // gio quet cua dinh phien HIEN TAI (na=chua quet)
+    var int   cLsw = na
+    if started
+        if not na(cH) and pushT.get(0) != time
+            pushT.set(0, time)
+            hist.push(SPiv.new(cH, cHt, cHsw, true))     // day sang BP + giu trang thai quet
+            hist.push(SPiv.new(cL, cLt, cLsw, false))
+        cH := high
+        cL := low
+        cHt := time
+        cLt := time
+        cHsw := na
+        cLsw := na
+    else if inS
+        if na(cH) or high > cH
+            cH := high
+            cHt := time
+            cHsw := na                                   // pha dinh moi = keo dai, chua tinh quet
+        if na(cL) or low < cL
+            cL := low
+            cLt := time
+            cLsw := na
+    // quet cua muc phien HIEN TAI. Trong phien: else-if o tren da cap nhat cH:=high truoc -> high>cH = false,
+    // nen KHONG can guard "not inS" (guard nay tung chan nham lich su). Chi set lan DAU (na(cHsw)).
+    if not na(cH) and na(cHsw) and high > cH
+        cHsw := time
+    if not na(cL) and na(cLsw) and low < cL
+        cLsw := time
+    cut2 = time - eqDays * 86400000
+    while hist.size() > 0                     // KHONG dung "and get(0)" -> RE10045
+        if hist.get(0).t >= cut2
+            break
+        hist.remove(0)
+    for p in hist
+        if na(p.swT)
+            if p.isHigh and high > p.price
+                p.swT := time
+            if (not p.isHigh) and low < p.price
+                p.swT := time
+    [cH, cL, cHt, cLt, cHsw, cLsw, hist]
+
+// ================= VUNG PHIEN (box quanh range) - port tu BigBeluga nd_drawSession =================
+// Moi phien: box dut net (khung + High/Low) + nhan ten + (tuy chon) duong Open. Giu sessZoneDays box moi nhat.
+nc_sessZone(bool inS, string name, bool useBox, color brdC, color bgC) =>
+    // Lop box co CONG TAC CHUNG (showSessZone) va cong tac rieng tung phien.
+    bool zOn = showSessZone and useBox
+    // 23-08: VIEN va NEN doc lap nhau, mau lay tu chinh hang cua box nay. Nhan ten va
+    // duong Open cung an mau vien de ca cum trong nhu mot mon.
+    color zBrdC = not sessZoneBrd  ? na : brdC
+    color zBgC  = not sessZoneFill ? na : bgC
+    var array<box>   a_box = array.new<box>()
+    var array<label> a_lbl = array.new<label>()
+    var array<line>  a_opn = array.new<line>()
+    var array<label> a_olb = array.new<label>()
+    var box   cbx = na
+    var label cnl = na
+    var line  cop = na
+    var float shi = na
+    var float slo = na
+    // Cung benh nhu nc_sess: `newS` dung suot nen dau phien va array khong bi rollback, nen
+    // khong khoa thi moi tick de them mot box - mang cham tran sessZoneDays roi box cac phien
+    // CU bi shift ra va xoa. Nguoc lai cbx/cnl/cop la bien var nen CO bi rollback ve object
+    // cua phien truoc: phai lay lai handle tu mang, khong thi se di sua box phien truoc.
+    var array<int> zT = array.new_int(1, 0)
+    newS = inS and not inS[1]
+    bool zNew = newS
+    if newS
+        shi := high
+        slo := low
+        if zT.get(0) == time
+            zNew := false
+            if a_box.size() > 0
+                cbx := a_box.get(a_box.size() - 1)
+            if a_lbl.size() > 0
+                cnl := a_lbl.get(a_lbl.size() - 1)
+            if a_opn.size() > 0
+                cop := a_opn.get(a_opn.size() - 1)
+    if zOn and zNew
+        zT.set(0, time)
+        // 19-08 owner chot: BO han nen to, chi con VIEN dut. Truoc day bgcolor = 92% mo;
+        // 4 phien chong nhau la cong mau lai thanh mang xam de. Nay khop ban MT5, ben do
+        // von da OBJPROP_FILL = InpSessZoneFill = false (chi vien) tu truoc.
+        // 23-08: nen to quay lai, va mac dinh BAT o 90% trong suot. Canh bao 19-08 o tren
+        // van dung nhung chi khi keo do mo len cao - de 90% thi ba box mac dinh (Tokyo,
+        // London, NY AM) noi tiep nhau theo gio chu khong chong len nhau.
+        cbx := box.new(time, high, time, low, xloc = xloc.bar_time, border_color = zBrdC, border_style = f_lst(sessZoneBrdS), border_width = sessZoneBrd ? sessZoneBrdW : 0, bgcolor = zBgC)
+        a_box.push(cbx)
+        if a_box.size() > sessZoneDays
+            box.delete(a_box.shift())
+        if sessZoneLbl
+            cnl := label.new(time, high, name, xloc = xloc.bar_time, style = label.style_label_down, color = color.new(brdC, 55), textcolor = color.white, size = size.small)
+            a_lbl.push(cnl)
+            if a_lbl.size() > sessZoneDays
+                label.delete(a_lbl.shift())
+        if sessZoneOpen
+            cop := line.new(time, open, time, open, xloc = xloc.bar_time, color = brdC, width = 2)
+            a_opn.push(cop)
+            if a_opn.size() > sessZoneDays
+                line.delete(a_opn.shift())
+            olb = label.new(time, open, "O " + name, xloc = xloc.bar_time, style = label.style_label_left, color = #ffffff00, textcolor = brdC, size = size.tiny)
+            a_olb.push(olb)
+            if a_olb.size() > sessZoneDays
+                label.delete(a_olb.shift())
+    else if zOn and inS
+        shi := math.max(shi, high)
+        slo := math.min(slo, low)
+        if not na(cbx)
+            box.set_right (cbx, time)
+            box.set_top   (cbx, shi)
+            box.set_bottom(cbx, slo)
+        if sessZoneLbl and not na(cnl)
+            label.set_y(cnl, shi)
+        if sessZoneOpen and not na(cop)
+            line.set_x2(cop, time)
+
+// ================= ICT Weekend Skip =================
+dowNY = dayofweek(time, "America/New_York")
+isWkndNY = dowNY == dayofweek.saturday or dowNY == dayofweek.sunday
+dowDay = dayofweek(time, dayTZ)
+isWkndDay = dowDay == dayofweek.saturday or dowDay == dayofweek.sunday
+
+tokIn = not na(time(timeframe.period, sTokyo,  TZ)) and not isWkndNY
+lonIn = not na(time(timeframe.period, sLondon, TZ)) and not isWkndNY
+amIn  = not na(time(timeframe.period, sNyAm,   TZ)) and not isWkndNY
+luIn  = not na(time(timeframe.period, sLunch,  TZ)) and not isWkndNY
+pmIn  = not na(time(timeframe.period, sNyPm,   TZ)) and not isWkndNY
+
+[tkCH, tkCL, tkCHt, tkCLt, tkCHsw, tkCLsw, tkHist] = nc_sess(tokIn)
+[loCH, loCL, loCHt, loCLt, loCHsw, loCLsw, loHist] = nc_sess(lonIn)
+[amCH, amCL, amCHt, amCLt, amCHsw, amCLsw, amHist] = nc_sess(amIn)
+[luCH, luCL, luCHt, luCLt, luCHsw, luCLsw, luHist] = nc_sess(luIn)
+[pmCH, pmCL, pmCHt, pmCLt, pmCHsw, pmCLsw, pmHist] = nc_sess(pmIn)
+
+nc_sessZone(tokIn, "Tokyo",    zTok, zTokB, zTokF)
+nc_sessZone(lonIn, "London",   zLon, zLonB, zLonF)
+nc_sessZone(amIn,  "NY AM",    zAm,  zAmB,  zAmF)
+nc_sessZone(luIn,  "NY Lunch", zLu,  zLuB,  zLuF)
+nc_sessZone(pmIn,  "NY PM",    zPm,  zPmB,  zPmF)
+
+// ================= PDH/PDL + Day-High/Low (+ swept-time + t.hinh thanh) =================
+// dayTZ + dayHour, KHONG phai TZ: phien giu nguyen gio New York.
+// Bat thoi diem gio DIA PHUONG vuot qua dayHour, thay vi lui timestamp roi lay
+// ngay: lui timestamp thi dung ngay doi DST offset da khac, moc lech mot gio.
+// dayHour = 0 chay dung nhanh cu, khong doi gi so voi truoc.
+nyDay   = dayofmonth(time, dayTZ)
+nyHour  = hour(time, dayTZ)
+newDayRaw = dayHour == 0 ? (nyDay != nyDay[1] and nyHour < 12) : (nyHour >= dayHour and (na(nyHour[1]) or nyHour[1] < dayHour))
+// --- D1+ vs Intraday ---------------------------------------------------------
+// D1 tro len: moi bar la mot ngay giao dich. Broker da loai bar cuoi tuan, va
+// `time` cua bar co the roi vao chieu chu nhat theo NY (Pepperstone EET mo nen
+// thu 2 luc CN 17:00 NY) nen isWkndDay va guard nyHour<12 deu SAI o day.
+// Chi can so ngay thay doi la du.
+// Intraday: deferred weekend flip - khi newDayRaw fire vao weekend (bi block
+// boi isWkndDay), ghi nho lai va fire vao nen weekday dau tien.
+isDailyTF = timeframe.in_seconds(timeframe.period) >= 86400
+var bool _pendingDayFlip = false
+if not isDailyTF and newDayRaw and isWkndDay
+    _pendingDayFlip := true
+_wkndToWkday = not isWkndDay and (bar_index == 0 or isWkndDay[1])
+_gapNewDay = _wkndToWkday and nyDay != nyDay[1] and not newDayRaw and not isWkndDay
+newDay = isDailyTF ? (nyDay != nyDay[1]) : ((newDayRaw and not isWkndDay) or ((_pendingDayFlip or _gapNewDay) and not isWkndDay and _wkndToWkday))
+if newDay and not isDailyTF
+    _pendingDayFlip := false
+// So thu tu NGAY NY da troi qua - dung de AN PWH/PWL tu ngay ke tiep ngay bi quet.
+var int nyDayIdx = 0
+if newDay
+    nyDayIdx += 1
+var float dH  = na
+var float dL  = na
+var float pdh = na
+var float pdl = na
+var float bpdh = na
+var float bpdl = na
+var int pdhSw = na
+var int pdlSw = na
+var int bpdhSw = na
+var int bpdlSw = na
+var int dHt  = na
+var int dLt  = na
+var int pdhT = na
+var int pdlT = na
+var int bpdhT = na
+var int bpdlT = na
+if newDay
+    // PDH/PDL hom qua -> BPDH/BPDL (giu nguyen trang thai quet + gio hinh thanh)
+    bpdh := pdh
+    bpdl := pdl
+    bpdhSw := pdhSw
+    bpdlSw := pdlSw
+    bpdhT := pdhT
+    bpdlT := pdlT
+    // cuc tri ngay dang chay -> PDH/PDL (reset quet)
+    pdh := dH
+    pdl := dL
+    pdhSw := na
+    pdlSw := na
+    pdhT := dHt
+    pdlT := dLt
+    dH := high
+    dL := low
+    dHt := time
+    dLt := time
+else
+    if isDailyTF or not isWkndDay
+        if na(dH) or high > dH
+            dH := high
+            dHt := time
+        if na(dL) or low < dL
+            dL := low
+            dLt := time
+if not na(pdh) and na(pdhSw) and dH > pdh
+    pdhSw := time
+if not na(pdl) and na(pdlSw) and dL < pdl
+    pdlSw := time
+if not na(bpdh) and na(bpdhSw) and dH > bpdh
+    bpdhSw := time
+if not na(bpdl) and na(bpdlSw) and dL < bpdl
+    bpdlSw := time
+
+var float cbH = na
+var float cbL = na
+var int   cbT = na
+var float cbH_live = na
+var float cbL_live = na
+var float cbH_comp = na
+var float cbL_comp = na
+
+// ================= MNO = Midnight Open NY (open nen 00:00 gio NY = bar dau ngay moi) =================
+var float mno = na
+var int   mnoT = na
+if newDay
+    mno := open
+    mnoT := time
+    cbT := time
+
+// ================= CB MOR (CBDR Range Extraction) =================
+cbIn = not na(time(timeframe.period, cbSess, cbTZ)) and not isWkndNY
+
+if cbIn and not cbIn[1]
+    cbH_live := high
+    cbL_live := low
+else if cbIn
+    cbH_live := math.max(cbH_live, high)
+    cbL_live := math.min(cbL_live, low)
+
+if not cbIn and cbIn[1]
+    cbH_comp := cbH_live
+    cbL_comp := cbL_live
+
+if cbDayMode == "Today"
+    cbH := cbIn ? cbH_live : (na(cbH_live) ? cbH_comp : cbH_live)
+    cbL := cbIn ? cbL_live : (na(cbL_live) ? cbL_comp : cbL_live)
+else
+    cbH := cbH_comp
+    cbL := cbL_comp
+
+// ================= Gom OHLC tung ngay NY (cho nen-ngay ve o le phai) =================
+// Dung chinh moc `newDay` o tren = 00:00 gio New York, nen khong can them may moc gi.
+// Ngay dang chay luon la phan tu CUOI mang va duoc cap nhat moi nen -> nen "chay" that.
+// Khong trim mang: moi ngay chi them 1 phan tu (chart H1 5000 nen = ~208 phan tu) nen
+// khong dang de goi array.shift roi bo ket qua.
+// MOC cua cay cuoi duoc chot vao chinh mang. Ly do: Pine KHONG rollback array tren nen
+// realtime, nen mot dieu kien su kien kieu `newDay` - dung suot ca nen dau ngay - se day
+// them mot cay MOI TICK, va cac cay ben trai bien thanh ban sao cua cay dang chay. Mang
+// song sot qua rollback, nen so voi moc da luu la cach duy nhat dung o moi tick.
+var array<float> dcO = array.new_float(0)
+var array<float> dcH = array.new_float(0)
+var array<float> dcL = array.new_float(0)
+var array<float> dcC = array.new_float(0)
+var array<int>   dcT = array.new_int(0)
+// dcT giu SO THU TU ngay (khoa chong nhan doi), dcTs giu MOC THAT de ghi nhan thu
+// duoi cay. Hai thu khac nhau nen phai la hai mang.
+var array<int>   dcTs = array.new_int(0)
+if showDayCandle
+    int  dcLi  = dcT.size() - 1
+    bool dcNew = dcLi < 0
+    // tach lam hai buoc vi Pine khong short-circuit `or`: get(-1) se no runtime error
+    if not dcNew
+        dcNew := dcT.get(dcLi) != nyDayIdx
+    if dcNew
+        dcT.push(nyDayIdx)
+        dcTs.push(time)
+        dcO.push(open)
+        dcH.push(high)
+        dcL.push(low)
+        dcC.push(close)
+    else
+        if isDailyTF or not isWkndDay
+            dcH.set(dcLi, math.max(dcH.get(dcLi), high))
+            dcL.set(dcLi, math.min(dcL.get(dcLi), low))
+            dcC.set(dcLi, close)
+
+// ================= Tuan: HOW/LOW (tuan nay) + PWH/PWL (tuan truoc) - theo nen 1W tren chart =================
+[wkH, wkL, wkOpenT, wkPrevH, wkPrevL, wkPrevT] = request.security(syminfo.tickerid, "1W", [high, low, time, high[1], low[1], time[1]], lookahead = barmerge.lookahead_off)
+var int pwhSw = na
+var int pwlSw = na
+// Ngay NY (nyDayIdx) luc bi quet -> qua ngay hom sau thi ngung ve han duong do.
+var int pwhSwDay = na
+var int pwlSwDay = na
+newWk = wkOpenT != wkOpenT[1]
+
+// ---- Nen-TUAN cho cay nen ve o le phai: lay them open/close cua chinh nen 1W do ----
+// wkH/wkL o tren da la dinh/day tuan nay, chi thieu open/close. Dung THANG nen 1W cua
+// TradingView (owner chot) nen khong phu thuoc chart co du lich su mot tuan hay khong.
+[wkOo, wkCc, wkTc] = request.security(syminfo.tickerid, "1W", [open, close, time_close], lookahead = barmerge.lookahead_off)
+var array<float> wcO = array.new_float(0)
+var array<float> wcH = array.new_float(0)
+var array<float> wcL = array.new_float(0)
+var array<float> wcC = array.new_float(0)
+var array<int>   wcT = array.new_int(0)   // moc mo tuan cua tung cay - xem chu thich o nen-ngay
+if showWkCandle and not na(wkOo)
+    int  wcLi  = wcT.size() - 1
+    bool wcNew = wcLi < 0
+    if not wcNew
+        wcNew := wcT.get(wcLi) != wkOpenT
+    if wcNew
+        wcT.push(wkOpenT)
+        wcO.push(wkOo)
+        wcH.push(wkH)
+        wcL.push(wkL)
+        wcC.push(wkCc)
+    else
+        wcO.set(wcLi, wkOo)
+        wcH.set(wcLi, wkH)
+        wcL.set(wcLi, wkL)
+        wcC.set(wcLi, wkCc)
+if newWk
+    pwhSw := na
+    pwlSw := na
+    pwhSwDay := na
+    pwlSwDay := na
+if not na(wkPrevH) and na(pwhSw) and high > wkPrevH
+    pwhSw := time
+    pwhSwDay := nyDayIdx
+if not na(wkPrevL) and na(pwlSw) and low < wkPrevL
+    pwlSw := time
+    pwlSwDay := nyDayIdx
+// CHUA quet -> luon ve. DA quet -> chi ve trong dung ngay bi quet.
+pwhOn = na(pwhSwDay) or nyDayIdx <= pwhSwDay
+pwlOn = na(pwlSwDay) or nyDayIdx <= pwlSwDay
+
+// ================= Nen H1 / H4 cho cay nen ve o le phai =================
+// Doc THANG lich su cua chinh khung do - open[1], open[2]... duoc tinh TRONG ngu canh H1/H4,
+// nen la nen H1 lien truoc that su. KHONG gom bang mang theo nen chart nua: cach cu chi nhan
+// duoc MOT mau moi nen chart, nen tren chart CAO hon khung cum (owner mo chart D1 ngay 21-08)
+// ba cay "H1 / H1-1 / H1-2" thuc ra la nen H1 CUOI cua ba NGAY khac nhau - cach nhau ca thang
+// tren truc thoi gian, lech nhau vai chuc do la, va nhay moi lan co nen chart moi.
+// Toi da 6 cay moi cum (maxval cua h1Num / h4Num) nen doc san 6 nen.
+[hAo0, hAh0, hAl0, hAc0, hAo1, hAh1, hAl1, hAc1, hAo2, hAh2, hAl2, hAc2, hAo3, hAh3, hAl3, hAc3, hAo4, hAh4, hAl4, hAc4, hAo5, hAh5, hAl5, hAc5] = request.security(syminfo.tickerid, "60",  [open, high, low, close, open[1], high[1], low[1], close[1], open[2], high[2], low[2], close[2], open[3], high[3], low[3], close[3], open[4], high[4], low[4], close[4], open[5], high[5], low[5], close[5]], lookahead = barmerge.lookahead_off)
+[hBo0, hBh0, hBl0, hBc0, hBo1, hBh1, hBl1, hBc1, hBo2, hBh2, hBl2, hBc2, hBo3, hBh3, hBl3, hBc3, hBo4, hBh4, hBl4, hBc4, hBo5, hBh5, hBl5, hBc5] = request.security(syminfo.tickerid, "240", [open, high, low, close, open[1], high[1], low[1], close[1], open[2], high[2], low[2], close[2], open[3], high[3], low[3], close[3], open[4], high[4], low[4], close[4], open[5], high[5], low[5], close[5]], lookahead = barmerge.lookahead_off)
+// Moc MO cua sau nen gan nhat + moc DONG cua nen dang chay, doc trong ngu canh chinh
+// khung do. Tach thanh loi goi rieng thay vi noi vao tuple 24 phan tu o tren cho de doc.
+[hAt0, hAt1, hAt2, hAt3, hAt4, hAt5, hAtc] = request.security(syminfo.tickerid, "60",  [time, time[1], time[2], time[3], time[4], time[5], time_close], lookahead = barmerge.lookahead_off)
+[hBt0, hBt1, hBt2, hBt3, hBt4, hBt5, hBtc] = request.security(syminfo.tickerid, "240", [time, time[1], time[2], time[3], time[4], time[5], time_close], lookahead = barmerge.lookahead_off)
+
+// Buffer cho f_cands (cu -> moi). Dung lai o khoi ve, khong con tich luy qua tung nen.
+var array<float> h1cO = array.new_float(0)
+var array<float> h1cH = array.new_float(0)
+var array<float> h1cL = array.new_float(0)
+var array<float> h1cC = array.new_float(0)
+var array<int>   h1cT = array.new_int(0)
+var array<float> h4cO = array.new_float(0)
+var array<float> h4cH = array.new_float(0)
+var array<float> h4cL = array.new_float(0)
+var array<float> h4cC = array.new_float(0)
+var array<int>   h4cT = array.new_int(0)
+
+// ================= EQH / EQL (H1 + M15) =================
+// Pivot KHOA luc xac nhan: nen ben phai lay GIA MO cua nen dang chay (khong lay high/low
+// cuoi cung cua no). Nen do an lai dinh/day thi pivot van con -> chuyen XAM (da quet) thay vi
+// bien mat. Gia tri dung yen suot ca nen HTF nen pushPiv chot on dinh o moi khung chart.
+f_pivH() => high[1] > high[2] and high[1] > open ? high[1] : na
+f_pivL() => low[1]  < low[2]  and low[1]  < open  ? low[1]  : na
+[ph1,  pl1]  = request.security(syminfo.tickerid, "60", [f_pivH(), f_pivL()], lookahead = barmerge.lookahead_off)
+[ph15, pl15] = request.security(syminfo.tickerid, "15", [f_pivH(), f_pivL()], lookahead = barmerge.lookahead_off)
+
+var array<Piv> h1H  = array.new<Piv>()
+var array<Piv> h1L  = array.new<Piv>()
+var array<Piv> m15H = array.new<Piv>()
+var array<Piv> m15L = array.new<Piv>()
+
+pushPiv(array<Piv> a, float v) =>
+    if not na(v) and (na(v[1]) or v != v[1])
+        int  n     = a.size()
+        bool fresh = n == 0
+        // Tick truoc cua CHINH nen nay da chot pivot roi thi thoi (array khong rollback).
+        // Ban sao trung khit gia se de ra EQH/EQL ao vi buildEq gom pivot theo nguong.
+        if not fresh
+            fresh := a.get(n - 1).t != time
+        if fresh
+            a.push(Piv.new(v, time, na))
+
+pushPiv(h1H,  ph1)
+pushPiv(h1L,  pl1)
+pushPiv(m15H, ph15)
+pushPiv(m15L, pl15)
+
+// ATH = GIA CAO NHAT LICH SU (all-time high). Lay ta.max(high) tren khung THANG de bao trum lich su
+// dai (khung chart 1m chi nap vai ngay). ta.max chi tang -> ATH luon nam TREN CUNG, tu doi len khi co gia moi.
+athAll = request.security(syminfo.tickerid, "M", ta.max(high), lookahead = barmerge.lookahead_off)
+var int athFromT = na
+if na(athFromT)
+    athFromT := time
+
+cutoff = time - eqDays * 86400000
+pruneSweep(array<Piv> a, bool isHigh) =>
+    while a.size() > 0                       // KHONG dung "and get(0)" -> Pine ko short-circuit -> RE10045
+        if a.get(0).t >= cutoff
+            break
+        a.remove(0)
+    for p in a
+        if na(p.swT)
+            if isHigh and high > p.price
+                p.swT := time
+            if (not isHigh) and low < p.price
+                p.swT := time
+
+pruneSweep(h1H,  true)
+pruneSweep(h1L,  false)
+pruneSweep(m15H, true)
+pruneSweep(m15L, false)
+
+buildEq(array<Piv> a, int side, float thr, string nm) =>
+    tmp = array.new<Piv>()
+    for p in a
+        if na(p.swT)
+            tmp.push(p)
+    n = tmp.size()
+    if n >= 2 and thr > 0
+        for i = 0 to n - 2
+            for j = 0 to n - 2 - i
+                if tmp.get(j).price > tmp.get(j + 1).price
+                    t0 = tmp.get(j)
+                    tmp.set(j, tmp.get(j + 1))
+                    tmp.set(j + 1, t0)
+        i = 0
+        while i < n
+            j = i + 1
+            while j < n                       // tach dieu kien -> tranh get(j) khi j==n (RE10045)
+                if (tmp.get(j).price - tmp.get(j - 1).price) > thr
+                    break
+                j += 1
+            if j - i >= 2
+                lp = side > 0 ? tmp.get(j - 1).price : tmp.get(i).price
+                int org = tmp.get(i).t
+                for k = i to j - 1
+                    org := math.min(org, tmp.get(k).t)
+                // cum moi gia BANG NHAU tuyet doi -> EQH/EQL; lech trong nguong -> rEQH/rEQL
+                khit = (tmp.get(j - 1).price - tmp.get(i).price) <= syminfo.mintick * 0.5
+                drawLvl(lp, (khit ? "" : "r") + nm, eqC, eqS, eqZ, org, na)
+            i := j
+
+// Pivot: day HET (chua quet -> hien thuong; da quet -> feed maxSw, chi hien neu la muc THANG)
+drawAllPiv(array<Piv> a, string base, bool isHigh, color c, string st, string sz) =>
+    for p in a
+        drawLvl(p.price, base + (isHigh ? "-H" : "-L"), c, st, sz, p.t, p.swT)
+
+// lich su phien (BP): day HET voi swT (chua quet -> hien thuong; da quet -> feed maxSw)
+drawSessHist(array<SPiv> a, string base, color c, string st, string sz) =>
+    for p in a
+        drawLvl(p.price, base + (p.isHigh ? "-H" : "-L"), c, st, sz, p.t, p.swT)
+
+// ================= VE (tren nen cuoi) =================
+var array<box> ncDcBx = array.new<box>()
+
+// Co cho alertcondition(). Bien THUONG, khong var: moi nen tu ve false, chi
+// bat len o nen co su kien. Dat ngoai barstate.islast vi alertcondition phai
+// nam o global scope.
+bool sweptHiSig = false
+bool sweptLoSig = false
+bool nearSig    = false
+
+// ------------------------------ Dashboard shell ------------------------------
+// ------------------------------ Dashboard shell ------------------------------
+// Built once, repositioned and refilled on the last bar. Six rows is the fixed
+// height: title, buy-side, sell-side, draw, swept, session. Ban 1.0 co hang thu
+// bay (RANGE) di kem lop Premium & Discount - lop do da bo nen bang lui con sau.
+var table hud = table.new(position.top_right, 3, 6, border_width = 1)
+
+f_hudPos(string s) =>
+    s == "Top left"      ? position.top_left :
+     s == "Bottom right" ? position.bottom_right :
+     s == "Bottom left"  ? position.bottom_left :
+     s == "Middle right" ? position.middle_right :
+     s == "Middle left"  ? position.middle_left : position.top_right
+
+// Nap mot cay vao buffer cum nen. Cay na (chart chua du lich su khung do) thi bo qua.
+f_put(array<float> ao, array<float> ah, array<float> al, array<float> ac, array<int> at, float o, float h, float l, float c, int t) =>
+    if not na(o)
+        ao.push(o)
+        ah.push(h)
+        al.push(l)
+        ac.push(c)
+        at.push(t)
+
+// Dem nguoc cua cay dang chay -> "1d 4h" / "3h 12m" / "07m 40s". Het gio / na = chuoi rong.
+f_ctd(int ms) =>
+    string r = ""
+    if not na(ms) and ms > 0
+        int ss = int(ms / 1000)
+        int dd = int(ss / 86400)
+        int hh = int((ss % 86400) / 3600)
+        int mm = int((ss % 3600) / 60)
+        int s2 = ss % 60
+        r := dd > 0 ? str.tostring(dd) + "d " + str.tostring(hh) + "h" : hh > 0 ? str.tostring(hh) + "h " + str.tostring(mm) + "m" : str.tostring(mm) + "m " + str.tostring(s2) + "s"
+    r
+
+// Nhan ngay/gio duoi cay. CA BA kieu deu doc theo gio NEW YORK - owner chot 22-08.
+// Luu y kem: neu o "Day boundary" tren cung duoc doi sang mui khac (EET, London...) thi
+// thu ghi o day co the lech mot ngay so voi moc that su cat cum nen-ngay. Do la y muon.
+f_dcStamp(int ts, string kind) =>
+    string r = ""
+    if not na(ts)
+        if kind == "date"
+            r := str.format_time(ts, "dd/MM", TZ)
+        else if kind == "time"
+            r := str.format_time(ts, "HH:mm", TZ)
+        else if kind == "dow"
+            int w = dayofweek(ts, TZ)
+            r := w == dayofweek.monday ? "Mon" : w == dayofweek.tuesday ? "Tue" : w == dayofweek.wednesday ? "Wed" : w == dayofweek.thursday ? "Thu" : w == dayofweek.friday ? "Fri" : w == dayofweek.saturday ? "Sat" : "Sun"
+    r
+
+// Ve MOT cum nen gop o le phai; tra ve cot X ngay sau cum de cum ke tiep noi vao.
+// Cum TAT thi khong goi ham -> khong chua cho trong. Trong cum: cu -> moi, trai -> phai.
+//
+// Cau tao mot cay bam theo nhom "5.HTF Candles" cua GTrader: THAN (box) / VIEN (mau
+// rieng) / RAU (mau rieng), cong nhan ten dat tren hoac duoi, dem nguoc, moc ngay,
+// nhan gia, va vach trace keo tu nen song ve tung muc O/H/L/C.
+//   msLeft    = mili giay con lai cua cay dang chay (na = khong dem)
+//   stampKind = "date" / "dow" / "time" / "" cho nhan ngay duoi cay
+f_cands(array<float> ao, array<float> ah, array<float> al, array<float> ac, array<int> at, int num, int x0, int halfW, string tag, int msLeft, string stampKind) =>
+    int xEnd = x0
+    if ao.size() > 0
+        int m = math.min(num, ao.size())
+        // "Align" = ca cum dung chung mot cao do nhan; "Follow candles" = tung cay rieng.
+        float clHi = na
+        float clLo = na
+        for cj = 0 to m - 1
+            int sj = ao.size() - m + cj
+            clHi := na(clHi) ? ah.get(sj) : math.max(clHi, ah.get(sj))
+            clLo := na(clLo) ? al.get(sj) : math.min(clLo, al.get(sj))
+        for ci = 0 to m - 1
+            int   si = ao.size() - m + ci
+            float cO = ao.get(si)
+            float cH = ah.get(si)
+            float cL = al.get(si)
+            float cC = ac.get(si)
+            int   xc = x0 + ci * dcGap
+            bool  up  = cC >= cO
+            bool  run = ci == m - 1              // cay cuoi cum = cay dang chay
+            bxc = box.new(xc - halfW, math.max(cO, cC), xc + halfW, math.min(cO, cC), xloc = xloc.bar_index, border_color = up ? dcBullBd : dcBearBd, bgcolor = up ? cDcBull : cDcBear)
+            ncDcBx.push(bxc)
+            lnc = line.new(xc, cH, xc, cL, xloc = xloc.bar_index, color = up ? dcBullWk : dcBearWk, width = lineW)
+            ncLines.push(lnc)
+            // Chi ghi TEN cum. Cay cuoi = cay dang chay -> de tran; cay cu lui dan: D-1, D-2...
+            string txt = run ? tag : tag + "-" + str.tostring(m - 1 - ci)
+            float yTop = dcLblAlign == "Align" ? clHi : cH
+            float yBot = dcLblAlign == "Align" ? clLo : cL
+            // Nhan TREN: ten + dem nguoc. Mot nhan hai dong, khong phai hai object chong nhau.
+            if dcLblPos == "Top" or dcLblPos == "Both"
+                string tTxt = txt
+                if run and dcTimer
+                    string cd = f_ctd(msLeft)
+                    if cd != ""
+                        tTxt := txt + "\n" + cd
+                ncLabs.push(label.new(xc, yTop, tTxt, xloc = xloc.bar_index, style = label.style_label_down, color = #ffffff00, textcolor = cDcText, size = f_sz(dcZ)))
+            // Nhan DUOI: ten (neu chon) + moc ngay (neu bat). Cung gop vao mot object.
+            string bTxt = ""
+            if dcLblPos == "Bottom" or dcLblPos == "Both"
+                bTxt := txt
+            if dcIntvl
+                // Tach ra khoi ?: vi Pine danh gia CA HAI nhanh - at.get() qua tam la RE.
+                int sTs = na
+                if at.size() > si
+                    sTs := at.get(si)
+                string st = f_dcStamp(sTs, stampKind)
+                if st != ""
+                    bTxt := bTxt == "" ? st : bTxt + "\n" + st
+            if bTxt != ""
+                ncLabs.push(label.new(xc, yBot, bTxt, xloc = xloc.bar_index, style = label.style_label_up, color = #ffffff00, textcolor = cDcText, size = f_sz(dcZ)))
+            // Nhan GIA: dat ben PHAI than, khong dung cho voi hai nhan tren/duoi.
+            if dcPxLbl
+                ncLabs.push(label.new(xc + halfW, cC, str.tostring(cC, format.mintick), xloc = xloc.bar_index, style = label.style_label_left, color = #ffffff00, textcolor = cDcText, size = f_sz(dcZ)))
+            // Trace: keo tu nen SONG sang tan cay, chi cho cay dang chay.
+            if dcTrace and run
+                if dcTrOOn
+                    ncLines.push(line.new(bar_index, cO, xc, cO, xloc = xloc.bar_index, color = dcTrOC, style = f_lst(dcTrOS), width = lineW))
+                if dcTrCOn
+                    ncLines.push(line.new(bar_index, cC, xc, cC, xloc = xloc.bar_index, color = dcTrCC, style = f_lst(dcTrCS), width = lineW))
+                if dcTrHOn
+                    ncLines.push(line.new(bar_index, cH, xc, cH, xloc = xloc.bar_index, color = dcTrHC, style = f_lst(dcTrHS), width = lineW))
+                if dcTrLOn
+                    ncLines.push(line.new(bar_index, cL, xc, cL, xloc = xloc.bar_index, color = dcTrLC, style = f_lst(dcTrLS), width = lineW))
+        xEnd := x0 + m * dcGap + dcGrpGap
+    xEnd
+
+if barstate.islast
+    for bx in ncDcBx
+        box.delete(bx)
+    ncDcBx.clear()
+    for ln in ncLines
+        line.delete(ln)
+    ncLines.clear()
+    for lb in ncLabs
+        label.delete(lb)
+    ncLabs.clear()
+    pend.clear()
+
+    // Each session is switched on its own row in the panel; the previous-session
+    // history rides on the same switch plus its own master toggle.
+    if showTokyoR
+        drawLvl(tkCH, "Tokyo-H",  tkC, tkS, tkZ, tkCHt, tkCHsw)
+        drawLvl(tkCL, "Tokyo-L",  tkC, tkS, tkZ, tkCLt, tkCLsw)
+        if showPrevSessR
+            drawSessHist(tkHist, "pTokyo",  btkC, btkS, btkZ)
+    if showLondonR
+        drawLvl(loCH, "London-H", loC, loS, loZ, loCHt, loCHsw)
+        drawLvl(loCL, "London-L", loC, loS, loZ, loCLt, loCLsw)
+        if showPrevSessR
+            drawSessHist(loHist, "pLondon", bloC, bloS, bloZ)
+    if showNyAmR
+        drawLvl(amCH, "NY AM-H",  amC, amS, amZ, amCHt, amCHsw)
+        drawLvl(amCL, "NY AM-L",  amC, amS, amZ, amCLt, amCLsw)
+        if showPrevSessR
+            drawSessHist(amHist, "pNY AM",  bamC, bamS, bamZ)
+    if showLunchR
+        drawLvl(luCH, "NY Lunch-H", luC, luS, luZ, luCHt, luCHsw)
+        drawLvl(luCL, "NY Lunch-L", luC, luS, luZ, luCLt, luCLsw)
+        if showPrevSessR
+            drawSessHist(luHist, "pNY Lunch", bluC, bluS, bluZ)
+    if showNyPmR
+        drawLvl(pmCH, "NY PM-H",  pmC, pmS, pmZ, pmCHt, pmCHsw)
+        drawLvl(pmCL, "NY PM-L",  pmC, pmS, pmZ, pmCLt, pmCLsw)
+        if showPrevSessR
+            drawSessHist(pmHist, "pNY PM",  bpmC, bpmS, bpmZ)
+
+    if showPDR
+        drawLvl(pdh, "PDH", pdC, pdS, pdZ, pdhT, pdhSw)
+        drawLvl(pdl, "PDL", pdC, pdS, pdZ, pdlT, pdlSw)
+
+    if showBPDR
+        drawLvl(bpdh, "BPDH", bpdC, bpdS, bpdZ, bpdhT, bpdhSw)
+        drawLvl(bpdl, "BPDL", bpdC, bpdS, bpdZ, bpdlT, bpdlSw)
+
+    if showDayR
+        drawLvl(dH, "HOD", dayC, dayS, dayZ, dHt, na)
+        drawLvl(dL, "LOD", dayC, dayS, dayZ, dLt, na)
+
+    // Da quet + da sang ngay NY moi -> khong day vao pend nua = an het ca duong,
+    // nhan, vach xam va ca khi bat 'Hien LICH SU QUET'.
+    if showPWR and pwhOn
+        drawLvl(wkPrevH, "PWH", pwC, pwS, pwZ, wkPrevT, pwhSw)
+    if showPWR and pwlOn
+        drawLvl(wkPrevL, "PWL", pwC, pwS, pwZ, wkPrevT, pwlSw)
+
+    if showHOWR
+        drawLvl(wkH, "HOW", wkC, wkS, wkZ, wkOpenT, na)
+        drawLvl(wkL, "LOW", wkC, wkS, wkZ, wkOpenT, na)
+
+    if showEqR
+        buildEq(h1H,  1,  eqThr, "EQH H1")
+        buildEq(h1L,  -1, eqThr, "EQL H1")
+        buildEq(m15H, 1,  eqThr, "EQH M15")
+        buildEq(m15L, -1, eqThr, "EQL M15")
+
+    if showPivH1R
+        drawAllPiv(h1H,  "H1",  true,  pvh1C, pvh1S, pvh1Z)
+        drawAllPiv(h1L,  "H1",  false, pvh1C, pvh1S, pvh1Z)
+
+    if showPivM15R
+        drawAllPiv(m15H, "M15", true,  pvm15C, pvm15S, pvm15Z)
+        drawAllPiv(m15L, "M15", false, pvm15C, pvm15S, pvm15Z)
+
+    // ===== chon muc "vua quet moi nhat" RIENG cho TUNG timeframe VA RIENG TUNG PHIA =====
+    // Suat = TF*2 + (dinh 0 / day 1): moi TF giu 1 vach xam DINH + 1 vach xam DAY. Vach xam
+    // dinh chi bi thay khi co DINH KHAC cung TF bi quet (day quet sau khong hat dinh di nua).
+    // Tie-break theo Prio.
+    np = pend.size()
+    winIdxs = array.new<int>()
+    if np > 0
+        for sl = 0 to 11
+            g     = int(math.floor(sl / 2))
+            sideH = sl % 2 == 0
+            int gMax = na
+            int gWin = -1
+            for wi = 0 to np - 1
+                pwg = pend.get(wi)
+                if (not na(pwg.swT)) and f_tf(pwg.name) == g and f_isHigh(pwg.name) == sideH and (na(gMax) or pwg.swT > gMax)
+                    gMax := pwg.swT
+            for wi = 0 to np - 1
+                pwg = pend.get(wi)
+                if (not na(pwg.swT)) and f_tf(pwg.name) == g and f_isHigh(pwg.name) == sideH and pwg.swT == gMax
+                    if gWin == -1
+                        gWin := wi
+                    else if f_prio(pwg.name) < f_prio(pend.get(gWin).name)
+                        gWin := wi
+            if gWin >= 0
+                winIdxs.push(gWin)
+
+    // Fires once per level, on the bar where it flips to swept.
+    // Only levels that flip state on THIS bar fire, so nothing repeats.
+    if winIdxs.size() > 0
+        for wa = 0 to winIdxs.size() - 1
+            pa = pend.get(winIdxs.get(wa))
+            if pa.swT == time
+                if f_isHigh(pa.name)
+                    sweptHiSig := true
+                else
+                    sweptLoSig := true
+            if pa.swT == time and ncAlert
+                alert("Neiro Liquidity Map [" + syminfo.ticker + " " + timeframe.period + "]: liquidity SWEPT - " + pa.name + " @ " + str.tostring(pa.price, format.mintick), alert.freq_once_per_bar_close)
+
+    // uu tien EQ: lay gia winner nhom EQ (5) de bo vach xam pivot H1/M15 trung gia (so CUNG phia)
+    float eqWinPrH = na
+    float eqWinPrL = na
+    if winIdxs.size() > 0
+        for wj = 0 to winIdxs.size() - 1
+            pj = pend.get(winIdxs.get(wj))
+            if f_tf(pj.name) == 5
+                if f_isHigh(pj.name)
+                    eqWinPrH := pj.price
+                else
+                    eqWinPrL := pj.price
+
+    // ===== GOP cum: uu tien PD>Day>Session>EQ>H1>M15, gia = cuc tri; roi so le nhan con trung =====
+    merged = array.new<PLvl>()
+    // (1) unswept: tach 2 phia -> sort gia -> cluster single-linkage -> 1 muc/cum
+    for side = 0 to 1
+        sd = array.new<PLvl>()
+        if np > 0
+            for si = 0 to np - 1
+                psd = pend.get(si)
+                isH = f_isHigh(psd.name)
+                if na(psd.swT) and ((side == 0 and isH) or (side == 1 and not isH))
+                    sd.push(psd)
+        ns = sd.size()
+        if ns >= 2
+            for sa = 0 to ns - 2
+                for sb = 0 to ns - 2 - sa
+                    if sd.get(sb).price > sd.get(sb + 1).price
+                        stmp = sd.get(sb)
+                        sd.set(sb, sd.get(sb + 1))
+                        sd.set(sb + 1, stmp)
+        if ns > 0
+            kk = 0
+            while kk < ns
+                jj = kk + 1
+                while jj < ns
+                    if mergeGapUSD == 0 or sd.get(jj).price - sd.get(jj - 1).price > mergeGapUSD
+                        break
+                    jj += 1
+                best = sd.get(kk)
+                ex = sd.get(kk).price
+                for mm = kk to jj - 1
+                    cm = sd.get(mm)
+                    if f_prio(cm.name) < f_prio(best.name)
+                        best := cm
+                    ex := side == 0 ? math.max(ex, cm.price) : math.min(ex, cm.price)
+                merged.push(PLvl.new(ex, best.name, best.col, best.lst, best.tsz, best.t0, na))
+                kk := jj
+    // (2) muc DA QUET (xam, dut gach):
+    //   - MAC DINH (showSwHist OFF): MOI timeframe giu 1 muc vua quet moi nhat (winIdxs)
+    //   - BAT lich su (showSwHist ON): hien HET cac muc da quet trong cua so
+    if showSwHist
+        // Cat theo swHistDays: ca cua so co the sinh >1500 duong, vuot tran 500
+        // cua TradingView va cac muc cu bi bo am tham.
+        swCut = time - swHistDays * 86400000
+        if np > 0
+            for wi2 = 0 to np - 1
+                pw2 = pend.get(wi2)
+                if not na(pw2.swT) and pw2.swT >= swCut
+                    merged.push(pw2)
+    else
+        if winIdxs.size() > 0
+            for wi3 = 0 to winIdxs.size() - 1
+                pv3 = pend.get(winIdxs.get(wi3))
+                tf3  = f_tf(pv3.name)
+                eqp3 = f_isHigh(pv3.name) ? eqWinPrH : eqWinPrL
+                dup = (not na(eqp3)) and (tf3 == 3 or tf3 == 4) and math.abs(pv3.price - eqp3) <= mergeGapUSD
+                if not dup
+                    merged.push(pv3)
+    // MNO va ATH khong qua buoc gop cum, nhung VAN phai chia cot cung moi
+    // nguoi - neu khong chung dinh chet o cot 0 va de len nhan trung gia.
+    if showMNOR and not na(mno)
+        merged.push(PLvl.new(mno, "MNO", mnoC, mnoS, mnoZ, na(mnoT) ? time : mnoT, na))
+        
+    if cbOnR and not na(cbH) and not na(cbL)
+        float cbRangeLive = cbH - cbL
+        float cbStep = cbStepMode == "Full Range (ICT)" ? cbRangeLive : cbRangeLive / 2
+        float cbAnchor = na(mno) ? ((cbH + cbL) / 2) : mno
+        
+        if cbShowEQ and na(mno)
+            merged.push(PLvl.new(cbAnchor, "Base Open", cbCol, "Solid", cbZ, na(cbT) ? time : cbT, na))
+        for i = 1 to cbLevels
+            color rCol = i == 1 ? cbR1Col : i == 2 ? cbR2Col : i == 3 ? cbR3Col : i == 4 ? cbR4Col : cbR5Col
+            merged.push(PLvl.new(cbAnchor + i * cbStep, "+R" + str.tostring(i), rCol, cbStyle, cbZ, na(cbT) ? time : cbT, na))
+            merged.push(PLvl.new(cbAnchor - i * cbStep, "-R" + str.tostring(i), rCol, cbStyle, cbZ, na(cbT) ? time : cbT, na))
+    if showATHR and not na(athAll)
+        merged.push(PLvl.new(athAll, "ATH", athC, athS, athZ, na(athFromT) ? time : athFromT, na))
+
+    // (3) so le nhan con TRUNG gia
+    nmg = merged.size()
+    if nmg >= 2
+        for ma = 0 to nmg - 2
+            for mb = 0 to nmg - 2 - ma
+                if merged.get(mb).price > merged.get(mb + 1).price
+                    mtmp = merged.get(mb)
+                    merged.set(mb, merged.get(mb + 1))
+                    merged.set(mb + 1, mtmp)
+    if nmg > 0
+        // --- pass 1: moi muc duoc cot nao; -1 = khong ve nhan (duong VAN ve) ---
+        colLast = array.new<float>()
+        colOf   = array.new<int>()
+        if labelCrowd == "Show all, overlapping"
+            for idx = 0 to nmg - 1
+                colOf.push(0)
+        else if labelCrowd == "Keep the strongest only"
+            // merged da sort tang dan theo gia -> gom cum lien tiep nam trong
+            // labelGapUSD, moi cum chi giu nhan cua muc co uu tien CAO nhat.
+            ii = 0
+            while ii < nmg
+                jj = ii + 1
+                while jj < nmg
+                    if merged.get(jj).price - merged.get(jj - 1).price >= labelGapUSD
+                        break
+                    jj += 1
+                bst = ii
+                for kk = ii to jj - 1
+                    if f_prio(merged.get(kk).name) < f_prio(merged.get(bst).name)
+                        bst := kk
+                for kk = ii to jj - 1
+                    colOf.push(kk == bst ? 0 : -1)
+                ii := jj
+        else
+            for idx = 0 to nmg - 1
+                pc = merged.get(idx)
+                placed = -1
+                cn = colLast.size()
+                if cn > 0
+                    for c = 0 to cn - 1
+                        if pc.price - colLast.get(c) >= labelGapUSD
+                            placed := c
+                            break
+                if placed == -1
+                    colLast.push(pc.price)
+                    placed := colLast.size() - 1
+                colLast.set(placed, pc.price)
+                colOf.push(placed)
+
+        // --- buoc cot nhan ---
+        // 21-08: GO han doan bop cot theo be rong man hinh. No doc chart.right_visible_bar_time,
+        // ma bien vung-nhin bat TradingView TINH LAI CA SCRIPT moi lan khung nhin doi - cuon,
+        // zoom, VA ca auto-scroll khi co nen moi. Script nay nang (nhieu request.security +
+        // gop cum + vai tram object) nen moi lan tinh lai mat mot nhip: object da bi xoa ma
+        // chua ve lai xong -> owner thay CA CHART chop. Bo di thi buoc cot la hang so, khong
+        // con cho nao lam script tu tinh lai ngoai tick binh thuong.
+        ncol  = math.max(1, colLast.size())
+        cstep = labelColBars
+
+        // --- pass 2: ve ---
+        for idx = 0 to nmg - 1
+            p = merged.get(idx)
+            placed = colOf.get(idx)
+            col2 = not na(p.swT) ? sweptCol : p.col
+            st2  = not na(p.swT) ? "Dashed" : p.lst
+            x0 = na(p.t0) ? time : p.t0
+            xE = na(gXfut) ? time : gXfut
+            ln = line.new(x0, p.price, xE, p.price, xloc = xloc.bar_time, color = col2, style = f_lst(st2), width = lineW)
+            ncLines.push(ln)
+            if placed >= 0
+                lb = label.new(bar_index + labelBack + placed * cstep, p.price, p.name + " : " + str.tostring(p.price, format.mintick), xloc = xloc.bar_index, style = label.style_label_left, color = color.new(color.gray, 100), textcolor = col2, size = f_sz(p.tsz))
+                ncLabs.push(lb)
+
+
+    // ===== Nen gop ve o LE PHAI: W -> D -> H4 -> H1, trai sang phai =====
+    // Cay CUOI moi cum = cay DANG CHAY, cap nhat theo gia nhu nen that.
+    // Than = box (open..close), rau = line (high..low); moi cum dung chung be rong than.
+    // Buffer H1/H4 dung lai tu lich su khung do, cu -> moi (f_cands ve trai sang phai).
+    if showH4Candle
+        h4cO.clear()
+        h4cH.clear()
+        h4cL.clear()
+        h4cC.clear()
+        h4cT.clear()
+        if h4Num >= 6
+            f_put(h4cO, h4cH, h4cL, h4cC, h4cT, hBo5, hBh5, hBl5, hBc5, hBt5)
+        if h4Num >= 5
+            f_put(h4cO, h4cH, h4cL, h4cC, h4cT, hBo4, hBh4, hBl4, hBc4, hBt4)
+        if h4Num >= 4
+            f_put(h4cO, h4cH, h4cL, h4cC, h4cT, hBo3, hBh3, hBl3, hBc3, hBt3)
+        if h4Num >= 3
+            f_put(h4cO, h4cH, h4cL, h4cC, h4cT, hBo2, hBh2, hBl2, hBc2, hBt2)
+        if h4Num >= 2
+            f_put(h4cO, h4cH, h4cL, h4cC, h4cT, hBo1, hBh1, hBl1, hBc1, hBt1)
+        f_put(h4cO, h4cH, h4cL, h4cC, h4cT, hBo0, hBh0, hBl0, hBc0, hBt0)
+    if showH1Candle
+        h1cO.clear()
+        h1cH.clear()
+        h1cL.clear()
+        h1cC.clear()
+        h1cT.clear()
+        if h1Num >= 6
+            f_put(h1cO, h1cH, h1cL, h1cC, h1cT, hAo5, hAh5, hAl5, hAc5, hAt5)
+        if h1Num >= 5
+            f_put(h1cO, h1cH, h1cL, h1cC, h1cT, hAo4, hAh4, hAl4, hAc4, hAt4)
+        if h1Num >= 4
+            f_put(h1cO, h1cH, h1cL, h1cC, h1cT, hAo3, hAh3, hAl3, hAc3, hAt3)
+        if h1Num >= 3
+            f_put(h1cO, h1cH, h1cL, h1cC, h1cT, hAo2, hAh2, hAl2, hAc2, hAt2)
+        if h1Num >= 2
+            f_put(h1cO, h1cH, h1cL, h1cC, h1cT, hAo1, hAh1, hAl1, hAc1, hAt1)
+        f_put(h1cO, h1cH, h1cL, h1cC, h1cT, hAo0, hAh0, hAl0, hAc0, hAt0)
+    int xCand = bar_index + dcOffset
+    int halfB = math.max(1, int(dcBody / 2))
+    if showWkCandle
+        xCand := f_cands(wcO,  wcH,  wcL,  wcC,  wcT,  wcNum, xCand, halfB, "1W", na(wkTc) ? na : wkTc - timenow, "date")
+    if showDayCandle
+        // Cum nen-ngay gop tay tu nen chart nen KHONG co time_close - khong dem nguoc.
+        // Moc mo + 24 gio thi ngay doi gio mua he lech mot tieng; owner chot bo han 22-08.
+        xCand := f_cands(dcO,  dcH,  dcL,  dcC,  dcTs, dcNum, xCand, halfB, "1D", int(na), "dow")
+    if showH4Candle
+        xCand := f_cands(h4cO, h4cH, h4cL, h4cC, h4cT, h4Num, xCand, halfB, "H4", na(hBtc) ? na : hBtc - timenow, "time")
+    if showH1Candle
+        xCand := f_cands(h1cO, h1cH, h1cL, h1cC, h1cT, h1Num, xCand, halfB, "H1", na(hAtc) ? na : hAtc - timenow, "time")
+
+    // =====================================================================
+    //  DASHBOARD
+    //  One question, answered at a glance: where is the nearest untouched
+    //  liquidity on each side, and which side is price drawing toward.
+    // =====================================================================
+    // Nearest UNSWEPT level above (buy-side liquidity) and below (sell-side).
+    // `merged` now carries MNO and ATH too, so nothing has to be folded in here.
+    float bslP = na
+    string bslN = ""
+    float sslP = na
+    string sslN = ""
+    for pn in merged
+        if na(pn.swT)
+            if pn.price > close and (na(bslP) or pn.price < bslP)
+                bslP := pn.price
+                bslN := pn.name
+            if pn.price < close and (na(sslP) or pn.price > sslP)
+                sslP := pn.price
+                sslN := pn.name
+
+    // Most recent swept level still on the chart.
+    string swN = ""
+    int    swTm = na
+    for pn in merged
+        if not na(pn.swT) and (na(swTm) or pn.swT > swTm)
+            swTm := pn.swT
+            swN := pn.name
+
+    float dUp = na(bslP) ? na : bslP - close
+    float dDn = na(sslP) ? na : close - sslP
+    string sNow = tokIn ? "Tokyo" : lonIn ? "London" : amIn ? "NY AM" : luIn ? "NY Lunch" : pmIn ? "NY PM" : "Closed"
+
+    if showHud
+        bgC  = hudTheme == "Dark" ? #131722 : #FFFFFF
+        brdC = hudTheme == "Dark" ? #2A2E39 : #E0E3EB
+        txtC = hudTheme == "Dark" ? #D1D4DC : #131722
+        mutC = #787B86
+        bslC = #F23645
+        sslC = #089981
+        hz   = f_sz(hudSize)
+
+        table.set_position(hud, f_hudPos(hudPos))
+        table.set_bgcolor(hud, color.new(bgC, 8))
+        table.set_border_color(hud, color.new(brdC, 100))
+        table.set_frame_color(hud, brdC)
+        table.set_frame_width(hud, 1)
+
+        table.cell(hud, 0, 0, "NEIRO LIQUIDITY MAP", text_color = txtC, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 1, 0, "", text_size = hz)
+        table.cell(hud, 2, 0, syminfo.ticker + " " + timeframe.period + "  v" + NL_VER, text_color = mutC, text_size = hz, text_halign = text.align_right)
+
+        table.cell(hud, 0, 1, "BSL", text_color = bslC, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 1, 1, na(bslP) ? "-" : bslN, text_color = txtC, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 2, 1, na(bslP) ? "-" : str.tostring(bslP, format.mintick) + "   +" + str.tostring(dUp, format.mintick), text_color = bslC, text_size = hz, text_halign = text.align_right)
+
+        table.cell(hud, 0, 2, "SSL", text_color = sslC, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 1, 2, na(sslP) ? "-" : sslN, text_color = txtC, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 2, 2, na(sslP) ? "-" : str.tostring(sslP, format.mintick) + "   -" + str.tostring(dDn, format.mintick), text_color = sslC, text_size = hz, text_halign = text.align_right)
+
+        drawTxt = na(dUp) and na(dDn) ? "-" : na(dDn) ? "BSL" : na(dUp) ? "SSL" : dUp <= dDn ? "BSL" : "SSL"
+        drawCol = drawTxt == "BSL" ? bslC : drawTxt == "SSL" ? sslC : mutC
+        table.cell(hud, 0, 3, "DRAW", text_color = mutC, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 1, 3, drawTxt, text_color = drawCol, text_size = hz, text_halign = text.align_left)
+        table.cell(hud, 2, 3, na(dUp) or na(dDn) ? "" : str.tostring(math.min(dUp, dDn), format.mintick) + " away", text_color = mutC, text_size = hz, text_halign = text.align_right)
+
+        if hudSwept
+            table.cell(hud, 0, 4, "SWEPT", text_color = mutC, text_size = hz, text_halign = text.align_left)
+            table.cell(hud, 1, 4, swN == "" ? "-" : swN, text_color = txtC, text_size = hz, text_halign = text.align_left)
+            table.cell(hud, 2, 4, na(swTm) ? "" : str.format_time(nz(swTm, time), "HH:mm", TZ), text_color = mutC, text_size = hz, text_halign = text.align_right)
+        else
+            table.cell(hud, 0, 4, "", text_size = hz)
+            table.cell(hud, 1, 4, "", text_size = hz)
+            table.cell(hud, 2, 4, "", text_size = hz)
+
+        if hudSess
+            table.cell(hud, 0, 5, "SESSION", text_color = mutC, text_size = hz, text_halign = text.align_left)
+            table.cell(hud, 1, 5, sNow, text_color = sNow == "Closed" ? mutC : txtC, text_size = hz, text_halign = text.align_left)
+            table.cell(hud, 2, 5, str.format_time(timenow, "HH:mm", TZ) + " NY", text_color = mutC, text_size = hz, text_halign = text.align_right)
+        else
+            table.cell(hud, 0, 5, "", text_size = hz)
+            table.cell(hud, 1, 5, "", text_size = hz)
+            table.cell(hud, 2, 5, "", text_size = hz)
+    else
+        table.clear(hud, 0, 0, 2, 5)
+
+    // Approach alert: price has walked into the buffer around a live level.
+    if not na(dUp) and dUp <= nearDist
+        nearSig := true
+    if not na(dDn) and dDn <= nearDist
+        nearSig := true
+    if alertNear and not na(dUp) and dUp <= nearDist
+        alert("Neiro Liquidity Map [" + syminfo.ticker + " " + timeframe.period + "]: price approaching " + bslN + " @ " + str.tostring(bslP, format.mintick), alert.freq_once_per_bar)
+    if alertNear and not na(dDn) and dDn <= nearDist
+        alert("Neiro Liquidity Map [" + syminfo.ticker + " " + timeframe.period + "]: price approaching " + sslN + " @ " + str.tostring(sslP, format.mintick), alert.freq_once_per_bar)
+
+// =====================================================================
+//  ICT MACROS
+//  Port tu "GTrader-ICT All In One - Comumnity Version"
+//  (tradingview/vendor/Gtrader-ICT.txt, CHI DOC).
+//
+//  Giu nguyen luat cua ban goc. Nhung cho LECH ban goc, va ly do:
+//
+//  1. CHAN NHAN DOI TREN NEN REALTIME. `in_time_range` cua ban goc dung suot
+//     CA nen chua moc mo macro, con Pine thi KHONG rollback array/object giua
+//     cac tick - moi tick lai push them mot macro = 2 line + 1 label. Cung
+//     benh da sua 4 cho trong ban 1.0 (commit b102ad7). Cach sua: moc nen da
+//     mo macro nam trong chinh object - object song sot qua rollback nen la
+//     cho duy nhat giu duoc trang thai giua cac tick cua CUNG mot nen.
+//  2. `timeframe.multiplier` cua ban goc doc khung D1 ra so 1, nen "chi ve o
+//     M3 tro xuong" lai cho ve luon tren D1. Doi sang timeframe.in_seconds().
+//  3. Gio dia phuong: ban goc tu tinh offset UTC roi cong tay; ket qua bang
+//     dung hour()/minute() co san (phep `% 24` triet tieu ca truong hop lech
+//     ngay), nen dung thang ham co san cho gon.
+//  4. Chart GIAY: hai nen lien tiep cung nam trong mot phut nen ca hai deu
+//     "chua moc mo" -> ban goc mo hai macro cho mot moc. Da doi chieu them
+//     nen lien truoc.
+//  5. Bo cac truong CHET cua ban goc: macro len / o / co / ch / cl / cc /
+//     xloc / color / nocolor - khai bao roi khong doc lai lan nao.
+//
+//  KHONG port: "Level Prices", "Timestamps", "Watermark". Ban Community chi co
+//  O NHAP cho ba nhom do, khong mot dong code ve nao - khong co gi de port.
+//  Rieng "True Day Open" thi Neiro da co san duoi ten Midnight Open.
+//  "Killzones" da port roi lai GO 22-08: trung han voi lop Session Ranges.
+//
+//  Nhom "5.HTF Candles" cung khong co code ve, nhung BO O NHAP cua no dinh
+//  nghia du bo tinh nang, nen da dung theo do vao lop Projection Candles co
+//  san cua Neiro (xem nhom `gDc`). Phan tinh toan va ve la cua Neiro; cai
+//  tham khao tu ban goc la CAU TAO: than/vien/rau tach mau, `offset` /
+//  `buffer` / `htf_buffer` / `width`, Label Positions + Label Alignment,
+//  Remaining time, Price Label, Interval Value, va nhom Trace O/H/L/C.
+// =====================================================================
+
+// ------------------------------- ICT Macros -------------------------------
+type NL_Mc
+    int   t
+    int   x2       // bar_index cua nen dong macro - ban goc neo bang bar_index
+    float top
+    float bot
+    line  lnh
+    line  lnl
+    label lb
+
+var array<NL_Mc> mcS1 = array.new<NL_Mc>()
+var array<NL_Mc> mcS2 = array.new<NL_Mc>()
+var array<NL_Mc> mcS3 = array.new<NL_Mc>()
+var array<NL_Mc> mcS4 = array.new<NL_Mc>()
+var array<NL_Mc> mcS5 = array.new<NL_Mc>()
+
+// "HH:MM" -> [gio, phut]. Ham tra ve tuple nen goi o GLOBAL scope, y ban goc.
+mc_hm(string hm) =>
+    parts = str.split(hm, ":")
+    [int(str.tonumber(parts.get(0))), int(str.tonumber(parts.get(1)))]
+
+// Noi rong macro dang chay theo nen hien tai roi keo hai vach + nhan theo.
+mc_touch(NL_Mc mc, float off) =>
+    mc.top := math.max(high, mc.top)
+    mc.bot := math.min(low,  mc.bot)
+    if not na(mc.lnh)
+        mc.lnh.set_y1(mc.top + off)
+        mc.lnh.set_y2(mc.top + off)
+    if not na(mc.lnl)
+        mc.lnl.set_y1(mc.bot - off)
+        mc.lnl.set_y2(mc.bot - off)
+    if not na(mc.lb)
+        mc.lb.set_y(mc.top + off)
+
+mc_run(array<NL_Mc> store, bool use, int sh, int sm, int eh, int em, bool useTop, bool useBot, float off, string tag) =>
+    if use
+        float tfM   = timeframe.in_seconds(timeframe.period) / 60.0
+        int   startM = sh * 60 + sm
+        int   endM   = eh * 60 + em
+        int   curM   = hour(time, mcTZ) * 60 + minute(time, mcTZ)
+        // Nen nay co chua moc mo macro khong. `time` la gio MO nen nen curM da
+        // nam san tren luoi khung - khong can lam tron nhu ban goc.
+        // Chart GIAY: hai nen lien tiep cung nam trong mot phut nen ca hai deu
+        // "chua moc mo" -> ban goc mo hai macro. Doi chieu them nen LIEN TRUOC;
+        // tren chart PHUT dieu kien nay luon dung nen khong doi gi.
+        int   prevM  = hour(time[1], mcTZ) * 60 + minute(time[1], mcTZ)
+        bool  prevIn = startM >= prevM and startM < prevM + tfM
+        bool inRng  = startM >= curM and startM < curM + tfM and not prevIn
+        if inRng
+            // Pine khong short-circuit `or` nen phai tach: store.last() tren mang
+            // rong la RE. `fresh` false = van con o nen cu, chi noi rong macro do.
+            bool fresh = store.size() == 0
+            if not fresh
+                fresh := store.last().t != time
+            if fresh
+                NL_Mc mc = NL_Mc.new()
+                mc.t   := time
+                mc.top := high
+                mc.bot := low
+                int need = int(math.ceil((endM - startM) / tfM))
+                mc.x2  := bar_index + need
+                if useTop
+                    mc.lnh := line.new(bar_index, mc.top + off, mc.x2, mc.top + off, color = mcCol, style = line.style_solid, width = 2)
+                if useBot
+                    mc.lnl := line.new(bar_index, mc.bot - off, mc.x2, mc.bot - off, color = mcCol, style = line.style_solid, width = 2)
+                mc.lb := label.new(bar_index + int(need / 2), mc.top + off, "MACRO\n" + tag, xloc = xloc.bar_index, yloc = yloc.price, color = #00000000, style = label.style_label_down, textcolor = mcCol, size = size.small, textalign = text.align_center)
+                store.push(mc)
+                if store.size() > mcKeep
+                    old = store.shift()
+                    if not na(old.lnh)
+                        old.lnh.delete()
+                    if not na(old.lnl)
+                        old.lnl.delete()
+                    if not na(old.lb)
+                        old.lb.delete()
+            else
+                mc_touch(store.last(), off)
+        else if store.size() > 0
+            NL_Mc mcL = store.last()
+            if bar_index <= mcL.x2 and time >= mcL.t
+                mc_touch(mcL, off)
+
+[mc1sh, mc1sm] = mc_hm(mc1S)
+[mc1eh, mc1em] = mc_hm(mc1E)
+[mc2sh, mc2sm] = mc_hm(mc2S)
+[mc2eh, mc2em] = mc_hm(mc2E)
+[mc3sh, mc3sm] = mc_hm(mc3S)
+[mc3eh, mc3em] = mc_hm(mc3E)
+[mc4sh, mc4sm] = mc_hm(mc4S)
+[mc4eh, mc4em] = mc_hm(mc4E)
+[mc5sh, mc5sm] = mc_hm(mc5S)
+[mc5eh, mc5em] = mc_hm(mc5E)
+
+// Macro dai 20 phut nen chi co nghia o khung nho - ban goc chan tu M3 tro xuong.
+if mcOnR and timeframe.in_seconds(timeframe.period) <= mcTfLim * 60
+    mc_run(mcS1, mc1On and not isWkndNY, mc1sh, mc1sm, mc1eh, mc1em, mc1T, mc1B, mcDist, mc1S + "-" + mc1E)
+    mc_run(mcS2, mc2On and not isWkndNY, mc2sh, mc2sm, mc2eh, mc2em, mc2T, mc2B, mcDist, mc2S + "-" + mc2E)
+    mc_run(mcS3, mc3On and not isWkndNY, mc3sh, mc3sm, mc3eh, mc3em, mc3T, mc3B, mcDist, mc3S + "-" + mc3E)
+    mc_run(mcS4, mc4On and not isWkndNY, mc4sh, mc4sm, mc4eh, mc4em, mc4T, mc4B, mcDist, mc4S + "-" + mc4E)
+    mc_run(mcS5, mc5On and not isWkndNY, mc5sh, mc5sm, mc5eh, mc5em, mc5T, mc5B, mcDist, mc5S + "-" + mc5E)
+
+
+// =====================================================================
+//  ALERT CONDITIONS
+//  These show up by name in the TradingView alert dialog, so a buyer never
+//  has to know what "Any alert() function call" means. The alert() calls
+//  above stay as well - only those can carry the level name and price.
+// =====================================================================
+alertcondition(sweptHiSig, "Buy-side liquidity swept", "Neiro Liquidity Map: buy-side liquidity swept")
+alertcondition(sweptLoSig, "Sell-side liquidity swept", "Neiro Liquidity Map: sell-side liquidity swept")
+alertcondition(sweptHiSig or sweptLoSig, "Any liquidity swept", "Neiro Liquidity Map: liquidity swept")
+alertcondition(nearSig, "Price approaching a level", "Neiro Liquidity Map: price approaching a liquidity level")

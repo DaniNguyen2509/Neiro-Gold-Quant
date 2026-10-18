@@ -1,0 +1,63 @@
+﻿# =====================================================================
+#  Neiro-Quant - .gitignore
+#  Quantitative Gold Options Trading System
+# =====================================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+env/
+
+# --- Bi mat ---
+.env
+*.env
+*.key
+*.pem
+*.pfx
+credentials*
+secrets*
+
+# --- Du lieu ---
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.csv
+*.parquet
+
+# --- Log ---
+logs/
+*.log
+
+# --- MetaTrader 5: nhi phan compile ra ---
+*.ex5
+*.ex4
+
+# --- Backup ---
+*.bak_*
+
+# --- Agent / IDE ---
+.claude/worktrees/
+.claude/settings.local.json
+.claude/projects/
+.gemini/
+.agents/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
