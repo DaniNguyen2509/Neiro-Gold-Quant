@@ -141,6 +141,12 @@ class TestTacticalMatrix:
         assert matrix['call_wall'] == 4200.0
         assert matrix['put_wall'] == 4200.0 or matrix['put_wall'] == 4150.0
         assert 'total_net_gex' in matrix
+        assert 'total_net_vex' in matrix
+        assert 'total_net_chex' in matrix
+        assert 'netVEX' in matrix['df'].columns
+        assert 'netCHEX' in matrix['df'].columns
+        assert not matrix['df']['netVEX'].isna().any()
+        assert not matrix['df']['netCHEX'].isna().any()
         assert 'tactical_table' in matrix
 
         table = matrix['tactical_table']

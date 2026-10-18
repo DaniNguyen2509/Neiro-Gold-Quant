@@ -673,6 +673,43 @@ def compute_tactical_matrix(
     df['putDeltaFlow'] = - (df['putVolume'] * MULT * scale)
     df['netDeltaFlow'] = df['callDeltaFlow'] + df['putDeltaFlow']
 
+    # 2.2 Second-Order Greeks: Vanna (VEX) & Charm (CHEX) Calculation (Black-76)
+    T_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
+    atm_straddle = c_mid_atm + p_mid_atm
+    if spot_price > 0 and T_years > 0:
+        sigma_atm = atm_straddle / (0.7979 * spot_price * np.sqrt(T_years))
+        sigma_atm = float(np.clip(sigma_atm, 0.01, 2.0))
+    else:
+        sigma_atm = 0.15
+
+    strikes_arr = df['strike'].values.astype(float)
+    denom = sigma_atm * np.sqrt(T_years)
+    d1 = (np.log(np.maximum(1e-4, spot_price / strikes_arr)) + 0.5 * (sigma_atm ** 2) * T_years) / denom
+    d2 = d1 - denom
+
+    pdf_d1 = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1 ** 2))
+    cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
+    df_discount = np.exp(-r * T_years)
+
+    # Vanna = -df * n(d1) * (d2 / sigma)
+    vanna = - df_discount * pdf_d1 * (d2 / sigma_atm)
+
+    # Charm_call = -df * [ n(d1) * (r / denom - d2 / (2T)) - r * N(d1) ]
+    charm_call = - df_discount * (pdf_d1 * (r / denom - d2 / (2.0 * T_years)) - r * cdf_d1)
+    charm_put = charm_call - r * df_discount
+
+    charm_call_day = charm_call / 365.0
+    charm_put_day = charm_put / 365.0
+
+    # VEX ($M per 1% IV shift) & CHEX ($M per day of decay)
+    df['callVEX'] = vanna * df['callOpenInterest'] * MULT * spot_price * 0.01 / 1e6
+    df['putVEX'] = - (vanna * df['putOpenInterest'] * MULT * spot_price * 0.01 / 1e6)
+    df['netVEX'] = df['callVEX'] + df['putVEX']
+
+    df['callCHEX'] = charm_call_day * df['callOpenInterest'] * MULT * spot_price / 1e6
+    df['putCHEX'] = - (charm_put_day * df['putOpenInterest'] * MULT * spot_price / 1e6)
+    df['netCHEX'] = df['callCHEX'] + df['putCHEX']
+
     # 3. Institutional Walls & Levels
     call_wall_row = df.loc[df['callOpenInterest'].idxmax()]
     put_wall_row = df.loc[df['putOpenInterest'].idxmax()]
@@ -683,6 +720,8 @@ def compute_tactical_matrix(
     put_wall_oi = int(put_wall_row['putOpenInterest'])
 
     total_net_gex = float(df['netGEX'].sum())
+    total_net_vex = float(df['netVEX'].sum())
+    total_net_chex = float(df['netCHEX'].sum())
     regime = "LONG_GAMMA" if total_net_gex > 10.0 else ("SHORT_GAMMA" if total_net_gex < -10.0 else "NEUTRAL")
 
     # Gamma Flip: Strike where cumulative net GEX transitions
@@ -693,7 +732,6 @@ def compute_tactical_matrix(
     waterfall_trigger = put_wall - 2.50
 
     # 4. Straddle & 1-Sigma Expected Move (Brenner-Subrahmanyam)
-    atm_straddle = c_mid_atm + p_mid_atm
     expected_move_1s = atm_straddle / 0.7979
 
     # 5. Build Structured Tactical Table (Bảng tác chiến định lượng theo thời gian thực)
@@ -743,6 +781,9 @@ def compute_tactical_matrix(
         'put_wall': put_wall,
         'put_wall_oi': put_wall_oi,
         'total_net_gex': total_net_gex,
+        'total_net_vex': total_net_vex,
+        'total_net_chex': total_net_chex,
+        'sigma_atm': sigma_atm,
         'regime': regime,
         'gamma_flip_floor': gamma_flip_floor,
         'squeeze_trigger': squeeze_trigger,
