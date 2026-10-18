@@ -2,11 +2,12 @@ name: ⚡ CME Gold Options Automated Sync (Neiro-Quant)
 
 on:
   schedule:
-    # 00:30 UTC = 07:30 Vietnam (Chot Open Interest moi nhat cua CME cho ca ngay)
-    # 07:00 UTC = 14:00 Vietnam (Dau phien Au - London mo cua)
-    # 12:30 UTC = 19:30 Vietnam (Truoc phien My - New York mo cua)
-    # Chay tu Thu 2 den Thu 6 hang tuan
-    - cron: '30 0,7,12 * * 1-5'
+    # 00:30 UTC = 07:30 Vietnam (Chốt Open Interest mới nhất từ CME Clearing cho cả ngày)
+    # 07:00 UTC = 14:00 Vietnam (Đầu phiên Âu - London mở cửa)
+    # Khung Giờ Vàng phiên Mỹ (chạy mỗi 1 tiếng từ 19:30 đến 23:30 Vietnam):
+    # 12:30, 13:30, 14:30, 15:30, 16:30 UTC
+    # Chạy từ Thứ 2 đến Thứ 6 hàng tuần
+    - cron: '30 0,7,12,13,14,15,16 * * 1-5'
   workflow_dispatch:
     inputs:
       dry_run:
