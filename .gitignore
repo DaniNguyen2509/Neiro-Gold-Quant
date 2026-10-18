@@ -67,3 +67,8 @@ desktop.ini
 !data/data.csv
 !data/options_prices.csv
 !data/volatility-greeks.csv
+
+# --- Generated Visualizations & Reports ---
+reports/
+quant_truevision_map.*
+*.html
