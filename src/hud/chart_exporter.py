@@ -1,13 +1,15 @@
 """
 Neiro-Quant HUD: Tactical Flow & Execution Chart Exporter (100% CME Gold Futures GCZ26).
-Delivers pure native Matplotlib 2-panel dashboard:
+Delivers pure native Matplotlib 3-panel dashboard:
 - Panel 1: Net GEX ($M) & Tactical Action Levels (Fade Sell, Rebound Buy, Squeeze, Waterfall, Hard SL)
 - Panel 2: Intraday Volume vs Open Interest (Identifies 80% volume clusters and aggressive flow)
-Ultra-fast execution (< 1.2s), no bloat, pure Python.
+- Panel 3: Second-Order Greeks: Vanna (VEX) & Charm (CHEX) Flows (V-Rebound & Time Decay profile)
+Ultra-fast execution (< 1.5s), no bloat, pure Python.
 """
 
 import time
 import os
+import math
 import shutil
 import numpy as np
 import pandas as pd
@@ -28,132 +30,225 @@ def export_quant_chart(
     output_png: str = "quant_truevision_map.png"
 ):
     t0 = time.time()
+    MULT = 100.0
     
-    # Vectorized GEX calculation
-    MULT = 100
+    # 1. Vectorized GEX calculation fallback
     if 'callGEX' not in df.columns or 'putGEX' not in df.columns:
-        df['callGEX'] = df['callGamma'] * df['callOpenInterest'] * MULT * (futures_price**2) * 0.01 / 1e6
-        df['putGEX']  = - (df['putGamma'] * df['putOpenInterest'] * MULT * (futures_price**2) * 0.01 / 1e6)
+        scale = (futures_price ** 2) * 0.01 / 1e6
+        df['callGEX'] = df['callGamma'] * df['callOpenInterest'] * MULT * scale
+        df['putGEX']  = - (df['putGamma'] * df['putOpenInterest'] * MULT * scale)
         df['netGEX']  = df['callGEX'] + df['putGEX']
+
+    # 2. Vectorized VEX & CHEX calculation fallback (Black-76)
+    if 'netVEX' not in df.columns or 'netCHEX' not in df.columns:
+        T_years = 38.0 / 365.0
+        atm_idx = (df['strike'] - k_atm).abs().idxmin()
+        c_mid_atm = float(df.loc[atm_idx, 'callMid']) if 'callMid' in df.columns else 45.0
+        p_mid_atm = float(df.loc[atm_idx, 'putMid']) if 'putMid' in df.columns else 44.0
+        atm_straddle = max(1.0, c_mid_atm + p_mid_atm)
+        sigma_atm = float(np.clip(atm_straddle / (0.7979 * futures_price * np.sqrt(T_years)), 0.01, 2.0))
         
-    strikes = df['strike'].values
-    net_gex = df['netGEX'].values
-    call_oi = df['callOpenInterest'].values
-    put_oi = df['putOpenInterest'].values
-    call_vol = df['callVolume'].values
-    put_vol = df['putVolume'].values
+        strikes_arr = df['strike'].values.astype(float)
+        denom = sigma_atm * np.sqrt(T_years)
+        d1 = (np.log(np.maximum(1e-4, futures_price / strikes_arr)) + 0.5 * (sigma_atm ** 2) * T_years) / denom
+        d2 = d1 - denom
+        pdf_d1 = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1 ** 2))
+        cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
+        df_disc = np.exp(-0.045 * T_years)
+        
+        vanna = - df_disc * pdf_d1 * (d2 / sigma_atm)
+        charm_call = - df_disc * (pdf_d1 * (0.045 / denom - d2 / (2.0 * T_years)) - 0.045 * cdf_d1)
+        charm_put = charm_call - 0.045 * df_disc
+        
+        df['callVEX'] = vanna * df['callOpenInterest'] * MULT * futures_price * 0.01 / 1e6
+        df['putVEX'] = - (vanna * df['putOpenInterest'] * MULT * futures_price * 0.01 / 1e6)
+        df['netVEX'] = df['callVEX'] + df['putVEX']
+        
+        df['callCHEX'] = (charm_call / 365.0) * df['callOpenInterest'] * MULT * futures_price / 1e6
+        df['putCHEX'] = - ((charm_put / 365.0) * df['putOpenInterest'] * MULT * futures_price / 1e6)
+        df['netCHEX'] = df['callCHEX'] + df['putCHEX']
+        
+    # Filter Near-The-Money strikes for tactical intraday readability (avoids vertical squishing from far OTM strikes)
+    if len(df) > 16:
+        atm_idx = (df['strike'] - k_atm).abs().idxmin()
+        window_size = 14
+        half = window_size // 2
+        start_idx = max(0, atm_idx - half)
+        end_idx = min(len(df), atm_idx + half + 1)
+        plot_df = df.iloc[start_idx:end_idx].copy().reset_index(drop=True)
+    else:
+        plot_df = df.copy()
+
+    strikes = plot_df['strike'].values
+    net_gex = plot_df['netGEX'].values
+    net_vex = plot_df['netVEX'].values
+    net_chex = plot_df['netCHEX'].values
+    call_oi = plot_df['callOpenInterest'].values
+    put_oi = plot_df['putOpenInterest'].values
+    call_vol = plot_df['callVolume'].values
+    put_vol = plot_df['putVolume'].values
+
+    step = float(np.diff(strikes).min()) if len(strikes) > 1 else 25.0
+    bar_h = step * 0.55
+    y_bottom = strikes.min() - step * 1.05
+    y_top = strikes.max() + step * 1.25
     
     plt.rcParams['font.sans-serif'] = 'DejaVu Sans'
     plt.rcParams['axes.unicode_minus'] = False
     plt.style.use('seaborn-v0_8-whitegrid' if 'seaborn-v0_8-whitegrid' in plt.style.available else 'default')
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16.5, 8.2), dpi=130, sharey=True, gridspec_kw={'width_ratios': [1.18, 1.0]})
+    fig, (ax1, ax2, ax3) = plt.subplots(
+        1, 3,
+        figsize=(23.5, 8.5),
+        dpi=130,
+        sharey=True,
+        gridspec_kw={'width_ratios': [1.18, 1.0, 1.05]}
+    )
+    ax1.set_ylim(y_bottom, y_top)
     
     # -------------------------------------------------------------------------
     # PANEL 1: NET GEX & TACTICAL LEVELS (BẢN ĐỒ CHIẾN THUẬT VÀ MỐC VÀO LỆNH)
     # -------------------------------------------------------------------------
     colors = ['#2E7D32' if x >= 0 else '#C62828' for x in net_gex]
-    ax1.barh(strikes, net_gex, height=3.6, color=colors, alpha=0.75, edgecolor='black', linewidth=0.5)
+    ax1.barh(strikes, net_gex, height=bar_h, color=colors, alpha=0.78, edgecolor='black', linewidth=0.5)
     ax1.axvline(0, color='black', linewidth=0.8, linestyle='--')
     
-    # 1. Mốc Giá Hiện Tại & ATM
-    ax1.axhline(futures_price, color='#0D47A1', linewidth=2.5, linestyle='-')
-    ax1.text(38, futures_price, f"◄ GIÁ HIỆN TẠI: {futures_price:.2f}", color='#0D47A1', fontsize=9.5, fontweight='bold', va='center')
-    
-    ax1.axhline(k_atm, color='#546E7A', linewidth=1.2, linestyle=':')
-    ax1.text(38, k_atm - 0.9, f"◄ ATM PIVOT: {k_atm:.0f} (Mục tiêu chốt lời TP1)", color='#37474F', fontsize=8.5, fontweight='bold', va='center')
-    
-    # 2. VÙNG BÁN TẠI 4200 (MAJOR CALL WALL)
-    ax1.axhline(call_wall, color='#6A1B9A', linewidth=2.0, linestyle='--')
-    ax1.text(3, call_wall + 0.8, "▼ VÙNG BÁN (FADE SELL): 4198.5 - 4200.0 | Hard SL: 4204.0 (4.0 USD) | TP: 4181 / 4175", 
-             color='#4A148C', fontsize=8.5, fontweight='bold', va='bottom',
-             bbox=dict(boxstyle='square,pad=0.2', facecolor='#F3E5F5', edgecolor='#6A1B9A', alpha=0.9))
-             
-    # Trigger Squeeze > 4202.5
-    ax1.axhline(squeeze_trigger, color='#00838F', linewidth=1.5, linestyle=':')
-    ax1.text(3, squeeze_trigger + 0.7, "▲ SQUEEZE BREAKOUT > 4202.5: Vỡ tường Call -> CẮT SHORT, MUA ĐUỔI LÊN 4220", 
-             color='#006064', fontsize=8.2, fontweight='bold', va='bottom')
-             
-    # 3. VÙNG MUA TẠI 4175 (GEX CUSHION)
-    ax1.axhline(4175.0, color='#1B5E20', linewidth=2.0, linestyle='--')
-    ax1.text(3, 4175.0 + 0.8, "▲ VÙNG MUA (REBOUND BUY): 4175.0 - 4176.5 | Hard SL: 4171.0 (4.0 USD) | TP: 4181 / 4200", 
-             color='#1B5E20', fontsize=8.5, fontweight='bold', va='bottom',
-             bbox=dict(boxstyle='square,pad=0.2', facecolor='#E8F5E9', edgecolor='#1B5E20', alpha=0.9))
-             
-    # Trigger Gamma Flip Đáy 4171.10
-    ax1.axhline(gamma_flip_floor, color='#C2185B', linewidth=1.4, linestyle=':')
-    ax1.text(3, gamma_flip_floor - 0.8, "▼ GAMMA FLIP ĐÁY: 4171.10 (Ngưỡng Hard SL sống còn - thủng là rơi tự do)", 
-             color='#880E4F', fontsize=8.2, fontweight='bold', va='top')
-             
-    # 4. HỖ TRỢ ĐÁY TẠI 4150 (PUT WALL) & WATERFALL TRIGGER
-    ax1.axhline(put_wall, color='#E65100', linewidth=1.8, linestyle='-.')
-    ax1.text(3, put_wall + 0.8, "■ MAJOR PUT WALL: 4150.0 (1,162 Puts - Hỗ trợ đáy cuối phiên)", 
-             color='#BF360C', fontsize=8.2, fontweight='bold', va='bottom')
-             
-    ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.3, linestyle=':')
-    ax1.text(3, waterfall_trigger - 0.8, "▼ WATERFALL TRIGGER < 4147.5: Thủng đáy -> Bán tháo nhanh về 4135", 
-             color='#B71C1C', fontsize=8.0, fontweight='bold', va='top')
-
     max_abs_gex = max(abs(net_gex.min()), abs(net_gex.max())) if len(net_gex) > 0 else 50.0
     gex_span = max(max_abs_gex * 1.5, 25.0)
     ax1.set_xlim(-gex_span, gex_span)
+    
+    # 1. Mốc Giá Hiện Tại & ATM
+    ax1.axhline(futures_price, color='#0D47A1', linewidth=2.5, linestyle='-', zorder=4)
+    ax1.text(gex_span * 0.35, futures_price, f"◄ GIÁ HIỆN TẠI: {futures_price:.2f} (ATM: {k_atm:.0f})", 
+             color='#0D47A1', fontsize=8.6, fontweight='bold', va='center',
+             bbox=dict(boxstyle='round,pad=0.25', facecolor='#E3F2FD', edgecolor='#0D47A1', alpha=0.95), zorder=5)
+    
+    # 2. VÙNG BÁN TẠI CALL WALL
+    if strikes.min() <= call_wall <= strikes.max():
+        ax1.axhline(call_wall, color='#6A1B9A', linewidth=2.0, linestyle='--')
+        ax1.text(-gex_span * 0.96, call_wall + step * 0.40, 
+                 f"▼ CALL WALL {call_wall:.0f} (FADE SELL: {call_wall-1.5:.1f}-{call_wall:.1f} | SL: {call_wall+4:.1f})", 
+                 color='#4A148C', fontsize=7.8, fontweight='bold', va='center', ha='left',
+                 bbox=dict(boxstyle='square,pad=0.2', facecolor='#F3E5F5', edgecolor='#6A1B9A', alpha=0.92))
+                 
+        ax1.axhline(squeeze_trigger, color='#00838F', linewidth=1.4, linestyle=':')
+        ax1.text(-gex_span * 0.96, squeeze_trigger + step * 0.40, 
+                 f"▲ SQUEEZE BREAKOUT > {squeeze_trigger:.1f}: Vỡ Call Wall -> MUA ĐUỔI", 
+                 color='#006064', fontsize=7.6, fontweight='bold', va='center', ha='left')
+             
+    # 3. VÙNG MUA TẠI PUT WALL
+    if strikes.min() <= put_wall <= strikes.max():
+        ax1.axhline(put_wall, color='#1B5E20', linewidth=2.0, linestyle='--')
+        ax1.text(gex_span * 0.04, put_wall - step * 0.40, 
+                 f"▲ PUT WALL {put_wall:.0f} (REBOUND BUY: {put_wall:.1f}-{put_wall+1.5:.1f} | SL: {put_wall-4:.1f})", 
+                 color='#1B5E20', fontsize=7.8, fontweight='bold', va='center', ha='left',
+                 bbox=dict(boxstyle='square,pad=0.2', facecolor='#E8F5E9', edgecolor='#1B5E20', alpha=0.92))
+                 
+        ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.4, linestyle=':')
+        ax1.text(gex_span * 0.04, waterfall_trigger - step * 0.40, 
+                 f"▼ WATERFALL TRIGGER < {waterfall_trigger:.1f}: Thủng đáy -> Bán tháo", 
+                 color='#B71C1C', fontsize=7.6, fontweight='bold', va='center', ha='left')
 
-    ax1.set_title("Panel 1: Net GEX (Triệu USD) & Mốc Chiến Thuật Vào Lệnh (SL/TP)", fontsize=11, fontweight='bold')
-    ax1.set_xlabel("Net GEX (Triệu USD / 1% Biến Động Giá)", fontsize=10)
-    ax1.set_ylabel("CME Gold Futures Strike Price ($)", fontsize=10)
+    ax1.set_title("Panel 1: Net GEX ($M) & Mốc Chiến Thuật (SL/TP)", fontsize=11, fontweight='bold')
+    ax1.set_xlabel("Net GEX (Triệu USD / 1% Biến Động)", fontsize=9.5)
+    ax1.set_ylabel("CME Gold Futures Strike Price ($)", fontsize=9.5)
     ax1.set_yticks(strikes)
-    ax1.set_yticklabels([f"${s:.0f}" for s in strikes], fontsize=9)
+    ax1.set_yticklabels([f"${s:.0f}" for s in strikes], fontsize=8.5)
     ax1.grid(True, linestyle=':', alpha=0.6)
     
     # -------------------------------------------------------------------------
     # PANEL 2: VOLUME INTRADAY vs OPEN INTEREST (SOI DÒNG TIỀN THỰC CHIẾN)
     # -------------------------------------------------------------------------
-    ax2.barh(strikes, call_oi, height=3.6, color='#A5D6A7', alpha=0.6, label='Call OI (Vị thế tích lũy)', edgecolor='gray', linewidth=0.4)
-    ax2.barh(strikes, -put_oi, height=3.6, color='#EF9A9A', alpha=0.6, label='Put OI (Vị thế tích lũy)', edgecolor='gray', linewidth=0.4)
+    ax2.barh(strikes, call_oi, height=bar_h, color='#A5D6A7', alpha=0.6, label='Call OI (Vị thế tích lũy)', edgecolor='gray', linewidth=0.4)
+    ax2.barh(strikes, -put_oi, height=bar_h, color='#EF9A9A', alpha=0.6, label='Put OI (Vị thế tích lũy)', edgecolor='gray', linewidth=0.4)
     
-    ax2.barh(strikes, call_vol, height=2.2, color='#1B5E20', alpha=0.95, label='Call Volume Hôm Nay (Lực Mua)', edgecolor='black', linewidth=0.6)
-    ax2.barh(strikes, -put_vol, height=2.2, color='#B71C1C', alpha=0.95, label='Put Volume Hôm Nay (Lực Bán)', edgecolor='black', linewidth=0.6)
+    ax2.barh(strikes, call_vol, height=bar_h * 0.45, color='#1B5E20', alpha=0.95, label='Call Volume (Lực Mua)', edgecolor='black', linewidth=0.6)
+    ax2.barh(strikes, -put_vol, height=bar_h * 0.45, color='#B71C1C', alpha=0.95, label='Put Volume (Lực Bán)', edgecolor='black', linewidth=0.6)
     ax2.axvline(0, color='black', linewidth=0.8, linestyle='--')
     
-    # Dynamically annotate highest volume strike
-    if len(df) > 0 and call_vol.max() > 0:
-        top_call_idx = df['callVolume'].idxmax()
-        top_call_stk = df.loc[top_call_idx, 'strike']
-        top_call_v = df.loc[top_call_idx, 'callVolume']
-        top_call_oi = df.loc[top_call_idx, 'callOpenInterest']
+    if len(plot_df) > 0 and call_vol.max() > 0:
+        top_call_idx = plot_df['callVolume'].idxmax()
+        top_call_stk = plot_df.loc[top_call_idx, 'strike']
+        top_call_v = plot_df.loc[top_call_idx, 'callVolume']
+        top_call_oi = plot_df.loc[top_call_idx, 'callOpenInterest']
         ax2.text(top_call_v + 15, top_call_stk, f"Call Vol: {int(top_call_v)} | OI: {int(top_call_oi)}", 
-                 color='#1B5E20', fontsize=8.0, fontweight='bold', va='center')
+                 color='#1B5E20', fontsize=7.8, fontweight='bold', va='center')
                  
-    if len(df) > 0 and put_vol.max() > 0:
-        top_put_idx = df['putVolume'].idxmax()
-        top_put_stk = df.loc[top_put_idx, 'strike']
-        top_put_v = df.loc[top_put_idx, 'putVolume']
-        top_put_oi = df.loc[top_put_idx, 'putOpenInterest']
+    if len(plot_df) > 0 and put_vol.max() > 0:
+        top_put_idx = plot_df['putVolume'].idxmax()
+        top_put_stk = plot_df.loc[top_put_idx, 'strike']
+        top_put_v = plot_df.loc[top_put_idx, 'putVolume']
+        top_put_oi = plot_df.loc[top_put_idx, 'putOpenInterest']
         ax2.text(-top_put_v - 15, top_put_stk, f"Put Vol: {int(top_put_v)} | OI: {int(top_put_oi)}", 
-                 color='#B71C1C', fontsize=8.0, fontweight='bold', va='center', ha='right')
+                 color='#B71C1C', fontsize=7.8, fontweight='bold', va='center', ha='right')
 
     ax2.axhline(futures_price, color='#0D47A1', linewidth=2.0, linestyle='-')
-    ax2.axhline(call_wall, color='#6A1B9A', linewidth=1.6, linestyle='--')
-    ax2.axhline(put_wall, color='#E65100', linewidth=1.6, linestyle='-.')
+    if strikes.min() <= call_wall <= strikes.max():
+        ax2.axhline(call_wall, color='#6A1B9A', linewidth=1.6, linestyle='--')
+    if strikes.min() <= put_wall <= strikes.max():
+        ax2.axhline(put_wall, color='#E65100', linewidth=1.6, linestyle='-.')
     
     max_vol_oi = max(call_oi.max() if len(call_oi) else 0, put_oi.max() if len(put_oi) else 0,
                      call_vol.max() if len(call_vol) else 0, put_vol.max() if len(put_vol) else 0)
     p2_span = max(max_vol_oi * 1.25, 200.0)
     ax2.set_xlim(-p2_span, p2_span)
 
-    ax2.set_title("Panel 2: Dòng Tiền Thực Chiến (Volume Hôm Nay vs Open Interest Nền)", fontsize=11, fontweight='bold')
-    ax2.set_xlabel("Put OI/Vol (-)  |  Call OI/Vol (+)", fontsize=10)
-    ax2.legend(loc='lower right', fontsize=8.2, framealpha=0.95)
+    ax2.set_title("Panel 2: Dòng Tiền Volume vs Open Interest Nền", fontsize=11, fontweight='bold')
+    ax2.set_xlabel("Put OI/Vol (-)  |  Call OI/Vol (+)", fontsize=9.5)
+    ax2.legend(loc='lower right', fontsize=8.0, framealpha=0.95)
     ax2.grid(True, linestyle=':', alpha=0.6)
+
+    # -------------------------------------------------------------------------
+    # PANEL 3: SECOND-ORDER GREEKS: VANNA (VEX) & CHARM (CHEX) FLOWS
+    # -------------------------------------------------------------------------
+    ax3.barh(strikes + step * 0.16, net_vex, height=bar_h * 0.48, color='#FB8C00', alpha=0.88, label='Net VEX ($M / 1% IV)', edgecolor='black', linewidth=0.5)
+    ax3.barh(strikes - step * 0.16, net_chex, height=bar_h * 0.48, color='#00ACC1', alpha=0.88, label='Net CHEX ($M / Ngày decay)', edgecolor='black', linewidth=0.5)
+    ax3.axvline(0, color='black', linewidth=0.8, linestyle='--')
+
+    ax3.axhline(futures_price, color='#0D47A1', linewidth=2.0, linestyle='-')
+    if strikes.min() <= call_wall <= strikes.max():
+        ax3.axhline(call_wall, color='#6A1B9A', linewidth=1.6, linestyle='--')
+    if strikes.min() <= put_wall <= strikes.max():
+        ax3.axhline(put_wall, color='#E65100', linewidth=1.6, linestyle='-.')
+
+    # Annotate Top Vanna & Charm Strikes
+    if len(plot_df) > 0:
+        top_vex_idx = (plot_df['netVEX'].abs()).idxmax()
+        top_vex_stk = plot_df.loc[top_vex_idx, 'strike']
+        top_vex_val = plot_df.loc[top_vex_idx, 'netVEX']
+        ax3.text(top_vex_val, top_vex_stk + step * 0.16, f"◄ Đỉnh Vanna ({top_vex_val:+.1f}M)", 
+                 color='#E65100', fontsize=7.8, fontweight='bold', va='center')
+
+        top_chex_idx = (plot_df['netCHEX'].abs()).idxmax()
+        top_chex_stk = plot_df.loc[top_chex_idx, 'strike']
+        top_chex_val = plot_df.loc[top_chex_idx, 'netCHEX']
+        ax3.text(top_chex_val, top_chex_stk - step * 0.16, f"◄ Đỉnh Charm ({top_chex_val:+.1f}M)", 
+                 color='#00838F', fontsize=7.8, fontweight='bold', va='center')
+
+    max_vex_chex = max(abs(net_vex.min()) if len(net_vex) else 0, abs(net_vex.max()) if len(net_vex) else 0,
+                       abs(net_chex.min()) if len(net_chex) else 0, abs(net_chex.max()) if len(net_chex) else 0)
+    p3_span = max(max_vex_chex * 1.35, 10.0)
+    ax3.set_xlim(-p3_span, p3_span)
+
+    ax3.set_title("Panel 3: Greeks Bậc 2: Vanna (VEX) & Charm (CHEX)", fontsize=11, fontweight='bold')
+    ax3.set_xlabel("Độ Nhạy Ròng Của Dealers (Triệu USD)", fontsize=9.5)
+    ax3.legend(loc='lower right', fontsize=8.0, framealpha=0.95)
+    ax3.grid(True, linestyle=':', alpha=0.6)
     
     tot_gex = float(net_gex.sum()) if len(net_gex) else 0.0
+    tot_vex = float(net_vex.sum()) if len(net_vex) else 0.0
+    tot_chex = float(net_chex.sum()) if len(net_chex) else 0.0
     regime = "LONG GAMMA" if tot_gex > 10 else ("SHORT GAMMA" if tot_gex < -10 else "NEUTRAL")
-    header_title = f"NEIRO-QUANT: GCZ26 GOLD OPTIONS | Giá Futures: {futures_price:.2f} | Trạng thái: {regime} ({tot_gex:+.1f}M USD) | SL Cứng: 4.0 USD"
-    fig.suptitle(header_title, fontsize=12, fontweight='bold')
+    
+    header_title = (
+        f"NEIRO-QUANT: GCZ26 GOLD OPTIONS (3 PANELS) | Futures: {futures_price:.2f} | "
+        f"Trạng thái: {regime} ({tot_gex:+.1f}M GEX) | Net VEX: {tot_vex:+.1f}M/1% IV | Net CHEX: {tot_chex:+.1f}M/ngày"
+    )
+    fig.suptitle(header_title, fontsize=11.5, fontweight='bold')
                  
     plt.tight_layout()
     plt.savefig(output_png, dpi=130)
     plt.close()
     
     t1 = time.time()
-    print(f"[SUCCESS] Exported Tactical Flow chart to: {output_png} in {t1 - t0:.3f}s")
+    print(f"[SUCCESS] Exported 3-Panel Tactical Map to: {output_png} in {t1 - t0:.3f}s")

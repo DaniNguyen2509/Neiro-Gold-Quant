@@ -72,11 +72,11 @@ async def fetch_barchart_options_playwright(
 
         logger.info("Navigating to: %s", page_url)
         try:
-            await page.goto(page_url, timeout=timeout_ms, wait_until="commit")
-            # Brief wait for initial challenge redirect and hydration to settle
-            await asyncio.sleep(6.0)
+            await page.goto(page_url, timeout=timeout_ms, wait_until="domcontentloaded")
+            await asyncio.sleep(4.0)
         except Exception as e:
             logger.warning("Page navigation notice (proceeding to evaluate): %s", e)
+            await asyncio.sleep(3.0)
 
         # Check if we already intercepted the API response
         if captured_data:
@@ -115,7 +115,16 @@ async def fetch_barchart_options_playwright(
             return null;
         }}
         """
-        result = await page.evaluate(js_code)
+        result = None
+        for attempt in range(2):
+            try:
+                result = await page.evaluate(js_code)
+                if result:
+                    break
+            except Exception as e:
+                logger.warning("Evaluation attempt %d error: %s", attempt + 1, e)
+                await asyncio.sleep(3.0)
+
         await browser.close()
 
         if result:
