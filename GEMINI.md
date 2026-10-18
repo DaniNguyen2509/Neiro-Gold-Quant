@@ -36,3 +36,15 @@ Nghiêm cấm Gemini tự đưa ra các lý do sau để bỏ qua việc mở sk
 3. **ASCII và KHÔNG EMOJI** trong code MQL5. Pine và Markdown dùng tiếng Việt có dấu.
 4. **Không tự chế luật hoặc backtest ngoài lề.** Mọi thay đổi logic do owner trực tiếp chỉ đạo.
 5. **Performance constraints:** Python code phải đảm bảo CPU < 5%, RAM cố định, zero memory leak.
+
+
+---
+
+## 🧹 3. QUY ĐỊNH BẮT BUỘC: DỌN RÁC & BẢO TỒN DUNG LƯỢNG MÁY TÍNH (ZERO-WASTE MANDATE)
+
+> [!CRITICAL]
+> **TIÊU CHUẨN DUNG LƯỢNG TỐI THIỂU CHO MÁY TÍNH CỦA NGƯỜI DÙNG:**
+> Toàn bộ dự án phải luôn được giữ ở mức siêu nhẹ (< 15MB). Mọi AI model khi thực thi đều phải tuân thủ nghiêm ngặt:
+> 1. **Tự động dọn rác ngay lập tức:** Mọi file cào thử nghiệm (HTML/JSON tạm), script test scratch, file log tạm thời sinh ra trong quá trình nghiên cứu bắt buộc phải bị XÓA SẠCH SẼ ngay sau khi tác vụ hoàn thành.
+> 2. **Không xả rác vào thư mục gốc:** Không tạo các file rác, file backup đuôi .bak, .tmp bừa bãi.
+> 3. **Tận dụng đám mây (Cloud-First):** Ưu tiên chạy tính toán trên Google Colab / Codespaces, không cài đặt các gói dữ liệu nặng vào ổ cứng laptop của người dùng nếu không có yêu cầu rõ ràng.

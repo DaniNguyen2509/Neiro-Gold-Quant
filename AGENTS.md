@@ -6,7 +6,8 @@
 ## 1. QUY TRINH TIEN TRAM BAT BUOC: GOI SKILL TRUOC MOI PHAN HOI
 
 > **BUOC 0: TRUOC KHI SUY NGHI GIAI PHAP, TRA LOI HOAC SUA BAT KY DONG CODE NAO:**
-> Moi model AI **BAT BUOC** phai truy cap vao thu muc .agents/skills/ va dung tool doc file (iew_file / ead_file) de nap file SKILL.md phu hop nhat voi yeu cau hien tai cua nguoi dung.
+> Moi model AI **BAT BUOC** phai truy cap vao thu muc .agents/skills/ va dung tool doc file (iew_file / 
+ead_file) de nap file SKILL.md phu hop nhat voi yeu cau hien tai cua nguoi dung.
 
 ### 1.1. Header xac nhan bat buoc (Bang chung goi Skill)
 O dau moi luot phan hoi cho nguoi dung, AI **bat buoc** phai ghi dong trang thai sau:
@@ -59,3 +60,15 @@ Cac model **TUYET DOI KHONG DUOC** tu bien ho de bo qua viec goi skill.
    - Khong dung emoji trang tri trong code (chi cho phep cac ky hieu chart chuc nang).
 4. **Khong tu che luat hoac backtest ngoai le:** Moi thay doi logic do owner truc tiep chi dao.
 5. **Python code phai tuan thu performance constraints:** CPU < 5%, RAM co dinh, khong memory leak.
+
+
+---
+
+## 🧹 3. QUY ĐỊNH BẮT BUỘC: DỌN RÁC & BẢO TỒN DUNG LƯỢNG MÁY TÍNH (ZERO-WASTE MANDATE)
+
+> [!CRITICAL]
+> **TIÊU CHUẨN DUNG LƯỢNG TỐI THIỂU CHO MÁY TÍNH CỦA NGƯỜI DÙNG:**
+> Toàn bộ dự án phải luôn được giữ ở mức siêu nhẹ (< 15MB). Mọi AI model khi thực thi đều phải tuân thủ nghiêm ngặt:
+> 1. **Tự động dọn rác ngay lập tức:** Mọi file cào thử nghiệm (HTML/JSON tạm), script test scratch, file log tạm thời sinh ra trong quá trình nghiên cứu bắt buộc phải bị XÓA SẠCH SẼ ngay sau khi tác vụ hoàn thành.
+> 2. **Không xả rác vào thư mục gốc:** Không tạo các file rác, file backup đuôi .bak, .tmp bừa bãi.
+> 3. **Tận dụng đám mây (Cloud-First):** Ưu tiên chạy tính toán trên Google Colab / Codespaces, không cài đặt các gói dữ liệu nặng vào ổ cứng laptop của người dùng nếu không có yêu cầu rõ ràng.
