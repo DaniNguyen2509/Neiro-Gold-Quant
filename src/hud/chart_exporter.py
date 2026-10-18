@@ -217,31 +217,39 @@ def export_quant_chart(
     if strikes.min() <= put_wall <= strikes.max():
         ax3.axhline(put_wall, color='#E65100', linewidth=1.6, linestyle='-.')
 
-    # Annotate Top Vanna & Charm Strikes
+    # Annotate Top Vanna & Charm Strikes with Meaning & Practical Action
     if len(plot_df) > 0:
         top_vex_idx = (plot_df['netVEX'].abs()).idxmax()
         top_vex_stk = plot_df.loc[top_vex_idx, 'strike']
         top_vex_val = plot_df.loc[top_vex_idx, 'netVEX']
         if top_vex_val >= 0:
-            ax3.text(top_vex_val + 0.3, top_vex_stk + step * 0.16, f"◄ Đỉnh Vanna ({top_vex_val:+.1f}M)", 
-                     color='#E65100', fontsize=7.6, fontweight='bold', va='center', ha='left')
+            vex_action = f"◄ ĐỈNH VANNA ({top_vex_val:+.1f}M): Lực đẩy V-Rebound (Canh BUY khi IV hạ)"
+            ax3.text(top_vex_val + 0.4, top_vex_stk + step * 0.16, vex_action, 
+                     color='#E65100', fontsize=7.2, fontweight='bold', va='center', ha='left',
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='#FFF3E0', edgecolor='#E65100', alpha=0.92, linewidth=0.8))
         else:
-            ax3.text(top_vex_val - 0.3, top_vex_stk + step * 0.16, f"Đỉnh Vanna ({top_vex_val:+.1f}M) ►", 
-                     color='#E65100', fontsize=7.6, fontweight='bold', va='center', ha='right')
+            vex_action = f"ĐỈNH VANNA ({top_vex_val:+.1f}M): Áp lực xả khi IV tăng (Cẩn thận Waterfall) ►"
+            ax3.text(top_vex_val - 0.4, top_vex_stk + step * 0.16, vex_action, 
+                     color='#E65100', fontsize=7.2, fontweight='bold', va='center', ha='right',
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='#FFF3E0', edgecolor='#E65100', alpha=0.92, linewidth=0.8))
 
         top_chex_idx = (plot_df['netCHEX'].abs()).idxmax()
         top_chex_stk = plot_df.loc[top_chex_idx, 'strike']
         top_chex_val = plot_df.loc[top_chex_idx, 'netCHEX']
         if top_chex_val >= 0:
-            ax3.text(top_chex_val + 0.3, top_chex_stk - step * 0.16, f"◄ Đỉnh Charm ({top_chex_val:+.1f}M)", 
-                     color='#00838F', fontsize=7.6, fontweight='bold', va='center', ha='left')
+            chex_action = f"◄ ĐỈNH CHARM ({top_chex_val:+.1f}M): Bệ đỡ thời gian (MM mua bù delta)"
+            ax3.text(top_chex_val + 0.4, top_chex_stk - step * 0.16, chex_action, 
+                     color='#00838F', fontsize=7.2, fontweight='bold', va='center', ha='left',
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='#E0F7FA', edgecolor='#00838F', alpha=0.92, linewidth=0.8))
         else:
-            ax3.text(top_chex_val - 0.3, top_chex_stk - step * 0.16, f"Đỉnh Charm ({top_chex_val:+.1f}M) ►", 
-                     color='#00838F', fontsize=7.6, fontweight='bold', va='center', ha='right')
+            chex_action = f"ĐỈNH CHARM ({top_chex_val:+.1f}M): Nam châm ghìm giá đêm (Canh Chốt Lời) ►"
+            ax3.text(top_chex_val - 0.4, top_chex_stk - step * 0.16, chex_action, 
+                     color='#00838F', fontsize=7.2, fontweight='bold', va='center', ha='right',
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='#E0F7FA', edgecolor='#00838F', alpha=0.92, linewidth=0.8))
 
     max_vex_chex = max(abs(net_vex.min()) if len(net_vex) else 0, abs(net_vex.max()) if len(net_vex) else 0,
                        abs(net_chex.min()) if len(net_chex) else 0, abs(net_chex.max()) if len(net_chex) else 0)
-    p3_span = max(max_vex_chex * 1.35, 10.0)
+    p3_span = max(max_vex_chex * 2.3, 16.0)
     ax3.set_xlim(-p3_span, p3_span)
 
     ax3.set_title("Panel 3: Greeks Bậc 2: Vanna (VEX) & Charm (CHEX)", fontsize=11, fontweight='bold')
