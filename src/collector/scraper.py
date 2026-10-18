@@ -139,6 +139,17 @@ def scrape_and_save(output_path: str = "data/options_prices_GCZ26.csv", dry_run:
     out_file.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_file, index=False)
     logger.info("Saved %d strikes to %s (file size: %d bytes)", len(df), out_file, out_file.stat().st_size)
+
+    # Mirror to Google Drive Desktop if folder exists
+    drive_data_dir = Path("H:/My Drive/Neiro-Quant/data")
+    if drive_data_dir.exists():
+        try:
+            drive_file = drive_data_dir / out_file.name
+            df.to_csv(drive_file, index=False)
+            logger.info("Mirrored to Google Drive Desktop: %s", drive_file)
+        except Exception as e:
+            logger.warning("Could not mirror to Google Drive: %s", e)
+
     return str(out_file)
 
 
