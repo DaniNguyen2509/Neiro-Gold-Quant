@@ -49,7 +49,7 @@ def clean_val(v: Any, default: float = 0.0) -> float:
         return default
 
 
-def load_and_preprocess_options(csv_path: str, basis: float = 44.5) -> tuple[pd.DataFrame, dict[str, Any]]:
+def load_and_preprocess_options(csv_path: str, basis: float = 24.0) -> tuple[pd.DataFrame, dict[str, Any]]:
     df_raw = pd.read_csv(csv_path)
 
     # Normalize column names
@@ -435,7 +435,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     now_str = now_vn.strftime("%d/%m/%Y %H:%M:%S")
 
     spot = meta["spot_price"]
-    basis = float(meta.get("basis", 44.5))
+    basis = float(meta.get("basis", 24.0))
     spot_mt5 = spot - basis
     regime = meta["regime"]
     total_gex = meta["total_net_gex"]
@@ -728,7 +728,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     return html
 
 
-def run_pipeline(input_csv: str = "data/options_prices_GCZ26.csv", output_files: list[str] | None = None, basis: float = 44.5) -> list[str]:
+def run_pipeline(input_csv: str = "data/options_prices_GCZ26.csv", output_files: list[str] | None = None, basis: float = 24.0) -> list[str]:
     if output_files is None:
         output_files = [
             "exports/latest_gold_dashboard.html",
@@ -762,7 +762,7 @@ def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Tactical HTML Dashboard Generator")
     parser.add_argument("--input", default="data/options_prices_GCZ26.csv", help="Input options CSV")
     parser.add_argument("--output", nargs="+", default=["exports/latest_gold_dashboard.html", "exports/index.html"], help="Output HTML paths")
-    parser.add_argument("--basis", type=float, default=44.5, help="Dynamic Basis Spread (Futures - Spot XAUUSD)")
+    parser.add_argument("--basis", type=float, default=24.0, help="Dynamic Basis Spread (Futures - Spot XAUUSD, default ~24.0 USD)")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, 'reconfigure'):
