@@ -188,7 +188,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
         subplot_titles=(
             "<b>Panel 1: Net GEX ($M) & Mốc Chiến Thuật (SL/TP)</b>",
             "<b>Panel 2: Dòng Tiền Volume vs Open Interest Nén</b>",
-            "<b>Panel 3: Greeks Bậc 2: Vanna (VEX) & Charm (CHEX)</b>",
+            "<b>Panel 3: Greeks Bậc 2 (Vanna & Charm)</b>",
         ),
         column_widths=[0.36, 0.36, 0.28],
     )
@@ -218,40 +218,42 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     if strikes.min() <= put_wall <= strikes.max():
         fig.add_hline(y=put_wall, line_color="#34D399", line_dash="dash", line_width=1.8, row=1, col=1)
 
+    # Place SPOT CME label cleanly at the right edge of Panel 1 to avoid colliding with left-side levels
     fig.add_annotation(
-        x=0, y=spot_price,
+        x=0.98, y=spot_price,
         text=f"◄ SPOT CME: {spot_price:.2f} (ATM: {atm_strike:.0f})",
-        showarrow=False, xanchor="left", xref="x domain", yref="y",
-        font=dict(color="#FFFFFF", size=10, family="JetBrains Mono"),
+        showarrow=False, xanchor="right", xref="x domain", yref="y",
+        font=dict(color="#FFFFFF", size=9.5, family="JetBrains Mono"),
         bgcolor="#0284C7", bordercolor="#38BDF8", borderwidth=1, borderpad=3,
     )
 
     if strikes.min() <= put_wall <= strikes.max():
         fig.add_annotation(
-            x=-8, y=put_wall,
-            text=f"<b>[MAJOR PUT WALL {put_wall:.0f}] ({put_wall_oi:,} OI - HỖ TRỢ ĐÁY NỀN)</b><br>• Vùng Mua (Rebound Buy): {put_wall-1.5:.1f} - {put_wall+1.5:.1f} | SL: {put_wall-4:.1f} ($4.0) | TP: {spot_price:.1f}<br>• Waterfall Breakout: Thủng < {waterfall_trigger:.1f} -> Bán Tháo Nhanh",
-            showarrow=True, arrowhead=2, arrowcolor="#EF4444",
-            align="left", xref="x", yref="y",
-            font=dict(color="#FEE2E2", size=9),
-            bgcolor="rgba(127, 29, 29, 0.9)", bordercolor="#EF4444", borderwidth=1,
+            x=0.03, y=put_wall - step * 0.15,
+            text=f"<b>[PUT WALL {put_wall:.0f}] ({put_wall_oi:,} OI)</b> &bull; Mua Rebound: {put_wall-1.5:.1f}-{put_wall+1.5:.1f} (SL: {put_wall-4:.1f})",
+            showarrow=True, arrowhead=2, arrowcolor="#EF4444", ax=0, ay=18,
+            align="left", xref="x domain", yref="y",
+            font=dict(color="#FEE2E2", size=8.5),
+            bgcolor="rgba(127, 29, 29, 0.92)", bordercolor="#EF4444", borderwidth=1,
         )
 
     if strikes.min() <= strike_above <= strikes.max() and strike_above != call_wall:
         fig.add_annotation(
-            x=6, y=strike_above,
-            text=f"<b>CỬA ẢI {strike_above:.0f} (Squeeze > {strike_above+2.5:.1f} -> TP {next_above:.0f})</b>",
-            showarrow=True, arrowhead=2, arrowcolor="#22C55E",
-            xref="x", yref="y", font=dict(color="#DCFCE7", size=9),
-            bgcolor="rgba(20, 83, 45, 0.9)", bordercolor="#22C55E", borderwidth=1,
+            x=0.03, y=strike_above + step * 0.15,
+            text=f"<b>CỬA ẢI {strike_above:.0f}</b> (Squeeze > {strike_above+2.5:.1f} -> TP {next_above:.0f})",
+            showarrow=True, arrowhead=2, arrowcolor="#22C55E", ax=0, ay=-16,
+            xref="x domain", yref="y", font=dict(color="#DCFCE7", size=8.5),
+            bgcolor="rgba(20, 83, 45, 0.92)", bordercolor="#22C55E", borderwidth=1,
         )
 
-    if strikes.min() <= strike_below <= strikes.max() and strike_below != put_wall:
+    # Only show separate Sàn Đỡ if not directly overlapping the ATM strike
+    if strikes.min() <= strike_below <= strikes.max() and strike_below != put_wall and abs(strike_below - spot_price) > 3.0:
         fig.add_annotation(
-            x=-6, y=strike_below,
-            text=f"SÀN ĐỠ ATM {strike_below:.0f} (Rebound: {strike_below-1.5:.1f} - {strike_below+1.5:.1f})",
-            showarrow=True, arrowhead=2, arrowcolor="#38BDF8",
-            xref="x", yref="y", font=dict(color="#E0F2FE", size=9),
-            bgcolor="rgba(12, 74, 110, 0.9)", bordercolor="#38BDF8", borderwidth=1,
+            x=0.03, y=strike_below - step * 0.15,
+            text=f"<b>SÀN ĐỠ {strike_below:.0f}</b> (Rebound: {strike_below-1.5:.1f}-{strike_below+1.5:.1f})",
+            showarrow=True, arrowhead=2, arrowcolor="#38BDF8", ax=0, ay=16,
+            xref="x domain", yref="y", font=dict(color="#E0F2FE", size=8.5),
+            bgcolor="rgba(12, 74, 110, 0.92)", bordercolor="#38BDF8", borderwidth=1,
         )
 
     # Panel 2: Volume vs Open Interest
@@ -310,40 +312,50 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     )
     fig.add_vline(x=0, line_dash="solid", line_color="#475569", row=1, col=3)
 
-    # Top VEX & CHEX annotations
+    # Top VEX & CHEX annotations with collision prevention
     top_vex_idx = df["netVEX"].abs().idxmax()
     top_vex_val = df.loc[top_vex_idx, "netVEX"]
     top_vex_stk = df.loc[top_vex_idx, "strike"]
-    fig.add_annotation(
-        x=top_vex_val, y=top_vex_stk,
-        text=f"◄ ĐỈNH VANNA ({top_vex_val:+.1f}M): Lực đẩy V-Rebound",
-        showarrow=False, xanchor="left" if top_vex_val >= 0 else "right",
-        xref="x3", yref="y3", font=dict(color="#FDBA74", size=9),
-        bgcolor="#1C1917", bordercolor="#FB923C", borderwidth=1,
-    )
 
     top_chex_idx = df["netCHEX"].abs().idxmax()
     top_chex_val = df.loc[top_chex_idx, "netCHEX"]
     top_chex_stk = df.loc[top_chex_idx, "strike"]
+
+    # If Vanna and Charm peaks share the same strike, offset them vertically
+    if top_vex_stk == top_chex_stk:
+        y_vex = top_vex_stk + step * 0.22
+        y_chex = top_chex_stk - data_step if (data_step := step * 0.22) else top_chex_stk
+    else:
+        y_vex = top_vex_stk
+        y_chex = top_chex_stk
+
     fig.add_annotation(
-        x=top_chex_val, y=top_chex_stk,
-        text=f"ĐỈNH CHARM ({top_chex_val:+.1f}M): Nam châm ghìm giá đêm ►",
-        showarrow=False, xanchor="right" if top_chex_val <= 0 else "left",
-        xref="x3", yref="y3", font=dict(color="#67E8F9", size=9),
-        bgcolor="#1C1917", bordercolor="#22D3EE", borderwidth=1,
+        x=top_vex_val, y=y_vex,
+        text=f"◄ ĐỈNH VANNA ({top_vex_val:+.1f}M): V-Rebound",
+        showarrow=False, xanchor="left" if top_vex_val >= 0 else "right",
+        xref="x3", yref="y3", font=dict(color="#FDBA74", size=8.5),
+        bgcolor="#1C1917", bordercolor="#FB923C", borderwidth=1, borderpad=2,
     )
 
-    # Layout styling
+    fig.add_annotation(
+        x=top_chex_val, y=y_chex,
+        text=f"ĐỈNH CHARM ({top_chex_val:+.1f}M): Ghìm giá đêm ►",
+        showarrow=False, xanchor="right" if top_chex_val <= 0 else "left",
+        xref="x3", yref="y3", font=dict(color="#67E8F9", size=8.5),
+        bgcolor="#1C1917", bordercolor="#22D3EE", borderwidth=1, borderpad=2,
+    )
+
+    # Layout styling with ample top margin to prevent legend/title overlap
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#0A0E17",
         plot_bgcolor="#111827",
         font=dict(family="Inter, sans-serif", color="#F8FAFC"),
         height=720,
-        margin=dict(l=70, r=25, t=75, b=40),
+        margin=dict(l=70, r=30, t=115, b=45),
         legend=dict(
             orientation="h",
-            yanchor="bottom", y=1.03,
+            yanchor="bottom", y=1.07,
             xanchor="center", x=0.5,
             font=dict(size=10),
         ),
@@ -362,7 +374,15 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
 
     fig.update_xaxes(gridcolor="#1E293B", title=dict(text="Net GEX ($M / 1% Move)", font=dict(size=10)), row=1, col=1)
     fig.update_xaxes(gridcolor="#1E293B", title=dict(text="Put OI/Vol (-) | Call OI/Vol (+)", font=dict(size=10)), row=1, col=2)
-    fig.update_xaxes(gridcolor="#1E293B", title=dict(text="Greeks Bậc 2 ($M Exposure)", font=dict(size=10)), row=1, col=3)
+
+    # Expand Panel 3 x-axis range so annotations never clip or overflow
+    max_vc = max(float(df["netVEX"].abs().max()), float(df["netCHEX"].abs().max()), 5.0)
+    fig.update_xaxes(
+        range=[-max_vc * 2.2, max_vc * 2.2],
+        gridcolor="#1E293B",
+        title=dict(text="Greeks Bậc 2 ($M Exposure)", font=dict(size=10)),
+        row=1, col=3,
+    )
 
     return fig
 
