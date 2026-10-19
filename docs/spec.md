@@ -1,4 +1,4 @@
-﻿# Spec: Neiro-Quant - Quantitative Gold Options Trading System
+# Spec: Neiro-Quant - Quantitative Gold Options Trading System
 
 ## Objective
 
@@ -26,12 +26,12 @@ Xay dung he thong dinh luong chay ngam tu dong 100% (Zero-Touch Automation) tren
 
 | Layer | Technology | Version |
 |---|---|---|
-| Quant Engine | Python | 3.14.6 |
-| Options Scraper | Playwright (headless) hoac httpx | latest |
+| Quant Engine | Python | 3.12 / 3.14 |
+| Options Scraper | Playwright (headless Chromium) | latest |
+| Tactical Dashboard | Plotly HTML (Dark Theme) | 6.x |
+| Cloud Automation | GitHub Actions + GitHub Pages | v4 |
 | MT5 Bridge | MetaTrader5 Python package | latest |
 | Async Runtime | asyncio + aiohttp | stdlib |
-| Data Store | SQLite (deque in-memory + periodic dump) | stdlib |
-| Scheduling | APScheduler hoac custom asyncio loop | latest |
 | MT5 Indicator | MQL5 | MT5 build 5xxx+ |
 | TV Indicator | Pine Script v6 | TradingView |
 | Config | TOML | stdlib (tomllib) |

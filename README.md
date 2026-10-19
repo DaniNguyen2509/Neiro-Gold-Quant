@@ -1,44 +1,58 @@
-# 🪙 Neiro-Quant — Market Microstructure & GEX Terminal
+# 🪙 Neiro-Quant — Market Microstructure & Options Flow Terminal
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DaniNguyen2509/Neiro-Quant/blob/main/notebooks/Neiro_Quant.ipynb)
-[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Quant/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Quant/actions)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12%20%7C%203.14-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 
-Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX) & Tích hợp Trí tuệ Nhân tạo DeepSeek trước 3 phiên giao dịch (Á • Âu • Mỹ).
-
----
-
-## 🚀 TÁC CHIẾN NHANH TRÊN GOOGLE COLAB (1-CLICK RUN)
-
-Chỉ cần bấm nút **[Open in Colab]** ở trên, anh có thể chạy toàn bộ hệ thống ngay trên điện thoại, iPad hoặc máy tính:
-1. **Nạp số liệu:** Dùng sẵn dữ liệu mẫu trong data/sample_options_chain.csv hoặc tải file CSV Options Chain từ Barchart lên.
-2. **Quy đổi Spot:** Nhập giá Spot XAUUSD trên sàn anh trade -> Hệ thống tự động trừ Basis quy đổi tất cả các mốc cản sang giá Spot.
-3. **Xem biểu đồ ATAS:** Trực quan hóa GEX Profile, Call Wall, Put Wall, ATM Pivot, Dải $\pm 1\sigma$ và các vùng Chân không thanh khoản (Air Pockets).
-4. **Trợ lý AI DeepSeek:** Tự động phân tích cấu trúc vi mô và xuất Kế hoạch vào lệnh, SL, TP sắc bén trước mỗi phiên.
+Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX), Greeks bậc 2 (Vanna, Charm), Expected Move & Market Microstructure vận hành **tự động 100% trên Cloud (Serverless)** cho thị trường Vàng CME Futures (`GCZ26`) và chiếu lên XAUUSD Spot.
 
 ---
 
-## 📚 TÀI LIỆU ĐẶC TẢ & HỆ THỐNG CÔNG THỨC
+## ⚡ TRUY CẬP WEB TERMINAL TRÊN ĐIỆN THOẠI & MÁY TÍNH
 
-- **Kiến trúc hệ thống 6 tầng & State Machine:** [docs/tailieudacta/KIEN_TRUC_DU_AN.md](docs/tailieudacta/KIEN_TRUC_DU_AN.md)
-- **Đặc tả toàn bộ công thức toán học (Black-76, Greeks, GEX):** [docs/tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](docs/tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
+- **URL Dashboard Trực Tuyến:** [https://daninguyen2509.github.io/Neiro-Quant/](https://daninguyen2509.github.io/Neiro-Quant/)
+- **Cơ chế cập nhật:** Hoàn toàn tự động 24/5 trên GitHub Actions (không cần mở laptop, không cần tài nguyên máy cá nhân).
+- **Lịch chạy tự động (Lưới Cron 2 mùa thích ứng):**
+  - **07:30 VN:** Chốt số liệu Open Interest (OI) chính thức ngày mới từ CME Clearing.
+  - **14:30 / 15:30 VN:** Đầu phiên London (thích ứng giờ mùa hè BST & mùa đông GMT).
+  - **19:30, 20:30, 21:30, 22:30, 23:30, 00:30 VN:** Khung giờ vàng phiên New York (chạy mỗi 1 tiếng/lần).
+
+---
+
+## 📚 TÀI LIỆU KIẾN TRÚC & QUYẾT ĐỊNH KỸ THUẬT
+
+- **Kiến trúc Hệ thống v2.0 (Toàn cảnh 6 tầng & Level State Engine):** [docs/architecture.md](docs/architecture.md)
+- **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Kiến trúc Cloud-Native (ADR-001):** [docs/decisions/ADR-001-cloud-native-tactical-terminal.md](docs/decisions/ADR-001-cloud-native-tactical-terminal.md)
+- **Công thức Toán học Định lượng (Black-76, GEX, Vanna, Charm, Expected Move):** [docs/tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](docs/tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
 
 ---
 
 ## 🛠️ CẤU TRÚC KHO LƯU TRỮ
 
-`
+```
 Neiro-Quant/
-├── notebooks/
-│   └── Neiro_Quant.ipynb       # Google Colab Notebook chính
-├── data/
-│   └── sample_options_chain.csv # Dữ liệu mẫu chuẩn CME Gold Options
+├── .github/workflows/
+│   └── daily_options_sync.yml   # Workflow cào Barchart, tính toán Greeks & xuất bản GitHub Pages
 ├── docs/
-│   └── tailieudacta/            # Toàn bộ tài liệu đặc tả & công thức toán
+│   ├── architecture.md          # Tài liệu kiến trúc hệ thống chính (v2.0)
+│   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
+│   ├── decisions/               # Architecture Decision Records (ADRs)
+│   └── tailieudacta/            # Công thức toán học và tài liệu đặc tả vi mô
 ├── src/
-│   ├── quant_engine/            # Lõi toán định lượng
-│   ├── collector/               # Thu thập dữ liệu Barchart & CME
-│   └── mt5_bridge/              # Kết nối MT5 Spot & Futures
-└── config/
-    └── settings.toml            # Cấu hình hệ thống
-`
+│   ├── collector/               # Playwright headless scraper & API interceptor
+│   ├── quant_engine/            # Lõi Black-76, IV solver, GEX, Vanna, Charm, Expected Move
+│   └── hud/                     # Plotly Dark Mode tactical dashboard generator
+├── data/
+│   └── options_prices_GCZ26.csv # Dữ liệu CME Options Chain tự động cập nhật
+└── notebooks/                   # File nghiên cứu cũ (đã chuyển giao sang Cloud Pipeline)
+```
+
+---
+
+## 🧹 QUY TẮC BẢO TỒN DUNG LƯỢNG (ZERO-WASTE MANDATE)
+
+Dự án tuân thủ nghiêm ngặt chuẩn dung lượng siêu nhẹ:
+- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~8.4MB).
+- Mọi dữ liệu tạm, scratch scripts, cache đều được tự động dọn dẹp sạch sẽ sau mỗi lần thực thi.
+- Không lưu trữ tệp tin nhị phân nặng trên máy cục bộ của người dùng.

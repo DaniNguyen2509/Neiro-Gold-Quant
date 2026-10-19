@@ -1,9 +1,9 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v1.0 — 18/10/2026  
-> **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX & Market Microstructure)  
-> **Tài sản mục tiêu:** Vàng CME Futures (`GC`), XAUUSD Spot (Pepperstone / Exness / IC Markets) & Nasdaq Futures (`NQ`).  
-> **Tài liệu đối chiếu:** [spec.md](spec.md) & [tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
+> **Phiên bản:** v2.0 — 19/10/2026 (Chuyển giao 100% Cloud-Native Automation)  
+> **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
+> **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26`), XAUUSD Spot (Pepperstone / Exness / IC Markets) & E-mini Gold.  
+> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md) & [tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
 
 ---
 
@@ -19,38 +19,33 @@ Hệ thống **Neiro-Quant** được xây dựng không phải để đoán mò
      - Xuất hiện lực đỡ/hấp thụ thụ động (Passive Absorption), Delta suy kiệt, nằm trong vùng Positive Net GEX (Dealer buộc phải mua đỡ khi giá rơi, bán ghìm khi giá tăng) -> Kích hoạt lệnh **ĐẢO CHIỀU (Fade Reversal)**.
    - **Hay Chốt chặn sẽ BỊ ĐÂM THỦNG VÀ TRƯỢT DÀI (Sliced & Vacuum Cascade)?**
      - Bên dưới chốt chặn là vùng **Chân không thanh khoản (Air Pocket / Low OI Gap)**, kết hợp Negative Net GEX (Dealer bị ép bán tháo phòng hộ khi giá phá vỡ) -> **TUYỆT ĐỐI CẤM BẮT ĐÁY / ĐỠ DAO**, chuyển trạng thái sang **ĐÁNH PHÁ VỠ (Breakout Vacuum Runner)** ăn trọn con sóng trượt giá.
-3. **Chuẩn hóa điểm vào lệnh (Precision Execution):**
-   - Entry vào đúng thời điểm xác nhận phản ứng vi mô (không FOMO).
-   - Stop Loss cực ngắn (1.5 - 2.5 giá) đặt ngay sau lưng cấu trúc hấp thụ/vùng cản.
-   - Take Profit nhắm thẳng tới trung tâm hồi quy (ATM Pivot) hoặc mép thanh khoản đón giá tiếp theo.
+3. **Vận hành độc lập 100% trên Cloud (Zero-Touch Cloud Automation):**
+   - Hoạt động tự động 24/5 trên máy chủ đám mây (GitHub Actions). Không phụ thuộc vào laptop của người dùng, tự động cào dữ liệu, tính toán ma trận Greeks và xuất bản Web Terminal xem trực tiếp trên điện thoại.
 
 ---
 
 ## II. GIẢI MÃ CA LÂM SÀNG THỰC TẾ (CASE STUDY TỪ BIỂU ĐỒ ORDERFLOW)
 
-Phân tích cấu trúc thực tế từ biểu đồ NQZ6 / Rithmic / TrueVision Levels:
+Phân tích cấu trúc thực tế từ biểu đồ CME Gold / Orderflow / TrueVision Levels:
 
 ```
-[31287.50]  ════ Put Wall • Gamma C • Gamma P • DEX P • #1 OI Put ════  (Bức tường Put Wall vĩ mô)
-                   │
-[31280 - 72]      ├── deep ef stack (Cụm lệnh Limit xếp tầng dày đặc thử thách đà rơi)
-                   │
-[31265 - 62]      ├── buyer abs (Buyer Absorption — Phe mua cố gắng đỡ nhưng cạn kiệt lực)
-                   │
-[31255 - 52]      ├── seller offer (Cụm Footprint mất cân bằng bán: 59, 37, 30, 35 dội xuống)
-                   │
-[31246.00]  ════ gex 5 reaction (#5 Gamma Level — Phản ứng giằng co nhẹ) ════
-                   │
-                   ▼ ──► [CÚ ĐÂM THỦNG & TRƯỢT DÀI (LIQUIDITY VACUUM / AIR POCKET SLIDE)]
-                         Bên dưới 31246 cạn kiệt thanh khoản Bid, Dealer buộc phải bán hedge
-                         -> Giá trượt tự do không phanh qua 31214.00
-                   ▼
-[31187.50]  ════ Vùng cụm thanh khoản Bid / OI kế tiếp mới đón và chặn đứng được giá ════
+[4250.00]  ════ Call Wall • Max Call OI ════ (Trần nhà kiên cố của Market Maker)
+                  │
+[4225.00]  ────── Cửa Ải Kháng Cự Tiền Tuyến (Squeeze > 4227.5 -> MM vỡ trần Short -> Phóng lên 4250)
+                  │
+[4201.96]  ────── SPOT CME FUTURES (Giá tương lai cân bằng ngầm định via Put-Call Parity)
+                  │
+[4200.00]  ────── Sàn Đỡ Kỹ Thuật ATM (Đệm Put đỡ nến M5 rút chân)
+                  │
+                  ▼ ──► [CÚ ĐÂM THỦNG & TRƯỢT DÀI (LIQUIDITY VACUUM / AIR POCKET SLIDE)]
+                        Bên dưới 4175 cạn kiệt OI (< 35% trung bình), Dealer buộc phải bán hedge
+                        -> Giá trượt tự do không phanh qua 4150
+                  ▼
+[4100.00]  ════ Major Put Wall • Max Put OI ════ (Đáy bê tông cốt thép cuối cùng của MM)
 ```
 
 **Bài học cấu trúc:**  
-Nếu trader chỉ nhìn vào đường 31246 (GEX #5) mà nhảy vào bắt đáy với niềm tin mù quáng rằng "đây là cản cứng", trader sẽ bị quét sạch tài khoản trong cú trượt chân không thanh khoản xuống 31187.  
-Hệ thống **Neiro-Quant** sinh ra để phát hiện trước **nguy cơ bị đâm thủng** và ngăn chặn lệnh bắt đáy tai hại đó.
+Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà bắt đáy tại các vùng rỗng thanh khoản (Air Pocket), trader sẽ bị quét sạch tài khoản trong cú trượt chân không thanh khoản. Hệ thống **Neiro-Quant** sinh ra để phát hiện trước **nguy cơ bị đâm thủng** và ngăn chặn lệnh bắt đáy tai hại đó.
 
 ---
 
@@ -59,41 +54,38 @@ Hệ thống **Neiro-Quant** sinh ra để phát hiện trước **nguy cơ bị
 ```
                     ┌──────────────────────────────────────────────┐
                     │       BARCHART / CME OPTIONS FEED            │
-                    │  (Weekly OG1..OG5 & Monthly OG Gold Options) │
+                    │  (Weekly OG1..OG5 & Monthly GCZ Gold Options)│
                     └──────────────────────┬───────────────────────┘
-                                           │ Playwright Headless + XHR Sniffer
+                                           │ Playwright Chromium Cloud + Internal API Sniffer
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 1: COLLECTOR & EXPIRY AUTO-RESOLVER]                                             │
-│  - symbols.py: Xây dựng CME root symbol & URL query động.                             │
-│  - expiry_resolver.py: Tự động phát hiện ngày/thứ trong tháng (OG1..OG5).             │
-│    Tuần cuối tháng/quý/năm: Kích hoạt chế độ Dual-frame (Weekly + Monthly).            │
-│  - scraper.py: Intercept trực tiếp XHR JSON nội bộ từ Barchart (vượt HTTP 202).       │
-│  - parser.py: Chuẩn hóa thành OptionsSnapshot & OptionsStrike.                        │
+│ [TẦNG 1: CLOUD COLLECTOR & AUTOMATION PIPELINE]                                        │
+│  - Playwright Headless Chromium: Tự động chạy trên Ubuntu GitHub Actions.              │
+│  - Internal API Interceptor: Bắt gói JSON /proxies/core-api/v1/options/get.            │
+│  - Lưới Cron thích ứng 2 mùa: 07:30 VN (Chốt OI), 14:30/15:30 VN (London Mùa Hè/Đông), │
+│    19:30 đến 00:30 đêm VN (Khung giờ vàng New York, mỗi 1 tiếng/lần).                   │
+│  - Lưu trữ CSV: data/options_prices_GCZ26.csv tự động commit vào repository.           │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 2: QUANT ENGINE & GREEKS CORE (CÔNG THỨC TOÁN HỌC)]                              │
 │  - black76.py: Mô hình Black-76 cho Options on Futures (Call, Put, d1, d2).            │
-│  - iv_solver.py: Giải ngược Implied Volatility (Newton-Raphson + Brent fallback)       │
-│    -> Giải quyết triệt để lỗi Barchart trả IV = 0.00% ngày 0DTE.                       │
-│  - greeks.py: Đạo hàm bậc 1 & bậc 2 (Delta, Gamma, Theta, Vega, Rho).                  │
-│  - gex.py: GEX ($/1% move), DEX ($ Exposure), Net GEX, Gamma Flip Point.               │
-│  - advanced_greeks.py: VEX (Vanna Exposure) & CHEX (Charm Exposure).                   │
-│  - synthetic.py: K_ATM, Synthetic Futures S_Implied, Straddle, ±1.0σ & ±0.85σ Bands.   │
-│  - air_pocket.py: Thuật toán quét chân không thanh khoản (OI < 35% trung bình).        │
-│  - dealer.py: Major Call Wall, Put Wall, Absolute Gamma Strike, Pin Risk.              │
+│  - iv_solver.py: Giải ngược Implied Volatility (Newton-Raphson + Brent fallback).      │
+│  - Put-Call Parity Implied Spot: S_Implied = K_ATM + exp(r*T)*(C_ATM - P_ATM).         │
+│  - gex.py: Net GEX ($/1% move), Gamma Flip Point, Gamma Squeeze / Waterfall Triggers.   │
+│  - advanced_greeks.py: Net VEX ($M/1% IV - Vanna) & Net CHEX ($M/ngày - Charm).        │
+│  - expected_move.py: Biên độ 1-Sigma (Straddle / 0.7979) & Intraday Rule of 16.        │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 3: REAL-TIME BASIS SYNC & BROKER BRIDGE]                                         │
-│  - connector.py: Kết nối MetaTrader 5 Python API (Pepperstone, Exness, IC Markets).    │
-│  - price_feed.py: Event-driven tick listener cho XAUUSD Spot & Futures.                │
-│  - basis_sync.py: Tính toán độ lệch Basis = Futures - Spot theo Rolling Window (60s):   │
-│         Level_Spot = Level_Futures - Basis_Spread                                      │
-│    Chiếu toàn bộ các mốc cản CME chuẩn xác từng pip lên biểu đồ Spot của sàn.          │
+│ [TẦNG 3: CLOUD TACTICAL TERMINAL & STATIC HOSTING (FRONTEND)]                          │
+│  - html_dashboard.py: Render độc lập file Plotly HTML Dark Mode cao cấp.               │
+│  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
+│  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
+│  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │
+│  - Zero Laptop Dependency: Người dùng xem trực tiếp trên điện thoại ở bất kỳ đâu.      │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
                                            ▼
@@ -107,29 +99,40 @@ Hệ thống **Neiro-Quant** sinh ra để phát hiện trước **nguy cơ bị
 │        -> Tín hiệu BREAKOUT RUNNER (Cảnh báo CẤM ĐỠ DAO).                              │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
-                                           ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 5: DISPATCHER & REALTIME CACHE]                                                  │
-│  - levels_cache.json: Ghi nhận snapshot levels liên tục cho các hệ thống ngoại vi.     │
-│  - WebSocket Server (FastAPI): Truyền stream dữ liệu siêu tốc (< 50ms) tới Web UI.    │
-└──────────────────────────────────────────┬─────────────────────────────────────────────┘
-                                           │
-                     ┌─────────────────────┴─────────────────────┐
-                     ▼                                           ▼
+                      ┌────────────────────┴────────────────────┐
+                      ▼                                         ▼
 ┌─────────────────────────────────────────┐ ┌────────────────────────────────────────────┐
-│ [TẦNG 6A: WEB COCKPIT DASHBOARD]        │ │ [TẦNG 6B: MT5 / TRADINGVIEW OVERLAY]       │
-│  - Localhost:8080 (Dark Theme ATAS)     │ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5  │
-│  - Radar Matrix: Giám sát trạng thái    │ │    đọc levels_cache.json vẽ trực tiếp hộp   │
-│    từng level theo thời gian thực       │ │    vùng cản & Air Pocket lên nến MT5.       │
-│  - GEX Profile Bar Chart từng Strike    │ │  - TradingView Pine Script Indicator       │
-│  - Actionable Cards: Khuyến nghị        │ │    (Neiro-Quant-Overlay.pine).             │
-│    vào lệnh, SL, TP rõ ràng, tức thì    │ │                                            │
+│ [TẦNG 5: STRATEGY EXECUTION MATRICES]   │ │ [TẦNG 6: BROKER BASIS BRIDGE (TÙY CHỌN)]   │
+│  - Bảng 1: Intraday Scalping (Ăn 20-25$)│ │  - MetaTrader 5 Connector (Pepperstone)     │
+│    Entry, Hard SL, TP, Lý do Market     │ │  - Auto-Basis Sync: Futures <-> Spot       │
+│  - Bảng 2: Structural Swing Walls       │ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5   │
+│    Bắt đáy Put Wall / Bán đỉnh Call Wall│ │  - TradingView Pine Script Indicator       │
 └─────────────────────────────────────────┘ └────────────────────────────────────────────┘
 ```
 
 ---
 
-## IV. CƠ CHẾ STATE MACHINE CHO TỪNG LEVEL (LEVEL STATE ENGINE)
+## IV. CƠ CHẾ LƯỚI CRON THÍCH ỨNG 2 MÙA (DUAL-SEASON CLOUD PIPELINE)
+
+Do thị trường tài chính thế giới (London & New York) chuyển đổi qua lại giữa **Giờ mùa hè (Daylight Saving Time - EDT/BST)** và **Giờ mùa đông (Standard Time - EST/GMT)**, hệ thống áp dụng Lưới Cron đa tầng chạy theo giờ UTC tuyệt đối:
+
+```yaml
+on:
+  schedule:
+    # 00:30 UTC = 07:30 VN (Chốt Open Interest từ CME Clearing)
+    # 07:30 UTC = 14:30 VN (London Mở cửa - Mùa Hè)
+    # 08:30 UTC = 15:30 VN (London Mở cửa - Mùa Đông)
+    # 12:30, 13:30, 14:30, 15:30, 16:30, 17:30 UTC (Khung giờ vàng New York: 19:30 đến 00:30 đêm VN)
+    - cron: '30 0,7,8,12,13,14,15,16,17 * * 1-5'
+```
+
+* **Phiên Âu:** Đảm bảo dù là mùa hè hay mùa đông, hệ thống luôn cào đúng thời điểm 30 phút sau khi tiếng chuông London vang lên (14:30 hoặc 15:30 VN).
+* **Phiên Mỹ:** Chạy liên tục mỗi 1 tiếng từ 19:30 đến 00:30 đêm hôm sau, bao trọn cả giờ ra tin tức vĩ mô (08:30 sáng NY), giờ mở cửa sàn chứng khoán (09:30 sáng NY) và giờ chốt giá London Fix (00:00 - 00:30 VN).
+* **Hạn mức tài nguyên:** 9 lần chạy/ngày $\times$ 1.5 phút $\approx$ **290 phút/tháng** (chiếm ~14% hạn mức 2,000 phút miễn phí của GitHub Actions, an toàn tuyệt đối).
+
+---
+
+## V. CƠ CHẾ STATE MACHINE CHO TỪNG LEVEL (LEVEL STATE ENGINE)
 
 Mỗi đường Level được hệ thống theo dõi 24/7 theo chu trình trạng thái khép kín:
 
@@ -152,48 +155,35 @@ stateDiagram-v2
 ```
 
 ### 1. Trạng thái `DORMANT` (Chờ kích hoạt)
-- Giá hiện tại cách Level > 5.0 USD (với Gold) hoặc > 20 ticks (với NQ).
+- Giá hiện tại cách Level > 5.0 USD (với Gold).
 - Level đóng vai trò là mốc định hướng trên bản đồ thanh khoản lớn.
 
 ### 2. Trạng thái `TRIGGERED / TESTING` (Đang tiếp cận & thử thách)
 - Giá chạm vào phạm vi đệm `[Level - 2.0, Level + 2.0]`.
 - Hệ thống kích hoạt radar phân tích vi mô:
   - Kiểm tra Net GEX tại Strike (Dương hay Âm?).
-  - Đo tốc độ nến (Tick velocity) và tỷ lệ mất cân bằng (Footprint Imbalance).
+  - Đo tốc độ nến và khối lượng giao dịch dồn tụ.
 
 ### 3. Trạng thái `ABSORPTION_DEFENDED` (Chốt chặn trụ vững)
 - **Điều kiện kích hoạt:**
   1. Net GEX tại Strike mang giá trị **DƯƠNG (+GEX)**: Dealer đóng vai trò đè nén dao động.
-  2. Khối lượng khớp chủ động (Market orders) lớn nhưng nến rút chân hoặc dao động giằng co hẹp (Passive Absorption).
-  3. Delta phân kỳ kiệt sức (Delta Exhaustion).
+  2. Nến M5 rút chân trở lại vào trong vùng cản (Passive Absorption).
+  3. Delta suy kiệt.
 - **Quy tắc vào lệnh (Fade Reversal):**
   - **Entry:** Vào lệnh khi nến M1/M5 đóng cửa rút chân trở lại vào trong vùng cản.
   - **Stop Loss (SL):** Đặt cách mép ngoài của chốt chặn **1.5 - 2.5 giá**.
-  - **Take Profit (TP):** 
-    - TP1: Trục cân bằng ngầm định `S_Implied` (ATM Pivot).
-    - TP2: Mép cản đối diện (Call Wall nếu Buy, Put Wall nếu Sell).
+  - **Take Profit (TP):** Trục cân bằng ngầm định `S_Implied` (ATM Pivot) hoặc mốc cản đối diện.
 
 ### 4. Trạng thái `SLICED_VACUUM_RUN` (Chốt chặn bị đâm thủng - Trượt dốc)
 - **Điều kiện kích hoạt:**
   1. Giá đóng cửa xuyên thủng qua Level > 1.5 giá.
   2. Phía sau Level là một **Air Pocket (Vùng rỗng thanh khoản)** có OI mỏng (< 35% trung bình).
-  3. Net GEX mang giá trị **ÂM (-GEX)**: Dealer bị ép bán/mua đuổi theo hướng phá vỡ để phòng hộ.
+  3. Net GEX mang giá trị **ÂM (-GEX)**: Dealer bị ép bán tháo phòng hộ.
 - **Quy tắc ứng xử & Vào lệnh (Breakout Runner):**
   - **Lệnh cấm tối cao:** **TUYỆT ĐỐI KHÔNG BẮT ĐÁY / KHÔNG ĐỠ DAO**.
   - **Entry:** Đánh theo đà phá vỡ (Breakout Entry) ngay khi xác nhận nến đóng ngoài Level.
   - **Stop Loss (SL):** Đặt ngay phía trên Level vừa bị thủng 1.0 - 1.5 giá.
   - **Take Profit (TP):** Biên trên của Bức tường OI/GEX dày tiếp theo (Ăn trọn khoảng chân không Air Pocket).
-
----
-
-## V. CƠ CHẾ EXPIRY RESOLVER & DUAL-FRAME (CHỌN KỲ HẠN ĐÁO HẠN)
-
-Hệ thống tự động giải mã chu kỳ đáo hạn của sàn CME:
-- **Tuần 1 -> Tuần 4 bình thường:** Thu thập hợp đồng Weekly tương ứng (`OG1`, `OG2`, `OG3`, `OG4`, `OG5`).
-- **Tuần cuối tháng / cuối quý / cuối năm:**
-  - Tự động kích hoạt cơ chế **Dual-Frame**: Tính toán và hiển thị **SONG SONG cả 2 bộ Levels (Weekly + Monthly)**.
-  - Hợp đồng Monthly (`OG`) phản ánh dòng tiền vị thế lớn của các quỹ tổ chức (Institutional Hedging).
-  - Hợp đồng Weekly phản ánh biến động ngắn hạn trong tuần.
 
 ---
 
@@ -204,16 +194,18 @@ Hệ thống tự động giải mã chu kỳ đáo hạn của sàn CME:
 | `underlying_symbol` | `GCZ26` / `GC` | Mã hợp đồng tương lai vàng CME |
 | `spot_symbols` | `XAUUSD`, `XAUUSDc`, `XAUUSD-F` | Mã tài sản giao dịch trên sàn MT5 |
 | `multiplier` | `100` | 100 troy oz mỗi CME Gold Contract |
+| `risk_free_rate` | `0.045` (4.5%) | Lãi suất phi rủi ro chuẩn định giá Black-76 |
+| `dte_days` | `38.0` | Số ngày còn lại tới ngày đáo hạn hợp đồng |
 | `proximity_threshold` | `2.0` | Ngưỡng $ kích hoạt trạng thái TESTING |
 | `breakout_threshold` | `1.5` | Ngưỡng $ xác nhận xuyên thủng Level |
 | `air_pocket_threshold` | `< 0.35` | Tỷ lệ OI so với trung bình để định danh Air Pocket |
-| `basis_window_seconds`| `60` | Cửa sổ trượt tính trung vị Basis Spread |
-| `dashboard_port` | `8080` | Cổng Web Cockpit UI trên máy local |
+| `web_terminal_url` | `https://daninguyen2509.github.io/Neiro-Quant/` | Địa chỉ Web Terminal mở trên điện thoại |
 
 ---
 
-## VII. ĐỘNG LỰC VÀ TIÊU CHUẨN MÃ NGUỒN
+## VII. QUY ĐỊNH BẢO TỒN DUNG LƯỢNG & HIỆU NĂNG (ZERO-WASTE MANDATE)
 
-- **Zero-Touch Automation:** Chạy ngầm 24/7, tự kết nối lại nếu rớt mạng, tự động fetch lãi suất và Greeks.
-- **Tiêu tốn tài nguyên tối thiểu:** CPU < 5%, RAM < 250MB.
-- **Tính toán chính xác tuyệt đối:** Mọi module toán học (Black-76, Greeks, GEX) phải vượt qua 100% Unit Tests với Golden Values từ thị trường trước khi cấp dữ liệu cho Dashboard.
+1. **Chuẩn dung lượng siêu nhẹ:** Toàn bộ repository luôn được duy trì < 15MB.
+2. **Loại bỏ hoàn toàn rác tạm:** Mọi file cào tạm thời, script scratch, file log thử nghiệm phải bị xóa sạch ngay sau khi hoàn thành.
+3. **Cloud-First:** Tính toán hoàn toàn trên đám mây, không cài đặt dữ liệu nặng vào ổ cứng của người dùng.
+4. **Không phụ thuộc Laptop:** Toàn bộ luồng sinh dữ liệu và xuất bản giao diện vận hành trơn tru ngay cả khi laptop tắt nguồn.
