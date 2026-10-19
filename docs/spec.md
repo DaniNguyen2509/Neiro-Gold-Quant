@@ -134,10 +134,18 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 4. **OI Air Pockets (oi_air_pocket_zones):**
    - Dai Strike giua ATM va Walls co OI < 30-40% muc trung binh -> Vung chan khong
 
-### Auto-Basis Sync & Live Spot Feed
-- **Live Spot Ingestion:** Tự động gọi API thời gian thực (Gold-API `api.gold-api.com/price/XAU` & Binance London Good Delivery `PAXGUSDT`) để lấy giá Spot Vàng Cash.
-- **Dynamic Basis Resolution:** $\text{Basis} = \text{Price}_{\text{Futures}}(\text{CME GCZ26}) - \text{Price}_{\text{Spot}}(\text{XAU/USD})$.
-- Tự động quy đổi toàn bộ các mốc chiến thuật sang cả 2 hệ quy chiếu: CME Futures và MT5 Spot (chuẩn khớp độ lệch thực tế 24-29 USD, fallback 24.0 USD khi offline).
+### Auto-Basis Sync & Live Spot Feed (DeepSeek Hardened)
+- **Live Spot Ingestion:** Tự động gọi API thời gian thực với cơ chế multi-source fallback (Gold-API LBMA-blended `api.gold-api.com/price/XAU` làm nguồn chính, Binance `PAXGUSDT` làm proxy dự phòng).
+- **Quy ước dấu chuẩn CME/LBMA:**
+  $$\text{Basis} = \text{Price}_{\text{Spot}}(\text{XAU/USD}) - \text{Price}_{\text{Futures}}(\text{CME GCZ26})$$
+  - Thị trường Contango (Futures > Spot) $\Rightarrow \text{Basis} < 0$ (ví dụ: $4,156.0 - 4,180.0 = -24.0$ USD).
+  - Độ lệch giá tuyệt đối (Spread): $\text{Spread} = |\text{Basis}| \approx 24.0$ USD.
+  - Công thức quy đổi: $\text{Level}_{\text{Spot}} = \text{Level}_{\text{Futures}} + \text{Basis}$.
+- **Cơ chế an toàn Production (Hardening theo DeepSeek Audit):**
+  - **Thread-safe TTL Cache (5.0s):** Bảo vệ API không bị dội request/rate-limit khi tick chạy liên tục.
+  - **Exponential Backoff & Retries:** 2 lần thử, timeout 5.0s, log lỗi rõ ràng (không nuốt exception).
+  - **Kiểm soát giờ mở cửa OTC Spot Gold:** Thị trường đóng cửa từ Thứ 6 22:00 UTC đến Chủ Nhật 22:00 UTC. Vào cuối tuần, hệ thống tự động fallback về basis tham chiếu, tránh dùng proxy crypto bị lệch giá.
+  - **Sanity Relative Outlier Guard:** Từ chối mọi giá trị có $\text{Spread} > 5\%$ giá Futures (loại bỏ dữ liệu lỗi hoặc flash crash bất thường).
 
 ---
 

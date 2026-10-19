@@ -1,6 +1,7 @@
 """Unit tests for Barchart Options Chain Scraper and Parser."""
 from __future__ import annotations
 
+import unittest.mock as mock
 import pytest
 import pandas as pd
 from src.collector.parser import clean_num, parse_barchart_json
@@ -26,70 +27,71 @@ class TestScraperCleaning:
         assert clean_num(None) == 0.0
 
 
+@pytest.fixture
+def mock_barchart_api_data():
+    """Realistic mock response from Barchart proxies/core-api/v1/options/get."""
+    return {
+        "count": 4,
+        "total": 4,
+        "data": [
+            {
+                "raw": {
+                    "strikePrice": "4,175.00",
+                    "optionType": "Call",
+                    "bidPrice": "44.50",
+                    "askPrice": "45.70",
+                    "lastPrice": "45.10",
+                    "volume": "28",
+                    "openInterest": "42",
+                    "gamma": "0.0006",
+                    "volatility": "21.5%",
+                }
+            },
+            {
+                "raw": {
+                    "strikePrice": "4,175.00",
+                    "optionType": "Put",
+                    "bidPrice": "38.50",
+                    "askPrice": "39.50",
+                    "lastPrice": "39.00",
+                    "volume": "78",
+                    "openInterest": "231",
+                    "gamma": "0.0006",
+                    "volatility": "21.8%",
+                }
+            },
+            {
+                "raw": {
+                    "strikePrice": "4,200.00",
+                    "optionType": "Call",
+                    "bidPrice": "32.00",
+                    "askPrice": "33.20",
+                    "lastPrice": "32.60",
+                    "volume": "105",
+                    "openInterest": "512",
+                    "gamma": "0.0004",
+                    "volatility": "21.9%",
+                }
+            },
+            {
+                "raw": {
+                    "strikePrice": "4,200.00",
+                    "optionType": "Put",
+                    "bidPrice": "51.50",
+                    "askPrice": "52.70",
+                    "lastPrice": "52.10",
+                    "volume": "372",
+                    "openInterest": "275",
+                    "gamma": "0.0003",
+                    "volatility": "22.0%",
+                }
+            },
+        ]
+    }
+
+
 class TestScraperParser:
     """Tests for parse_barchart_json."""
-
-    @pytest.fixture
-    def mock_barchart_api_data(self):
-        """Realistic mock response from Barchart proxies/core-api/v1/options/get."""
-        return {
-            "count": 4,
-            "total": 4,
-            "data": [
-                {
-                    "raw": {
-                        "strikePrice": "4,175.00",
-                        "optionType": "Call",
-                        "bidPrice": "44.50",
-                        "askPrice": "45.70",
-                        "lastPrice": "45.10",
-                        "volume": "28",
-                        "openInterest": "42",
-                        "gamma": "0.0006",
-                        "volatility": "21.5%",
-                    }
-                },
-                {
-                    "raw": {
-                        "strikePrice": "4,175.00",
-                        "optionType": "Put",
-                        "bidPrice": "38.50",
-                        "askPrice": "39.50",
-                        "lastPrice": "39.00",
-                        "volume": "78",
-                        "openInterest": "231",
-                        "gamma": "0.0006",
-                        "volatility": "21.8%",
-                    }
-                },
-                {
-                    "raw": {
-                        "strikePrice": "4,200.00",
-                        "optionType": "Call",
-                        "bidPrice": "32.80",
-                        "askPrice": "33.60",
-                        "lastPrice": "33.20",
-                        "volume": "448",
-                        "openInterest": "366",
-                        "gamma": "0.0006",
-                        "volatility": "21.2%",
-                    }
-                },
-                {
-                    "raw": {
-                        "strikePrice": "4,200.00",
-                        "optionType": "Put",
-                        "bidPrice": "51.50",
-                        "askPrice": "52.70",
-                        "lastPrice": "52.10",
-                        "volume": "372",
-                        "openInterest": "275",
-                        "gamma": "0.0003",
-                        "volatility": "22.0%",
-                    }
-                },
-            ]
-        }
 
     def test_parse_valid_json(self, mock_barchart_api_data):
         df = parse_barchart_json(mock_barchart_api_data)
@@ -161,3 +163,41 @@ class TestScraperParser:
         assert df["expirationDate"].iloc[0] == "2026-11-24"
         assert df.attrs.get("expiration_date") == "2026-11-24"
 
+
+class TestScraperWorkflow:
+    def test_get_dynamic_barchart_url(self):
+        from src.collector.scraper import get_dynamic_barchart_url
+        url = get_dynamic_barchart_url()
+        assert "barchart.com" in url
+        assert "options" in url
+
+    def test_scrape_and_save_success(self, mock_barchart_api_data, tmp_path):
+        from src.collector.scraper import scrape_and_save
+        out_csv = tmp_path / "scraped.csv"
+
+        with mock.patch("src.collector.scraper.fetch_barchart_options_playwright", return_value=mock_barchart_api_data):
+            saved = scrape_and_save(output_path=str(out_csv))
+            assert saved == str(out_csv)
+            assert out_csv.exists()
+            df = pd.read_csv(out_csv)
+            assert len(df) == 2
+            assert "strike" in df.columns
+
+    def test_scrape_and_save_fallback_on_network_error(self, tmp_path):
+        from src.collector.scraper import scrape_and_save
+        out_csv = tmp_path / "fallback.csv"
+        out_csv.write_text("strike,callBid,callAsk\n4180,20,21\n", encoding="utf-8")
+
+        with mock.patch("src.collector.scraper.fetch_barchart_options_playwright", side_effect=RuntimeError("Cloudflare timeout")):
+            saved = scrape_and_save(output_path=str(out_csv))
+            # Gracefully preserves existing dataset
+            assert saved == str(out_csv)
+            assert out_csv.exists()
+
+    def test_scrape_and_save_raises_if_no_existing_file(self, tmp_path):
+        from src.collector.scraper import scrape_and_save
+        out_csv = tmp_path / "nonexistent.csv"
+
+        with mock.patch("src.collector.scraper.fetch_barchart_options_playwright", side_effect=RuntimeError("Cloudflare timeout")):
+            with pytest.raises(RuntimeError, match="Cloudflare timeout"):
+                scrape_and_save(output_path=str(out_csv))

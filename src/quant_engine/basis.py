@@ -1,58 +1,206 @@
+"""src/quant_engine/basis.py
+
+Production-grade Basis Engine for Neiro-Quant.
+
+MANDATORY MATHEMATICAL SIGN CONVENTION (CME/LBMA STANDARD):
+    basis := spot_price - futures_price
+    - Contango (futures > spot)     => basis < 0 (e.g. 4156.0 - 4180.0 = -24.0 USD)
+    - Backwardation (futures < spot) => basis > 0
+
+    spot_level = futures_level + basis
+    futures_level = spot_level - basis
+
+All conversion functions and callers MUST adhere to this signed convention.
+"""
+from __future__ import annotations
+
 import json
+import logging
+import threading
+import time
+import urllib.error
 import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Final, Optional
 
 from .models import QuantLevels
 
+logger = logging.getLogger(__name__)
 
-def fetch_live_spot_gold_price() -> float | None:
-    """Fetches real-time physical XAU/USD spot price from public zero-latency APIs with fallback.
+# ---------------------------------------------------------------------------
+# Configuration & Constants
+# ---------------------------------------------------------------------------
+
+_HTTP_TIMEOUT_S: Final[float] = 5.0
+_HTTP_RETRIES: Final[int] = 2
+_HTTP_BACKOFF_S: Final[float] = 0.25
+
+# Cache TTL: 5.0 seconds is optimal to avoid rate-limiting while keeping quotes fresh.
+_CACHE_TTL_S: Final[float] = 5.0
+
+# Relative tolerance for sanity check (5% of futures price).
+_BASIS_REL_TOLERANCE: Final[float] = 0.05
+
+# OTC Spot Gold market closes Friday 22:00 UTC and reopens Sunday 22:00 UTC.
+_SPOT_CLOSE_WEEKDAY: Final[int] = 4  # Friday
+_SPOT_CLOSE_HOUR_UTC: Final[int] = 22
+_SPOT_OPEN_WEEKDAY: Final[int] = 6   # Sunday
+_SPOT_OPEN_HOUR_UTC: Final[int] = 22
+
+
+# ---------------------------------------------------------------------------
+# Data Models
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True, slots=True)
+class SpotQuote:
+    """Spot gold quote with timestamp and source attribution."""
+    price: float
+    source: str
+    fetched_at: datetime
+
+    def age_seconds(self, now: Optional[datetime] = None) -> float:
+        current_time = now or datetime.now(timezone.utc)
+        return max(0.0, (current_time - self.fetched_at).total_seconds())
+
+
+# ---------------------------------------------------------------------------
+# In-Memory Thread-Safe Cache
+# ---------------------------------------------------------------------------
+
+_cache_lock = threading.Lock()
+_cached_quote: Optional[SpotQuote] = None
+_last_fetch_mono: float = 0.0
+
+
+def clear_spot_cache() -> None:
+    """Clears in-memory quote cache (useful for testing and manual resets)."""
+    global _cached_quote, _last_fetch_mono
+    with _cache_lock:
+        _cached_quote = None
+        _last_fetch_mono = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Market Hours Verification
+# ---------------------------------------------------------------------------
+
+def is_gold_spot_market_open(dt: Optional[datetime] = None) -> bool:
+    """Checks whether the OTC XAU/USD spot market is currently open.
+
+    Market closes: Friday 22:00 UTC.
+    Market opens:  Sunday 22:00 UTC.
+    """
+    check_time = dt or datetime.now(timezone.utc)
+    if check_time.tzinfo is None:
+        check_time = check_time.replace(tzinfo=timezone.utc)
+    else:
+        check_time = check_time.astimezone(timezone.utc)
+
+    weekday = check_time.weekday()
+    hour = check_time.hour
+
+    # Friday after 22:00 UTC
+    if weekday == _SPOT_CLOSE_WEEKDAY and hour >= _SPOT_CLOSE_HOUR_UTC:
+        return False
+
+    # Saturday (all day)
+    if weekday == 5:
+        return False
+
+    # Sunday before 22:00 UTC
+    if weekday == _SPOT_OPEN_WEEKDAY and hour < _SPOT_OPEN_HOUR_UTC:
+        return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Live Spot Fetching
+# ---------------------------------------------------------------------------
+
+def fetch_live_spot_gold_price(
+    timeout: float = _HTTP_TIMEOUT_S,
+    retries: int = _HTTP_RETRIES,
+) -> Optional[SpotQuote]:
+    """Fetches real-time physical XAU/USD spot price with TTL caching & fallback.
 
     Sources:
-    1. Gold-API (Direct LBMA-blended spot XAU/USD)
-    2. Binance PAXG/USDT (1:1 London Good Delivery physical gold spot)
+    1. Gold-API (LBMA-blended spot XAU/USD)
+    2. Binance PAXG/USDT (Physical crypto-backed proxy fallback)
     """
+    global _cached_quote, _last_fetch_mono
+
+    # Check cache under thread-lock
+    with _cache_lock:
+        now_mono = time.monotonic()
+        if _cached_quote is not None and (now_mono - _last_fetch_mono) < _CACHE_TTL_S:
+            return _cached_quote
+
     sources = [
-        ("https://api.gold-api.com/price/XAU", "price"),
-        ("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", "price"),
+        ("https://api.gold-api.com/price/XAU", "price", "Gold-API"),
+        ("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", "price", "Binance-PAXG"),
     ]
 
-    for url, key in sources:
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                data = json.loads(resp.read().decode())
-                p = float(data.get(key, 0.0))
-                if p > 1000.0:
-                    return p
-        except Exception:
-            continue
+    for url, key, source_name in sources:
+        for attempt in range(retries):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
+                        "Accept": "application/json",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    status = getattr(resp, "status", getattr(resp, "code", 200))
+                    if status != 200:
+                        logger.warning("HTTP status %s from %s", status, source_name)
+                        continue
+
+                    raw_data = resp.read().decode("utf-8")
+                    data = json.loads(raw_data)
+                    p_val = data.get(key)
+                    if p_val is None:
+                        continue
+
+                    price = float(p_val)
+                    if price > 500.0:  # Valid gold price range
+                        quote = SpotQuote(
+                            price=price,
+                            source=source_name,
+                            fetched_at=datetime.now(timezone.utc),
+                        )
+                        with _cache_lock:
+                            _cached_quote = quote
+                            _last_fetch_mono = time.monotonic()
+                        return quote
+
+            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError) as e:
+                logger.debug("Fetch attempt %d failed for %s: %s", attempt + 1, source_name, e)
+                if attempt < retries - 1:
+                    time.sleep(_HTTP_BACKOFF_S * (2 ** attempt))
+            except Exception as e:
+                logger.warning("Unexpected error fetching spot from %s: %s", source_name, e)
+                break
 
     return None
 
 
-def resolve_dynamic_basis(futures_price: float, fallback_basis: float = 24.0) -> float:
-    """Computes dynamic basis spread = futures_price - spot_price.
-
-    If live spot price is unavailable, gracefully falls back to fallback_basis.
-    """
-    spot = fetch_live_spot_gold_price()
-    if spot is not None and spot > 0:
-        spread = futures_price - spot
-        # Sanity check: gold basis spread for active contracts is typically between 0 and 60 USD
-        if 0.0 <= spread <= 60.0:
-            return round(spread, 2)
-    return fallback_basis
-
+# ---------------------------------------------------------------------------
+# Basis Resolution & Conversions
+# ---------------------------------------------------------------------------
 
 def compute_basis(spot_price: float, futures_price: float) -> float:
-    """Compute basis = Spot - Futures.
+    """Compute signed basis = Spot - Futures.
 
     Args:
-        spot_price: Current spot price (e.g., Exness XAUUSDc).
-        futures_price: Current futures/forward price (e.g., MT5 XAUUSD-F).
+        spot_price: Current spot price (e.g., Exness MT5 XAUUSDc).
+        futures_price: Current active futures price (e.g., CME GCZ26).
 
     Returns:
-        Basis value (typically negative for contango).
+        Basis value (typically negative for contango, e.g. -24.0 USD).
     """
     return spot_price - futures_price
 
@@ -61,16 +209,64 @@ def convert_to_spot(futures_level: float, basis: float) -> float:
     """Convert a futures-referenced level to spot reference.
 
     spot_level = futures_level + basis
+    (Example in contango: 4180.0 + (-24.0) = 4156.0)
     """
     return futures_level + basis
 
 
-def convert_levels_to_spot(levels: QuantLevels, basis: float) -> dict:
+def resolve_dynamic_basis(
+    futures_price: float,
+    fallback_basis: float = -24.0,
+) -> float:
+    """Computes dynamic basis: basis = spot_price - futures_price.
+
+    In contango, returns a negative value (e.g., -24.0).
+    If live spot is unavailable, market is closed, or outlier is detected,
+    gracefully returns fallback_basis.
+    """
+    # Guard 1: Market Hours
+    if not is_gold_spot_market_open():
+        logger.info(
+            "OTC Gold Spot market is closed (weekend). Using fallback basis: %s",
+            fallback_basis,
+        )
+        return fallback_basis
+
+    # Guard 2: Fetch Live Quote
+    quote = fetch_live_spot_gold_price()
+    if quote is None or quote.price <= 0:
+        logger.warning(
+            "Live spot quote unavailable. Falling back to basis: %s",
+            fallback_basis,
+        )
+        return fallback_basis
+
+    spot = quote.price
+    basis = spot - futures_price
+    spread = abs(futures_price - spot)
+
+    # Guard 3: Relative Sanity Check (within 5% of futures price)
+    max_tolerated_spread = futures_price * _BASIS_REL_TOLERANCE
+    if spread > max_tolerated_spread:
+        logger.warning(
+            "Basis spread outlier rejected: spread=%.2f > max_tolerated=%.2f (spot=%.2f, futures=%.2f). Fallback used: %.2f",
+            spread,
+            max_tolerated_spread,
+            spot,
+            futures_price,
+            fallback_basis,
+        )
+        return fallback_basis
+
+    return round(basis, 2)
+
+
+def convert_levels_to_spot(levels: QuantLevels, basis: float) -> dict[str, float]:
     """Convert all QuantLevels to spot-referenced values.
 
-    Returns dict with all key levels in spot terms.
+    Returns dict with all key levels converted to spot terms.
     """
-    result = {
+    result: dict[str, float] = {
         "synthetic_atm_pivot": convert_to_spot(levels.synthetic_atm_pivot, basis),
         "sigma_1_upper": convert_to_spot(levels.sigma_1_upper, basis),
         "sigma_1_lower": convert_to_spot(levels.sigma_1_lower, basis),
@@ -78,9 +274,9 @@ def convert_levels_to_spot(levels: QuantLevels, basis: float) -> dict:
         "sigma_085_lower": convert_to_spot(levels.sigma_085_lower, basis),
     }
 
-    if levels.call_wall_1:
+    if levels.call_wall_1 is not None:
         result["call_wall_1"] = convert_to_spot(levels.call_wall_1.strike, basis)
-    if levels.put_wall_1:
+    if levels.put_wall_1 is not None:
         result["put_wall_1"] = convert_to_spot(levels.put_wall_1.strike, basis)
     if levels.gamma_squeeze_up is not None:
         result["gamma_squeeze_up"] = convert_to_spot(levels.gamma_squeeze_up, basis)

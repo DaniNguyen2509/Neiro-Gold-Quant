@@ -162,7 +162,10 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tu
     waterfall_trigger = put_wall - 2.50
 
     if basis is None:
-        basis = resolve_dynamic_basis(spot_price, fallback_basis=24.0)
+        basis = resolve_dynamic_basis(spot_price, fallback_basis=-24.0)
+    elif basis > 0:
+        # User passed positive spread e.g. 24.0 -> convert to signed basis (spot - futures = -24.0)
+        basis = -basis
 
     meta = {
         "spot_price": spot_price,
@@ -439,8 +442,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     now_str = now_vn.strftime("%d/%m/%Y %H:%M:%S")
 
     spot = meta["spot_price"]
-    basis = float(meta.get("basis", 24.0))
-    spot_mt5 = spot - basis
+    basis = float(meta.get("basis", -24.0))
+    if basis > 0:
+        basis = -basis
+    spot_mt5 = spot + basis
     regime = meta["regime"]
     total_gex = meta["total_net_gex"]
     total_vex = meta["total_net_vex"]
@@ -595,7 +600,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         <div class="kpi-card">
             <div class="kpi-label">Spot CME Futures ↔ Spot MT5 (Quy Đổi)</div>
             <div class="kpi-val" style="color: #FACC15;">${spot:,.2f} <span style="font-size: 16px; color: #38BDF8;">(MT5: ~${spot_mt5:,.2f})</span></div>
-            <div class="kpi-sub">Trục ATM CME: <b>${meta['atm_strike']:,.0f}</b> | Basis MT5 Spot: <b>-{basis:.2f} USD</b></div>
+            <div class="kpi-sub">Trục ATM CME: <b>${meta['atm_strike']:,.0f}</b> | Basis MT5 Spot: <b>{basis:+.2f} USD</b></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Market Regime & Net GEX</div>
@@ -638,7 +643,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>Chiến Lược</th>
                     <th>Vùng Kích Hoạt (CME)</th>
                     <th>Entry CME</th>
-                    <th>MT5 Spot (~ -{basis:.1f}$)</th>
+                    <th>MT5 Spot (~ {basis:+.1f}$)</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
                     <th>Ghi Chú Hành Vi Market Maker & Túi Chân Không</th>
@@ -649,7 +654,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</td>
                     <td>Vượt > {strike_above + buffer_up:.2f}</td>
                     <td>{strike_above + buffer_up + 0.50:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_above + buffer_up + 0.50 - basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_above + buffer_up + 0.50 + basis:.2f}</td>
                     <td style="color:#F87171;">{strike_above - 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{squeeze_tp:.2f} ({squeeze_tp_note})</td>
                     <td>{squeeze_note}</td>
@@ -658,7 +663,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</td>
                     <td>{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
                     <td>{strike_above - 1.00:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_above - 1.00 - basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_above - 1.00 + basis:.2f}</td>
                     <td style="color:#F87171;">{strike_above + buffer_up + 1.50:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f}</td>
                     <td>Cản Vol cực đại -> MM bán Futures chặn đầu ghìm giá hồi về Spot</td>
@@ -667,7 +672,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</td>
                     <td>{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
                     <td>{strike_below + 1.00:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_below + 1.00 - basis:.2f} (Vùng ~{spot_mt5:.0f})</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_below + 1.00 + basis:.2f} (Vùng ~{spot_mt5:.0f})</td>
                     <td style="color:#F87171;">{strike_below - 4.00:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{strike_above - front_run_tp:.2f}</td>
                     <td>Đệm Put hỗ trợ kỹ thuật trong phiên đẩy giá hồi phục (chỉ vào khi có nến rút chân xác nhận)</td>
@@ -676,7 +681,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</td>
                     <td>Thủng < {strike_below - buffer_down:.2f}</td>
                     <td>{strike_below - buffer_down - 0.50:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_below - buffer_down - 0.50 - basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_below - buffer_down - 0.50 + basis:.2f}</td>
                     <td style="color:#F87171;">{strike_below + 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{breakdown_tp:.2f} ({breakdown_tp_note})</td>
                     <td>{breakdown_note}</td>
@@ -693,7 +698,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>Chiến Lược</th>
                     <th>Vùng Kích Hoạt (CME)</th>
                     <th>Entry CME</th>
-                    <th>MT5 Spot (~ -{basis:.1f}$)</th>
+                    <th>MT5 Spot (~ {basis:+.1f}$)</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
                     <th>Ghi Chú Cấu Trúc Khối Lượng</th>
@@ -704,7 +709,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f})</td>
                     <td>{call_wall - 1.50:.2f} - {call_wall:.2f}</td>
                     <td>{call_wall - 1.00:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{call_wall - 1.00 - basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{call_wall - 1.00 + basis:.2f}</td>
                     <td style="color:#F87171;">{call_wall + 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{strike_above:.2f} / {spot:.2f}</td>
                     <td>Call Wall {call_wall_oi:,} OI (Nóc nhà kiên cố cuối cùng của MM)</td>
@@ -713,7 +718,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f})</td>
                     <td>{put_wall:.2f} - {put_wall + 1.50:.2f}</td>
                     <td>{put_wall + 0.50:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{put_wall + 0.50 - basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{put_wall + 0.50 + basis:.2f}</td>
                     <td style="color:#F87171;">{put_wall - 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f} / {strike_above:.2f}</td>
                     <td>Major Put Wall {put_wall_oi:,} OI (Đáy bê tông cốt thép của MM)</td>
@@ -766,7 +771,7 @@ def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Tactical HTML Dashboard Generator")
     parser.add_argument("--input", default="data/options_prices_GCZ26.csv", help="Input options CSV")
     parser.add_argument("--output", nargs="+", default=["exports/latest_gold_dashboard.html", "exports/index.html"], help="Output HTML paths")
-    parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis Spread (Futures - Spot XAUUSD, auto-resolves live if omitted)")
+    parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Spot - Futures XAUUSD, e.g. -24.0 or positive spread 24.0, auto-resolves live if omitted)")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, 'reconfigure'):

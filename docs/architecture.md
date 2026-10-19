@@ -110,7 +110,7 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 ┌─────────────────────────────────────────┐ ┌────────────────────────────────────────────┐
 │ [TẦNG 5: STRATEGY EXECUTION MATRICES]   │ │ [TẦNG 6: REAL-TIME BASIS & BROKER BRIDGE]  │
 │  - Bảng 1: Intraday Scalping (Ăn 20-25$)│ │  - Auto-Basis Sync: Live Gold-API & Binance│
-│    Entry, Hard SL, TP, Lý do Market     │ │  - Dynamic Basis: F_CME - S_Spot (~24-29$) │
+│    Entry, Hard SL, TP, Lý do Market     │ │  - Dynamic Basis: S_Spot - F_CME (-24 USD) │
 │  - Bảng 2: Structural Swing Walls       │ │  - MetaTrader 5 Connector (Pepperstone)     │
 │    Bắt đáy Put Wall / Bán đỉnh Call Wall│ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5   │
 └─────────────────────────────────────────┘ └────────────────────────────────────────────┘
