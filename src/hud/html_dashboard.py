@@ -23,6 +23,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.quant_engine.synthetic import compute_dynamic_dte
+from src.quant_engine.level_state import (
+    LevelState,
+    evaluate_tactical_level_states,
+    find_next_major_wall,
+    detect_strike_air_pockets,
+)
 
 
 def clean_val(v: Any, default: float = 0.0) -> float:
@@ -457,6 +463,66 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     buffer_down = min(step * 0.10, 2.50)
     front_run_tp = 1.00
 
+    # Level State Machine & Air Pocket Pipeline (Tầng 4)
+    level_evals = evaluate_tactical_level_states(spot, df, meta)
+    major_down_wall, major_down_oi = find_next_major_wall(df, strike_below, direction="DOWN", oi_percentile=60.0)
+    major_up_wall, major_up_oi = find_next_major_wall(df, strike_above, direction="UP", oi_percentile=60.0)
+
+    down_pockets = detect_strike_air_pockets(df, strike_below, major_down_wall, threshold_ratio=0.40)
+    has_down_air_pocket = len(down_pockets) > 0 or (abs(strike_below - major_down_wall) > step * 1.5)
+
+    up_pockets = detect_strike_air_pockets(df, strike_above, major_up_wall, threshold_ratio=0.40)
+    has_up_air_pocket = len(up_pockets) > 0 or (abs(major_up_wall - strike_above) > step * 1.5)
+
+    breakdown_tp = major_down_wall + front_run_tp if has_down_air_pocket else secondary_support + front_run_tp
+    breakdown_tp_note = f"Nấc {major_down_wall:.0f} (Major Wall)" if has_down_air_pocket else f"Nấc {secondary_support:.0f}"
+    breakdown_note = (
+        f"🚨 SLICED_VACUUM_RUN: Phía dưới là Túi chân không (Air Pocket) -> CẤM BẮT ĐÁY! "
+        f"Dealer xả Delta Hedge ép giá trượt thẳng về Major Wall {major_down_wall:.0f} ({major_down_oi:,} OI)"
+    ) if has_down_air_pocket else (
+        f"Mất mốc ATM Pivot -> Rơi tự do về trạm nghỉ {secondary_support:.0f} (Đệm nấc 2)"
+    )
+
+    squeeze_tp = major_up_wall - front_run_tp if has_up_air_pocket else next_above - front_run_tp
+    squeeze_tp_note = f"Nấc {major_up_wall:.0f} (Major Wall)" if has_up_air_pocket else f"Nấc {next_above:.0f}"
+    squeeze_note = (
+        f"⚡ GAMMA SQUEEZE VACUUM RUN: MM vỡ trần Short -> Phía trên là Air Pocket, giá hút vụt lên {major_up_wall:.0f} ({major_up_oi:,} OI)"
+    ) if has_up_air_pocket else (
+        f"MM vỡ trần Short -> Gamma Squeeze đẩy giá lên nấc {next_above:.0f}"
+    )
+
+    radar_cards_html = []
+    for ev in level_evals:
+        if ev.state == LevelState.SLICED_VACUUM_RUN:
+            badge_html = '<span class="badge" style="background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444;">🔴 SLICED / VACUUM RUN</span>'
+            border_color = "rgba(239, 68, 68, 0.5)"
+        elif ev.state == LevelState.TESTING:
+            badge_html = '<span class="badge" style="background:rgba(250, 204, 21, 0.2); color:#FACC15; border:1px solid #EAB308;">🟡 TESTING</span>'
+            border_color = "rgba(250, 204, 21, 0.5)"
+        elif ev.state == LevelState.ABSORPTION_DEFENDED:
+            badge_html = '<span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E;">🟢 DEFENDED</span>'
+            border_color = "rgba(34, 197, 94, 0.5)"
+        elif ev.state == LevelState.WALL_DEFENDED:
+            badge_html = '<span class="badge" style="background:rgba(56, 189, 248, 0.15); color:#38BDF8; border:1px solid #0284C7;">🛡️ HOLDING</span>'
+            border_color = "rgba(56, 189, 248, 0.3)"
+        else:
+            badge_html = '<span class="badge" style="background:rgba(148, 163, 184, 0.15); color:#94A3B8; border:1px solid #475569;">⚪ DORMANT</span>'
+            border_color = "var(--border-color)"
+
+        target_text = f" &bull; Đích đến: <b>${ev.vacuum_target:,.0f}</b>" if ev.vacuum_target else ""
+        radar_cards_html.append(f"""
+            <div class="kpi-card" style="border: 1px solid {border_color}; padding: 12px 14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <div style="font-size:12px; font-weight:700; color:#E2E8F0;">{ev.level_name} (${ev.strike:,.0f})</div>
+                    {badge_html}
+                </div>
+                <div style="font-size:11.5px; color:#94A3B8; line-height:1.4;">
+                    {ev.notes}{target_text}
+                </div>
+            </div>
+        """)
+    radar_cards_str = "".join(radar_cards_html)
+
     plotly_div = fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True, "displayModeBar": True})
 
     html = f"""<!DOCTYPE html>
@@ -548,6 +614,18 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         {plotly_div}
     </div>
 
+    <div class="table-box" style="margin-bottom: 18px;">
+        <div class="section-header" style="justify-content:space-between; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span>🧭</span> RADAR VI MÔ: TRẠNG THÁI CHỐT CHẶN & TÚI CHÂN KHÔNG (LEVEL STATE MACHINE - TẦNG 4)
+            </div>
+            <span class="badge badge-gold">AUTOMATED LEVEL STATE ENGINE</span>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:10px;">
+            {radar_cards_str}
+        </div>
+    </div>
+
     <div class="table-box">
         <div class="section-header">⚡ PHẦN 1: BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - ĂN 20-25 GIÁ VÀNG)</div>
         <table>
@@ -556,10 +634,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>Chiến Lược</th>
                     <th>Vùng Kích Hoạt (CME)</th>
                     <th>Entry CME</th>
-                    <th>MT5 Spot (~ -44.5$)</th>
+                    <th>MT5 Spot (~ -{basis:.1f}$)</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
-                    <th>Ghi Chú Hành Vi Market Maker</th>
+                    <th>Ghi Chú Hành Vi Market Maker & Túi Chân Không</th>
                 </tr>
             </thead>
             <tbody>
@@ -569,8 +647,8 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td>{strike_above + buffer_up + 0.50:.2f}</td>
                     <td style="color:#38BDF8; font-weight:600;">~{strike_above + buffer_up + 0.50 - basis:.2f}</td>
                     <td style="color:#F87171;">{strike_above - 1.50:.2f} ($4.5)</td>
-                    <td style="color:#4ADE80;">{next_above - front_run_tp:.2f}</td>
-                    <td>MM vỡ trần Short -> Gamma Squeeze đẩy giá lên nấc {next_above:.0f}</td>
+                    <td style="color:#4ADE80;">{squeeze_tp:.2f} ({squeeze_tp_note})</td>
+                    <td>{squeeze_note}</td>
                 </tr>
                 <tr>
                     <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</td>
@@ -588,16 +666,16 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{strike_below + 1.00 - basis:.2f} (Vùng ~{spot_mt5:.0f})</td>
                     <td style="color:#F87171;">{strike_below - 4.00:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{strike_above - front_run_tp:.2f}</td>
-                    <td>Đệm Put hỗ trợ kỹ thuật trong phiên đẩy giá hồi phục</td>
+                    <td>Đệm Put hỗ trợ kỹ thuật trong phiên đẩy giá hồi phục (chỉ vào khi có nến rút chân xác nhận)</td>
                 </tr>
                 <tr>
-                    <td class="tag-sell">4. SELL THỦNG SÀN ATM (Breakdown {strike_below:.0f})</td>
+                    <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</td>
                     <td>Thủng < {strike_below - buffer_down:.2f}</td>
                     <td>{strike_below - buffer_down - 0.50:.2f}</td>
                     <td style="color:#38BDF8; font-weight:600;">~{strike_below - buffer_down - 0.50 - basis:.2f}</td>
                     <td style="color:#F87171;">{strike_below + 1.50:.2f} ($4.5)</td>
-                    <td style="color:#4ADE80;">{secondary_support + front_run_tp:.2f} (Nấc {secondary_support:.0f})</td>
-                    <td>Mất mốc ATM Pivot -> Rơi tự do về trạm nghỉ {secondary_support:.0f} (Đệm nấc 2)</td>
+                    <td style="color:#4ADE80;">{breakdown_tp:.2f} ({breakdown_tp_note})</td>
+                    <td>{breakdown_note}</td>
                 </tr>
             </tbody>
         </table>

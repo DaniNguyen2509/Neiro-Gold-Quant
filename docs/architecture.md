@@ -95,13 +95,14 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
                                            │
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 4: MICROSTRUCTURE & LEVEL STATE ENGINE]                                          │
-│  - Giám sát tương tác giữa Giá Real-time và từng Level:                                │
+│ [TẦNG 4: MICROSTRUCTURE & LEVEL STATE ENGINE] (src/quant_engine/level_state.py)        │
+│  - Giám sát tương tác giữa Giá Real-time và từng Level (State Machine hoàn thiện):     │
 │      * DORMANT: Cách xa > 5.0 pts (Chưa tiếp cận).                                     │
 │      * TESTING / TRIGGERED: Khoảng cách <= 2.0 pts (Đang chạm chốt chặn).              │
-│      * ABSORPTION_DEFENDED: Net GEX (+) + Delta cạn kiệt -> Tín hiệu FADE REVERSAL.    │
+│      * ABSORPTION_DEFENDED: Net GEX (+) + Hấp thụ cạn kiệt -> Tín hiệu FADE REVERSAL.  │
 │      * SLICED_VACUUM_RUN: Thủng Level + Phía sau là Air Pocket + Net GEX (-)           │
-│        -> Tín hiệu BREAKOUT RUNNER (Cảnh báo CẤM ĐỠ DAO).                              │
+│        -> Tín hiệu BREAKOUT RUNNER (Cảnh báo CẤM ĐỠ DAO, Target về Major Wall tiếp theo)│
+│  - Tự động tích hợp vào Radar Vi Mô và Bảng Tác Chiến Scalping trong HTML Terminal.   │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
                       ┌────────────────────┴────────────────────┐
