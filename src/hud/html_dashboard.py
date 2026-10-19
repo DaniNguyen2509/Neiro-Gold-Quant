@@ -69,8 +69,17 @@ def load_and_preprocess_options(csv_path: str, basis: float = 44.5) -> tuple[pd.
     df.loc[mask_p_mid, "putMid"] = (df.loc[mask_p_mid, "putBid"] + df.loc[mask_p_mid, "putAsk"]) / 2.0
 
     # 1. ATM Strike & Implied Spot Price via Put-Call Parity
-    diff = (df["callMid"] - df["putMid"]).abs()
-    atm_idx = diff.idxmin()
+    # Filter liquid strikes with active OI/volume to avoid stale outlier quotes
+    total_interest = df["callOpenInterest"] + df["putOpenInterest"] + df["callVolume"] + df["putVolume"]
+    liquid_threshold = np.percentile(total_interest[total_interest > 0], 50) if (total_interest > 0).any() else 0
+    candidate_mask = (total_interest >= liquid_threshold) & (df["callMid"] > 0) & (df["putMid"] > 0)
+    if candidate_mask.any():
+        diff = (df.loc[candidate_mask, "callMid"] - df.loc[candidate_mask, "putMid"]).abs()
+        atm_idx = diff.idxmin()
+    else:
+        diff = (df["callMid"] - df["putMid"]).abs()
+        atm_idx = diff.idxmin()
+
     atm_strike = float(df.loc[atm_idx, "strike"])
     c_mid_atm = float(df.loc[atm_idx, "callMid"])
     p_mid_atm = float(df.loc[atm_idx, "putMid"])
@@ -179,10 +188,9 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     squeeze_trigger = meta["squeeze_trigger"]
     waterfall_trigger = meta["waterfall_trigger"]
 
-    # Near-The-Money filter for clean visual hierarchy (14-16 strikes)
+    # Near-The-Money filter: ATM ± 5 strikes for intraday scalping (10-11 strikes total)
     atm_idx = (df_full["strike"] - atm_strike).abs().idxmin()
-    window = 14
-    half = window // 2
+    half = 5
     s_idx = max(0, atm_idx - half)
     e_idx = min(len(df_full), atm_idx + half + 1)
     df = df_full.iloc[s_idx:e_idx].copy().reset_index(drop=True)

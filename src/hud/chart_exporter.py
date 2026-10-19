@@ -80,11 +80,10 @@ def export_quant_chart(
         df['putCHEX'] = - ((charm_put / 365.0) * df['putOpenInterest'] * MULT * futures_price / 1e6)
         df['netCHEX'] = df['callCHEX'] + df['putCHEX']
         
-    # Filter Near-The-Money strikes for tactical intraday readability (avoids vertical squishing from far OTM strikes)
-    if len(df) > 16:
+    # Filter Near-The-Money strikes for tactical intraday scalping (ATM ± 5 strikes)
+    if len(df) > 11:
         atm_idx = (df['strike'] - k_atm).abs().idxmin()
-        window_size = 14
-        half = window_size // 2
+        half = 5
         start_idx = max(0, atm_idx - half)
         end_idx = min(len(df), atm_idx + half + 1)
         plot_df = df.iloc[start_idx:end_idx].copy().reset_index(drop=True)
