@@ -134,10 +134,10 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 4. **OI Air Pockets (oi_air_pocket_zones):**
    - Dai Strike giua ATM va Walls co OI < 30-40% muc trung binh -> Vung chan khong
 
-### Auto-Basis Sync
-
-- Basis = Price_Spot(Exness) - Price_Futures(Implied_ATM_or_MT5_Forward)
-- Quy doi toan bo moc sang ca 2 he quy chieu: Futures/Forward va Spot (Exness Cent)
+### Auto-Basis Sync & Live Spot Feed
+- **Live Spot Ingestion:** Tự động gọi API thời gian thực (Gold-API `api.gold-api.com/price/XAU` & Binance London Good Delivery `PAXGUSDT`) để lấy giá Spot Vàng Cash.
+- **Dynamic Basis Resolution:** $\text{Basis} = \text{Price}_{\text{Futures}}(\text{CME GCZ26}) - \text{Price}_{\text{Spot}}(\text{XAU/USD})$.
+- Tự động quy đổi toàn bộ các mốc chiến thuật sang cả 2 hệ quy chiếu: CME Futures và MT5 Spot (chuẩn khớp độ lệch thực tế 24-29 USD, fallback 24.0 USD khi offline).
 
 ---
 

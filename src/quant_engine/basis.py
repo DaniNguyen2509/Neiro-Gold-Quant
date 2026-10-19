@@ -1,7 +1,47 @@
-"""Auto-Basis Sync: Futures <-> Spot conversion."""
-from __future__ import annotations
+import json
+import urllib.request
 
 from .models import QuantLevels
+
+
+def fetch_live_spot_gold_price() -> float | None:
+    """Fetches real-time physical XAU/USD spot price from public zero-latency APIs with fallback.
+
+    Sources:
+    1. Gold-API (Direct LBMA-blended spot XAU/USD)
+    2. Binance PAXG/USDT (1:1 London Good Delivery physical gold spot)
+    """
+    sources = [
+        ("https://api.gold-api.com/price/XAU", "price"),
+        ("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", "price"),
+    ]
+
+    for url, key in sources:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode())
+                p = float(data.get(key, 0.0))
+                if p > 1000.0:
+                    return p
+        except Exception:
+            continue
+
+    return None
+
+
+def resolve_dynamic_basis(futures_price: float, fallback_basis: float = 24.0) -> float:
+    """Computes dynamic basis spread = futures_price - spot_price.
+
+    If live spot price is unavailable, gracefully falls back to fallback_basis.
+    """
+    spot = fetch_live_spot_gold_price()
+    if spot is not None and spot > 0:
+        spread = futures_price - spot
+        # Sanity check: gold basis spread for active contracts is typically between 0 and 60 USD
+        if 0.0 <= spread <= 60.0:
+            return round(spread, 2)
+    return fallback_basis
 
 
 def compute_basis(spot_price: float, futures_price: float) -> float:

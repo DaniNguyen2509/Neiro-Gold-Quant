@@ -23,6 +23,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.quant_engine.synthetic import compute_dynamic_dte
+from src.quant_engine.basis import resolve_dynamic_basis
 from src.quant_engine.level_state import (
     LevelState,
     evaluate_tactical_level_states,
@@ -49,7 +50,7 @@ def clean_val(v: Any, default: float = 0.0) -> float:
         return default
 
 
-def load_and_preprocess_options(csv_path: str, basis: float = 24.0) -> tuple[pd.DataFrame, dict[str, Any]]:
+def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
     df_raw = pd.read_csv(csv_path)
 
     # Normalize column names
@@ -159,6 +160,9 @@ def load_and_preprocess_options(csv_path: str, basis: float = 24.0) -> tuple[pd.
 
     squeeze_trigger = call_wall + 2.50
     waterfall_trigger = put_wall - 2.50
+
+    if basis is None:
+        basis = resolve_dynamic_basis(spot_price, fallback_basis=24.0)
 
     meta = {
         "spot_price": spot_price,
@@ -728,7 +732,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     return html
 
 
-def run_pipeline(input_csv: str = "data/options_prices_GCZ26.csv", output_files: list[str] | None = None, basis: float = 24.0) -> list[str]:
+def run_pipeline(input_csv: str = "data/options_prices_GCZ26.csv", output_files: list[str] | None = None, basis: float | None = None) -> list[str]:
     if output_files is None:
         output_files = [
             "exports/latest_gold_dashboard.html",
@@ -762,7 +766,7 @@ def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Tactical HTML Dashboard Generator")
     parser.add_argument("--input", default="data/options_prices_GCZ26.csv", help="Input options CSV")
     parser.add_argument("--output", nargs="+", default=["exports/latest_gold_dashboard.html", "exports/index.html"], help="Output HTML paths")
-    parser.add_argument("--basis", type=float, default=24.0, help="Dynamic Basis Spread (Futures - Spot XAUUSD, default ~24.0 USD)")
+    parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis Spread (Futures - Spot XAUUSD, auto-resolves live if omitted)")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, 'reconfigure'):
