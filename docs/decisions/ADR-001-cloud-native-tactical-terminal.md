@@ -20,12 +20,14 @@ Chuyển đổi toàn diện hệ thống sang mô hình **100% Serverless Cloud
 
 1. **GitHub Actions làm Orchestrator:**
    - Sử dụng runner `ubuntu-latest` chạy ngầm hoàn toàn độc lập 24/5.
-   - Thiết lập **Lưới Cron Thích Ứng 2 Mùa (Dual-Season Cron)** theo giờ UTC: `30 0,7,8,12,13,14,15,16,17 * * 1-5`.
-   - Bao quát toàn bộ các mốc quan trọng:
-     - 07:30 VN (Chốt số liệu Open Interest ngày mới từ CME Clearing).
-     - 14:30 VN (Mở cửa phiên London - Giờ Mùa Hè BST).
-     - 15:30 VN (Mở cửa phiên London - Giờ Mùa Đông GMT).
-     - 19:30 đến 00:30 đêm VN (Khung giờ vàng phiên New York, tự động cập nhật mỗi 1 tiếng/lần).
+   - Thiết lập **Lưới Cron Thích Ứng 2 Mùa & Pre-Session Radar (Dual-Stage Cron)** theo giờ UTC:
+     - `15 0 * * 1-5`: **07:15 VN** (Chốt số liệu Open Interest ngày mới từ CME Clearing).
+     - `30 5,6,7,8 * * 1-5`: **Phiên Âu 2 nấc** thích ứng cả 2 mùa:
+       - 12:30 VN (Pre-Europe Mùa Hè) & 13:30 VN (Pre-Europe Mùa Đông): Chuẩn bị bản đồ tác chiến trước giờ G.
+       - 14:30 VN (In-Session Mùa Hè) & 15:30 VN (In-Session Mùa Đông): Cập nhật Greeks sau mở cửa.
+     - `45 11,12,13,14,15,16 * * 1-5`: **Phiên Mỹ đón đầu**:
+       - 18:45 VN (Pre-US: trước tin vĩ mô CPI/NFP 19:30 hè / 20:30 đông 45 phút).
+       - 19:45, 20:45, 21:45, 22:45, 23:45 VN (Bao trọn mở cửa NYSE và chốt giá London Fix 00:00 VN).
 
 2. **Playwright Headless Chromium + Internal API Sniffer:**
    - Khởi chạy trình duyệt Chromium không giao diện (headless) để bypass Cloudflare và lấy session cookie/token hợp lệ.
@@ -57,7 +59,7 @@ Chuyển đổi toàn diện hệ thống sang mô hình **100% Serverless Cloud
 - **Kết luận:** **REJECTED.**
 
 ## Consequences
-- **Chi phí vận hành: 0 VNĐ ($0/month).** 9 lần chạy/ngày $\times$ 1.5 phút $\approx$ 290 phút/tháng, chỉ chiếm ~14% hạn mức 2,000 phút miễn phí hàng tháng của GitHub Actions.
+- **Chi phí vận hành: 0 VNĐ ($0/month).** 11 lần chạy/ngày $\times$ 1.5 phút $\approx$ 360 phút/tháng, chỉ chiếm ~18% hạn mức 2,000 phút miễn phí hàng tháng của GitHub Actions (hoàn toàn miễn phí).
 - **Độc lập 100% với laptop cá nhân:** Dữ liệu vẫn được cào, xử lý toán học và xuất bản ngay cả khi laptop của trader tắt nguồn hoặc không có mạng.
 - **Bảo tồn dung lượng (Zero-Waste Compliance):** Không sinh file rác trên ổ cứng cá nhân; repository giữ nguyên độ tinh gọn (< 9 MB, vượt chuẩn yêu cầu < 15 MB).
 - **Nghỉ hưu các file dư thừa:** File `H:\My Drive\Neiro-Quant\notebooks\Neiro_Quant.ipynb` và notebook cũ trong repo không còn nhiệm vụ trong pipeline vận hành chính.

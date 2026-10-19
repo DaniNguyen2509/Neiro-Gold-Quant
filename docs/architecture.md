@@ -62,8 +62,8 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │ [TẦNG 1: CLOUD COLLECTOR & AUTOMATION PIPELINE]                                        │
 │  - Playwright Headless Chromium: Tự động chạy trên Ubuntu GitHub Actions.              │
 │  - Internal API Interceptor: Bắt gói JSON /proxies/core-api/v1/options/get.            │
-│  - Lưới Cron thích ứng 2 mùa: 07:30 VN (Chốt OI), 14:30/15:30 VN (London Mùa Hè/Đông), │
-│    19:30 đến 00:30 đêm VN (Khung giờ vàng New York, mỗi 1 tiếng/lần).                   │
+│  - Lưới Cron thích ứng 2 mùa: 07:15 VN (Chốt OI), London 2 nấc (12:30/13:30 & 14:30/15:30),│
+│    18:45 VN (Pre-US) & 19:45 đến 23:45 VN (Đón đầu phiên New York & London Fix).           │
 │  - Lưu trữ CSV: data/options_prices_GCZ26.csv tự động commit vào repository.           │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
