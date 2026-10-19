@@ -29,6 +29,7 @@ import pandas as pd
 
 from .models import OptionsSnapshot, OptionsStrike, QuantLevels, Wall
 from .strategy import MarketSnapshot, OptionQuote, compute_implied_spot
+from .synthetic import compute_dynamic_dte
 
 
 # ==============================================================================
@@ -181,6 +182,15 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
         # Check if table is stacked with 'Type' or strike ends with C/P
         return _parse_stacked_df(df)
 
+    exp_col = norm_col.get('expirationdate') or norm_col.get('expiry') or norm_col.get('expiredate')
+    found_exp = ""
+    if exp_col and exp_col in df.columns:
+        s_series = df[exp_col].dropna()
+        if not s_series.empty:
+            found_exp = str(s_series.iloc[0]).strip()
+    if not found_exp and hasattr(df, 'attrs') and df.attrs.get('expiration_date'):
+        found_exp = str(df.attrs['expiration_date']).strip()
+
     def get_num(r, *keys, default=0.0):
         for k in keys:
             norm_k = re.sub(r'[\s_\-]+', '', k.lower())
@@ -243,7 +253,7 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
         if p_iv > 1.0:
             p_iv = p_iv / 100.0
 
-        rows.append({
+        r_dict = {
             'strike': stk,
             'callBid': c_bid if c_bid > 0 else (c_mid - 0.20 if c_mid > 0 else 0.0),
             'callAsk': c_ask if c_ask > 0 else (c_mid + 0.20 if c_mid > 0 else 0.0),
@@ -261,7 +271,10 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
             'putOpenInterest': p_oi,
             'putGamma': p_gamma,
             'putIV': p_iv
-        })
+        }
+        if found_exp:
+            r_dict['expirationDate'] = found_exp
+        rows.append(r_dict)
 
 
     out_df = pd.DataFrame(rows)
@@ -269,7 +282,13 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(BENCHMARK_GCZ26_DATA)
 
     out_df = out_df.drop_duplicates(subset=['strike'], keep='last').sort_values('strike').reset_index(drop=True)
-    return out_df[CANONICAL_COLUMNS]
+    cols = [c for c in CANONICAL_COLUMNS if c in out_df.columns]
+    if 'expirationDate' in out_df.columns:
+        cols.append('expirationDate')
+        out_df.attrs['expiration_date'] = found_exp
+    elif found_exp:
+        out_df.attrs['expiration_date'] = found_exp
+    return out_df[cols]
 
 
 def _parse_stacked_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -641,13 +660,19 @@ def compute_tactical_matrix(
     df: pd.DataFrame,
     spot: Optional[float] = None,
     r: float = 0.045,
-    dte_days: float = 1.0
+    dte_days: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Computes Net GEX matrix, Delta Flow, institutional key levels,
     and returns a structured Real-time Tactical Board (Bang tac chien dinh luong).
     """
     df = normalize_options_df(df).copy()
+
+    if dte_days is None:
+        exp_val = df.attrs.get('expiration_date') or (df['expirationDate'].dropna().iloc[0] if 'expirationDate' in df.columns and not df['expirationDate'].dropna().empty else None)
+        effective_dte = compute_dynamic_dte(exp_val, default_dte=30.0)
+    else:
+        effective_dte = float(dte_days)
 
     # 1. Determine Spot Price via Implied Spot if not provided
     atm_idx = (df['callMid'] - df['putMid']).abs().idxmin()
@@ -656,7 +681,7 @@ def compute_tactical_matrix(
     p_mid_atm = float(df.loc[atm_idx, 'putMid'])
 
     if spot is None or spot <= 0:
-        spot_price = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=r, T=dte_days / 365.0)
+        spot_price = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=r, T=effective_dte / 365.0)
     else:
         spot_price = float(spot)
 
@@ -674,7 +699,7 @@ def compute_tactical_matrix(
     df['netDeltaFlow'] = df['callDeltaFlow'] + df['putDeltaFlow']
 
     # 2.2 Second-Order Greeks: Vanna (VEX) & Charm (CHEX) Calculation (Black-76)
-    T_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
+    T_years = max(float(effective_dte) / 365.0, 1.0 / 365.0)
     atm_straddle = c_mid_atm + p_mid_atm
     if spot_price > 0 and T_years > 0:
         sigma_atm = atm_straddle / (0.7979 * spot_price * np.sqrt(T_years))
@@ -811,11 +836,17 @@ def generate_tactical_summary(
 def to_options_snapshot(
     df: pd.DataFrame,
     symbol: str = "GCZ26",
-    expiry: str = "DEC26",
+    expiry: Optional[str] = None,
     timestamp: str = ""
 ) -> OptionsSnapshot:
     """Converts normalized DataFrame into OptionsSnapshot model."""
     df = normalize_options_df(df)
+    if not expiry:
+        exp_found = df.attrs.get('expiration_date') or (df['expirationDate'].dropna().iloc[0] if 'expirationDate' in df.columns and not df['expirationDate'].dropna().empty else None)
+        expiry_val = str(exp_found) if exp_found else "DEC26"
+    else:
+        expiry_val = expiry
+
     strikes = tuple(
         OptionsStrike(
             strike=float(r['strike']),
@@ -830,17 +861,23 @@ def to_options_snapshot(
         )
         for _, r in df.iterrows()
     )
-    return OptionsSnapshot(symbol=symbol, expiry=expiry, timestamp=timestamp, strikes=strikes)
+    return OptionsSnapshot(symbol=symbol, expiry=expiry_val, timestamp=timestamp, strikes=strikes)
 
 
 def to_market_snapshot(
     df: pd.DataFrame,
     spot: Optional[float] = None,
-    dte_days: float = 1.0,
+    dte_days: Optional[float] = None,
     risk_free_rate: float = 0.045
 ) -> MarketSnapshot:
     """Converts normalized DataFrame into MarketSnapshot model for Strategy V2."""
     df = normalize_options_df(df)
+    if dte_days is None:
+        exp_val = df.attrs.get('expiration_date') or (df['expirationDate'].dropna().iloc[0] if 'expirationDate' in df.columns and not df['expirationDate'].dropna().empty else None)
+        effective_dte = compute_dynamic_dte(exp_val, default_dte=30.0)
+    else:
+        effective_dte = float(dte_days)
+
     quotes = tuple(
         OptionQuote(
             strike=float(r['strike']),
@@ -861,13 +898,13 @@ def to_market_snapshot(
         atm_strike = float(df.loc[atm_idx, 'strike'])
         c_mid_atm = float(df.loc[atm_idx, 'callMid'])
         p_mid_atm = float(df.loc[atm_idx, 'putMid'])
-        spot_price = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=risk_free_rate, T=dte_days / 365.0)
+        spot_price = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=risk_free_rate, T=effective_dte / 365.0)
     else:
         spot_price = float(spot)
 
     return MarketSnapshot(
         spot=spot_price,
-        dte_days=dte_days,
+        dte_days=effective_dte,
         quotes=quotes,
         risk_free_rate=risk_free_rate
     )

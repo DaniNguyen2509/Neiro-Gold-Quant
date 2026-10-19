@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 DEFAULT_BARCHART_URL = "https://www.barchart.com/futures/quotes/GCZ26/options/IG4V26?futuresOptionsView=merged"
-ALL_FIELDS = "strikePrice,optionType,openPrice,highPrice,lowPrice,lastPrice,priceChange,bidPrice,askPrice,volume,openInterest,premium,tradeTime,volatility,delta,gamma,theta,vega"
+ALL_FIELDS = "strikePrice,optionType,openPrice,highPrice,lowPrice,lastPrice,priceChange,bidPrice,askPrice,volume,openInterest,premium,tradeTime,expirationDate,volatility,delta,gamma,theta,vega"
 
 
 async def fetch_barchart_options_playwright(
@@ -63,8 +63,9 @@ async def fetch_barchart_options_playwright(
                 try:
                     if response.ok and "json" in response.headers.get("content-type", ""):
                         body = await response.json()
-                        captured_data.append(body)
-                        logger.info("Intercepted Barchart options response from: %s", response.url)
+                        if isinstance(body, dict) and (body.get("data") or body.get("count")):
+                            captured_data.append(body)
+                            logger.info("Intercepted Barchart options response from: %s", response.url)
                 except Exception:
                     pass
 
@@ -78,10 +79,15 @@ async def fetch_barchart_options_playwright(
             logger.warning("Page navigation notice (proceeding to evaluate): %s", e)
             await asyncio.sleep(3.0)
 
-        # Check if we already intercepted the API response
-        if captured_data:
-            await browser.close()
-            return captured_data[0]
+        # Check if we already intercepted a valid API response
+        for data in captured_data:
+            records = data.get("data") if isinstance(data, dict) else data
+            if isinstance(records, list) and len(records) > 0:
+                first_rec = records[0].get("raw", records[0]) if isinstance(records[0], dict) else {}
+                if first_rec.get("strikePrice") is not None or first_rec.get("strike") is not None:
+                    await browser.close()
+                    logger.info("Using intercepted response with %d records", len(records))
+                    return data
 
         # Execute direct API call in browser context (using active XSRF token)
         logger.info("Evaluating internal API fetch in browser context...")
@@ -134,13 +140,17 @@ async def fetch_barchart_options_playwright(
         raise RuntimeError("Failed to obtain Barchart options data via browser evaluation")
 
 
-def scrape_and_save(output_path: str = "data/options_prices_GCZ26.csv", dry_run: bool = False) -> str:
+def scrape_and_save(
+    output_path: str = "data/options_prices_GCZ26.csv",
+    page_url: str = DEFAULT_BARCHART_URL,
+    dry_run: bool = False,
+) -> str:
     """Scrape Barchart options chain and save to CSV file with weekend/offline fallback."""
-    logger.info("Initiating scrape for CME GCZ26 options...")
+    logger.info("Initiating scrape for CME options from: %s", page_url)
     out_file = Path(output_path)
     df = None
     try:
-        raw_json = asyncio.run(fetch_barchart_options_playwright())
+        raw_json = asyncio.run(fetch_barchart_options_playwright(page_url=page_url))
         df = parse_barchart_json(raw_json)
     except Exception as e:
         if out_file.exists():
@@ -179,12 +189,13 @@ def scrape_and_save(output_path: str = "data/options_prices_GCZ26.csv", dry_run:
 
 def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Barchart Options Scraper")
+    parser.add_argument("--url", default=DEFAULT_BARCHART_URL, help="Barchart Options Chain page URL")
     parser.add_argument("--output", default="data/options_prices_GCZ26.csv", help="Path to save output CSV")
     parser.add_argument("--dry-run", action="store_true", help="Test scraping without saving to file")
     args = parser.parse_args()
 
     try:
-        scrape_and_save(output_path=args.output, dry_run=args.dry_run)
+        scrape_and_save(output_path=args.output, page_url=args.url, dry_run=args.dry_run)
     except Exception as e:
         logger.error("Scraper failed: %s", e)
         sys.exit(1)

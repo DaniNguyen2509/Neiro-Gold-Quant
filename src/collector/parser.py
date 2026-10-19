@@ -67,11 +67,24 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
     call_map: dict[float, dict[str, Any]] = {}
     put_map: dict[float, dict[str, Any]] = {}
     all_strikes: set[float] = set()
+    found_expiry: str = ""
+
+    # Check top-level metadata for expiration date
+    if isinstance(json_data, dict):
+        meta_exp = json_data.get("meta", {}).get("expirationDate") or json_data.get("expirationDate")
+        if meta_exp:
+            found_expiry = str(meta_exp).strip()
 
     for item in records:
         if not isinstance(item, dict):
             continue
         raw = item.get("raw") if isinstance(item.get("raw"), dict) else item
+        
+        # Check record level expiration date
+        if not found_expiry:
+            exp_val = raw.get("expirationDate") or raw.get("expiry") or raw.get("expireDate")
+            if exp_val:
+                found_expiry = str(exp_val).strip()
         
         # Strike price
         k_val = raw.get("strikePrice") or raw.get("strike") or raw.get("strike_price")
@@ -131,7 +144,7 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
             p_iv = p_iv / 100.0
         p_mid = (p_bid + p_ask) / 2.0 if (p_bid > 0 and p_ask > 0) else p_last
 
-        rows.append({
+        row_dict: dict[str, Any] = {
             "strike": k,
             "callBid": c_bid,
             "callAsk": c_ask,
@@ -149,8 +162,13 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
             "putOpenInterest": p_oi,
             "putGamma": p_gamma,
             "putIV": round(p_iv, 4),
-        })
+        }
+        if found_expiry:
+            row_dict["expirationDate"] = found_expiry
+        rows.append(row_dict)
 
     df = pd.DataFrame(rows)
-    logger.info("Successfully parsed %d strikes from Barchart JSON", len(df))
+    if found_expiry:
+        df.attrs["expiration_date"] = found_expiry
+    logger.info("Successfully parsed %d strikes from Barchart JSON (expiry: %s)", len(df), found_expiry or "N/A")
     return df

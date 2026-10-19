@@ -41,7 +41,17 @@ def export_quant_chart(
 
     # 2. Vectorized VEX & CHEX calculation fallback (Black-76)
     if 'netVEX' not in df.columns or 'netCHEX' not in df.columns:
-        T_years = 38.0 / 365.0
+        from src.quant_engine.synthetic import compute_dynamic_dte
+        exp_val = ""
+        if "expirationDate" in df.columns:
+            s_exp = df["expirationDate"].dropna()
+            if not s_exp.empty:
+                exp_val = str(s_exp.iloc[0]).strip()
+        if not exp_val and hasattr(df, "attrs") and df.attrs.get("expiration_date"):
+            exp_val = str(df.attrs["expiration_date"]).strip()
+
+        dte_days = compute_dynamic_dte(exp_val, default_dte=30.0)
+        T_years = max(dte_days / 365.0, 1.0 / 365.0)
         atm_idx = (df['strike'] - k_atm).abs().idxmin()
         c_mid_atm = float(df.loc[atm_idx, 'callMid']) if 'callMid' in df.columns else 45.0
         p_mid_atm = float(df.loc[atm_idx, 'putMid']) if 'putMid' in df.columns else 44.0

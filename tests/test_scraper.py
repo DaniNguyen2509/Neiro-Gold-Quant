@@ -130,3 +130,34 @@ class TestScraperParser:
         assert isinstance(df_loaded, pd.DataFrame)
         assert len(df_loaded) == 2
         assert list(df_loaded["strike"]) == [4175.0, 4200.0]
+
+    def test_parse_with_expiration_date(self):
+        data = {
+            "meta": {"expirationDate": "2026-11-24"},
+            "data": [
+                {
+                    "raw": {
+                        "strikePrice": "4180.00",
+                        "optionType": "Call",
+                        "bidPrice": "40.0",
+                        "askPrice": "41.0",
+                        "expirationDate": "2026-11-24",
+                    }
+                },
+                {
+                    "raw": {
+                        "strikePrice": "4180.00",
+                        "optionType": "Put",
+                        "bidPrice": "39.0",
+                        "askPrice": "40.0",
+                        "expirationDate": "2026-11-24",
+                    }
+                }
+            ]
+        }
+        df = parse_barchart_json(data)
+        assert len(df) == 1
+        assert "expirationDate" in df.columns
+        assert df["expirationDate"].iloc[0] == "2026-11-24"
+        assert df.attrs.get("expiration_date") == "2026-11-24"
+

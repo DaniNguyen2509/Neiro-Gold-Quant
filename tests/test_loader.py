@@ -181,3 +181,25 @@ class TestModelInteroperability:
         assert 'gamma_levels' in signals
         assert 'expected_move' in signals
         assert signals['s_implied'] > 4000.0
+
+
+class TestDynamicDTE:
+    def test_dynamic_dte_calculation(self):
+        from src.quant_engine.synthetic import compute_dynamic_dte
+        import datetime
+
+        now = datetime.datetime(2026, 10, 19, 12, 0, tzinfo=datetime.timezone.utc)
+        dte = compute_dynamic_dte("2026-11-24", now=now)
+        assert 36.0 < dte < 37.0
+
+    def test_dynamic_dte_fallback(self):
+        from src.quant_engine.synthetic import compute_dynamic_dte
+        dte = compute_dynamic_dte(None, default_dte=25.0)
+        assert dte == 25.0
+
+    def test_to_market_snapshot_with_dynamic_dte(self):
+        df = pd.DataFrame(BENCHMARK_GCZ26_DATA)
+        df['expirationDate'] = '2026-11-24'
+        snap = to_market_snapshot(df)
+        assert snap.dte_days > 1.0
+

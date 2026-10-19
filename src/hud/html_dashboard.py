@@ -22,6 +22,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from src.quant_engine.synthetic import compute_dynamic_dte
+
 
 def clean_val(v: Any, default: float = 0.0) -> float:
     if v is None:
@@ -73,7 +75,16 @@ def load_and_preprocess_options(csv_path: str, basis: float = 44.5) -> tuple[pd.
     c_mid_atm = float(df.loc[atm_idx, "callMid"])
     p_mid_atm = float(df.loc[atm_idx, "putMid"])
 
-    r, dte_days = 0.045, 38.0
+    r = 0.045
+    exp_val = ""
+    if "expirationDate" in df.columns:
+        s_exp = df["expirationDate"].dropna()
+        if not s_exp.empty:
+            exp_val = str(s_exp.iloc[0]).strip()
+    if not exp_val and hasattr(df, "attrs") and df.attrs.get("expiration_date"):
+        exp_val = str(df.attrs["expiration_date"]).strip()
+
+    dte_days = compute_dynamic_dte(exp_val, default_dte=30.0)
     T_years = max(dte_days / 365.0, 1.0 / 365.0)
     spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
     if spot_price <= 0 or math.isnan(spot_price):
@@ -148,6 +159,8 @@ def load_and_preprocess_options(csv_path: str, basis: float = 44.5) -> tuple[pd.
         "squeeze_trigger": squeeze_trigger,
         "waterfall_trigger": waterfall_trigger,
         "basis": basis,
+        "dte_days": dte_days,
+        "expiration_date": exp_val or "GCZ26 Standard",
     }
     return df, meta
 
@@ -489,7 +502,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <span class="badge badge-live">100% CLOUD AUTOMATED</span>
         </div>
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #D6D3D1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <div>Cập nhật: <b>{now_str} (Giờ VN)</b></div>
+            <div>Cập nhật: <b>{now_str} (Giờ VN)</b> | Hạn: <b>{meta['expiration_date']} ({meta['dte_days']:.1f}d)</b></div>
             <button onclick="window.location.reload(true)" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='rgba(250, 204, 21, 0.3)'" onmouseout="this.style.background='rgba(250, 204, 21, 0.15)'" title="Tải lại số liệu mới nhất">
                 <span>&#x21bb;</span> Làm mới
             </button>
