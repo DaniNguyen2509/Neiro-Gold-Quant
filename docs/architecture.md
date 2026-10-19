@@ -119,16 +119,24 @@ Do thị trường tài chính thế giới (London & New York) chuyển đổi 
 ```yaml
 on:
   schedule:
-    # 00:30 UTC = 07:30 VN (Chốt Open Interest từ CME Clearing)
-    # 07:30 UTC = 14:30 VN (London Mở cửa - Mùa Hè)
-    # 08:30 UTC = 15:30 VN (London Mở cửa - Mùa Đông)
-    # 12:30, 13:30, 14:30, 15:30, 16:30, 17:30 UTC (Khung giờ vàng New York: 19:30 đến 00:30 đêm VN)
-    - cron: '30 0,7,8,12,13,14,15,16,17 * * 1-5'
+    # 1. Chốt Open Interest ngày mới từ CME Clearing: 00:15 UTC = 07:15 VN
+    - cron: '15 0 * * 1-5'
+    # 2. Phiên Âu 2 nấc thích ứng cả 2 mùa (Pre-Europe & In-Session Europe):
+    #    05:30 UTC = 12:30 VN (Pre-Europe Mùa Hè: trước Frankfurt 13:00 và London 14:00)
+    #    06:30 UTC = 13:30 VN (Pre-Europe Mùa Đông: trước Frankfurt 14:00 và London 15:00)
+    #    07:30 UTC = 14:30 VN (In-Session Europe Mùa Hè: sau mở cửa London 30 phút)
+    #    08:30 UTC = 15:30 VN (In-Session Europe Mùa Đông: sau mở cửa London 30 phút)
+    - cron: '30 5,6,7,8 * * 1-5'
+    # 3. Phiên Mỹ đón đầu tin tức vĩ mô (18:45 VN) và giờ cao điểm NYSE / London Fix:
+    #    11:45 UTC = 18:45 VN (Pre-US: trước tin CPI/NFP 19:30 hè / 20:30 đông 45 phút)
+    #    12:45, 13:45, 14:45, 15:45, 16:45 UTC (19:45, 20:45, 21:45, 22:45, 23:45 VN)
+    - cron: '45 11,12,13,14,15,16 * * 1-5'
 ```
 
-* **Phiên Âu:** Đảm bảo dù là mùa hè hay mùa đông, hệ thống luôn cào đúng thời điểm 30 phút sau khi tiếng chuông London vang lên (14:30 hoặc 15:30 VN).
-* **Phiên Mỹ:** Chạy liên tục mỗi 1 tiếng từ 19:30 đến 00:30 đêm hôm sau, bao trọn cả giờ ra tin tức vĩ mô (08:30 sáng NY), giờ mở cửa sàn chứng khoán (09:30 sáng NY) và giờ chốt giá London Fix (00:00 - 00:30 VN).
-* **Hạn mức tài nguyên:** 9 lần chạy/ngày $\times$ 1.5 phút $\approx$ **290 phút/tháng** (chiếm ~14% hạn mức 2,000 phút miễn phí của GitHub Actions, an toàn tuyệt đối).
+* **Phiên Á:** Chốt toàn bộ dữ liệu vị thế Open Interest (OI) của ngày hôm trước từ CME Clearing lúc 07:15 VN để định hình khung Asian Range.
+* **Phiên Âu (2 nấc):** Cào nấc 1 (12:30 / 13:30 VN) để lên bản đồ tác chiến trước giờ G (Pre-Europe Radar). Cào nấc 2 (14:30 / 15:30 VN) để cập nhật Greeks và dịch chuyển Gamma sau khi dòng tiền London hấp thụ.
+* **Phiên Mỹ:** Đón đầu trước tin vĩ mô lúc 18:45 VN, sau đó chạy đều mỗi 1 tiếng bao trọn giờ mở cửa sàn chứng khoán New York (NYSE) và đợt chốt sổ London Fix (00:00 VN).
+* **Hạn mức tài nguyên:** 11 lần chạy/ngày $\times$ 1.5 phút $\approx$ **360 phút/tháng** (chỉ chiếm ~18% hạn mức 2,000 phút miễn phí của GitHub Actions, 100% miễn phí).
 
 ---
 

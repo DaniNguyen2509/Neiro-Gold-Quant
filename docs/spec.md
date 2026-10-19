@@ -2,105 +2,100 @@
 
 ## Objective
 
-Xay dung he thong dinh luong chay ngam tu dong 100% (Zero-Touch Automation) tren may tinh ca nhan:
+Xây dựng hệ thống định lượng dòng tiền quyền chọn (Options Flow), vị thế Dealer (Dealer Positioning) và cấu trúc vi mô thị trường (Market Microstructure) vận hành tự động 100% trên Cloud (Serverless Zero-Touch Automation):
 
-1. **Thu thap** chuoi du lieu Options Chain vang tu Barchart
-2. **Giai ma** cau truc vi the Dealer (Dealer Positioning) va bien do ky vong (Implied Expectations)
-3. **Dong bo** do lech gia (Auto-Basis Sync) giua Futures va Spot
-4. **Hien thi** truc tiep len bieu do MT5 / TradingView va bang Mini-HUD quy doi
+1. **Thu thập:** Tự động bắt gói Options Chain CME Gold (GCZ26) từ Barchart qua Playwright Headless Chromium + Internal API Sniffer.
+2. **Giải mã:** Tính toán ma trận Greeks (Black-76, Net GEX, Net DEX, Net VEX, Net CHEX), Synthetic ATM Pivot (Put-Call Parity) và biên độ kỳ vọng Expected Move (1.0σ & 0.85σ Bands).
+3. **Phân tích Vi mô (Level State Engine):** Giám sát tương tác động tại từng Level (Absorption / Defense vs Slicing & Air Pocket Vacuum Slide).
+4. **Xuất bản Độc lập:** Tự động sinh Plotly Tactical Terminal Dark Mode và xuất bản lên GitHub Pages (xem trực tiếp trên điện thoại & máy tính mọi lúc mọi nơi).
 
-**Target Assets:** Gold Futures/Forward (GC CME / XAUUSDF TradingView / XAUUSD-F MT5 Pepperstone) va Gold Spot (XAUUSDc / XAUUSD MT5 Exness).
+**Target Assets:** Gold Futures CME (`GCZ26`), XAUUSD Spot (Pepperstone / Exness / IC Markets) & E-mini Gold.
 
-**Triet ly:**
-- Quan tri rui ro tuyet doi - khong chi bao ky thuat tre (RSI, MACD...), khong du doan cam tinh
-- Chi dinh vi nut that thanh khoan xac suat cao (Walls, +/-1 Sigma) de vao lenh an toan
-- Nhan dien vung trong thanh khoan (Air Pockets) de toi uu gong loi
+**Triết lý:**
+- Quản trị rủi ro tuyệt đối — không dùng chỉ báo kỹ thuật trễ (RSI, MACD...), không đoán mò đỉnh đáy.
+- Nhận diện vùng hấp thụ (Absorption) để FADE REVERSAL với Stop Loss siêu ngắn (1.5 - 2.5 giá).
+- Nhận diện vùng chân không thanh khoản (Air Pockets) và rủi ro bị đâm thủng (Slicing Risk) -> CẤM ĐỠ DAO, kích hoạt BREAKOUT VACUUM RUNNER.
 
-**Loai bo tuyet doi:**
-1. Cot Latest tren Barchart (stale prints). Luon dung Mid = (Bid + Ask) / 2
-2. Bang Greeks mac dinh cua Barchart trong ngay 0DTE (IV = 0.00% sai lech toan bo)
+**Loại bỏ tuyệt đối:**
+1. Cột Latest trên Barchart (stale prints). Luôn dùng Mid = (Bid + Ask) / 2.
+2. Bảng Greeks mặc định của Barchart trong ngày 0DTE (IV = 0.00% sai lệch toàn bộ; tự giải ngược bằng Newton-Raphson / Brent).
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Version |
+| Layer | Technology | Role |
 |---|---|---|
-| Quant Engine | Python | 3.12 / 3.14 |
-| Options Scraper | Playwright (headless Chromium) | latest |
-| Tactical Dashboard | Plotly HTML (Dark Theme) | 6.x |
-| Cloud Automation | GitHub Actions + GitHub Pages | v4 |
-| MT5 Bridge | MetaTrader5 Python package | latest |
-| Async Runtime | asyncio + aiohttp | stdlib |
-| MT5 Indicator | MQL5 | MT5 build 5xxx+ |
-| TV Indicator | Pine Script v6 | TradingView |
-| Config | TOML | stdlib (tomllib) |
+| Quant Engine | Python 3.12 / 3.14 | Mô hình Black-76, IV Solver, GEX/VEX/CHEX Core |
+| Options Scraper | Playwright Headless Chromium | Bắt gói API JSON `/proxies/core-api/v1/options/get` |
+| Cloud Orchestration | GitHub Actions (Ubuntu) | Lưới Cron thích ứng 2 mùa (07:15 VN, London 2 nấc, New York) |
+| Tactical Dashboard | Plotly HTML (Dark Theme) | Giao diện Web Terminal tương tác độc lập (mobile-ready) |
+| Web Hosting | GitHub Pages | Host tĩnh `https://daninguyen2509.github.io/Neiro-Quant/` |
+| Broker Basis Bridge | MetaTrader 5 Python / MQL5 | Auto-Basis Sync Futures <-> Spot (tùy chọn) |
 
 ---
 
 ## Commands
 
-`ash
-# Setup
+```bash
+# Setup môi trường cục bộ (tùy chọn)
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+python -m playwright install chromium
 
-# Run collector daemon
-python -m src.collector.main
+# Cào dữ liệu Options Chain thủ công
+python -m src.collector.scraper --output data/options_prices_GCZ26.csv
 
-# Run full system (collector + bridge + HUD)
-python -m src.main
+# Sinh Plotly Tactical Web Terminal (Dark Mode)
+python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/index.html
 
-# Test
+# Kiểm thử tự động (Unit Test & Math Verification)
 python -m pytest tests/ -v --tb=short
 
-# Lint
+# Kiểm tra quy chuẩn mã nguồn (Lint & Format)
 python -m ruff check src/ tests/
 python -m ruff format src/ tests/
-`
+```
 
 ---
 
 ## Project Structure
 
-`
+```
 Neiro-Quant/
-+-- .agents/skills/          -> Junction -> agent-skills
-+-- AGENTS.md / GEMINI.md / CLAUDE.md
-+-- README.md
-+-- requirements.txt
-+-- pyproject.toml
-+-- config/
-|   +-- settings.toml        -> Cau hinh runtime
-+-- src/
-|   +-- __init__.py
-|   +-- main.py              -> Entry point
-|   +-- quant_engine/        -> Loi tinh toan (Tier 1-2-3)
-|   |   +-- models.py        -> Dataclasses
-|   |   +-- synthetic.py     -> Tier 2: ATM Pivot, Straddle, Bands
-|   |   +-- dealer.py        -> Tier 3: Walls, Pin Risk, Gamma
-|   |   +-- air_pocket.py    -> Tier 3: OI Air Pocket detection
-|   |   +-- basis.py         -> Auto-Basis Sync
-|   +-- collector/           -> Thu thap Options Chain
-|   |   +-- main.py          -> Collector daemon
-|   |   +-- scraper.py       -> Playwright/httpx scraper
-|   |   +-- parser.py        -> Parse HTML/JSON -> OptionsSnapshot
-|   +-- mt5_bridge/          -> Cau noi Python <-> MT5
-|   |   +-- connector.py     -> MetaTrader5 wrapper
-|   |   +-- price_feed.py    -> Event-driven tick listener
-|   |   +-- chart_writer.py  -> Ghi levels len chart MT5
-|   +-- hud/                 -> Mini-HUD quy doi
-|       +-- console_hud.py   -> Terminal-based HUD (ATAS-style)
-+-- mt5/Indicators/          -> 2TC-v10.mq5, NLM-v2.mq5, Neiro-Quant-Overlay.mq5
-+-- mt5/Include/Neiro/       -> quant_levels.mqh
-+-- tradingview/             -> Pine scripts
-+-- data/                    -> Runtime data (git-ignored)
-+-- logs/                    -> Runtime logs (git-ignored)
-+-- docs/                    -> spec.md, architecture.md, math-reference.md
-+-- tests/                   -> pytest test files
-+-- tools/                   -> manual_scrape.py
-`
+├── .github/workflows/
+│   └── daily_options_sync.yml    # Workflow cào Barchart, tính Greeks & xuất bản GitHub Pages
+├── .agents/skills/               # 24 bộ kỹ năng kỹ thuật chuẩn (Agent Skills)
+├── docs/
+│   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.0 (Single Source of Truth)
+│   ├── spec.md                   # Bản đặc tả kỹ thuật chi tiết
+│   ├── decisions/                # Architecture Decision Records (ADRs)
+│   │   └── ADR-001-cloud-native-tactical-terminal.md
+│   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
+│       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
+│       └── DEEPSEEK_MATH_AUDIT_REPORT.md
+├── src/
+│   ├── collector/                # Thu thập dữ liệu Options Chain
+│   │   ├── scraper.py            # Playwright API Sniffer (/proxies/core-api/v1/options/get)
+│   │   └── parser.py             # Chuẩn hóa OptionsSnapshot
+│   ├── quant_engine/             # Lõi tính toán định lượng
+│   │   ├── models.py             # Dataclasses & kiểu dữ liệu
+│   │   ├── synthetic.py          # Put-Call Parity Implied Spot & Expected Move Bands
+│   │   ├── dealer.py             # Call/Put Walls, Gamma Flip, Squeeze Triggers
+│   │   ├── air_pocket.py         # Quét chân không thanh khoản (OI < 35% MA)
+│   │   └── strategy.py           # Ma trận chiến lược Scalping & Swing
+│   ├── hud/                      # Giao diện Tactical Terminal
+│   │   ├── html_dashboard.py     # Plotly Dark Theme generator (Anti-Collision Labels)
+│   │   └── chart_exporter.py     # Xuất biểu đồ tĩnh
+│   └── mt5_bridge/               # Cầu nối MetaTrader 5 (tùy chọn)
+│       └── connector.py          # Kết nối MT5 & tính Auto-Basis Sync
+├── data/
+│   └── options_prices_GCZ26.csv  # Chuỗi Options Chain mới nhất từ CME
+├── tests/                        # Bộ kiểm thử pytest
+├── AGENTS.md / GEMINI.md         # Quy tắc cốt lõi & Quy trình kích hoạt Skill
+└── README.md                     # Hướng dẫn truy cập và tổng quan dự án
+```
 
 ---
 
