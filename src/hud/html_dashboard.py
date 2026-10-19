@@ -256,6 +256,16 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
             bgcolor="rgba(12, 74, 110, 0.92)", bordercolor="#38BDF8", borderwidth=1,
         )
 
+    # Explicit Tactical Banner for Secondary Support 4150 (Trạm Nghỉ / Chốt Lời Short)
+    if strikes.min() <= 4150.0 <= strikes.max() and 4150.0 != put_wall and 4150.0 != strike_below:
+        fig.add_annotation(
+            x=0.03, y=4150.0 - step * 0.15,
+            text=f"<b>TRẠM NGHỈ 4150</b> (TP Short / Cản đệm nấc 2 trước Put Wall {put_wall:.0f})",
+            showarrow=True, arrowhead=2, arrowcolor="#F59E0B", ax=0, ay=16,
+            xref="x domain", yref="y", font=dict(color="#FEF3C7", size=8.5),
+            bgcolor="rgba(180, 83, 9, 0.92)", bordercolor="#F59E0B", borderwidth=1,
+        )
+
     # Panel 2: Volume vs Open Interest
     fig.add_trace(
         go.Bar(
@@ -476,9 +486,9 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
 
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-label">Spot CME Gold Futures</div>
-            <div class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
-            <div class="kpi-sub">ATM: <b>${meta['atm_strike']:,.0f}</b> | Put-Call Parity Synced</div>
+            <div class="kpi-label">Spot CME Futures ↔ Spot MT5 (Quy Đổi)</div>
+            <div class="kpi-val" style="color: #FACC15;">${spot:,.2f} <span style="font-size: 16px; color: #38BDF8;">(MT5: ~${spot - 44.5:,.2f})</span></div>
+            <div class="kpi-sub">Trục ATM CME: <b>${meta['atm_strike']:,.0f}</b> | Basis MT5 Spot: <b>-44.50 USD</b></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Market Regime & Net GEX</div>
@@ -507,9 +517,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <thead>
                 <tr>
                     <th>Chiến Lược</th>
-                    <th>Vùng Giá Kích Hoạt</th>
-                    <th>Entry Chuẩn</th>
-                    <th>Hard SL</th>
+                    <th>Vùng Kích Hoạt (CME)</th>
+                    <th>Entry CME</th>
+                    <th>MT5 Spot (~ -44.5$)</th>
+                    <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
                     <th>Ghi Chú Hành Vi Market Maker</th>
                 </tr>
@@ -519,6 +530,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</td>
                     <td>Vượt > {strike_above + buffer_up:.2f}</td>
                     <td>{strike_above + buffer_up + 0.50:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_above + buffer_up + 0.50 - 44.5:.2f}</td>
                     <td style="color:#F87171;">{strike_above - 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{next_above - front_run_tp:.2f}</td>
                     <td>MM vỡ trần Short -> Gamma Squeeze đẩy giá lên nấc {next_above:.0f}</td>
@@ -527,6 +539,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</td>
                     <td>{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
                     <td>{strike_above - 1.00:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_above - 1.00 - 44.5:.2f}</td>
                     <td style="color:#F87171;">{strike_above + buffer_up + 1.50:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f}</td>
                     <td>Cản Vol cực đại -> MM bán Futures chặn đầu ghìm giá hồi về Spot</td>
@@ -535,6 +548,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</td>
                     <td>{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
                     <td>{strike_below + 1.00:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_below + 1.00 - 44.5:.2f} (Vùng ~4157)</td>
                     <td style="color:#F87171;">{strike_below - 4.00:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{strike_above - front_run_tp:.2f}</td>
                     <td>Đệm Put hỗ trợ kỹ thuật trong phiên đẩy giá hồi phục</td>
@@ -543,9 +557,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">4. SELL THỦNG SÀN ATM (Breakdown {strike_below:.0f})</td>
                     <td>Thủng < {strike_below - buffer_down:.2f}</td>
                     <td>{strike_below - buffer_down - 0.50:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{strike_below - buffer_down - 0.50 - 44.5:.2f}</td>
                     <td style="color:#F87171;">{strike_below + 1.50:.2f} ($4.5)</td>
-                    <td style="color:#4ADE80;">{next_below + front_run_tp:.2f}</td>
-                    <td>Mất mốc ATM Pivot -> Rơi tự do về trạm nghỉ {next_below:.0f}</td>
+                    <td style="color:#4ADE80;">{next_below + front_run_tp:.2f} (Nấc 4150)</td>
+                    <td>Mất mốc ATM Pivot -> Rơi tự do về trạm nghỉ {next_below:.0f} (Đệm 4150)</td>
                 </tr>
             </tbody>
         </table>
@@ -557,9 +572,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <thead>
                 <tr>
                     <th>Chiến Lược</th>
-                    <th>Vùng Giá Kích Hoạt</th>
-                    <th>Entry Chuẩn</th>
-                    <th>Hard SL</th>
+                    <th>Vùng Kích Hoạt (CME)</th>
+                    <th>Entry CME</th>
+                    <th>MT5 Spot (~ -44.5$)</th>
+                    <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
                     <th>Ghi Chú Cấu Trúc Khối Lượng</th>
                 </tr>
@@ -569,6 +585,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f})</td>
                     <td>{call_wall - 1.50:.2f} - {call_wall:.2f}</td>
                     <td>{call_wall - 1.00:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{call_wall - 1.00 - 44.5:.2f}</td>
                     <td style="color:#F87171;">{call_wall + 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{strike_above:.2f} / {spot:.2f}</td>
                     <td>Call Wall {call_wall_oi:,} OI (Nóc nhà kiên cố cuối cùng của MM)</td>
@@ -577,6 +594,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f})</td>
                     <td>{put_wall:.2f} - {put_wall + 1.50:.2f}</td>
                     <td>{put_wall + 0.50:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">~{put_wall + 0.50 - 44.5:.2f}</td>
                     <td style="color:#F87171;">{put_wall - 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f} / {strike_above:.2f}</td>
                     <td>Major Put Wall {put_wall_oi:,} OI (Đáy bê tông cốt thép của MM)</td>
