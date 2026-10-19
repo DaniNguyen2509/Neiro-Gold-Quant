@@ -62,6 +62,9 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │ [TẦNG 1: CLOUD COLLECTOR & AUTOMATION PIPELINE]                                        │
 │  - Playwright Headless Chromium: Tự động chạy trên Ubuntu GitHub Actions.              │
 │  - Internal API Interceptor: Bắt gói JSON /proxies/core-api/v1/options/get.            │
+│  - Dynamic CME Rollover Engine: Tự động giải mã Front-Month Options theo CME Rule       │
+│    120102.E (resolve_front_month_cme_option), tự động rollover (OGX26 -> OGZ26...).     │
+│  - Dynamic Expiration & DTE: Trích xuất expirationDate từ sàn, tính DTE chính xác.     │
 │  - Lưới Cron thích ứng 2 mùa: 07:15 VN (Chốt OI), London 2 nấc (12:30/13:30 & 14:30/15:30),│
 │    18:45 VN (Pre-US) & 19:45 đến 23:45 VN (Đón đầu phiên New York & London Fix).           │
 │  - Lưu trữ CSV: data/options_prices_GCZ26.csv tự động commit vào repository.           │
@@ -73,6 +76,7 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - black76.py: Mô hình Black-76 cho Options on Futures (Call, Put, d1, d2).            │
 │  - iv_solver.py: Giải ngược Implied Volatility (Newton-Raphson + Brent fallback).      │
 │  - Put-Call Parity Implied Spot: S_Implied = K_ATM + exp(r*T)*(C_ATM - P_ATM).         │
+│  - Liquid Strike Weighting: Lọc mốc ATM thực theo Open Interest và Volume thanh khoản. │
 │  - gex.py: Net GEX ($/1% move), Gamma Flip Point, Gamma Squeeze / Waterfall Triggers.   │
 │  - advanced_greeks.py: Net VEX ($M/1% IV - Vanna) & Net CHEX ($M/ngày - Charm).        │
 │  - expected_move.py: Biên độ 1-Sigma (Straddle / 0.7979) & Intraday Rule of 16.        │
@@ -82,6 +86,7 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 3: CLOUD TACTICAL TERMINAL & STATIC HOSTING (FRONTEND)]                          │
 │  - html_dashboard.py: Render độc lập file Plotly HTML Dark Mode cao cấp.               │
+│  - Chế độ ATM ± 5 Strikes (Scalping View): Cắt lớp 10-11 strikes xung quanh ATM.       │
 │  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
 │  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │

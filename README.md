@@ -24,6 +24,7 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 - **Kiến trúc Hệ thống v2.0 (Toàn cảnh 6 tầng & Level State Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
 - **Quyết định Kiến trúc Cloud-Native (ADR-001):** [docs/decisions/ADR-001-cloud-native-tactical-terminal.md](docs/decisions/ADR-001-cloud-native-tactical-terminal.md)
+- **Quyết định Rollover Tự động & Chế độ Scalping ATM ± 5 Strikes (ADR-002):** [docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md](docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md)
 - **Công thức Toán học Định lượng (Black-76, GEX, Vanna, Charm, Expected Move):** [docs/tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](docs/tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
 
 ---

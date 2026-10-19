@@ -1,4 +1,4 @@
-﻿# AGENTS.md - Quy tac cot loi cho moi AI Coding Agent
+# AGENTS.md - Quy tac cot loi cho moi AI Coding Agent
 > Ap dung bat buoc cho: **Gemini, DeepSeek, Claude, Cursor, Copilot, OpenCode, Windsurf** va moi mo hinh AI khi hoat dong trong repository Neiro-Quant.
 
 ---
@@ -60,6 +60,9 @@ Cac model **TUYET DOI KHONG DUOC** tu bien ho de bo qua viec goi skill.
    - Khong dung emoji trang tri trong code (chi cho phep cac ky hieu chart chuc nang).
 4. **Khong tu che luat hoac backtest ngoai le:** Moi thay doi logic do owner truc tiep chi dao.
 5. **Python code phai tuan thu performance constraints:** CPU < 5%, RAM co dinh, khong memory leak.
+6. **BAT BUOC DONG BO TAI LIEU (DOCUMENTATION-FIRST MANDATE):**
+   Sau khi hoan thanh bat ky thay doi, toi uu tinh nang, kien truc hoac sua loi (fix bug) nao trong repository, AI model **BAT BUOC PHAI CAP NHAT LAI TAI LIEU** tuong ung (`docs/spec.md`, `docs/architecture.md`, `README.md`, hoac tao ADR trong `docs/decisions/` neu co quyet dinh kien truc moi) truoc khi ket thuc phien lam viec. Tuyet doi khong de ma nguon di truoc ma tai lieu bi lac hau.
+
 
 
 ---

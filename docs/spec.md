@@ -4,12 +4,12 @@
 
 Xây dựng hệ thống định lượng dòng tiền quyền chọn (Options Flow), vị thế Dealer (Dealer Positioning) và cấu trúc vi mô thị trường (Market Microstructure) vận hành tự động 100% trên Cloud (Serverless Zero-Touch Automation):
 
-1. **Thu thập:** Tự động bắt gói Options Chain CME Gold (GCZ26) từ Barchart qua Playwright Headless Chromium + Internal API Sniffer.
-2. **Giải mã:** Tính toán ma trận Greeks (Black-76, Net GEX, Net DEX, Net VEX, Net CHEX), Synthetic ATM Pivot (Put-Call Parity) và biên độ kỳ vọng Expected Move (1.0σ & 0.85σ Bands).
+1. **Thu thập:** Tự động bắt gói Options Chain CME Gold (GCZ26) từ Barchart qua Playwright Headless Chromium + Internal API Sniffer. Tự động tính toán và phân giải mã hợp đồng Front-Month theo lịch CME Rule 120102.E (`resolve_front_month_cme_option`), tự động rollover khi đến hạn.
+2. **Giải mã:** Ma trận Greeks (Black-76, Net GEX, Net DEX, Net VEX, Net CHEX), Dynamic DTE tính thời gian đáo hạn chính xác theo phút, Synthetic ATM Pivot (Put-Call Parity kết hợp bộ lọc Liquid Strike Weighting) và biên độ kỳ vọng Expected Move (1.0σ & 0.85σ Bands).
 3. **Phân tích Vi mô (Level State Engine):** Giám sát tương tác động tại từng Level (Absorption / Defense vs Slicing & Air Pocket Vacuum Slide).
-4. **Xuất bản Độc lập:** Tự động sinh Plotly Tactical Terminal Dark Mode và xuất bản lên GitHub Pages (xem trực tiếp trên điện thoại & máy tính mọi lúc mọi nơi).
+4. **Xuất bản Độc lập:** Tự động sinh Plotly Tactical Terminal Dark Mode với chế độ hiển thị ATM ± 5 Strikes chuyên dụng cho Scalping trong ngày, xuất bản lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`) và Google Drive.
 
-**Target Assets:** Gold Futures CME (`GCZ26`), XAUUSD Spot (Pepperstone / Exness / IC Markets) & E-mini Gold.
+**Target Assets:** Gold Futures CME (`GCZ26`), COMEX Gold Options (`OGX26`, `OGZ26`...), XAUUSD Spot (Pepperstone / Exness / IC Markets) & E-mini Gold.
 
 **Triết lý:**
 - Quản trị rủi ro tuyệt đối — không dùng chỉ báo kỹ thuật trễ (RSI, MACD...), không đoán mò đỉnh đáy.
@@ -214,5 +214,5 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 1. Barchart data source: Scrape HTML truc tiep hay co API endpoint JSON an?
 2. MT5 communication: Global Variables, Named Pipes, hay file-based?
 3. TradingView data sync: Pine Script khong co HTTP - dung Google Sheets bridge hay manual input?
-4. Expiry selection: Luon lay hop dong som nhat (front-month) hay cho phep chon?
+4. Expiry selection: [ĐÃ GIẢI QUYẾT] Tự động giải mã Front-Month Options theo CME Rule 120102.E (`resolve_front_month_cme_option`) và tự động Rollover.
 5. Multiple broker support: Chi Pepperstone + Exness hay mo rong?

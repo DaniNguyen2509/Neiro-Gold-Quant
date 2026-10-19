@@ -1,4 +1,4 @@
-﻿# GEMINI.md - Quy tắc cốt lõi cho Google Gemini & Antigravity IDE
+# GEMINI.md - Quy tắc cốt lõi cho Google Gemini & Antigravity IDE
 > File này được nạp tự động vào ngữ cảnh của Google Gemini mỗi phiên làm việc tại Neiro-Quant.
 
 ---
@@ -36,6 +36,7 @@ Nghiêm cấm Gemini tự đưa ra các lý do sau để bỏ qua việc mở sk
 3. **ASCII và KHÔNG EMOJI** trong code MQL5. Pine và Markdown dùng tiếng Việt có dấu.
 4. **Không tự chế luật hoặc backtest ngoài lề.** Mọi thay đổi logic do owner trực tiếp chỉ đạo.
 5. **Performance constraints:** Python code phải đảm bảo CPU < 5%, RAM cố định, zero memory leak.
+6. **BẮT BUỘC ĐỒNG BỘ TÀI LIỆU (DOCUMENTATION-FIRST MANDATE):** Sau khi hoàn thành bất kỳ thay đổi, tối ưu tính năng, kiến trúc hoặc sửa lỗi (fix bug) nào trong repository, AI model **BẮT BUỘC PHẢI CẬP NHẬT LẠI TÀI LIỆU** tương ứng (`docs/spec.md`, `docs/architecture.md`, `README.md`, hoặc tạo ADR trong `docs/decisions/` nếu có quyết định kiến trúc mới) trước khi kết thúc phiên làm việc. Tuyệt đối không để mã nguồn đi trước mà tài liệu bị lạc hậu.
 
 
 ---
