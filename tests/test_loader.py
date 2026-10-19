@@ -203,3 +203,34 @@ class TestDynamicDTE:
         snap = to_market_snapshot(df)
         assert snap.dte_days > 1.0
 
+
+class TestCMEOptionsResolver:
+    def test_cme_expiry_calculation_dates(self):
+        from src.quant_engine.synthetic import get_cme_option_expiry_date
+        import datetime
+
+        # Nov 2026 option expires on 4th last business day of Oct 2026
+        exp_nov = get_cme_option_expiry_date(2026, 11)
+        assert exp_nov == datetime.date(2026, 10, 27)
+
+        # Dec 2026 option expires on 4th last business day of Nov 2026
+        exp_dec = get_cme_option_expiry_date(2026, 12)
+        assert exp_dec == datetime.date(2026, 11, 25)
+
+    def test_resolve_front_month_cme_option_active_and_rollover(self):
+        from src.quant_engine.synthetic import resolve_front_month_cme_option
+        import datetime
+
+        # During Oct 2026 before Oct 27
+        res1 = resolve_front_month_cme_option(datetime.date(2026, 10, 19))
+        assert res1['option_symbol'] == 'OGX26'
+        assert res1['expiration_date'] == '2026-10-27'
+        assert 'OGX26' in res1['barchart_url']
+
+        # After Oct 27 expiration -> automatically rolls over to Dec 2026 option (OGZ26)
+        res2 = resolve_front_month_cme_option(datetime.date(2026, 10, 28))
+        assert res2['option_symbol'] == 'OGZ26'
+        assert res2['expiration_date'] == '2026-11-25'
+        assert 'OGZ26' in res2['barchart_url']
+
+

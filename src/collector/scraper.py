@@ -20,14 +20,25 @@ from .parser import parse_barchart_json
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-DEFAULT_BARCHART_URL = "https://www.barchart.com/futures/quotes/GCZ26/options/OGX26?futuresOptionsView=merged"
+def get_dynamic_barchart_url() -> str:
+    try:
+        from src.quant_engine.synthetic import resolve_front_month_cme_option
+        resolved = resolve_front_month_cme_option()
+        return resolved["barchart_url"]
+    except Exception:
+        return "https://www.barchart.com/futures/quotes/GCZ26/options/OGX26?futuresOptionsView=merged"
+
+
+DEFAULT_BARCHART_URL = get_dynamic_barchart_url()
 ALL_FIELDS = "strikePrice,optionType,openPrice,highPrice,lowPrice,lastPrice,priceChange,bidPrice,askPrice,volume,openInterest,premium,tradeTime,expirationDate,volatility,delta,gamma,theta,vega"
 
 
 async def fetch_barchart_options_playwright(
-    page_url: str = DEFAULT_BARCHART_URL,
+    page_url: str | None = None,
     timeout_ms: int = 45000,
 ) -> dict[str, Any] | list[Any]:
+    if not page_url:
+        page_url = get_dynamic_barchart_url()
     """Launch headless Chromium, bypass Cloudflare, and fetch options JSON via internal API."""
     try:
         from playwright.async_api import async_playwright
