@@ -50,7 +50,9 @@ def export_quant_chart(
         if not exp_val and hasattr(df, "attrs") and df.attrs.get("expiration_date"):
             exp_val = str(df.attrs["expiration_date"]).strip()
 
-        dte_days = compute_dynamic_dte(exp_val, default_dte=30.0)
+        if not exp_val:
+            exp_val = "2026-10-27"
+        dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
         T_years = max(dte_days / 365.0, 1.0 / 365.0)
         atm_idx = (df['strike'] - k_atm).abs().idxmin()
         c_mid_atm = float(df.loc[atm_idx, 'callMid']) if 'callMid' in df.columns else 45.0

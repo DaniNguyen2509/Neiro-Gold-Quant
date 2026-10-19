@@ -20,7 +20,7 @@ from .parser import parse_barchart_json
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-DEFAULT_BARCHART_URL = "https://www.barchart.com/futures/quotes/GCZ26/options/IG4V26?futuresOptionsView=merged"
+DEFAULT_BARCHART_URL = "https://www.barchart.com/futures/quotes/GCZ26/options/OGX26?futuresOptionsView=merged"
 ALL_FIELDS = "strikePrice,optionType,openPrice,highPrice,lowPrice,lastPrice,priceChange,bidPrice,askPrice,volume,openInterest,premium,tradeTime,expirationDate,volatility,delta,gamma,theta,vega"
 
 

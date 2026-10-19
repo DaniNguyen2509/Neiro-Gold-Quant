@@ -84,7 +84,11 @@ def load_and_preprocess_options(csv_path: str, basis: float = 44.5) -> tuple[pd.
     if not exp_val and hasattr(df, "attrs") and df.attrs.get("expiration_date"):
         exp_val = str(df.attrs["expiration_date"]).strip()
 
-    dte_days = compute_dynamic_dte(exp_val, default_dte=30.0)
+    if not exp_val:
+        # Default to active CME Gold front-month Monthly Options (OGX26 / 2026-10-27)
+        exp_val = "2026-10-27"
+
+    dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
     T_years = max(dte_days / 365.0, 1.0 / 365.0)
     spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
     if spot_price <= 0 or math.isnan(spot_price):
@@ -160,7 +164,7 @@ def load_and_preprocess_options(csv_path: str, basis: float = 44.5) -> tuple[pd.
         "waterfall_trigger": waterfall_trigger,
         "basis": basis,
         "dte_days": dte_days,
-        "expiration_date": exp_val or "GCZ26 Standard",
+        "expiration_date": f"OGX26 ({exp_val})" if exp_val else "OGX26 (2026-10-27)",
     }
     return df, meta
 
