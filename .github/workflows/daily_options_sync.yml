@@ -1,13 +1,14 @@
-name: ⚡ CME Gold Options Automated Sync (Neiro-Quant)
+name: ⚡ CME Gold Options Automated Sync & Tactical Terminal (Neiro-Quant)
 
 on:
   schedule:
-    # 00:30 UTC = 07:30 Vietnam (Chốt Open Interest mới nhất từ CME Clearing cho cả ngày)
-    # 07:00 UTC = 14:00 Vietnam (Đầu phiên Âu - London mở cửa)
-    # Khung Giờ Vàng phiên Mỹ (chạy mỗi 1 tiếng từ 19:30 đến 23:30 Vietnam):
-    # 12:30, 13:30, 14:30, 15:30, 16:30 UTC
-    # Chạy từ Thứ 2 đến Thứ 6 hàng tuần
-    - cron: '30 0,7,12,13,14,15,16 * * 1-5'
+    # 00:30 UTC = 07:30 Vietnam (Chot Open Interest moi nhat tu CME Clearing cho ca ngay)
+    # 07:30 UTC = 14:30 Vietnam (Dau phien Au Mua He)
+    # 08:30 UTC = 15:30 Vietnam (Dau phien Au Mua Dong)
+    # Khung Gio Vang phien My (chay moi 1 tieng tu 19:30 den 00:30 dem Vietnam):
+    # 12:30, 13:30, 14:30, 15:30, 16:30, 17:30 UTC
+    # Chay tu Thu 2 den Thu 6 hang tuan (Thich ung 100% ca Mua He & Mua Dong)
+    - cron: '30 0,7,8,12,13,14,15,16,17 * * 1-5'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -20,12 +21,15 @@ concurrency:
   group: options-sync
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
-  sync:
-    name: Scrape and Update GCZ26 Options Chain
+  sync-and-deploy:
+    name: Scrape GCZ26 Options & Deploy Tactical Terminal
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout Repository
@@ -40,7 +44,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright pandas
+          pip install playwright pandas plotly
           python -m playwright install chromium --with-deps
 
       - name: Scrape Options Chain from Barchart
@@ -54,15 +58,36 @@ jobs:
       - name: Verify Generated Options File
         run: |
           if [ -f data/options_prices_GCZ26.csv ]; then
-            echo "✅ File data/options_prices_GCZ26.csv generated successfully!"
+            echo "[SUCCESS] File data/options_prices_GCZ26.csv generated successfully!"
             ls -lh data/options_prices_GCZ26.csv
             head -n 5 data/options_prices_GCZ26.csv
           else
-            echo "❌ File data/options_prices_GCZ26.csv not found!"
+            echo "[ERROR] File data/options_prices_GCZ26.csv not found!"
             exit 1
           fi
 
-      - name: Commit and Push Changes
+      - name: Generate Plotly Tactical HTML Dashboard
+        run: |
+          python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html
+          ls -lh exports/
+
+      - name: Upload Tactical Dashboard Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-tactical-dashboard
+          path: |
+            exports/latest_gold_dashboard.html
+            data/options_prices_GCZ26.csv
+          retention-days: 7
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./exports
+
+      - name: Commit and Push Updated Options Data
         if: github.event.inputs.dry_run != 'true'
         run: |
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
