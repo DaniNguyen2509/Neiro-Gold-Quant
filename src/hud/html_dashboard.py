@@ -439,6 +439,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta http-equiv="refresh" content="300">
     <title>NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -484,8 +488,11 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <span class="badge badge-gold">CME GCZ26 LIVE</span>
             <span class="badge badge-live">100% CLOUD AUTOMATED</span>
         </div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #D6D3D1;">
-            Cập nhật: <b>{now_str} (Giờ VN)</b>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #D6D3D1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div>Cập nhật: <b>{now_str} (Giờ VN)</b></div>
+            <button onclick="window.location.reload(true)" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='rgba(250, 204, 21, 0.3)'" onmouseout="this.style.background='rgba(250, 204, 21, 0.15)'" title="Tải lại số liệu mới nhất">
+                <span>&#x21bb;</span> Làm mới
+            </button>
         </div>
     </div>
 
