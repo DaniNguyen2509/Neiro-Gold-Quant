@@ -269,7 +269,7 @@ def evaluate_tactical_level_states(
                     entry_trigger=f"Đã thủng dứt khoát < {lvl - slice_buffer:.2f}",
                     hard_sl=lvl + 1.50,
                     take_profit=target + 1.00,
-                    notes=f"🚨 SLICED_VACUUM_RUN: Thủng {lvl:.0f} trong -GEX -> CẤM BẮT ĐÁY! Trượt tự do về Major Wall {target:.0f}.",
+                    notes=f"[SLICED_VACUUM_RUN]: Thủng {lvl:.0f} trong -GEX -> CẤM BẮT ĐÁY! Trượt tự do về Major Wall {target:.0f}.",
                 ))
             elif abs_dist <= testing_range:
                 # Testing support
@@ -326,7 +326,7 @@ def evaluate_tactical_level_states(
                     entry_trigger=f"Đã phá trần > {lvl + slice_buffer:.2f}",
                     hard_sl=lvl - 1.50,
                     take_profit=target - 1.00,
-                    notes=f"⚡ GAMMA SQUEEZE RUNNER: Phá trần {lvl:.0f} -> CẤM CHẶN ĐẦU! Hút giá lên Major Wall {target:.0f}.",
+                    notes=f"[GAMMA_SQUEEZE_RUNNER]: Phá trần {lvl:.0f} -> CẤM CHẶN ĐẦU! Hút giá lên Major Wall {target:.0f}.",
                 ))
             elif abs_dist <= testing_range:
                 # Testing resistance

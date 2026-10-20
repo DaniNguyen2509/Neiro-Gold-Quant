@@ -548,7 +548,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     breakdown_tp = major_down_wall + front_run_tp if has_down_air_pocket else secondary_support + front_run_tp
     breakdown_tp_note = f"Nấc {major_down_wall:.0f} (Major Wall)" if has_down_air_pocket else f"Nấc {secondary_support:.0f}"
     breakdown_note = (
-        f"🚨 SLICED_VACUUM_RUN: Phía dưới là Túi chân không (Air Pocket) -> CẤM BẮT ĐÁY! "
+        f"[SLICED_VACUUM_RUN]: Phía dưới là Túi chân không (Air Pocket) -> CẤM BẮT ĐÁY! "
         f"Dealer xả Delta Hedge ép giá trượt thẳng về Major Wall {major_down_wall:.0f} ({major_down_oi:,} OI)"
     ) if has_down_air_pocket else (
         f"Mất mốc ATM Pivot -> Rơi tự do về trạm nghỉ {secondary_support:.0f} (Đệm nấc 2)"
@@ -557,7 +557,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     squeeze_tp = major_up_wall - front_run_tp if has_up_air_pocket else next_above - front_run_tp
     squeeze_tp_note = f"Nấc {major_up_wall:.0f} (Major Wall)" if has_up_air_pocket else f"Nấc {next_above:.0f}"
     squeeze_note = (
-        f"⚡ GAMMA SQUEEZE VACUUM RUN: MM vỡ trần Short -> Phía trên là Air Pocket, giá hút vụt lên {major_up_wall:.0f} ({major_up_oi:,} OI)"
+        f"[GAMMA_SQUEEZE_VACUUM_RUN]: MM vỡ trần Short -> Phía trên là Air Pocket, giá hút vụt lên {major_up_wall:.0f} ({major_up_oi:,} OI)"
     ) if has_up_air_pocket else (
         f"MM vỡ trần Short -> Gamma Squeeze đẩy giá lên nấc {next_above:.0f}"
     )
@@ -565,19 +565,19 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     radar_cards_html = []
     for ev in level_evals:
         if ev.state == LevelState.SLICED_VACUUM_RUN:
-            badge_html = '<span class="badge" style="background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444;">🔴 SLICED / VACUUM RUN</span>'
+            badge_html = '<span class="badge" style="background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444;">SLICED / VACUUM RUN</span>'
             border_color = "rgba(239, 68, 68, 0.5)"
         elif ev.state == LevelState.TESTING:
-            badge_html = '<span class="badge" style="background:rgba(250, 204, 21, 0.2); color:#FACC15; border:1px solid #EAB308;">🟡 TESTING</span>'
+            badge_html = '<span class="badge" style="background:rgba(250, 204, 21, 0.2); color:#FACC15; border:1px solid #EAB308;">TESTING</span>'
             border_color = "rgba(250, 204, 21, 0.5)"
         elif ev.state == LevelState.ABSORPTION_DEFENDED:
-            badge_html = '<span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E;">🟢 DEFENDED</span>'
+            badge_html = '<span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E;">DEFENDED</span>'
             border_color = "rgba(34, 197, 94, 0.5)"
         elif ev.state == LevelState.WALL_DEFENDED:
-            badge_html = '<span class="badge" style="background:rgba(56, 189, 248, 0.15); color:#38BDF8; border:1px solid #0284C7;">🛡️ HOLDING</span>'
+            badge_html = '<span class="badge" style="background:rgba(56, 189, 248, 0.15); color:#38BDF8; border:1px solid #0284C7;">HOLDING</span>'
             border_color = "rgba(56, 189, 248, 0.3)"
         else:
-            badge_html = '<span class="badge" style="background:rgba(148, 163, 184, 0.15); color:#94A3B8; border:1px solid #475569;">⚪ DORMANT</span>'
+            badge_html = '<span class="badge" style="background:rgba(148, 163, 184, 0.15); color:#94A3B8; border:1px solid #475569;">DORMANT</span>'
             border_color = "var(--border-color)"
 
         target_text = f" &bull; Đích đến: <b>${ev.vacuum_target:,.0f}</b>" if ev.vacuum_target else ""
@@ -598,7 +598,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     is_pinning = (total_chex < -0.8) and (abs(strike_above - strike_below) <= 15.0) and (strike_below - 3.0 <= spot <= strike_above + 3.0)
     if is_pinning:
         pinning_status_title = "HIỆN TƯỢNG NEO GIÁ (INSTITUTIONAL PINNING & CHARM BURN)"
-        pinning_badge_text = "🔒 ĐANG NEO GIÁ (PINNING BOX)"
+        pinning_badge_text = "PINNING BOX (ĐANG NEO GIÁ)"
         pinning_badge_bg = "rgba(234, 179, 8, 0.15)"
         pinning_badge_color = "#FACC15"
         pinning_badge_border = "rgba(234, 179, 8, 0.4)"
@@ -608,7 +608,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         )
     else:
         pinning_status_title = "CHẾ ĐỘ THỊ TRƯỜNG: DÒ TÌM XU HƯỚNG (ACTIVE TREND / EXPANSION)"
-        pinning_badge_text = "🌊 UNPINNED / ACTIVE EXPANSION"
+        pinning_badge_text = "UNPINNED (ACTIVE EXPANSION)"
         pinning_badge_bg = "rgba(56, 189, 248, 0.15)"
         pinning_badge_color = "#38BDF8"
         pinning_badge_border = "rgba(56, 189, 248, 0.4)"
@@ -717,7 +717,6 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(250, 204, 21, 0.35); border-left: 4px solid #FACC15; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:18px;">🧲</span>
                 <span style="font-size:13px; font-weight:800; color:#FACC15; letter-spacing:0.5px;">TÍN HIỆU ĐỊNH LƯỢNG: {pinning_status_title}</span>
                 <span class="badge" style="background:{pinning_badge_bg}; color:{pinning_badge_color}; border:1px solid {pinning_badge_border}; font-size:11px;">{pinning_badge_text}</span>
             </div>
@@ -730,28 +729,28 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; font-size:12px; line-height:1.5;">
             <div style="background:rgba(15, 23, 42, 0.6); padding:10px 12px; border-radius:8px; border:1px solid #1E293B;">
-                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
-                    <span>⏱️</span> 1. Động Lực Ghìm (Charm & Theta Burn)
+                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px;">
+                    1. Động Lực Ghìm (Charm & Theta Burn)
                 </div>
                 <div style="color:#E2E8F0;">
                     Net CHEX = <b style="color:#22D3EE;">{total_chex:+.1f}M/ngày</b>. Cột Charm âm cực đại chứng minh Dealer đang hưởng lợi từ việc giữ giá bất động qua từng giờ để bào mòn phí Premium của bên mua.
                 </div>
             </div>
             <div style="background:rgba(15, 23, 42, 0.6); padding:10px 12px; border-radius:8px; border:1px solid #1E293B;">
-                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
-                    <span>🧱</span> 2. Gọng Kìm Thanh Khoản (Strike Defense)
+                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px;">
+                    2. Gọng Kìm Thanh Khoản (Strike Defense)
                 </div>
                 <div style="color:#E2E8F0;">
                     Trần trên Call <b style="color:#F87171;">${strike_above:,.0f}</b> chặn bán Futures ghìm xuống &bull; Sàn dưới Put <b style="color:#4ADE80;">${strike_below:,.0f}</b> đệm mua Futures đỡ lên. Hai đầu triệt tiêu biến động.
                 </div>
             </div>
             <div style="background:rgba(15, 23, 42, 0.6); padding:10px 12px; border-radius:8px; border:1px solid #1E293B;">
-                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
-                    <span>🚀</span> 3. Điều Kiện Phá Vỡ Neo (Breakout Trigger)
+                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px;">
+                    3. Điều Kiện Phá Vỡ Neo (Breakout Trigger)
                 </div>
                 <div style="color:#E2E8F0;">
-                    <span style="color:#4ADE80; font-weight:600;">⚡ Phá trên > ${strike_above + buffer_up:.2f}</span>: MM vỡ trần Short, kích hoạt Gamma Squeeze lên <b>{squeeze_tp_note}</b>.<br>
-                    <span style="color:#F87171; font-weight:600;">🚨 Phá dưới < ${strike_below - buffer_down:.2f}</span>: Thủng đệm kẹp, xả trượt (Sliced Vacuum) về <b>{breakdown_tp_note}</b>.
+                    <span style="color:#4ADE80; font-weight:600;">[Phá trên] > ${strike_above + buffer_up:.2f}</span>: MM vỡ trần Short, kích hoạt Gamma Squeeze lên <b>{squeeze_tp_note}</b>.<br>
+                    <span style="color:#F87171; font-weight:600;">[Phá dưới] < ${strike_below - buffer_down:.2f}</span>: Thủng đệm kẹp, xả trượt (Sliced Vacuum) về <b>{breakdown_tp_note}</b>.
                 </div>
             </div>
         </div>
@@ -764,7 +763,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     <div class="table-box" style="margin-bottom: 18px;">
         <div class="section-header" style="justify-content:space-between; flex-wrap:wrap;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span>🧭</span> RADAR VI MÔ: TRẠNG THÁI CHỐT CHẶN & TÚI CHÂN KHÔNG (LEVEL STATE MACHINE - TẦNG 4)
+                RADAR VI MÔ: TRẠNG THÁI CHỐT CHẶN & TÚI CHÂN KHÔNG (LEVEL STATE MACHINE - TẦNG 4)
             </div>
             <span class="badge badge-gold">AUTOMATED LEVEL STATE ENGINE</span>
         </div>
@@ -776,7 +775,6 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     <div style="background: linear-gradient(90deg, #111C33 0%, #0F172A 100%); border: 1px solid #1E293B; border-left: 4px solid #FACC15; border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div>
             <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:16px;">⚡</span>
                 <span style="font-size:12px; font-weight:800; color:#FACC15; letter-spacing:0.5px;">CTA MOMENTUM CONFLUENCE (20D BREAKOUT):</span>
                 <span class="badge badge-gold">{cta_badge}</span>
             </div>
@@ -790,7 +788,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     </div>
 
     <div class="table-box">
-        <div class="section-header">⚡ PHẦN 1: BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - ĂN 20-25 GIÁ VÀNG)</div>
+        <div class="section-header">PHẦN 1: BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - ĂN 20-25 GIÁ VÀNG)</div>
         <table>
             <thead>
                 <tr>
@@ -850,7 +848,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     </div>
 
     <div class="table-box">
-        <div class="section-header">🏰 PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ (STRUCTURAL SWING WALLS - ĐÁNH SÓNG LỚN)</div>
+        <div class="section-header">PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ (STRUCTURAL SWING WALLS - ĐÁNH SÓNG LỚN)</div>
         <table>
             <thead>
                 <tr>
