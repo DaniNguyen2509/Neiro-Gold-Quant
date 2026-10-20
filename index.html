@@ -78,7 +78,7 @@
             <span class="badge badge-live">ZERO TOUCH AUTOMATION</span>
         </div>
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #D6D3D1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <div>Cập nhật: <b>20/10/2026 21:50:58 (Giờ VN)</b> | Hạn: <b>OGX26 (2026-10-27) (7.2d)</b></div>
+            <div>Cập nhật: <b>20/10/2026 22:51:06 (Giờ VN)</b> | Hạn: <b>OGX26 (2026-10-27) (7.1d)</b></div>
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất">
                 Làm mới
             </button>
@@ -91,36 +91,36 @@
     </div>
 
     <!-- KHỐI 1: BẢNG TÁC CHIẾN TỨC THÌ (GLANCEABLE 3-SECOND ACTION BANNER) -->
-    <div id="live-action-banner" class="action-banner action-banner-green">
+    <div id="live-action-banner" class="action-banner action-banner-yellow">
         <div class="action-header-row">
             <div>
                 <span class="badge" style="background:#0F172A; color:#F8FAFC; border:1px solid #475569; font-size:12px; margin-right:6px;">KỊCH BẢN HIỆN TẠI</span>
-                <span id="banner-sc-title" style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">KB-4: MM ĐỆM MUA BẢO VỆ SÀN ĐÁY (PUT DEFENSE)</span>
+                <span id="banner-sc-title" style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">KB-1: GIẰNG CO NÉN BIÊN ĐỘ (PINNING BOX)</span>
             </div>
             <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#FACC15;">
-                GIÁ REALTIME CME GCZ26: <b id="banner-cme-price">$4,166.30</b> (Trục ATM: <span id="banner-atm-strike">$4,165</span>)
+                GIÁ REALTIME CME GCZ26: <b id="banner-cme-price">$4,152.80</b> (Trục ATM: <span id="banner-atm-strike">$4,155</span>)
             </div>
         </div>
         <div class="action-grid">
-            <div id="banner-action-card" class="action-box" style="border-left: 4px solid #22C55E;">
+            <div id="banner-action-card" class="action-box" style="border-left: 4px solid #FACC15;">
                 <div class="action-cmd-title">HÀNH ĐỘNG CẦN THỰC HIỆN NGAY:</div>
-                <div id="banner-action-cmd" class="action-cmd-val" style="color:#4ADE80;">
-                    BUY BẮT HỒI (REBOUND)
+                <div id="banner-action-cmd" class="action-cmd-val" style="color:#FACC15;">
+                    ĐỨNG NGOÀI (CẤM ĐÁNH BREAKOUT)
                 </div>
-                <div id="banner-action-desc" style="font-size:11.5px; color:#94A3B8;">Mua khi giá chạm $4,166.00 có nến rút chân</div>
+                <div id="banner-action-desc" style="font-size:11.5px; color:#94A3B8;">Vùng nén $4,150 ◄► $4,155</div>
             </div>
             <div class="action-box">
                 <div class="action-cmd-title">HÀNH VI CỦA MARKET MAKER:</div>
-                <div id="banner-mm-state" style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">MM gom mua Futures thụ động để bảo vệ sàn Put Wall, ngăn giá giảm thêm.</div>
-                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b id="banner-forecast">Giá phản ứng rút chân tại sàn $4,165, bật tăng hướng về trần $4,170.</b></div>
+                <div id="banner-mm-state" style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">MM đang ghìm giá giữa hai chốt chặn để bào mòn phí thời gian và ăn trọn tiền phế.</div>
+                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b id="banner-forecast">Giá tiếp tục đi ngang lừ đừ trong biên độ hẹp, chờ phiên Mỹ phá vỡ.</b></div>
             </div>
             <div class="action-box">
                 <div class="action-cmd-title">THÔNG SỐ VÀO LỆNH (CME FUTURES):</div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;">
-                    <div>Kích hoạt: <b id="banner-entry-trigger">$4,166.00</b></div>
-                    <div>Khối lượng: <b id="banner-lot-size" style="color:#FACC15;">~0.11 Lot</b></div>
-                    <div>Cắt lỗ SL: <b id="banner-hard-sl" style="color:#F87171;">$4,161.50</b></div>
-                    <div>Chốt lời TP: <b id="banner-take-profit" style="color:#4ADE80;">$4,169.00</b></div>
+                    <div>Kích hoạt: <b id="banner-entry-trigger">$4,155.00</b></div>
+                    <div>Khối lượng: <b id="banner-lot-size" style="color:#FACC15;">0 Lot</b></div>
+                    <div>Cắt lỗ SL: <b id="banner-hard-sl" style="color:#F87171;">N/A</b></div>
+                    <div>Chốt lời TP: <b id="banner-take-profit" style="color:#4ADE80;">N/A</b></div>
                 </div>
             </div>
         </div>
@@ -144,34 +144,34 @@
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
                 <div id="spine-dist-put" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
-                    +66.3$
+                    +52.8$
                 </div>
             </div>
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#4ADE80;">SÀN DƯỚI</div>
-                <div class="spine-node-price" style="color:#4ADE80;">$4,165</div>
+                <div class="spine-node-price" style="color:#4ADE80;">$4,150</div>
             </div>
             <div style="flex:1; height:2px; background:#FACC15; margin:0 8px; position:relative;">
                 <div id="spine-dist-below" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
-                    +1.3$
+                    +2.8$
                 </div>
             </div>
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#FACC15; font-weight:800;">GIÁ HIỆN TẠI</div>
-                <div id="spine-current-price" class="spine-node-current">$4,166.30</div>
+                <div id="spine-current-price" class="spine-node-current">$4,152.80</div>
             </div>
             <div style="flex:1; height:2px; background:#FACC15; margin:0 8px; position:relative;">
                 <div id="spine-dist-above" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
-                    +3.7$
+                    +2.2$
                 </div>
             </div>
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#F87171;">CẢN TRÊN</div>
-                <div class="spine-node-price" style="color:#F87171;">$4,170</div>
+                <div class="spine-node-price" style="color:#F87171;">$4,155</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
                 <div id="spine-dist-call" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
-                    +33.7$
+                    +47.2$
                 </div>
             </div>
             <div class="spine-node">
@@ -190,7 +190,7 @@
                 <span style="font-size:13.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">BĂNG GIÁ & XUNG LỰC VOLUME M5 REALTIME (COMEX GC=F)</span>
             </div>
             <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
-                Đỉnh ngày: <b style="color:#F87171;">$4,174.90</b> &bull; Đáy ngày: <b style="color:#4ADE80;">$4,130.10</b> &bull; Biên độ: <b style="color:#FACC15;">$44.80$</b> &bull; TB Vol M5: <b style="color:#38BDF8;">1654 HĐ</b>
+                Đỉnh ngày: <b style="color:#F87171;">$4,174.90</b> &bull; Đáy ngày: <b style="color:#4ADE80;">$4,130.10</b> &bull; Biên độ: <b style="color:#FACC15;">$44.80$</b> &bull; TB Vol M5: <b style="color:#38BDF8;">1638 HĐ</b>
             </div>
         </div>
         <div style="overflow-x:auto;">
@@ -209,77 +209,77 @@
                 </thead>
                 <tbody>
                     <tr style="">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:40</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,166.30</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,166.30</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,166.30</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,166.30</td>
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:41</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,152.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,152.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,152.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,152.80</td>
             <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#64748B;">0</td>
             <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#64748B;">0.0x</td>
             <td><span class="badge" style="background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;">[THANH KHOẢN CẠN KIỆT]</span></td>
         </tr><tr style="">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:40</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,166.60</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,173.70</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,163.60</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,168.80</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">1,729</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">1.1x</td>
-            <td><span class="badge" style="background:transparent; color:#94A3B8; border:none;">[BÌNH THƯỜNG]</span></td>
-        </tr><tr style="background:rgba(30, 41, 59, 0.7); box-shadow:inset 0 0 8px rgba(250,204,21,0.15);">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:35</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,170.20</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,171.50</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,163.70</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:700;">$4,166.30</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:800;">2,559</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:800;">1.6x</td>
-            <td><span class="badge" style="background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444; font-weight:700;">[CHẶN BÁN ĐÈ ĐỈNH]</span></td>
-        </tr><tr style="background:rgba(30, 41, 59, 0.7); box-shadow:inset 0 0 8px rgba(250,204,21,0.15);">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:30</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,173.60</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,174.90</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,167.60</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:700;">$4,169.50</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:800;">2,810</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:800;">1.7x</td>
-            <td><span class="badge" style="background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444; font-weight:700;">[CHẶN BÁN ĐÈ ĐỈNH]</span></td>
-        </tr><tr style="background:rgba(30, 41, 59, 0.7); box-shadow:inset 0 0 8px rgba(250,204,21,0.15);">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:25</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,164.40</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,173.70</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,163.50</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,173.60</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:800;">3,576</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:800;">2.2x</td>
-            <td><span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E; font-weight:700;">[HẤP THỤ ĐÁY RÚT CHÂN]</span></td>
-        </tr><tr style="background:rgba(30, 41, 59, 0.7); box-shadow:inset 0 0 8px rgba(250,204,21,0.15);">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:20</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,158.00</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,164.80</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,155.10</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,164.10</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:800;">2,354</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:800;">1.4x</td>
-            <td><span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E; font-weight:700;">[HẤP THỤ ĐÁY RÚT CHÂN]</span></td>
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:40</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,151.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,155.30</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,151.50</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,154.20</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#64748B;">636</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#64748B;">0.4x</td>
+            <td><span class="badge" style="background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;">[THANH KHOẢN CẠN KIỆT]</span></td>
         </tr><tr style="">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:15</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,150.90</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,160.40</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,150.20</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,157.50</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">2,250</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">1.4x</td>
-            <td><span class="badge" style="background:transparent; color:#94A3B8; border:none;">[BÌNH THƯỜNG]</span></td>
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:35</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,151.40</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,152.10</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,149.30</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,151.50</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#64748B;">807</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#64748B;">0.5x</td>
+            <td><span class="badge" style="background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;">[THANH KHOẢN CẠN KIỆT]</span></td>
         </tr><tr style="">
-            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">21:10</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,146.10</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,151.80</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,143.30</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,150.70</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">1,466</td>
-            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">0.9x</td>
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:30</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,153.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,154.20</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,150.40</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:700;">$4,151.40</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#64748B;">687</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#64748B;">0.4x</td>
+            <td><span class="badge" style="background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;">[THANH KHOẢN CẠN KIỆT]</span></td>
+        </tr><tr style="">
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:25</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,152.90</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,155.10</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,151.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,153.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#64748B;">552</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#64748B;">0.3x</td>
+            <td><span class="badge" style="background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;">[THANH KHOẢN CẠN KIỆT]</span></td>
+        </tr><tr style="">
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:20</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,158.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,158.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,152.30</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:700;">$4,152.90</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#64748B;">622</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#64748B;">0.4x</td>
+            <td><span class="badge" style="background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;">[THANH KHOẢN CẠN KIỆT]</span></td>
+        </tr><tr style="">
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:15</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,153.00</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,159.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,152.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#4ADE80; font-weight:700;">$4,158.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">1,184</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#CBD5E1;">0.7x</td>
             <td><span class="badge" style="background:transparent; color:#94A3B8; border:none;">[BÌNH THƯỜNG]</span></td>
+        </tr><tr style="background:rgba(30, 41, 59, 0.7); box-shadow:inset 0 0 8px rgba(250,204,21,0.15);">
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">22:10</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">$4,161.60</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">$4,162.40</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">$4,151.80</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:700;">$4,152.90</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:800;">2,926</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; color:#F87171; font-weight:800;">1.8x</td>
+            <td><span class="badge" style="background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444; font-weight:700;">[CHẶN BÁN ĐÈ ĐỈNH]</span></td>
         </tr>
                 </tbody>
             </table>
@@ -294,13 +294,13 @@
         </div>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:12px;">
             
-        <div id="card-KB-1" class="scenario-card" style="opacity: 0.55; border: 1px solid #1E293B; background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px; transition: all 0.3s ease;">
+        <div id="card-KB-1" class="scenario-card" style="box-shadow: 0 0 16px #EAB308; transform: scale(1.01); border: 2px solid #EAB308; background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px; transition: all 0.3s ease;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-                <div style="font-size:13px; font-weight:800; color:#94A3B8;">KB-1: GIẰNG CO NÉN BIÊN ĐỘ (PINNING BOX)</div>
-                <div id="card-tag-KB-1"><span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span></div>
+                <div style="font-size:13px; font-weight:800; color:#F8FAFC;">KB-1: GIẰNG CO NÉN BIÊN ĐỘ (PINNING BOX)</div>
+                <div id="card-tag-KB-1"><span class="badge" style="background:rgba(234, 179, 8, 0.2); color:#FACC15; border:1px solid #EAB308; font-weight:800; box-shadow:0 0 8px #EAB308;">ĐANG DIỄN RA (ACTIVE)</span></div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> $4,167.0 < Giá CME < $4,168.0 (Hiện tại: $4,166.30)
+                <b>Điều kiện:</b> $4,152.0 < Giá CME < $4,153.0 (Hiện tại: $4,152.80)
             </div>
             <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                 <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
@@ -308,7 +308,7 @@
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1E293B; padding-top:8px;">
                 <div style="font-size:11px; color:#94A3B8;">HÀNH ĐỘNG CẦN LÀM:</div>
-                <div id="card-act-KB-1" style="font-size:12px; font-family:'JetBrains Mono', monospace;"><span style="color:#64748B; font-weight:600;">ĐỨNG NGOÀI (CẤM ĐÁNH BREAKOUT) <small style="color:#475569;">(Chưa áp dụng)</small></span></div>
+                <div id="card-act-KB-1" style="font-size:12px; font-family:'JetBrains Mono', monospace;"><span style="font-weight:800; color:#FACC15;">ĐỨNG NGOÀI (CẤM ĐÁNH BREAKOUT)</span></div>
             </div>
         </div>
         
@@ -318,7 +318,7 @@
                 <div id="card-tag-KB-2"><span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span></div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> Chạm vùng cản $4,168.5 - $4,170.0 (Hiện tại: $4,166.30)
+                <b>Điều kiện:</b> Chạm vùng cản $4,153.5 - $4,155.0 (Hiện tại: $4,152.80)
             </div>
             <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                 <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
@@ -336,7 +336,7 @@
                 <div id="card-tag-KB-3"><span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span></div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> Vượt bứt phá > $4,171.50 (Hiện tại: $4,166.30)
+                <b>Điều kiện:</b> Vượt bứt phá > $4,156.50 (Hiện tại: $4,152.80)
             </div>
             <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                 <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
@@ -348,13 +348,13 @@
             </div>
         </div>
         
-        <div id="card-KB-4" class="scenario-card" style="box-shadow: 0 0 16px #22C55E; transform: scale(1.01); border: 2px solid #22C55E; background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px; transition: all 0.3s ease;">
+        <div id="card-KB-4" class="scenario-card" style="opacity: 0.55; border: 1px solid #1E293B; background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px; transition: all 0.3s ease;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-                <div style="font-size:13px; font-weight:800; color:#F8FAFC;">KB-4: MM ĐỆM MUA BẢO VỆ SÀN ĐÁY (PUT DEFENSE)</div>
-                <div id="card-tag-KB-4"><span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E; font-weight:800; box-shadow:0 0 8px #22C55E;">ĐANG DIỄN RA (ACTIVE)</span></div>
+                <div style="font-size:13px; font-weight:800; color:#94A3B8;">KB-4: MM ĐỆM MUA BẢO VỆ SÀN ĐÁY (PUT DEFENSE)</div>
+                <div id="card-tag-KB-4"><span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span></div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> Chạm vùng sàn $4,165.0 - $4,166.5 (Hiện tại: $4,166.30)
+                <b>Điều kiện:</b> Chạm vùng sàn $4,150.0 - $4,151.5 (Hiện tại: $4,152.80)
             </div>
             <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                 <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
@@ -362,7 +362,7 @@
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1E293B; padding-top:8px;">
                 <div style="font-size:11px; color:#94A3B8;">HÀNH ĐỘNG CẦN LÀM:</div>
-                <div id="card-act-KB-4" style="font-size:12px; font-family:'JetBrains Mono', monospace;"><span style="font-weight:800; color:#4ADE80;">BUY BẮT HỒI (REBOUND)</span></div>
+                <div id="card-act-KB-4" style="font-size:12px; font-family:'JetBrains Mono', monospace;"><span style="color:#64748B; font-weight:600;">BUY BẮT HỒI (REBOUND) <small style="color:#475569;">(Chưa áp dụng)</small></span></div>
             </div>
         </div>
         
@@ -372,7 +372,7 @@
                 <div id="card-tag-KB-5"><span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span></div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> Thủng dứt khoát < $4,163.50 (Hiện tại: $4,166.30)
+                <b>Điều kiện:</b> Thủng dứt khoát < $4,148.50 (Hiện tại: $4,152.80)
             </div>
             <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                 <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
@@ -390,7 +390,7 @@
                 <div id="card-tag-KB-6"><span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span></div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> Nằm cách xa các mốc kích hoạt trên và dưới (Hiện tại: $4,166.30)
+                <b>Điều kiện:</b> Nằm cách xa các mốc kích hoạt trên và dưới (Hiện tại: $4,152.80)
             </div>
             <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                 <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
@@ -409,28 +409,28 @@
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
-            <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">$4,166.30</div>
-            <div class="kpi-sub">Trục ATM: <b id="kpi-atm-strike">$4,165</b> | Nguồn: <b id="kpi-price-source">LIVE COMEX (GC=F)</b></div>
+            <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">$4,152.80</div>
+            <div class="kpi-sub">Trục ATM: <b id="kpi-atm-strike">$4,155</b> | Nguồn: <b id="kpi-price-source">LIVE COMEX (GC=F)</b></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Market Regime & Net GEX</div>
-            <div class="kpi-val" style="color: #F87171;">-115.7M GEX</div>
+            <div class="kpi-val" style="color: #F87171;">-114.9M GEX</div>
             <div class="kpi-sub"><span class="badge badge-gold">SHORT_GAMMA</span></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Biên Độ 1-Sigma Expected Move</div>
-            <div class="kpi-val" style="color: #F59E0B;">±$112.29</div>
-            <div class="kpi-sub">Trong ngày (Rule 16): <b>±$50.14</b> ($4116.2 - $4216.4)</div>
+            <div class="kpi-val" style="color: #F59E0B;">±$114.30</div>
+            <div class="kpi-sub">Trong ngày (Rule 16): <b>±$51.18</b> ($4101.6 - $4204.0)</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Greeks Bậc 2 (Vanna & Charm)</div>
-            <div class="kpi-val" style="color: #38BDF8;">+10.4M / -13.0M</div>
-            <div class="kpi-sub">VEX: +10.4M | CHEX: -13.0M/ngày</div>
+            <div class="kpi-val" style="color: #38BDF8;">+8.8M / -11.1M</div>
+            <div class="kpi-sub">VEX: +8.8M | CHEX: -11.1M/ngày</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Dòng Tiền Quỹ (25Δ Skew)</div>
             <div class="kpi-val" style="color: #4ADE80; font-size: 19px;">
-                +3.80v <span style="font-size:12px; color:#94A3B8;">(Fly: -0.39v)</span>
+                +3.80v <span style="font-size:12px; color:#94A3B8;">(Fly: -1.10v)</span>
             </div>
             <div class="kpi-sub"><span class="badge badge-gold">BULLISH CALL SKEW (DÒNG TIỀN QUỸ GOM CALL CƯỢC PHÁ ĐỈNH)</span></div>
         </div>
@@ -439,7 +439,7 @@
     <!-- KHỐI 5: BIỂU ĐỒ GEX & CHỐT CHẶN (PLOTLY COMPACT) -->
     <div class="chart-box">
         <div style="height:750px; width:100%;">                        <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
-        <script charset="utf-8" src="https://cdn.plot.ly/plotly-4.1.1.min.js" integrity="sha256-O24V1F27f8pb0glCkelh3cVHLNiHAJ5gCaVtq2aNch8=" crossorigin="anonymous"></script>                <div id="070300b4-0073-4cca-ac86-c2ff2f792679" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("070300b4-0073-4cca-ac86-c2ff2f792679")) {                    Plotly.newPlot(                        "070300b4-0073-4cca-ac86-c2ff2f792679",                        [{"hovertemplate":"Strike: $%{y}\u003cbr\u003eNet GEX: $%{x:.2f}M\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":["#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#4ADE80","#4ADE80","#4ADE80"]},"name":"Net GEX ($M)","orientation":"h","x":{"dtype":"f8","bdata":"wjOAXLvQ6b\u002foVgs6FE8OwG7Nn7V5Z\u002fG\u002fr05b7B7NBMCLNUMkE48FwHDPUY53FzHAZyJum14ME8BMOWvGag0awDRNXJFe2\u002fe\u002fQsctJIM4MsBKtWZQndApwNmGmEtsEC7AdyincSqDMsCd393d2ZAkwJj5flqVG\u002fO\u002fN1Z7PudELcAiK5PyChv\u002fvwQ4QOQO1TnAZP6LtSflFEAoS4K\u002fmP8eQEbpIsW0jghA"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"bar","xaxis":"x","yaxis":"y"},{"customdata":{"dtype":"f8","bdata":"AAAAAAAAGEAAAAAAAABGQAAAAAAAACRAAAAAAAAAJEAAAAAAAAAoQAAAAAAAAERAAAAAAAAAYEAAAAAAAAAwQAAAAAAAAPA\u002fAAAAAAAAAEAAAAAAAADwPwAAAAAAAPA\u002fAAAAAAAALkAAAAAAAAAYQAAAAAAAACBAAAAAAAAAIEAAAAAAAAAyQAAAAAAAADZAAAAAAAAAJkAAAAAAAAAkQAAAAAAAAPA\u002f"},"hovertemplate":"Strike: $%{y}\u003cbr\u003ePut Vol: %{customdata:,}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#F87171"},"name":"Put Volume","opacity":0.75,"orientation":"h","x":{"dtype":"f8","bdata":"AAAAAAAAGMAAAAAAAABGwAAAAAAAACTAAAAAAAAAJMAAAAAAAAAowAAAAAAAAETAAAAAAAAAYMAAAAAAAAAwwAAAAAAAAPC\u002fAAAAAAAAAMAAAAAAAADwvwAAAAAAAPC\u002fAAAAAAAALsAAAAAAAAAYwAAAAAAAACDAAAAAAAAAIMAAAAAAAAAywAAAAAAAADbAAAAAAAAAJsAAAAAAAAAkwAAAAAAAAPC\u002f"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"bar","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eCall Vol: %{x:,}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#4ADE80"},"name":"Call Volume","opacity":0.75,"orientation":"h","x":{"dtype":"f8","bdata":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAQAAAAAAAADZAAAAAAAAAFEAAAAAAAAAoQAAAAAAAABhAAAAAAAAA8D8AAAAAAAAIQAAAAAAAACJAAAAAAAAAJkAAAAAAAAAgQAAAAAAAYGNAAAAAAAAAHEAAAAAAAIBQQAAAAAAAACBA"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"bar","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eCall OI: %{x:,}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#22C55E","width":2.2},"marker":{"size":5,"symbol":"circle"},"mode":"lines+markers","name":"Call OI (Tr\u1ea7n)","x":{"dtype":"f8","bdata":"AAAAAAAAAAAAAAAAAAAUQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgEZAAAAAAAAAKEAAAAAAAAA9QAAAAAAAgFtAAAAAAADAWkAAAAAAAIBLQAAAAAAAAFZAAAAAAACgZEAAAAAAAEBgQAAAAAAAgFtAAAAAAADAVEAAAAAAAEBSQAAAAAAASJVAAAAAAADAXkAAAAAAAOBhQAAAAAAAwFBA"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"scatter","xaxis":"x2","yaxis":"y2"},{"customdata":{"dtype":"f8","bdata":"AAAAAABAUUAAAAAAAPByQAAAAAAAAEdAAAAAAACAV0AAAAAAAMBRQAAAAAAAoHhAAAAAAABAWEAAAAAAAABdQAAAAAAAQFlAAAAAAABAdUAAAAAAAEBuQAAAAAAAQHJAAAAAAACweUAAAAAAACBuQAAAAAAAAFtAAAAAAABgcEAAAAAAAMBUQAAAAAAA3JNAAAAAAAAAP0AAAAAAAAAmQAAAAAAAAPA\u002f"},"hovertemplate":"Strike: $%{y}\u003cbr\u003ePut OI: %{customdata:,}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#EF4444","width":2.2},"marker":{"size":5,"symbol":"circle"},"mode":"lines+markers","name":"Put OI (S\u00e0n)","x":{"dtype":"f8","bdata":"AAAAAABAUcAAAAAAAPBywAAAAAAAAEfAAAAAAACAV8AAAAAAAMBRwAAAAAAAoHjAAAAAAABAWMAAAAAAAABdwAAAAAAAQFnAAAAAAABAdcAAAAAAAEBuwAAAAAAAQHLAAAAAAACwecAAAAAAACBuwAAAAAAAAFvAAAAAAABgcMAAAAAAAMBUwAAAAAAA3JPAAAAAAAAAP8AAAAAAAAAmwAAAAAAAAPC\u002f"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eNet VEX: $%{x:.2f}M\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#38BDF8"},"name":"Net VEX ($M)","opacity":0.8,"orientation":"h","x":{"dtype":"f8","bdata":"IMJ6oL0jzD9V4qn04ULzP+ljIRtD3Ms\u002fqR56MvOM3j9VI7bcCVrWP6Pdi9D3Rvc\u002f4a\u002fC3OINzz\u002fNTylYtge5P8AVfnhZknu\u002fmm0lTqvltT\u002fwkOw71hFpv\u002fDDOIBq5rS\u002fNmIRg6KgyL\u002ffEi0MyXrAv0Av4CauFmk\u002fQtNfUTOz1b8gqCefVQGXv2AB+qjTIM4\u002f\u002fvnZp5\u002fM1z8T+FJCbQ7lP1kUoBqTptY\u002f"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"bar","xaxis":"x3","yaxis":"y3"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eNet CHEX: $%{x:.2f}M\u002fng\u00e0y\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#FACC15"},"name":"Net CHEX ($M\u002fng\u00e0y)","opacity":0.8,"orientation":"h","x":{"dtype":"f8","bdata":"zeTkstM20r9A1Locbcb4v5uUZMeUxNG\u002fotF5rQU+47+cMF8TFZvbv1kyHMOrsfu\u002fgBe8dHTs0L8dGcShVhuwvzTV1ZyNjn8\u002f8P1H6jyTsj9UT6\u002fnrarDP5LpH0QAlNE\u002fTHQiLQx63T8r5JxzyRTRPwDgzQGSGwO\u002fSGtPysEt4z\u002fQxGlJ9FWlP5AcxcsMPNS\u002fXZanzIPj4b8gkDAhKL7uv7PY1kD8QOC\u002f"},"y":{"dtype":"f8","bdata":"AAAAAAAOr0AAAAAAAECvQAAAAAAAcq9AAAAAAACkr0AAAAAAANavQAAAAAAABLBAAAAAAAAdsEAAAAAAADawQAAAAAAAO7BAAAAAAABAsEAAAAAAAEWwQAAAAAAASrBAAAAAAABPsEAAAAAAAFSwQAAAAAAAWbBAAAAAAABesEAAAAAAAGOwQAAAAAAAaLBAAAAAAACBsEAAAAAAAJqwQAAAAAAAs7BA"},"type":"bar","xaxis":"x3","yaxis":"y3"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#f2f5fa"},"error_y":{"color":"#f2f5fa"},"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"baxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"line":{"color":"#283442"}},"type":"scattergl"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"marker":{"line":{"color":"#283442"}},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#506784"},"line":{"color":"rgb(17,17,17)"}},"header":{"fill":{"color":"#2a3f5f"},"line":{"color":"rgb(17,17,17)"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#f2f5fa","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#f2f5fa"},"geo":{"bgcolor":"rgb(17,17,17)","lakecolor":"rgb(17,17,17)","landcolor":"rgb(17,17,17)","showlakes":true,"showland":true,"subunitcolor":"#506784"},"hoverlabel":{"align":"left"},"hovermode":"closest","paper_bgcolor":"rgb(17,17,17)","plot_bgcolor":"rgb(17,17,17)","polar":{"angularaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","radialaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"yaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"zaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"}},"shapedefaults":{"line":{"color":"#f2f5fa"}},"sliderdefaults":{"bgcolor":"#C8D4E3","bordercolor":"rgb(17,17,17)","borderwidth":1,"tickwidth":0},"ternary":{"aaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"baxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","caxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"title":{"x":0.05},"updatemenudefaults":{"bgcolor":"#506784","borderwidth":0},"xaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2}}},"xaxis":{"anchor":"y","domain":[0.0,0.3348],"gridcolor":"#1E293B"},"yaxis":{"anchor":"x","domain":[0.0,1.0],"range":[3965.0,4285.0],"gridcolor":"#1E293B","dtick":5.0},"xaxis2":{"anchor":"y2","domain":[0.3698,0.7046],"gridcolor":"#1E293B"},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"matches":"y","showticklabels":false,"range":[3965.0,4285.0],"gridcolor":"#1E293B","dtick":5.0},"xaxis3":{"anchor":"y3","domain":[0.7396,1.0],"gridcolor":"#1E293B"},"yaxis3":{"anchor":"x3","domain":[0.0,1.0],"matches":"y","showticklabels":false,"range":[3965.0,4285.0],"gridcolor":"#1E293B","dtick":5.0},"annotations":[{"font":{"size":16},"showarrow":false,"text":"\u003cb\u003ePanel 1: Net GEX ($M) & M\u1ed1c Chi\u1ebfn Thu\u1eadt (SL\u002fTP)\u003c\u002fb\u003e","x":0.1674,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"\u003cb\u003ePanel 2: D\u00f2ng Ti\u1ec1n Volume vs Open Interest N\u00e9n\u003c\u002fb\u003e","x":0.5372,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"\u003cb\u003ePanel 3: Greeks B\u1eadc 2 (Vanna & Charm)\u003c\u002fb\u003e","x":0.8698,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#EF4444","borderpad":3,"borderwidth":1,"font":{"color":"#EF4444","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eCALL WALL (TR\u1ea6N CH\u00cdNH)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4200.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#22C55E","borderpad":3,"borderwidth":1,"font":{"color":"#22C55E","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003ePUT WALL (S\u00c0N CH\u00cdNH)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4100.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#F87171","borderpad":3,"borderwidth":1,"font":{"color":"#F87171","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eC\u1ea2N TR\u00caN ($4170)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4170.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#4ADE80","borderpad":3,"borderwidth":1,"font":{"color":"#4ADE80","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eS\u00c0N D\u01af\u1edaI ($4165)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4165.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#FACC15","borderpad":3,"borderwidth":1,"font":{"color":"#FACC15","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eCME LIVE ($4166.30)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4166.3,"yanchor":"middle","yref":"y"}],"shapes":[{"line":{"color":"#475569","dash":"solid"},"type":"line","x0":0,"x1":0,"xref":"x","y0":0,"y1":1,"yref":"y domain"},{"line":{"color":"#475569","dash":"solid"},"type":"line","x0":0,"x1":0,"xref":"x2","y0":0,"y1":1,"yref":"y2 domain"},{"line":{"color":"#475569","dash":"solid"},"type":"line","x0":0,"x1":0,"xref":"x3","y0":0,"y1":1,"yref":"y3 domain"},{"line":{"color":"#EF4444","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4200.0,"y1":4200.0,"yref":"y"},{"line":{"color":"#EF4444","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4200.0,"y1":4200.0,"yref":"y2"},{"line":{"color":"#EF4444","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4200.0,"y1":4200.0,"yref":"y3"},{"line":{"color":"#22C55E","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4100.0,"y1":4100.0,"yref":"y"},{"line":{"color":"#22C55E","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4100.0,"y1":4100.0,"yref":"y2"},{"line":{"color":"#22C55E","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4100.0,"y1":4100.0,"yref":"y3"},{"line":{"color":"#F87171","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4170.0,"y1":4170.0,"yref":"y"},{"line":{"color":"#F87171","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4170.0,"y1":4170.0,"yref":"y2"},{"line":{"color":"#F87171","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4170.0,"y1":4170.0,"yref":"y3"},{"line":{"color":"#4ADE80","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4165.0,"y1":4165.0,"yref":"y"},{"line":{"color":"#4ADE80","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4165.0,"y1":4165.0,"yref":"y2"},{"line":{"color":"#4ADE80","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4165.0,"y1":4165.0,"yref":"y3"},{"line":{"color":"#FACC15","dash":"solid","width":1.8},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4166.3,"y1":4166.3,"yref":"y"},{"line":{"color":"#FACC15","dash":"solid","width":1.8},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4166.3,"y1":4166.3,"yref":"y2"},{"line":{"color":"#FACC15","dash":"solid","width":1.8},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4166.3,"y1":4166.3,"yref":"y3"}],"margin":{"l":60,"r":40,"t":50,"b":40},"legend":{"font":{"size":11,"family":"JetBrains Mono"},"orientation":"h","yanchor":"bottom","y":1.03,"xanchor":"center","x":0.5},"paper_bgcolor":"#0F172A","plot_bgcolor":"#0A0F1D","height":750,"barmode":"relative"},                        {"responsive": true, "displayModeBar": true}                    )                };            </script>        </div>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-4.1.1.min.js" integrity="sha256-O24V1F27f8pb0glCkelh3cVHLNiHAJ5gCaVtq2aNch8=" crossorigin="anonymous"></script>                <div id="be6dd3b5-5005-487e-ae3f-0c3af7b488d3" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("be6dd3b5-5005-487e-ae3f-0c3af7b488d3")) {                    Plotly.newPlot(                        "be6dd3b5-5005-487e-ae3f-0c3af7b488d3",                        [{"hovertemplate":"Strike: $%{y}\u003cbr\u003eNet GEX: $%{x:.2f}M\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":["#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#F87171","#4ADE80"]},"name":"Net GEX ($M)","orientation":"h","x":{"dtype":"f8","bdata":"yLuro69Q4L81um29+6Hjv9qUEhH5pem\u002f5FB6keAcDsCJ54PvpUrxvxCj\u002fbiqqgTAwqcIsF1rBcDQJJVNKPswwO2CtrDR7BLAsKcX90PiGcDIB++y2rP3v4xduyFVGjLAKc69NtulKcCPVpRqoN4twLs5bciAZDLA3FI8fsluJMD0BcM87\u002fvyv\u002fJobHZsFC3A6mjGdIXn\u002fr\u002fsxWBuRao5wElHFrOLwhRA"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"bar","xaxis":"x","yaxis":"y"},{"customdata":{"dtype":"f8","bdata":"AAAAAAAAJEAAAAAAAAAxQAAAAAAAABhAAAAAAAAARkAAAAAAAAAkQAAAAAAAACRAAAAAAAAAKEAAAAAAAABEQAAAAAAAAGBAAAAAAAAAMEAAAAAAAADwPwAAAAAAAABAAAAAAAAA8D8AAAAAAADwPwAAAAAAAC5AAAAAAAAAGEAAAAAAAAAgQAAAAAAAACBAAAAAAAAAMkAAAAAAAAA2QAAAAAAAACZA"},"hovertemplate":"Strike: $%{y}\u003cbr\u003ePut Vol: %{customdata:,}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#F87171"},"name":"Put Volume","opacity":0.75,"orientation":"h","x":{"dtype":"f8","bdata":"AAAAAAAAJMAAAAAAAAAxwAAAAAAAABjAAAAAAAAARsAAAAAAAAAkwAAAAAAAACTAAAAAAAAAKMAAAAAAAABEwAAAAAAAAGDAAAAAAAAAMMAAAAAAAADwvwAAAAAAAADAAAAAAAAA8L8AAAAAAADwvwAAAAAAAC7AAAAAAAAAGMAAAAAAAAAgwAAAAAAAACDAAAAAAAAAMsAAAAAAAAA2wAAAAAAAACbA"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"bar","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eCall Vol: %{x:,}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#4ADE80"},"name":"Call Volume","opacity":0.75,"orientation":"h","x":{"dtype":"f8","bdata":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA\u002fAAAAAAAAAEAAAAAAAAA2QAAAAAAAABRAAAAAAAAAKEAAAAAAAAAYQAAAAAAAAPA\u002fAAAAAAAACEAAAAAAAAAiQAAAAAAAACZAAAAAAAAAIEAAAAAAAGBjQAAAAAAAABxA"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"bar","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eCall OI: %{x:,}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#22C55E","width":2.2},"marker":{"size":5,"symbol":"circle"},"mode":"lines+markers","name":"Call OI (Tr\u1ea7n)","x":{"dtype":"f8","bdata":"AAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAFEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBGQAAAAAAAAChAAAAAAAAAPUAAAAAAAIBbQAAAAAAAwFpAAAAAAACAS0AAAAAAAABWQAAAAAAAoGRAAAAAAABAYEAAAAAAAIBbQAAAAAAAwFRAAAAAAABAUkAAAAAAAEiVQAAAAAAAwF5A"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"scatter","xaxis":"x2","yaxis":"y2"},{"customdata":{"dtype":"f8","bdata":"AAAAAADAUkAAAAAAAMBSQAAAAAAAQFFAAAAAAADwckAAAAAAAABHQAAAAAAAgFdAAAAAAADAUUAAAAAAAKB4QAAAAAAAQFhAAAAAAAAAXUAAAAAAAEBZQAAAAAAAQHVAAAAAAABAbkAAAAAAAEByQAAAAAAAsHlAAAAAAAAgbkAAAAAAAABbQAAAAAAAYHBAAAAAAADAVEAAAAAAANyTQAAAAAAAAD9A"},"hovertemplate":"Strike: $%{y}\u003cbr\u003ePut OI: %{customdata:,}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#EF4444","width":2.2},"marker":{"size":5,"symbol":"circle"},"mode":"lines+markers","name":"Put OI (S\u00e0n)","x":{"dtype":"f8","bdata":"AAAAAADAUsAAAAAAAMBSwAAAAAAAQFHAAAAAAADwcsAAAAAAAABHwAAAAAAAgFfAAAAAAADAUcAAAAAAAKB4wAAAAAAAQFjAAAAAAAAAXcAAAAAAAEBZwAAAAAAAQHXAAAAAAABAbsAAAAAAAEBywAAAAAAAsHnAAAAAAAAgbsAAAAAAAABbwAAAAAAAYHDAAAAAAADAVMAAAAAAANyTwAAAAAAAAD\u002fA"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eNet VEX: $%{x:.2f}M\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#38BDF8"},"name":"Net VEX ($M)","opacity":0.8,"orientation":"h","x":{"dtype":"f8","bdata":"0o52j\u002fyDwz9PChV9P2bKP8ett3ZeJtA\u002f1XODlprx9D\u002f6Nc0yNaTMP+OkIIMAi90\u002fi+7mjQUX1D9tVmDiW9vyP+owO4a7V8Q\u002f4Mg8iFMOgD9g+6cnx2xkPzZNd1t9LcO\u002fQMINcSITyL97h8jFkMzRv2DPuW1D+tq\u002ffGzbifswzb8ATy+o8YhzP0b7C2RE9N6\u002fEL5uhKzFnr9ARPv43SzTPwQO9nGsONo\u002f"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"bar","xaxis":"x3","yaxis":"y3"},{"hovertemplate":"Strike: $%{y}\u003cbr\u003eNet CHEX: $%{x:.2f}M\u002fng\u00e0y\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#FACC15"},"name":"Net CHEX ($M\u002fng\u00e0y)","opacity":0.8,"orientation":"h","x":{"dtype":"f8","bdata":"3yCS3cc0yr9ZUntAz6TRvyh2OLJQetW\u002fLaBWaGml+78t8+\u002fAWrbSv7Qkuc5xAOO\u002fDVwpJtUq2b8qOHydbFT2vx61TDsZG8S\u002fhjt\u002fjA5NrT\u002fg4umgsWRzv\u002fIqdys7Ftk\u002fjLq2jmgJ2j\u002fY\u002fh3uMnfhP1ZROz3A8ug\u002fJpdPHlAE2j8AxtiJHlBkvxAgx\u002fbq0+k\u002fsBcALzn7qj8Qv9a0VFHavzGQVkga5uO\u002f"},"y":{"dtype":"f8","bdata":"AAAAAACqrkAAAAAAANyuQAAAAAAADq9AAAAAAABAr0AAAAAAAHKvQAAAAAAApK9AAAAAAADWr0AAAAAAAASwQAAAAAAAHbBAAAAAAAA2sEAAAAAAADuwQAAAAAAAQLBAAAAAAABFsEAAAAAAAEqwQAAAAAAAT7BAAAAAAABUsEAAAAAAAFmwQAAAAAAAXrBAAAAAAABjsEAAAAAAAGiwQAAAAAAAgbBA"},"type":"bar","xaxis":"x3","yaxis":"y3"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#f2f5fa"},"error_y":{"color":"#f2f5fa"},"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"baxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"line":{"color":"#283442"}},"type":"scattergl"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"marker":{"line":{"color":"#283442"}},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#506784"},"line":{"color":"rgb(17,17,17)"}},"header":{"fill":{"color":"#2a3f5f"},"line":{"color":"rgb(17,17,17)"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#f2f5fa","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#f2f5fa"},"geo":{"bgcolor":"rgb(17,17,17)","lakecolor":"rgb(17,17,17)","landcolor":"rgb(17,17,17)","showlakes":true,"showland":true,"subunitcolor":"#506784"},"hoverlabel":{"align":"left"},"hovermode":"closest","paper_bgcolor":"rgb(17,17,17)","plot_bgcolor":"rgb(17,17,17)","polar":{"angularaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","radialaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"yaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"zaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"}},"shapedefaults":{"line":{"color":"#f2f5fa"}},"sliderdefaults":{"bgcolor":"#C8D4E3","bordercolor":"rgb(17,17,17)","borderwidth":1,"tickwidth":0},"ternary":{"aaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"baxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","caxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"title":{"x":0.05},"updatemenudefaults":{"bgcolor":"#506784","borderwidth":0},"xaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2}}},"xaxis":{"anchor":"y","domain":[0.0,0.3348],"gridcolor":"#1E293B"},"yaxis":{"anchor":"x","domain":[0.0,1.0],"range":[3915.0,4235.0],"gridcolor":"#1E293B","dtick":5.0},"xaxis2":{"anchor":"y2","domain":[0.3698,0.7046],"gridcolor":"#1E293B"},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"matches":"y","showticklabels":false,"range":[3915.0,4235.0],"gridcolor":"#1E293B","dtick":5.0},"xaxis3":{"anchor":"y3","domain":[0.7396,1.0],"gridcolor":"#1E293B"},"yaxis3":{"anchor":"x3","domain":[0.0,1.0],"matches":"y","showticklabels":false,"range":[3915.0,4235.0],"gridcolor":"#1E293B","dtick":5.0},"annotations":[{"font":{"size":16},"showarrow":false,"text":"\u003cb\u003ePanel 1: Net GEX ($M) & M\u1ed1c Chi\u1ebfn Thu\u1eadt (SL\u002fTP)\u003c\u002fb\u003e","x":0.1674,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"\u003cb\u003ePanel 2: D\u00f2ng Ti\u1ec1n Volume vs Open Interest N\u00e9n\u003c\u002fb\u003e","x":0.5372,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"\u003cb\u003ePanel 3: Greeks B\u1eadc 2 (Vanna & Charm)\u003c\u002fb\u003e","x":0.8698,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#EF4444","borderpad":3,"borderwidth":1,"font":{"color":"#EF4444","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eCALL WALL (TR\u1ea6N CH\u00cdNH)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4200.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#22C55E","borderpad":3,"borderwidth":1,"font":{"color":"#22C55E","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003ePUT WALL (S\u00c0N CH\u00cdNH)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4100.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#F87171","borderpad":3,"borderwidth":1,"font":{"color":"#F87171","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eC\u1ea2N TR\u00caN ($4155)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4155.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#4ADE80","borderpad":3,"borderwidth":1,"font":{"color":"#4ADE80","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eS\u00c0N D\u01af\u1edaI ($4150)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4150.0,"yanchor":"middle","yref":"y"},{"bgcolor":"rgba(15, 23, 42, 0.85)","bordercolor":"#FACC15","borderpad":3,"borderwidth":1,"font":{"color":"#FACC15","family":"JetBrains Mono","size":11},"showarrow":false,"text":"\u003cb\u003eCME LIVE ($4152.80)\u003c\u002fb\u003e","x":0,"xanchor":"left","xref":"x","y":4152.8,"yanchor":"middle","yref":"y"}],"shapes":[{"line":{"color":"#475569","dash":"solid"},"type":"line","x0":0,"x1":0,"xref":"x","y0":0,"y1":1,"yref":"y domain"},{"line":{"color":"#475569","dash":"solid"},"type":"line","x0":0,"x1":0,"xref":"x2","y0":0,"y1":1,"yref":"y2 domain"},{"line":{"color":"#475569","dash":"solid"},"type":"line","x0":0,"x1":0,"xref":"x3","y0":0,"y1":1,"yref":"y3 domain"},{"line":{"color":"#EF4444","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4200.0,"y1":4200.0,"yref":"y"},{"line":{"color":"#EF4444","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4200.0,"y1":4200.0,"yref":"y2"},{"line":{"color":"#EF4444","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4200.0,"y1":4200.0,"yref":"y3"},{"line":{"color":"#22C55E","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4100.0,"y1":4100.0,"yref":"y"},{"line":{"color":"#22C55E","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4100.0,"y1":4100.0,"yref":"y2"},{"line":{"color":"#22C55E","dash":"dash","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4100.0,"y1":4100.0,"yref":"y3"},{"line":{"color":"#F87171","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4155.0,"y1":4155.0,"yref":"y"},{"line":{"color":"#F87171","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4155.0,"y1":4155.0,"yref":"y2"},{"line":{"color":"#F87171","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4155.0,"y1":4155.0,"yref":"y3"},{"line":{"color":"#4ADE80","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4150.0,"y1":4150.0,"yref":"y"},{"line":{"color":"#4ADE80","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4150.0,"y1":4150.0,"yref":"y2"},{"line":{"color":"#4ADE80","dash":"dot","width":1.2},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4150.0,"y1":4150.0,"yref":"y3"},{"line":{"color":"#FACC15","dash":"solid","width":1.8},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":4152.8,"y1":4152.8,"yref":"y"},{"line":{"color":"#FACC15","dash":"solid","width":1.8},"type":"line","x0":0,"x1":1,"xref":"x2 domain","y0":4152.8,"y1":4152.8,"yref":"y2"},{"line":{"color":"#FACC15","dash":"solid","width":1.8},"type":"line","x0":0,"x1":1,"xref":"x3 domain","y0":4152.8,"y1":4152.8,"yref":"y3"}],"margin":{"l":60,"r":40,"t":50,"b":40},"legend":{"font":{"size":11,"family":"JetBrains Mono"},"orientation":"h","yanchor":"bottom","y":1.03,"xanchor":"center","x":0.5},"paper_bgcolor":"#0F172A","plot_bgcolor":"#0A0F1D","height":750,"barmode":"relative"},                        {"responsive": true, "displayModeBar": true}                    )                };            </script>        </div>
     </div>
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
@@ -459,38 +459,38 @@
             </thead>
             <tbody>
                 <tr>
-                    <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze 4170)</td>
-                    <td>Vượt > 4170.50</td>
-                    <td>4171.00</td>
-                    <td style="color:#F87171;">4168.50 ($4.5)</td>
-                    <td style="color:#4ADE80;">4179.00</td>
+                    <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze 4155)</td>
+                    <td>Vượt > 4155.50</td>
+                    <td>4156.00</td>
+                    <td style="color:#F87171;">4153.50 ($4.5)</td>
+                    <td style="color:#4ADE80;">4174.00</td>
                     <td style="color:#FACC15; font-weight:700;">~0.11 Lot</td>
                     <td>MM vỡ trần Short -> Buộc mua Futures cover đẩy giá phóng lên trạm tiếp theo</td>
                 </tr>
                 <tr>
-                    <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade 4170)</td>
-                    <td>4168.50 - 4170.00</td>
-                    <td>4169.00</td>
-                    <td style="color:#F87171;">4172.00 ($5.0)</td>
-                    <td style="color:#4ADE80;">4166.30</td>
+                    <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade 4155)</td>
+                    <td>4153.50 - 4155.00</td>
+                    <td>4154.00</td>
+                    <td style="color:#F87171;">4157.00 ($5.0)</td>
+                    <td style="color:#4ADE80;">4152.80</td>
                     <td style="color:#FACC15; font-weight:700;">~0.10 Lot</td>
                     <td>Cản Vol cực đại -> MM tung lệnh bán chặn đầu ghìm giá quay lại ATM</td>
                 </tr>
                 <tr>
-                    <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound 4165)</td>
-                    <td>4165.00 - 4166.50</td>
-                    <td>4166.00</td>
-                    <td style="color:#F87171;">4161.00 ($5.0)</td>
-                    <td style="color:#4ADE80;">4169.00</td>
+                    <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound 4150)</td>
+                    <td>4150.00 - 4151.50</td>
+                    <td>4151.00</td>
+                    <td style="color:#F87171;">4146.00 ($5.0)</td>
+                    <td style="color:#4ADE80;">4154.00</td>
                     <td style="color:#FACC15; font-weight:700;">~0.10 Lot</td>
                     <td>Đệm Put đỡ kỹ thuật -> MM gom mua đẩy giá phục hồi (vào khi có rút chân)</td>
                 </tr>
                 <tr>
-                    <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown 4165)</td>
-                    <td>Thủng < 4164.50</td>
-                    <td>4164.00</td>
-                    <td style="color:#F87171;">4166.50 ($4.5)</td>
-                    <td style="color:#4ADE80;">4161.00</td>
+                    <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown 4150)</td>
+                    <td>Thủng < 4149.50</td>
+                    <td>4149.00</td>
+                    <td style="color:#F87171;">4151.50 ($4.5)</td>
+                    <td style="color:#4ADE80;">4101.00</td>
                     <td style="color:#FACC15; font-weight:700;">~0.11 Lot</td>
                     <td>Thủng đệm sàn -> Phía dưới là túi rỗng Air Pocket -> CẤM ĐỠ DAO, MM xả lũ</td>
                 </tr>
@@ -518,7 +518,7 @@
                     <td>4198.50 - 4200.00</td>
                     <td>4199.00</td>
                     <td style="color:#F87171;">4204.00 ($4.0)</td>
-                    <td style="color:#4ADE80;">4170.00 / 4166.30</td>
+                    <td style="color:#4ADE80;">4155.00 / 4152.80</td>
                     <td style="color:#FACC15; font-weight:700;">~0.12 Lot</td>
                     <td>Call Wall 1,362 OI (Nóc nhà kiên cố cuối cùng của MM)</td>
                 </tr>
@@ -527,7 +527,7 @@
                     <td>4100.00 - 4101.50</td>
                     <td>4100.50</td>
                     <td style="color:#F87171;">4096.00 ($4.0)</td>
-                    <td style="color:#4ADE80;">4166.30 / 4170.00</td>
+                    <td style="color:#4ADE80;">4152.80 / 4155.00</td>
                     <td style="color:#FACC15; font-weight:700;">~0.12 Lot</td>
                     <td>Major Put Wall 394 OI (Đáy bê tông cốt thép của MM)</td>
                 </tr>
