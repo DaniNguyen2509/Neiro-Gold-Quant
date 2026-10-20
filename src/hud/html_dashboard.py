@@ -594,6 +594,28 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         """)
     radar_cards_str = "".join(radar_cards_html)
 
+    # Dynamic Pinning / Price Pegging Evaluation
+    is_pinning = (total_chex < -0.8) and (abs(strike_above - strike_below) <= 15.0) and (strike_below - 3.0 <= spot <= strike_above + 3.0)
+    if is_pinning:
+        pinning_status_title = "HIỆN TƯỢNG NEO GIÁ (INSTITUTIONAL PINNING & CHARM BURN)"
+        pinning_badge_text = "🔒 ĐANG NEO GIÁ (PINNING BOX)"
+        pinning_badge_bg = "rgba(234, 179, 8, 0.15)"
+        pinning_badge_color = "#FACC15"
+        pinning_badge_border = "rgba(234, 179, 8, 0.4)"
+        pinning_desc = (
+            f"Thị trường đang bị Market Maker <b>NEO CHẶT</b> trong biên độ hẹp <b>${strike_below:,.0f} ◄► ${strike_above:,.0f}</b>. "
+            f"MM triệt tiêu biến động để đốt thời gian (Charm decay {total_chex:+.1f}M/ngày) và ăn trọn phí quyền chọn."
+        )
+    else:
+        pinning_status_title = "CHẾ ĐỘ THỊ TRƯỜNG: DÒ TÌM XU HƯỚNG (ACTIVE TREND / EXPANSION)"
+        pinning_badge_text = "🌊 UNPINNED / ACTIVE EXPANSION"
+        pinning_badge_bg = "rgba(56, 189, 248, 0.15)"
+        pinning_badge_color = "#38BDF8"
+        pinning_badge_border = "rgba(56, 189, 248, 0.4)"
+        pinning_desc = (
+            f"Thị trường đang thoát khỏi biên độ nén ngầm. Dòng tiền Gamma và Delta đang chi phối hành vi giá."
+        )
+
     plotly_div = fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True, "displayModeBar": True})
 
     html = f"""<!DOCTYPE html>
@@ -688,6 +710,49 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <span class="badge" style="background: {'rgba(34, 197, 94, 0.15)' if rr25 > 0.005 else ('rgba(239, 68, 68, 0.15)' if rr25 < -0.005 else 'rgba(56, 189, 248, 0.15)')}; color: {'#4ADE80' if rr25 > 0.005 else ('#F87171' if rr25 < -0.005 else '#38BDF8')}; border: 1px solid {'rgba(34, 197, 94, 0.4)' if rr25 > 0.005 else ('rgba(239, 68, 68, 0.4)' if rr25 < -0.005 else 'rgba(56, 189, 248, 0.4)')};">
                     {skew_label}
                 </span>
+            </div>
+        </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(250, 204, 21, 0.35); border-left: 4px solid #FACC15; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">🧲</span>
+                <span style="font-size:13px; font-weight:800; color:#FACC15; letter-spacing:0.5px;">TÍN HIỆU ĐỊNH LƯỢNG: {pinning_status_title}</span>
+                <span class="badge" style="background:{pinning_badge_bg}; color:{pinning_badge_color}; border:1px solid {pinning_badge_border}; font-size:11px;">{pinning_badge_text}</span>
+            </div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#38BDF8;">
+                Hộp Kẹp Giá: <b>${strike_below:,.0f} ◄► ${strike_above:,.0f}</b> (Biên độ: ${strike_above - strike_below:,.1f}$)
+            </div>
+        </div>
+        <div style="font-size:12px; color:#CBD5E1; margin-bottom:12px; line-height:1.5;">
+            {pinning_desc}
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; font-size:12px; line-height:1.5;">
+            <div style="background:rgba(15, 23, 42, 0.6); padding:10px 12px; border-radius:8px; border:1px solid #1E293B;">
+                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+                    <span>⏱️</span> 1. Động Lực Ghìm (Charm & Theta Burn)
+                </div>
+                <div style="color:#E2E8F0;">
+                    Net CHEX = <b style="color:#22D3EE;">{total_chex:+.1f}M/ngày</b>. Cột Charm âm cực đại chứng minh Dealer đang hưởng lợi từ việc giữ giá bất động qua từng giờ để bào mòn phí Premium của bên mua.
+                </div>
+            </div>
+            <div style="background:rgba(15, 23, 42, 0.6); padding:10px 12px; border-radius:8px; border:1px solid #1E293B;">
+                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+                    <span>🧱</span> 2. Gọng Kìm Thanh Khoản (Strike Defense)
+                </div>
+                <div style="color:#E2E8F0;">
+                    Trần trên Call <b style="color:#F87171;">${strike_above:,.0f}</b> chặn bán Futures ghìm xuống &bull; Sàn dưới Put <b style="color:#4ADE80;">${strike_below:,.0f}</b> đệm mua Futures đỡ lên. Hai đầu triệt tiêu biến động.
+                </div>
+            </div>
+            <div style="background:rgba(15, 23, 42, 0.6); padding:10px 12px; border-radius:8px; border:1px solid #1E293B;">
+                <div style="color:#94A3B8; font-weight:600; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+                    <span>🚀</span> 3. Điều Kiện Phá Vỡ Neo (Breakout Trigger)
+                </div>
+                <div style="color:#E2E8F0;">
+                    <span style="color:#4ADE80; font-weight:600;">⚡ Phá trên > ${strike_above + buffer_up:.2f}</span>: MM vỡ trần Short, kích hoạt Gamma Squeeze lên <b>{squeeze_tp_note}</b>.<br>
+                    <span style="color:#F87171; font-weight:600;">🚨 Phá dưới < ${strike_below - buffer_down:.2f}</span>: Thủng đệm kẹp, xả trượt (Sliced Vacuum) về <b>{breakdown_tp_note}</b>.
+                </div>
             </div>
         </div>
     </div>

@@ -91,6 +91,7 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │ [TẦNG 3: CLOUD TACTICAL TERMINAL & STATIC HOSTING (FRONTEND)]                          │
 │  - html_dashboard.py: Render độc lập file Plotly HTML Dark Mode cao cấp.               │
 │  - 5 Thẻ KPI Thống Kê: Spot-MT5, Net GEX, Expected Move, Greeks Bậc 2, 25Δ Skew.       │
+│  - Institutional Pinning Radar: Cảnh báo tự động hiện tượng Neo giá (Pinning Box & Charm Burn).│
 │  - CTA Momentum Confluence Banner: Cảnh báo bứt phá đồng pha giữa Quỹ & Dealer.        │
 │  - Chế độ ATM ± 10 Strikes (Broad Tactical View): Cắt lớp 20-21 strikes (height 900px).  │
 │  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
