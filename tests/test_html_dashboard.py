@@ -36,6 +36,9 @@ def test_load_and_preprocess_options_with_basis():
     assert meta["put_wall"] > 0
     assert "strike" in df.columns
     assert "netGEX" in df.columns
+    assert "skew_rr25" in meta
+    assert "skew_bf25" in meta
+    assert "cta_badge" in meta
 
     # 2. Test with positive spread passed (should normalize to negative basis)
     df2, meta2 = load_and_preprocess_options(csv_path, basis=24.0)
@@ -112,6 +115,12 @@ def test_generate_html_terminal_content():
         "basis": -24.0,
         "dte_days": 8.5,
         "expiration_date": "OGX26 (2026-10-27)",
+        "skew_rr25": 0.015,
+        "skew_bf25": 0.008,
+        "skew_sentiment": "BULLISH CALL SKEW (DÒNG TIỀN QUỸ GOM CALL CƯỢC PHÁ ĐỈNH)",
+        "cta_badge": "INDEPENDENT DEALER WALLS",
+        "cta_description": "Các chốt chặn hiện tại do Market Maker độc lập phòng thủ trong biên độ thông thường.",
+        "cta_range": "$4,108.3 - $4,251.2",
     }
 
     import plotly.graph_objects as go
@@ -126,6 +135,10 @@ def test_generate_html_terminal_content():
     # MT5 Spot = 4180.0 + (-24.0) = 4156.00
     assert "MT5: ~$4,156.00" in html
     assert "Basis MT5 Spot: <b>-24.00 USD</b>" in html
+    assert "Institutional Vol Skew" in html
+    assert "+1.50v" in html
+    assert "CTA MOMENTUM CONFLUENCE" in html
+    assert "Lot Size ($10K, R: 1%)" in html
     # Check strategic tables
     assert "BUY MUA ĐUỔI" in html
     assert "SELL CHẶN TIỀN TUYẾN" in html

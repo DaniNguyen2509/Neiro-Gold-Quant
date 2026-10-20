@@ -24,6 +24,11 @@ from plotly.subplots import make_subplots
 
 from src.quant_engine.synthetic import compute_dynamic_dte
 from src.quant_engine.basis import resolve_dynamic_basis
+from src.quant_engine.institutional import (
+    extract_rr_bf,
+    size_xauusd,
+    detect_cta_confluence,
+)
 from src.quant_engine.level_state import (
     LevelState,
     evaluate_tactical_level_states,
@@ -145,7 +150,11 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tu
     df["putCHEX"] = - ((charm_put / 365.0) * df["putOpenInterest"] * MULT * spot_price / 1e6)
     df["netCHEX"] = df["callCHEX"] + df["putCHEX"]
 
-    # 4. Structural Walls & Regime
+    # 4. Deltas & Institutional Greeks
+    df["callDelta"] = df_disc * cdf_d1
+    df["putDelta"] = df["callDelta"] - df_disc
+
+    # 5. Structural Walls & Regime
     call_wall_row = df.loc[df["callOpenInterest"].idxmax()]
     put_wall_row = df.loc[df["putOpenInterest"].idxmax()]
     call_wall = float(call_wall_row["strike"])
@@ -167,6 +176,15 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tu
         # User passed positive spread e.g. 24.0 -> convert to signed basis (spot - futures = -24.0)
         basis = -basis
 
+    # 6. Institutional Skew & CTA Confluence
+    skew_metrics = extract_rr_bf(df, atm_strike=atm_strike)
+    cta_conf = detect_cta_confluence(
+        spot=spot_price,
+        call_wall=call_wall,
+        put_wall=put_wall,
+        daily_move_1s=rule16_daily_move,
+    )
+
     meta = {
         "spot_price": spot_price,
         "atm_strike": atm_strike,
@@ -187,6 +205,15 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tu
         "basis": basis,
         "dte_days": dte_days,
         "expiration_date": f"OGX26 ({exp_val})" if exp_val else "OGX26 (2026-10-27)",
+        "skew_rr25": skew_metrics.rr25,
+        "skew_bf25": skew_metrics.bf25,
+        "skew_regime": skew_metrics.regime.value,
+        "skew_label": skew_metrics.label_vi,
+        "skew_bias_pct": skew_metrics.bias_pct,
+        "cta_h20": cta_conf.h20,
+        "cta_l20": cta_conf.l20,
+        "cta_badge": cta_conf.confluence_badge,
+        "cta_desc": cta_conf.confluence_desc,
     }
     return df, meta
 
@@ -457,6 +484,24 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     put_wall = meta["put_wall"]
     put_wall_oi = meta["put_wall_oi"]
 
+    # Institutional metrics
+    rr25 = float(meta.get("skew_rr25", 0.0))
+    bf25 = float(meta.get("skew_bf25", 0.0))
+    skew_label = str(meta.get("skew_label", "CÂN BẰNG"))
+    skew_bias_pct = float(meta.get("skew_bias_pct", 0.0))
+    cta_badge = str(meta.get("cta_badge", "INDEPENDENT DEALER WALLS"))
+    cta_desc = str(meta.get("cta_desc", "Biên độ phòng thủ của Market Maker"))
+    cta_h20 = float(meta.get("cta_h20", spot + 50.0))
+    cta_l20 = float(meta.get("cta_l20", spot - 50.0))
+
+    # Volatility-Targeted Position Sizing (Account: $10k, Risk: 1% = $100)
+    size_squeeze = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.5, gex_regime=regime)
+    size_fade = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=5.0, gex_regime=regime)
+    size_rebound = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=5.0, gex_regime=regime)
+    size_breakdown = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.5, gex_regime=regime)
+    size_call_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.0, gex_regime=regime)
+    size_put_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.0, gex_regime=regime)
+
     strikes = df["strike"].values
     step = float(np.diff(strikes).min()) if len(strikes) > 1 else 25.0
     strikes_above = strikes[strikes > spot]
@@ -617,6 +662,17 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <div class="kpi-val" style="color: #38BDF8;">{total_vex:+.1f}M / {total_chex:+.1f}M</div>
             <div class="kpi-sub">Net VEX ({total_vex:+.1f}M) | Net CHEX ({total_chex:+.1f}M/ngày)</div>
         </div>
+        <div class="kpi-card" style="border: 1px solid rgba(56, 189, 248, 0.4);">
+            <div class="kpi-label">Institutional Vol Skew (25Δ RR & BF)</div>
+            <div class="kpi-val" style="color: {'#4ADE80' if rr25 > 0.005 else ('#F87171' if rr25 < -0.005 else '#38BDF8')}; font-size: 21px;">
+                {rr25*100:+.2f}v <span style="font-size: 13px; font-weight: 500; color: #94A3B8;">(Fly: {bf25*100:+.2f}v)</span>
+            </div>
+            <div class="kpi-sub" style="margin-top: 4px;">
+                <span class="badge" style="background: {'rgba(34, 197, 94, 0.15)' if rr25 > 0.005 else ('rgba(239, 68, 68, 0.15)' if rr25 < -0.005 else 'rgba(56, 189, 248, 0.15)')}; color: {'#4ADE80' if rr25 > 0.005 else ('#F87171' if rr25 < -0.005 else '#38BDF8')}; border: 1px solid {'rgba(34, 197, 94, 0.4)' if rr25 > 0.005 else ('rgba(239, 68, 68, 0.4)' if rr25 < -0.005 else 'rgba(56, 189, 248, 0.4)')};">
+                    {skew_label}
+                </span>
+            </div>
+        </div>
     </div>
 
     <div class="chart-box">
@@ -635,6 +691,22 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
     </div>
 
+    <div style="background: linear-gradient(90deg, #111C33 0%, #0F172A 100%); border: 1px solid #1E293B; border-left: 4px solid #FACC15; border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">⚡</span>
+                <span style="font-size:12px; font-weight:800; color:#FACC15; letter-spacing:0.5px;">CTA MOMENTUM CONFLUENCE (20D BREAKOUT):</span>
+                <span class="badge badge-gold">{cta_badge}</span>
+            </div>
+            <div style="font-size:12px; color:#94A3B8; margin-top:4px;">
+                {cta_desc} | Biên độ 20 phiên: <b>${cta_l20:,.1f} - ${cta_h20:,.1f}</b>
+            </div>
+        </div>
+        <div style="font-size:12px; color:#38BDF8; font-family:'JetBrains Mono', monospace; font-weight:700; background:rgba(56,189,248,0.1); padding:6px 12px; border-radius:6px; border:1px solid rgba(56,189,248,0.25);">
+            Regime: {regime} (Vol Scaler: {size_squeeze.regime_multiplier}x)
+        </div>
+    </div>
+
     <div class="table-box">
         <div class="section-header">⚡ PHẦN 1: BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - ĂN 20-25 GIÁ VÀNG)</div>
         <table>
@@ -646,6 +718,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>MT5 Spot (~ {basis:+.1f}$)</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
+                    <th>Lot Size ($10K, R: 1%)</th>
                     <th>Ghi Chú Hành Vi Market Maker & Túi Chân Không</th>
                 </tr>
             </thead>
@@ -657,6 +730,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{strike_above + buffer_up + 0.50 + basis:.2f}</td>
                     <td style="color:#F87171;">{strike_above - 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{squeeze_tp:.2f} ({squeeze_tp_note})</td>
+                    <td style="color:#FACC15; font-weight:700;">~{size_squeeze.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_squeeze.risk_usd:.0f})</span></td>
                     <td>{squeeze_note}</td>
                 </tr>
                 <tr>
@@ -666,6 +740,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{strike_above - 1.00 + basis:.2f}</td>
                     <td style="color:#F87171;">{strike_above + buffer_up + 1.50:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f}</td>
+                    <td style="color:#FACC15; font-weight:700;">~{size_fade.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_fade.risk_usd:.0f})</span></td>
                     <td>Cản Vol cực đại -> MM bán Futures chặn đầu ghìm giá hồi về Spot</td>
                 </tr>
                 <tr>
@@ -675,6 +750,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{strike_below + 1.00 + basis:.2f} (Vùng ~{spot_mt5:.0f})</td>
                     <td style="color:#F87171;">{strike_below - 4.00:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{strike_above - front_run_tp:.2f}</td>
+                    <td style="color:#FACC15; font-weight:700;">~{size_rebound.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_rebound.risk_usd:.0f})</span></td>
                     <td>Đệm Put hỗ trợ kỹ thuật trong phiên đẩy giá hồi phục (chỉ vào khi có nến rút chân xác nhận)</td>
                 </tr>
                 <tr>
@@ -684,6 +760,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{strike_below - buffer_down - 0.50 + basis:.2f}</td>
                     <td style="color:#F87171;">{strike_below + 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{breakdown_tp:.2f} ({breakdown_tp_note})</td>
+                    <td style="color:#FACC15; font-weight:700;">~{size_breakdown.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_breakdown.risk_usd:.0f})</span></td>
                     <td>{breakdown_note}</td>
                 </tr>
             </tbody>
@@ -701,6 +778,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>MT5 Spot (~ {basis:+.1f}$)</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
+                    <th>Lot Size ($10K, R: 1%)</th>
                     <th>Ghi Chú Cấu Trúc Khối Lượng</th>
                 </tr>
             </thead>
@@ -712,6 +790,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{call_wall - 1.00 + basis:.2f}</td>
                     <td style="color:#F87171;">{call_wall + 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{strike_above:.2f} / {spot:.2f}</td>
+                    <td style="color:#FACC15; font-weight:700;">~{size_call_wall.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_call_wall.risk_usd:.0f})</span></td>
                     <td>Call Wall {call_wall_oi:,} OI (Nóc nhà kiên cố cuối cùng của MM)</td>
                 </tr>
                 <tr>
@@ -721,6 +800,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td style="color:#38BDF8; font-weight:600;">~{put_wall + 0.50 + basis:.2f}</td>
                     <td style="color:#F87171;">{put_wall - 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f} / {strike_above:.2f}</td>
+                    <td style="color:#FACC15; font-weight:700;">~{size_put_wall.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_put_wall.risk_usd:.0f})</span></td>
                     <td>Major Put Wall {put_wall_oi:,} OI (Đáy bê tông cốt thép của MM)</td>
                 </tr>
             </tbody>

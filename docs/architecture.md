@@ -80,12 +80,16 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - gex.py: Net GEX ($/1% move), Gamma Flip Point, Gamma Squeeze / Waterfall Triggers.   │
 │  - advanced_greeks.py: Net VEX ($M/1% IV - Vanna) & Net CHEX ($M/ngày - Charm).        │
 │  - expected_move.py: Biên độ 1-Sigma (Straddle / 0.7979) & Intraday Rule of 16.        │
+│  - institutional.py: 25Δ Risk Reversal (RR25), Butterfly (BF25), Volatility-Targeted   │
+│    Position Sizing với GEX Regime Scaler & CTA 20-Day Momentum Confluence.             │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 3: CLOUD TACTICAL TERMINAL & STATIC HOSTING (FRONTEND)]                          │
 │  - html_dashboard.py: Render độc lập file Plotly HTML Dark Mode cao cấp.               │
+│  - 5 Thẻ KPI Thống Kê: Spot-MT5, Net GEX, Expected Move, Greeks Bậc 2, 25Δ Skew.       │
+│  - CTA Momentum Confluence Banner: Cảnh báo bứt phá đồng pha giữa Quỹ & Dealer.        │
 │  - Chế độ ATM ± 5 Strikes (Scalping View): Cắt lớp 10-11 strikes xung quanh ATM.       │
 │  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
@@ -108,11 +112,12 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
                       ┌────────────────────┴────────────────────┐
                       ▼                                         ▼
 ┌─────────────────────────────────────────┐ ┌────────────────────────────────────────────┐
-│ [TẦNG 5: STRATEGY EXECUTION MATRICES]   │ │ [TẦNG 6: REAL-TIME BASIS & BROKER BRIDGE]  │
+│ [TẦNG 5: STRATEGY & RISK MATRICES]      │ │ [TẦNG 6: REAL-TIME BASIS & BROKER BRIDGE]  │
 │  - Bảng 1: Intraday Scalping (Ăn 20-25$)│ │  - Auto-Basis Sync: Live Gold-API & Binance│
-│    Entry, Hard SL, TP, Lý do Market     │ │  - Dynamic Basis: S_Spot - F_CME (-24 USD) │
+│    Entry, Hard SL, TP, Vol-Target Lot   │ │  - Dynamic Basis: S_Spot - F_CME (-24 USD) │
 │  - Bảng 2: Structural Swing Walls       │ │  - MetaTrader 5 Connector (Pepperstone)     │
 │    Bắt đáy Put Wall / Bán đỉnh Call Wall│ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5   │
+│  - CTA 20-Day Momentum Confluence       │ │                                            │
 └─────────────────────────────────────────┘ └────────────────────────────────────────────┘
 ```
 
@@ -217,7 +222,35 @@ stateDiagram-v2
 
 ---
 
-## VII. QUY ĐỊNH BẢO TỒN DUNG LƯỢNG & HIỆU NĂNG (ZERO-WASTE MANDATE)
+## VII. CƠ CHẾ QUẢN TRỊ VỊ THẾ & DÒNG TIỀN QUỸ HEDGE FUND (INSTITUTIONAL QUANT MECHANISMS)
+
+Để hoàn thiện hệ sinh thái định lượng chuẩn quỹ phòng hộ (Hedge Fund Standards), hệ thống tích hợp 3 cơ chế toán học vi mô:
+
+### 1. 25-Delta Risk Reversal ($RR_{25}$) & Butterfly ($BF_{25}$) Volatility Skew
+- **Cơ sở học thuật:** Quỹ đầu cơ và định chế tài chính hiếm khi nhìn giá quyền chọn trực tiếp mà theo dõi **Mặt cong biến động ẩn (Volatility Smile / Skew)** thông qua các mốc độ nhạy Delta chuẩn: $\Delta = +0.25$ (Call OTM) và $\Delta = -0.25$ (Put OTM).
+- **Risk Reversal ($RR_{25}$):** Đo lường độ lệch định hướng (Directional Bias) của dòng tiền lớn:
+  $$RR_{25} = IV(\text{Call}_{25\Delta}) - IV(\text{Put}_{25\Delta})$$
+  - Khi $RR_{25} > +0.5\%$: **BULLISH CALL SKEW** — Quỹ chấp nhận trả phí cao (vol premium) gom Call OTM cược vàng phá đỉnh, bảo vệ kịch bản tăng tốc.
+  - Khi $RR_{25} < -0.5\%$: **BEARISH PUT SKEW** — Quỹ dồn tiền mua Put OTM phòng hộ rủi ro đuôi (Tail Risk) hoặc cược đảo chiều giảm mạnh.
+- **Butterfly ($BF_{25}$):** Đo lường độ cong mặt cười (Smile Curvature / Tail Fatness):
+  $$BF_{25} = \frac{IV(\text{Call}_{25\Delta}) + IV(\text{Put}_{25\Delta})}{2} - IV(\text{ATM})$$
+  - Giá trị $BF_{25}$ càng cao cảnh báo thị trường định giá rủi ro sự kiện bất ngờ (Black Swan Event) có xác suất xảy ra cao hơn phân phối chuẩn Gauss.
+
+### 2. Quản Trị Vị Thế Volatility-Targeted Sizing Kết Hợp GEX Regime Cho MT5 XAUUSD
+- **Công thức tính Lot quy chuẩn:**
+  $$\text{Base Lots} = \frac{\text{Equity} \times \text{Risk\%} / 100}{100 \times \text{SL USD}}$$
+  *(Ví dụ: Tài khoản \$10,000, rủi ro 1% = \$100, Stop Loss \$4.5 CME $\Rightarrow \text{Base Lots} = \frac{100}{100 \times 4.5} = 0.22$ Lot).*
+- **Bộ điều tiết Regime Dealer (GEX Regime Multiplier):**
+  - **Long Gamma Regime ($1.0\times$ Multiplier):** Thị trường dao động ổn định trong biên độ hẹp (Mean Reversion), Dealer mua thấp bán cao dập tắt biến động $\Rightarrow$ Giữ nguyên 100% Volume mục tiêu.
+  - **Short Gamma Regime ($0.5\times$ Multiplier):** Thị trường biến động cực đại và dễ sụp đổ dây chuyền, Dealer buộc phải bán tháo khuếch đại đà rơi $\Rightarrow$ Tự động **cắt giảm 50% khối lượng** (ví dụ từ 0.22 Lot xuống 0.11 Lot) để bảo toàn vốn trước hiện tượng giãn spread và trượt giá (Slippage).
+
+### 3. CTA Momentum Breakout Confluence (Hợp Lưu Quỹ Xu Hướng 20 Phiên)
+- Theo dõi ngưỡng bứt phá Donchian 20 phiên (20-Day High / Low) của các quỹ CTA (Commodity Trading Advisors).
+- Khi **20D Breakout High $\ge$ Call Wall**: Kích hoạt trạng thái `SUPER_SQUEEZE_CONFLUENCE`. Tại đây xảy ra hiệu ứng cộng hưởng kép (Double Squeeze): Quỹ CTA ồ ạt kích hoạt thuật toán mua gom theo xu hướng + Dealer Short Gamma bị chạm ngưỡng stop loss buộc phải vào lệnh Long Futures phòng hộ $\Rightarrow$ Cú đẩy giá vượt bậc.
+
+---
+
+## VIII. QUY ĐỊNH BẢO TỒN DUNG LƯỢNG & HIỆU NĂNG (ZERO-WASTE MANDATE)
 
 1. **Chuẩn dung lượng siêu nhẹ:** Toàn bộ repository luôn được duy trì < 15MB.
 2. **Loại bỏ hoàn toàn rác tạm:** Mọi file cào tạm thời, script scratch, file log thử nghiệm phải bị xóa sạch ngay sau khi hoàn thành.

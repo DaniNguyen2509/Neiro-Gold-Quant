@@ -84,6 +84,7 @@ Neiro-Quant/
 │   │   ├── synthetic.py          # Put-Call Parity Implied Spot & Expected Move Bands
 │   │   ├── dealer.py             # Call/Put Walls, Gamma Flip, Squeeze Triggers
 │   │   ├── air_pocket.py         # Quét chân không thanh khoản (OI < 35% MA)
+│   │   ├── institutional.py      # 25Δ Skew (RR/BF), Vol-Targeted Sizing & CTA Confluence
 │   │   └── strategy.py           # Ma trận chiến lược Scalping & Swing
 │   ├── hud/                      # Giao diện Tactical Terminal
 │   │   ├── html_dashboard.py     # Plotly Dark Theme generator (Anti-Collision Labels)
@@ -133,6 +134,33 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 
 4. **OI Air Pockets (oi_air_pocket_zones):**
    - Dai Strike giua ATM va Walls co OI < 30-40% muc trung binh -> Vung chan khong
+
+### Tier 4 (Hedge Fund Quantitative Mechanisms - src/quant_engine/institutional.py)
+
+1. **25-Delta Risk Reversal ($RR_{25}$) & Butterfly ($BF_{25}$) Volatility Skew:**
+   - Nội suy tuyến tính Implied Volatility theo độ nhạy Delta: $\Delta_{\text{Call}} = +0.25$ và $\Delta_{\text{Put}} = -0.25$.
+   - **Risk Reversal:** $RR_{25} = IV(\text{Call}_{25\Delta}) - IV(\text{Put}_{25\Delta})$.
+     - $RR_{25} > +0.5\%$: **BULLISH CALL SKEW** (Quỹ đầu cơ dồn vốn mua Call Out-of-the-Money cược bứt phá đỉnh).
+     - $RR_{25} < -0.5\%$: **BEARISH PUT SKEW** (Tổ chức gom Put phòng hộ rủi ro sập giá / Black Swan).
+     - $|RR_{25}| \le 0.5\%$: **BALANCED / NEUTRAL SKEW** (Thị trường kỳ vọng phân phối chuẩn).
+   - **Butterfly (Smile Curvature / Tail Risk):** $BF_{25} = \frac{IV(\text{Call}_{25\Delta}) + IV(\text{Put}_{25\Delta})}{2} - IV(\text{ATM})$.
+
+2. **Volatility-Targeted Position Sizing with GEX Regime Adjustment for MT5 XAUUSD:**
+   - Tài khoản chuẩn: Equity = \$10,000, Rủi ro mục tiêu = 1.0\% (\$100).
+   - Quy chuẩn XAUUSD MT5: 1 standard lot = 100 troy oz $\Rightarrow$ biến động \$1.0 USD giá vàng = \$100.0 PnL/lot.
+   - **Base Sizing:**
+     $$\text{Base Lots} = \frac{\text{Equity} \times \text{Risk\%} / 100}{100 \times \text{SL USD}}$$
+   - **GEX Regime Multiplier:**
+     - **Long Gamma Regime:** Nhân hệ số $1.0\times$ (Biến động ổn định, dealer dập tắt dao động).
+     - **Short Gamma Regime:** Nhân hệ số $0.5\times$ (Bảo toàn vốn tối đa trước nguy cơ dealer bán tháo khuếch đại đà rơi và trượt giá slippage).
+     - Giới hạn sàn: Tối thiểu 0.01 lot MT5.
+
+3. **CTA Momentum Breakout Confluence (20-Day Breakout Window):**
+   - Giám sát vùng phá vỡ đỉnh/đáy 20 phiên của các quỹ theo xu hướng (CTA Trend-Following Models: 20D High / 20D Low) đối chiếu trực tiếp với Options Dealer Walls.
+   - **Trạng thái hợp lưu:**
+     - `SUPER_SQUEEZE_CONFLUENCE`: 20D Breakout High $\ge$ Call Wall $\Rightarrow$ Hợp lưu kép: CTA kích hoạt lệnh Long mua đuổi theo đà + Market Maker vỡ trần Short Gamma bị ép mua Futures phòng hộ $\Rightarrow$ Siêu sóng tăng tốc cực mạnh.
+     - `SUPER_BREAKDOWN_CASCADE`: 20D Breakdown Low $\le$ Put Wall $\Rightarrow$ Hợp lưu kép xả lũ bán tháo.
+     - `INDEPENDENT_DEALER_WALLS`: Dealer Walls nằm độc lập trong biên độ thường, các chốt chặn phát huy tối đa vai trò cản kỹ thuật.
 
 ### Auto-Basis Sync & Live Spot Feed (DeepSeek Hardened)
 - **Live Spot Ingestion:** Tự động gọi API thời gian thực với cơ chế multi-source fallback (Gold-API LBMA-blended `api.gold-api.com/price/XAU` làm nguồn chính, Binance `PAXGUSDT` làm proxy dự phòng).
