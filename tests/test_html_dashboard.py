@@ -130,7 +130,7 @@ def test_generate_html_terminal_content():
     html = generate_html_terminal(df, meta, fig)
 
     # Check key indicators in HTML
-    assert "Spot CME Futures ↔ Spot MT5 (Quy Đổi)" in html
+    assert "CME Gold Futures (GCZ26) ↔ Spot XAU/USD (Quy Đổi)" in html
     assert "$4,180.00" in html
     # MT5 Spot = 4180.0 + (-24.0) = 4156.00
     assert "MT5: ~$4,156.00" in html

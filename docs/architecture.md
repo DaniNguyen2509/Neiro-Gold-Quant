@@ -90,7 +90,7 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - html_dashboard.py: Render độc lập file Plotly HTML Dark Mode cao cấp.               │
 │  - 5 Thẻ KPI Thống Kê: Spot-MT5, Net GEX, Expected Move, Greeks Bậc 2, 25Δ Skew.       │
 │  - CTA Momentum Confluence Banner: Cảnh báo bứt phá đồng pha giữa Quỹ & Dealer.        │
-│  - Chế độ ATM ± 5 Strikes (Scalping View): Cắt lớp 10-11 strikes xung quanh ATM.       │
+│  - Chế độ ATM ± 10 Strikes (Broad Tactical View): Cắt lớp 20-21 strikes (height 900px).  │
 │  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
 │  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │

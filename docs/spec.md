@@ -7,7 +7,7 @@ Xây dựng hệ thống định lượng dòng tiền quyền chọn (Options F
 1. **Thu thập:** Tự động bắt gói Options Chain CME Gold (GCZ26) từ Barchart qua Playwright Headless Chromium + Internal API Sniffer. Tự động tính toán và phân giải mã hợp đồng Front-Month theo lịch CME Rule 120102.E (`resolve_front_month_cme_option`), tự động rollover khi đến hạn.
 2. **Giải mã:** Ma trận Greeks (Black-76, Net GEX, Net DEX, Net VEX, Net CHEX), Dynamic DTE tính thời gian đáo hạn chính xác theo phút, Synthetic ATM Pivot (Put-Call Parity kết hợp bộ lọc Liquid Strike Weighting) và biên độ kỳ vọng Expected Move (1.0σ & 0.85σ Bands).
 3. **Phân tích Vi mô (Level State Engine & Air Pocket Pipeline):** [ĐÃ TRIỂN KHAI] Máy trạng thái hữu hạn giám sát tương tác động tại từng Level (`DORMANT`, `TESTING`, `ABSORPTION_DEFENDED`, `SLICED_VACUUM_RUN`), tự động quét vùng chân không thanh khoản (Air Pocket) và kích hoạt kịch bản Breakdown Slicing Runner mở rộng Target thẳng về Major Defense Wall tiếp theo.
-4. **Xuất bản Độc lập:** Tự động sinh Plotly Tactical Terminal Dark Mode với Radar Vi Mô Level State Machine, chế độ hiển thị ATM ± 5 Strikes chuyên dụng cho Scalping trong ngày, xuất bản lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`) và Google Drive.
+4. **Xuất bản Độc lập:** Tự động sinh Plotly Tactical Terminal Dark Mode với Radar Vi Mô Level State Machine, chế độ hiển thị ATM ± 10 Strikes chuyên dụng cho Scalping và Swing trong ngày (chiều cao 900px bao trọn biên độ biến động rộng), xuất bản lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`) và Google Drive.
 
 **Target Assets:** Gold Futures CME (`GCZ26`), COMEX Gold Options (`OGX26`, `OGZ26`...), XAUUSD Spot (Pepperstone / Exness / IC Markets) & E-mini Gold.
 
@@ -71,7 +71,10 @@ Neiro-Quant/
 │   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.0 (Single Source of Truth)
 │   ├── spec.md                   # Bản đặc tả kỹ thuật chi tiết
 │   ├── decisions/                # Architecture Decision Records (ADRs)
-│   │   └── ADR-001-cloud-native-tactical-terminal.md
+│   │   ├── ADR-001-cloud-native-tactical-terminal.md
+│   │   ├── ADR-002-cme-front-month-auto-rollover-and-scalping-view.md
+│   │   ├── ADR-003-level-state-engine-and-air-pocket-detection.md
+│   │   └── ADR-004-institutional-terminal-layout-and-anti-collision.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       └── DEEPSEEK_MATH_AUDIT_REPORT.md

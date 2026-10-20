@@ -238,9 +238,9 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     squeeze_trigger = meta["squeeze_trigger"]
     waterfall_trigger = meta["waterfall_trigger"]
 
-    # Near-The-Money filter: ATM ± 5 strikes for intraday scalping (10-11 strikes total)
+    # Near-The-Money filter: ATM ± 10 strikes for full intraday breadth (20-21 strikes total)
     atm_idx = (df_full["strike"] - atm_strike).abs().idxmin()
-    half = 5
+    half = 10
     s_idx = max(0, atm_idx - half)
     e_idx = min(len(df_full), atm_idx + half + 1)
     df = df_full.iloc[s_idx:e_idx].copy().reset_index(drop=True)
@@ -288,60 +288,47 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
             row=1, col=col_idx,
         )
 
-    # Panel 1 Action Annotations & Lines
+    # Panel 1 Institutional Level Lines & Clean Spine Badges (ADR-004)
     if strikes.min() <= call_wall <= strikes.max():
         fig.add_hline(y=call_wall, line_color="#A855F7", line_dash="dash", line_width=1.8, row=1, col=1)
     if strikes.min() <= put_wall <= strikes.max():
         fig.add_hline(y=put_wall, line_color="#34D399", line_dash="dash", line_width=1.8, row=1, col=1)
 
-    # Place SPOT CME label cleanly at the right edge of Panel 1 to avoid colliding with left-side levels
+    # Place CME FUTURES price label cleanly at the right edge across all panels
     fig.add_annotation(
         x=0.98, y=spot_price,
-        text=f"◄ SPOT CME: {spot_price:.2f} (ATM: {atm_strike:.0f})",
+        text=f"◄ CME FUTURES: {spot_price:.2f} (ATM: {atm_strike:.0f})",
         showarrow=False, xanchor="right", xref="x domain", yref="y",
         font=dict(color="#FFFFFF", size=9.5, family="JetBrains Mono"),
         bgcolor="#0284C7", bordercolor="#38BDF8", borderwidth=1, borderpad=3,
     )
 
-    if strikes.min() <= put_wall <= strikes.max():
+    # Institutional Wall Badges (Pinned to left spine without cluttering chart area)
+    if strikes.min() <= call_wall <= strikes.max() and call_wall == put_wall:
         fig.add_annotation(
-            x=0.03, y=put_wall - step * 0.15,
-            text=f"<b>[PUT WALL {put_wall:.0f}] ({put_wall_oi:,} OI)</b> &bull; Mua Rebound: {put_wall-1.5:.1f}-{put_wall+1.5:.1f} (SL: {put_wall-4:.1f})",
-            showarrow=True, arrowhead=2, arrowcolor="#EF4444", ax=0, ay=18,
-            align="left", xref="x domain", yref="y",
-            font=dict(color="#FEE2E2", size=8.5),
-            bgcolor="rgba(127, 29, 29, 0.92)", bordercolor="#EF4444", borderwidth=1,
+            x=0.02, y=call_wall,
+            text=f"<b>PIN WALL ${call_wall:.0f}</b> (Call: {call_wall_oi:,} | Put: {put_wall_oi:,} OI)",
+            showarrow=False, xanchor="left", xref="x domain", yref="y",
+            font=dict(color="#E9D5FF", size=9.0, family="JetBrains Mono"),
+            bgcolor="rgba(88, 28, 135, 0.88)", bordercolor="#A855F7", borderwidth=1, borderpad=2,
         )
-
-    if strikes.min() <= strike_above <= strikes.max() and strike_above != call_wall:
-        fig.add_annotation(
-            x=0.03, y=strike_above + step * 0.15,
-            text=f"<b>CỬA ẢI {strike_above:.0f}</b> (Squeeze > {strike_above+2.5:.1f} -> TP {next_above:.0f})",
-            showarrow=True, arrowhead=2, arrowcolor="#22C55E", ax=0, ay=-16,
-            xref="x domain", yref="y", font=dict(color="#DCFCE7", size=8.5),
-            bgcolor="rgba(20, 83, 45, 0.92)", bordercolor="#22C55E", borderwidth=1,
-        )
-
-    # Only show separate Sàn Đỡ if not directly overlapping the ATM strike
-    if strikes.min() <= strike_below <= strikes.max() and strike_below != put_wall and abs(strike_below - spot_price) > 3.0:
-        fig.add_annotation(
-            x=0.03, y=strike_below - step * 0.15,
-            text=f"<b>SÀN ĐỠ {strike_below:.0f}</b> (Rebound: {strike_below-1.5:.1f}-{strike_below+1.5:.1f})",
-            showarrow=True, arrowhead=2, arrowcolor="#38BDF8", ax=0, ay=16,
-            xref="x domain", yref="y", font=dict(color="#E0F2FE", size=8.5),
-            bgcolor="rgba(12, 74, 110, 0.92)", bordercolor="#38BDF8", borderwidth=1,
-        )
-
-    # Dynamic Tactical Banner for Secondary Support (Trạm Nghỉ Động nấc 2 / Chốt Lời Short)
-    secondary_support = next_below
-    if strikes.min() <= secondary_support <= strikes.max() and secondary_support != put_wall and secondary_support != strike_below:
-        fig.add_annotation(
-            x=0.03, y=secondary_support - step * 0.15,
-            text=f"<b>TRẠM NGHỈ {secondary_support:.0f}</b> (TP Short / Đệm hỗ trợ nấc 2 trước Put Wall {put_wall:.0f})",
-            showarrow=True, arrowhead=2, arrowcolor="#F59E0B", ax=0, ay=16,
-            xref="x domain", yref="y", font=dict(color="#FEF3C7", size=8.5),
-            bgcolor="rgba(180, 83, 9, 0.92)", bordercolor="#F59E0B", borderwidth=1,
-        )
+    else:
+        if strikes.min() <= call_wall <= strikes.max():
+            fig.add_annotation(
+                x=0.02, y=call_wall,
+                text=f"<b>CALL WALL ${call_wall:.0f}</b> ({call_wall_oi:,} OI)",
+                showarrow=False, xanchor="left", xref="x domain", yref="y",
+                font=dict(color="#E9D5FF", size=9.0, family="JetBrains Mono"),
+                bgcolor="rgba(88, 28, 135, 0.88)", bordercolor="#A855F7", borderwidth=1, borderpad=2,
+            )
+        if strikes.min() <= put_wall <= strikes.max():
+            fig.add_annotation(
+                x=0.02, y=put_wall,
+                text=f"<b>PUT WALL ${put_wall:.0f}</b> ({put_wall_oi:,} OI)",
+                showarrow=False, xanchor="left", xref="x domain", yref="y",
+                font=dict(color="#D1FAE5", size=9.0, family="JetBrains Mono"),
+                bgcolor="rgba(6, 78, 59, 0.88)", bordercolor="#34D399", borderwidth=1, borderpad=2,
+            )
 
     # Panel 2: Volume vs Open Interest
     fig.add_trace(
@@ -438,7 +425,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
         paper_bgcolor="#0A0E17",
         plot_bgcolor="#111827",
         font=dict(family="Inter, sans-serif", color="#F8FAFC"),
-        height=720,
+        height=900,
         margin=dict(l=70, r=30, t=115, b=45),
         legend=dict(
             orientation="h",
@@ -663,7 +650,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
 
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-label">{'Spot CME Futures (Thuần CME)' if no_mt5 else 'Spot CME Futures ↔ Spot MT5 (Quy Đổi)'}</div>
+            <div class="kpi-label">{'CME Gold Futures GCZ26 (Thuần CME)' if no_mt5 else 'CME Gold Futures (GCZ26) ↔ Spot XAU/USD (Quy Đổi)'}</div>
             <div class="kpi-val" style="color: #FACC15;">${spot:,.2f} <span style="font-size: {'13px' if no_mt5 else '16px'}; color: {'#94A3B8' if no_mt5 else '#38BDF8'};">({'MT5: Tắt' if no_mt5 else f'MT5: ~${spot_mt5:,.2f}'})</span></div>
             <div class="kpi-sub">Trục ATM CME: <b>${meta['atm_strike']:,.0f}</b> | Basis MT5 Spot: <b>{basis:+.2f} USD</b> <span class="badge" style="background:rgba(56,189,248,0.15); color:#38BDF8; border:1px solid rgba(56,189,248,0.4); font-size:10px;">{basis_source}</span></div>
         </div>
