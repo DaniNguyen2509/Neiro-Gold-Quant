@@ -150,16 +150,9 @@ def load_and_preprocess_options(
             spot_price = atm_strike
         futures_feed = "ATM STRIKE SYNTHESIS"
 
-    # 2. GEX Calculation ($M / 1% move)
+    # 2. Greeks via Black-76 & Volatility Model
     MULT = 100.0
     scale = (spot_price ** 2) * 0.01 / 1e6
-    gamma_c = df["callGamma"].replace(0, 0.0037).fillna(0.0037)
-    gamma_p = df["putGamma"].replace(0, 0.0037).fillna(0.0037)
-    df["callGEX"] = gamma_c * df["callOpenInterest"] * MULT * scale
-    df["putGEX"] = - (gamma_p * df["putOpenInterest"] * MULT * scale)
-    df["netGEX"] = df["callGEX"] + df["putGEX"]
-
-    # 3. Greeks Bac 2: Vanna (VEX) & Charm (CHEX) via Black-76
     atm_straddle = max(1.0, c_mid_atm + p_mid_atm)
     sigma_atm = float(np.clip(atm_straddle / (0.7979 * spot_price * np.sqrt(T_years)), 0.01, 2.0))
     expected_move_1s = atm_straddle / 0.7979
@@ -172,6 +165,16 @@ def load_and_preprocess_options(
     pdf_d1 = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1 ** 2))
     cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
     df_disc = np.exp(-r * T_years)
+
+    # Black-76 Gamma: e^(-rT) * n(d1) / (F * sigma * sqrt(T))
+    gamma_b76 = (df_disc * pdf_d1) / np.maximum(1e-4, spot_price * denom)
+    gamma_c = np.where(df["callGamma"] > 0, df["callGamma"], gamma_b76)
+    gamma_p = np.where(df["putGamma"] > 0, df["putGamma"], gamma_b76)
+
+    # 3. GEX Calculation ($M / 1% move)
+    df["callGEX"] = gamma_c * df["callOpenInterest"] * MULT * scale
+    df["putGEX"] = - (gamma_p * df["putOpenInterest"] * MULT * scale)
+    df["netGEX"] = df["callGEX"] + df["putGEX"]
 
     vanna = - df_disc * pdf_d1 * (d2 / sigma_atm)
     charm_call = - df_disc * (pdf_d1 * (r / denom - d2 / (2.0 * T_years)) - r * cdf_d1)
@@ -460,24 +463,51 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     cta_h20 = float(meta.get("cta_h20", spot + 50.0))
     cta_l20 = float(meta.get("cta_l20", spot - 50.0))
 
-    # Volatility sizing
-    size_squeeze = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.5, gex_regime=regime)
-    size_fade = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=5.0, gex_regime=regime)
-    size_rebound = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=5.0, gex_regime=regime)
-    size_breakdown = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.5, gex_regime=regime)
-    size_call_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.0, gex_regime=regime)
-    size_put_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=4.0, gex_regime=regime)
-
+    # Strikes and Geometry
     strikes = df["strike"].values
     step = float(np.diff(strikes).min()) if len(strikes) > 1 else 25.0
-    strikes_above = strikes[strikes > spot]
-    strike_above = float(strikes_above[0]) if len(strikes_above) > 0 else call_wall
-    next_above = float(strikes_above[1]) if len(strikes_above) > 1 else strike_above + step
+    buffer_up = min(step * 0.10, 2.50)
+    buffer_down = min(step * 0.10, 2.50)
+    front_run_tp = 1.00
+
+    # Exact Entry & SL Calculations
+    entry_squeeze = strike_above = float(strikes[strikes > spot][0]) if len(strikes[strikes > spot]) > 0 else call_wall
+    next_above = float(strikes[strikes > spot][1]) if len(strikes[strikes > spot]) > 1 else strike_above + step
+    entry_squeeze = strike_above + buffer_up + 0.50
+    sl_squeeze = strike_above - 1.50
+    sl_dist_squeeze = round(entry_squeeze - sl_squeeze, 2)
+
+    entry_fade = strike_above - 1.00
+    sl_fade = strike_above + buffer_up + 1.50
+    sl_dist_fade = round(sl_fade - entry_fade, 2)
 
     strikes_below = strikes[strikes <= spot]
     strike_below = float(strikes_below[-1]) if len(strikes_below) > 0 else put_wall
     next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else strike_below - step
 
+    entry_rebound = strike_below + 1.00
+    sl_rebound = strike_below - 4.00
+    sl_dist_rebound = round(entry_rebound - sl_rebound, 2)
+
+    entry_breakdown = strike_below - buffer_down - 0.50
+    sl_breakdown = strike_below + 1.50
+    sl_dist_breakdown = round(sl_breakdown - entry_breakdown, 2)
+
+    entry_call_wall = call_wall - 1.00
+    sl_call_wall = call_wall + 4.00
+    sl_dist_cw = round(sl_call_wall - entry_call_wall, 2)
+
+    entry_put_wall = put_wall + 0.50
+    sl_put_wall = put_wall - 4.00
+    sl_dist_pw = round(entry_put_wall - sl_put_wall, 2)
+
+    # Volatility sizing with exact calculated SL distance
+    size_squeeze = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_squeeze, gex_regime=regime)
+    size_fade = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_fade, gex_regime=regime)
+    size_rebound = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_rebound, gex_regime=regime)
+    size_breakdown = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_breakdown, gex_regime=regime)
+    size_call_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_cw, gex_regime=regime)
+    size_put_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_pw, gex_regime=regime)
     # Major walls & air pockets
     major_down_wall, major_down_oi = find_next_major_wall(df, strike_below, direction="DOWN", oi_percentile=60.0)
     major_up_wall, major_up_oi = find_next_major_wall(df, strike_above, direction="UP", oi_percentile=60.0)
@@ -559,13 +589,31 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         """)
     scenario_cards_str = "".join(scenario_cards_html)
 
-    # Strategy Table Targets
+    # Strategy Table Targets with Invariant Enforcement (BUY: TP > Entry, SELL: TP < Entry)
     front_run_tp = 1.00
     buffer_up = min(step * 0.10, 2.50)
     buffer_down = min(step * 0.10, 2.50)
 
-    squeeze_tp = major_up_wall - front_run_tp if has_up_air_pocket else next_above - front_run_tp
-    breakdown_tp = major_down_wall + front_run_tp if has_down_air_pocket else next_below + front_run_tp
+    # 1. Squeeze TP (BUY: must be strictly > entry_squeeze)
+    raw_squeeze_tp = major_up_wall - front_run_tp if has_up_air_pocket else next_above - front_run_tp
+    squeeze_tp = max(entry_squeeze + 2.00, raw_squeeze_tp)
+
+    # 2. Fade TP (SELL: must be strictly < entry_fade)
+    candidate_fade_tp = min(spot, strike_below + front_run_tp) if strike_below < entry_fade - 2.00 else entry_fade - 3.50
+    tp_fade = min(entry_fade - 2.00, candidate_fade_tp)
+
+    # 3. Rebound TP (BUY: must be strictly > entry_rebound)
+    tp_rebound = max(entry_rebound + 2.50, strike_above - front_run_tp)
+
+    # 4. Breakdown TP (SELL: must be strictly < entry_breakdown)
+    raw_breakdown_tp = major_down_wall + front_run_tp if has_down_air_pocket else next_below + front_run_tp
+    breakdown_tp = min(entry_breakdown - 2.00, raw_breakdown_tp)
+
+    # 5. Call Wall Fade TP (SELL: must be strictly < entry_call_wall)
+    tp_call_wall = min(entry_call_wall - 3.00, atm_strike)
+
+    # 6. Put Wall Rebound TP (BUY: must be strictly > entry_put_wall)
+    tp_put_wall = max(entry_put_wall + 3.00, atm_strike)
 
     # M5 Orderflow Tape & Volume Pulse processing
     m5_tape = meta.get("m5_tape") or {}
@@ -896,8 +944,8 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <tr>
                     <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</td>
                     <td>Vượt > {strike_above + buffer_up:.2f}</td>
-                    <td>{strike_above + buffer_up + 0.50:.2f}</td>
-                    <td style="color:#F87171;">{strike_above - 1.50:.2f} ($4.5)</td>
+                    <td>{entry_squeeze:.2f}</td>
+                    <td style="color:#F87171;">{sl_squeeze:.2f} (${sl_dist_squeeze:.1f})</td>
                     <td style="color:#4ADE80;">{squeeze_tp:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_squeeze.recommended_lots:.2f} Lot</td>
                     <td>MM vỡ trần Short -> Buộc mua Futures cover đẩy giá phóng lên trạm tiếp theo</td>
@@ -905,26 +953,26 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <tr>
                     <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</td>
                     <td>{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
-                    <td>{strike_above - 1.00:.2f}</td>
-                    <td style="color:#F87171;">{strike_above + buffer_up + 1.50:.2f} ($5.0)</td>
-                    <td style="color:#4ADE80;">{spot:.2f}</td>
+                    <td>{entry_fade:.2f}</td>
+                    <td style="color:#F87171;">{sl_fade:.2f} (${sl_dist_fade:.1f})</td>
+                    <td style="color:#4ADE80;">{tp_fade:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_fade.recommended_lots:.2f} Lot</td>
                     <td>Cản Vol cực đại -> MM tung lệnh bán chặn đầu ghìm giá quay lại ATM</td>
                 </tr>
                 <tr>
                     <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</td>
                     <td>{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
-                    <td>{strike_below + 1.00:.2f}</td>
-                    <td style="color:#F87171;">{strike_below - 4.00:.2f} ($5.0)</td>
-                    <td style="color:#4ADE80;">{strike_above - front_run_tp:.2f}</td>
+                    <td>{entry_rebound:.2f}</td>
+                    <td style="color:#F87171;">{sl_rebound:.2f} (${sl_dist_rebound:.1f})</td>
+                    <td style="color:#4ADE80;">{tp_rebound:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_rebound.recommended_lots:.2f} Lot</td>
                     <td>Đệm Put đỡ kỹ thuật -> MM gom mua đẩy giá phục hồi (vào khi có rút chân)</td>
                 </tr>
                 <tr>
                     <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</td>
                     <td>Thủng < {strike_below - buffer_down:.2f}</td>
-                    <td>{strike_below - buffer_down - 0.50:.2f}</td>
-                    <td style="color:#F87171;">{strike_below + 1.50:.2f} ($4.5)</td>
+                    <td>{entry_breakdown:.2f}</td>
+                    <td style="color:#F87171;">{sl_breakdown:.2f} (${sl_dist_breakdown:.1f})</td>
                     <td style="color:#4ADE80;">{breakdown_tp:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_breakdown.recommended_lots:.2f} Lot</td>
                     <td>Thủng đệm sàn -> Phía dưới là túi rỗng Air Pocket -> CẤM ĐỠ DAO, MM xả lũ</td>
@@ -951,18 +999,18 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <tr>
                     <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f})</td>
                     <td>{call_wall - 1.50:.2f} - {call_wall:.2f}</td>
-                    <td>{call_wall - 1.00:.2f}</td>
-                    <td style="color:#F87171;">{call_wall + 4.00:.2f} ($4.0)</td>
-                    <td style="color:#4ADE80;">{strike_above:.2f} / {spot:.2f}</td>
+                    <td>{entry_call_wall:.2f}</td>
+                    <td style="color:#F87171;">{sl_call_wall:.2f} (${sl_dist_cw:.1f})</td>
+                    <td style="color:#4ADE80;">{tp_call_wall:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_call_wall.recommended_lots:.2f} Lot</td>
                     <td>Call Wall {call_wall_oi:,} OI (Nóc nhà kiên cố cuối cùng của MM)</td>
                 </tr>
                 <tr>
                     <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f})</td>
                     <td>{put_wall:.2f} - {put_wall + 1.50:.2f}</td>
-                    <td>{put_wall + 0.50:.2f}</td>
-                    <td style="color:#F87171;">{put_wall - 4.00:.2f} ($4.0)</td>
-                    <td style="color:#4ADE80;">{spot:.2f} / {strike_above:.2f}</td>
+                    <td>{entry_put_wall:.2f}</td>
+                    <td style="color:#F87171;">{sl_put_wall:.2f} (${sl_dist_pw:.1f})</td>
+                    <td style="color:#4ADE80;">{tp_put_wall:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_put_wall.recommended_lots:.2f} Lot</td>
                     <td>Major Put Wall {put_wall_oi:,} OI (Đáy bê tông cốt thép của MM)</td>
                 </tr>

@@ -279,10 +279,13 @@ def compute_gamma_levels(
         T=snapshot.T,
     )
 
-    # Call Wall = strike with max call OI (resistance)
-    # Put Wall  = strike with max put OI  (support)
-    call_wall = max(quotes, key=lambda q: q.call_oi)
-    put_wall = max(quotes, key=lambda q: q.put_oi)
+    # Call Wall = OTM strike (strike >= snapshot.spot) with max call OI (resistance)
+    otm_calls = [q for q in quotes if q.strike >= snapshot.spot and q.call_oi > 0]
+    call_wall = max(otm_calls, key=lambda q: q.call_oi) if otm_calls else max(quotes, key=lambda q: q.call_oi)
+
+    # Put Wall  = OTM strike (strike <= snapshot.spot) with max put OI  (support)
+    otm_puts = [q for q in quotes if q.strike <= snapshot.spot and q.put_oi > 0]
+    put_wall = max(otm_puts, key=lambda q: q.put_oi) if otm_puts else max(quotes, key=lambda q: q.put_oi)
 
     total_net_gex = sum(q.net_gex for q in quotes)
 

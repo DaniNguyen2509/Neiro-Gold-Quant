@@ -38,12 +38,13 @@ def resolve_front_month_cme_option(
     Automatically handles future rollovers according to official CME expiry rules.
     """
     if now is None:
-        now_date = datetime.datetime.now(datetime.timezone.utc).date()
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
     elif isinstance(now, datetime.datetime):
-        now_date = now.date()
+        now_dt = now if now.tzinfo is not None else now.replace(tzinfo=datetime.timezone.utc)
     else:
-        now_date = now
+        now_dt = datetime.datetime.combine(now, datetime.time(0, 0), tzinfo=datetime.timezone.utc)
 
+    now_date = now_dt.date()
     y = now_date.year
     m = now_date.month
 
@@ -51,7 +52,9 @@ def resolve_front_month_cme_option(
         target_m = ((m - 1 + offset) % 12) + 1
         target_y = y + ((m - 1 + offset) // 12)
         exp = get_cme_option_expiry_date(target_y, target_m)
-        if exp >= now_date:
+        # COMEX Gold options expiration cutoff: 13:30 CT (18:30 UTC)
+        exp_cutoff_dt = datetime.datetime.combine(exp, datetime.time(18, 30), tzinfo=datetime.timezone.utc)
+        if exp_cutoff_dt >= now_dt:
             month_code = CME_OPTION_MONTH_CODES[target_m]
             yr_code = str(target_y)[-2:]
             opt_symbol = f"OG{month_code}{yr_code}"
@@ -123,10 +126,18 @@ def compute_dynamic_dte(
 
 
 def find_atm_strike(snapshot: OptionsSnapshot) -> OptionsStrike:
-    """Find the ATM strike where |Call_mid - Put_mid| is smallest."""
+    """Find the ATM strike where |Call_mid - Put_mid| is smallest (preferring liquid strikes)."""
     if not snapshot.strikes:
         raise ValueError("Empty options chain")
-    return min(snapshot.strikes, key=lambda s: abs(s.call_mid - s.put_mid))
+
+    # Prefer strikes with active two-sided quotes or non-zero mid on both sides
+    liquid = [
+        s for s in snapshot.strikes
+        if (s.call_bid > 0 and s.call_ask > 0 and s.put_bid > 0 and s.put_ask > 0)
+        or (s.call_mid > 0 and s.put_mid > 0)
+    ]
+    candidates = liquid if liquid else list(snapshot.strikes)
+    return min(candidates, key=lambda s: abs(s.call_mid - s.put_mid))
 
 
 def synthetic_atm_pivot(snapshot: OptionsSnapshot) -> float:

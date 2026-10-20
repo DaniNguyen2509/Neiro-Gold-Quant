@@ -89,7 +89,8 @@ Neiro-Quant/
 │   │   └── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
-│       └── DEEPSEEK_MATH_AUDIT_REPORT.md
+│       ├── DEEPSEEK_MATH_AUDIT_REPORT.md
+│       └── DEEPSEEK_SRC_FULL_AUDIT_REPORT.md
 ├── src/
 │   ├── collector/                # Thu thập dữ liệu Options Chain
 │   │   ├── scraper.py            # Playwright API Sniffer (/proxies/core-api/v1/options/get)
@@ -264,9 +265,9 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Khóa chuẩn OTM Dealer Boundary Walls: Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn lỗi nhận nhầm strike ITM.
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
 - [x] Khai tử hoàn toàn Spot Gold & Hiệu chỉnh Basis: Loại bỏ 100% việc lấy giá vàng giao ngay (Spot XAU/USD từ Gold-API / Binance PAXG). Toàn bộ hệ thống neo chuẩn 100% theo giá hợp đồng tương lai vàng CME GCZ26 (COMEX GC=F), triệt tiêu hoàn toàn sai số hiệu chỉnh và báo động kịch bản giả.
-- [x] Giao diện chuẩn Market Maker: Bảng tác chiến tức thì (3 giây), Thước đo vị trí MM, Ma trận 6 kịch bản mờ 55% khi chờ tín hiệu, 0 icon rườm rà, nút Làm mới chống cache trình duyệt.
-- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.57MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 93/93 test cases passed 100%.
+- [x] DeepSeek-R1 Adversarial Audit & Hardening (20/10/2026): Thẩm tra toàn diện mã nguồn src/ bằng DeepSeek-Reasoner (R1), vá triệt để 5 lỗi Critical (Invariant TP/SL HUD, OTM Wall filtering, giải ngược Black-76 Gamma loại bỏ hằng số fake 0.0037/0.0005, Expiry cutoff 18:30 UTC rollover và ưu tiên liquid strike cho ATM).
+- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.58MB), 0 MB rác trên laptop cá nhân.
+- [x] Unit test coverage: 97/97 test cases passed 100%.
 
 ---
 

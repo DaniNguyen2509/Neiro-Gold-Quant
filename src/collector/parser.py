@@ -126,11 +126,11 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
         c_last = clean_num(c.get("lastPrice") or c.get("last") or c.get("latest"))
         c_vol = int(clean_num(c.get("volume") or c.get("vol")))
         c_oi = int(clean_num(c.get("openInterest") or c.get("oi")))
-        c_gamma = clean_num(c.get("gamma"), default=0.0005)
+        c_gamma = clean_num(c.get("gamma"), default=0.0)
         c_iv = clean_num(c.get("volatility") or c.get("iv"))
         if c_iv > 1.0:
             c_iv = c_iv / 100.0
-        c_mid = (c_bid + c_ask) / 2.0 if (c_bid > 0 and c_ask > 0) else c_last
+        c_mid = (c_bid + c_ask) / 2.0 if (c_bid > 0 and c_ask > 0) else 0.0
 
         # Puts
         p_bid = clean_num(p.get("bidPrice") or p.get("bid"))
@@ -138,11 +138,11 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
         p_last = clean_num(p.get("lastPrice") or p.get("last") or p.get("latest"))
         p_vol = int(clean_num(p.get("volume") or p.get("vol")))
         p_oi = int(clean_num(p.get("openInterest") or p.get("oi")))
-        p_gamma = clean_num(p.get("gamma"), default=0.0005)
+        p_gamma = clean_num(p.get("gamma"), default=0.0)
         p_iv = clean_num(p.get("volatility") or p.get("iv"))
         if p_iv > 1.0:
             p_iv = p_iv / 100.0
-        p_mid = (p_bid + p_ask) / 2.0 if (p_bid > 0 and p_ask > 0) else p_last
+        p_mid = (p_bid + p_ask) / 2.0 if (p_bid > 0 and p_ask > 0) else 0.0
 
         row_dict: dict[str, Any] = {
             "strike": k,

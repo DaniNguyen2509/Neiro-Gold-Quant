@@ -122,3 +122,54 @@ def test_find_atm_strike_empty_snapshot():
     snapshot = OptionsSnapshot(symbol="GC", expiry="2026-10-27", timestamp="2026-10-19T00:00:00", strikes=())
     with pytest.raises(ValueError, match="Empty options chain"):
         find_atm_strike(snapshot)
+
+
+def test_resolve_front_month_cme_option_expiration_cutoff_rollover():
+    """Verify that on expiration day, before 18:30 UTC the contract is active, and after 18:30 UTC it rolls over."""
+    exp_date = datetime.date(2026, 10, 27)
+
+    # Before cutoff: 18:00 UTC on 2026-10-27
+    before_cutoff = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=datetime.timezone.utc)
+    res_before = resolve_front_month_cme_option(now=before_cutoff)
+    assert res_before["contract_month"] == 11
+    assert res_before["option_symbol"] == "OGX26"
+
+    # After cutoff: 19:00 UTC on 2026-10-27 -> must roll over to December 2026 (OGZ26)
+    after_cutoff = datetime.datetime(2026, 10, 27, 19, 0, tzinfo=datetime.timezone.utc)
+    res_after = resolve_front_month_cme_option(now=after_cutoff)
+    assert res_after["contract_month"] == 12
+    assert res_after["option_symbol"] == "OGZ26"
+
+
+def test_find_atm_strike_prefers_liquid():
+    """Verify that an illiquid strike with 0 bid and 0 ask (|0-0|=0) is ignored in favor of real quotes."""
+    illiquid_strike = OptionsStrike(
+        strike=4000.0,
+        call_bid=0.0,
+        call_ask=0.0,
+        put_bid=0.0,
+        put_ask=0.0,
+        call_oi=0,
+        put_oi=0,
+        call_volume=0,
+        put_volume=0,
+    )
+    liquid_strike = OptionsStrike(
+        strike=4180.0,
+        call_bid=19.0,
+        call_ask=21.0,
+        put_bid=19.5,
+        put_ask=21.5,
+        call_oi=1000,
+        put_oi=1000,
+        call_volume=50,
+        put_volume=50,
+    )
+    snapshot = OptionsSnapshot(
+        symbol="GC",
+        expiry="2026-10-27",
+        timestamp="2026-10-19T00:00:00",
+        strikes=(illiquid_strike, liquid_strike),
+    )
+    atm = find_atm_strike(snapshot)
+    assert atm.strike == 4180.0

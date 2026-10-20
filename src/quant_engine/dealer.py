@@ -7,8 +7,9 @@ from .models import OptionsSnapshot, Wall
 def find_walls(
     snapshot: OptionsSnapshot,
     top_n: int = 2,
+    spot_price: float | None = None,
 ) -> tuple[list[Wall], list[Wall]]:
-    """Find top-N Call Walls and Put Walls by OI.
+    """Find top-N Call Walls and Put Walls by OI (OTM preferred if spot_price provided).
 
     Returns:
         (call_walls, put_walls) sorted by OI descending.
@@ -16,8 +17,14 @@ def find_walls(
     if not snapshot.strikes:
         return [], []
 
-    call_sorted = sorted(snapshot.strikes, key=lambda s: s.call_oi, reverse=True)
-    put_sorted = sorted(snapshot.strikes, key=lambda s: s.put_oi, reverse=True)
+    if spot_price is not None and spot_price > 0:
+        call_candidates = [s for s in snapshot.strikes if s.strike >= spot_price and s.call_oi > 0]
+        put_candidates = [s for s in snapshot.strikes if s.strike <= spot_price and s.put_oi > 0]
+        call_sorted = sorted(call_candidates or snapshot.strikes, key=lambda s: s.call_oi, reverse=True)
+        put_sorted = sorted(put_candidates or snapshot.strikes, key=lambda s: s.put_oi, reverse=True)
+    else:
+        call_sorted = sorted(snapshot.strikes, key=lambda s: s.call_oi, reverse=True)
+        put_sorted = sorted(snapshot.strikes, key=lambda s: s.put_oi, reverse=True)
 
     call_walls = [
         Wall(

@@ -134,6 +134,13 @@ def evaluate_market_scenarios(
     if kb4_tp <= kb4_entry:
         kb4_tp = kb4_entry + 5.0
 
+    # KB-3 & KB-5: Directional Invariant Enforcement
+    kb3_entry = strike_above + buffer + 0.50
+    kb3_tp = max(major_up_wall - 1.0, kb3_entry + 5.0)
+
+    kb5_entry = strike_below - buffer - 0.50
+    kb5_tp = min(major_down_wall + 1.0, kb5_entry - 5.0)
+
     # Define all 6 structured scenarios
     all_scenarios: List[ScenarioItem] = [
         ScenarioItem(
@@ -178,10 +185,10 @@ def evaluate_market_scenarios(
             alert_level=AlertLevel.RED,
             action=ActionDirective.BUY_BREAKOUT,
             action_label="BUY MUA ĐUỔI THEO MM (SQUEEZE)",
-            entry_trigger=strike_above + buffer + 0.50,
+            entry_trigger=kb3_entry,
             entry_desc=f"Mua đuổi khi vượt nến đóng trên ${strike_above + buffer:,.2f}",
             hard_sl=strike_above - 2.0,
-            take_profit=major_up_wall - 1.0,
+            take_profit=kb3_tp,
             lot_size=recommended_lots,
             forecast=f"Giá tăng tốc cực mạnh quét qua vùng cản, hướng thẳng lên ${major_up_wall:,.0f}.",
             is_active=(active_code == "KB-3"),
@@ -212,10 +219,10 @@ def evaluate_market_scenarios(
             alert_level=AlertLevel.RED,
             action=ActionDirective.SELL_BREAKDOWN,
             action_label="CẤM BẮT ĐÁY / SELL BÁN THÁO",
-            entry_trigger=strike_below - buffer - 0.50,
+            entry_trigger=kb5_entry,
             entry_desc=f"Đánh theo đà rơi khi nến đóng dưới ${strike_below - buffer:,.2f}",
             hard_sl=strike_below + 2.0,
-            take_profit=major_down_wall + 1.0,
+            take_profit=kb5_tp,
             lot_size=recommended_lots,
             forecast=f"Giá rơi tự do không phanh qua vùng rỗng lệnh về đáy ${major_down_wall:,.0f}.",
             is_active=(active_code == "KB-5"),

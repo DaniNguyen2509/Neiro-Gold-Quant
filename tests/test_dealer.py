@@ -99,3 +99,28 @@ def test_detect_pin_risk():
     )
     s_no_overlap = OptionsSnapshot(symbol="GC", expiry="2026-10-27", timestamp="2026-10-19T00:00:00", strikes=strikes_no_overlap)
     assert detect_pin_risk(s_no_overlap) is None
+
+
+def test_find_walls_otm_filtering():
+    """Verify that ITM strikes with high legacy OI are filtered out when spot_price is provided."""
+    strikes = (
+        make_strike(4000.0, call_oi=99999, put_oi=1000),  # Deep ITM call with massive OI
+        make_strike(4100.0, call_oi=1000, put_oi=5000),   # OTM put
+        make_strike(4150.0, call_oi=3000, put_oi=4000),   # OTM put
+        make_strike(4200.0, call_oi=6000, put_oi=500),    # OTM call
+        make_strike(4250.0, call_oi=8000, put_oi=99999),  # Deep ITM put with massive OI
+    )
+    snapshot = OptionsSnapshot(symbol="GC", expiry="2026-10-27", timestamp="2026-10-19T00:00:00", strikes=strikes)
+    spot = 4160.0
+
+    call_walls, put_walls = find_walls(snapshot, top_n=2, spot_price=spot)
+
+    # Call wall must be >= spot (4160)
+    assert all(w.strike >= spot for w in call_walls)
+    assert call_walls[0].strike == 4250.0  # Max OTM call OI
+    assert call_walls[1].strike == 4200.0
+
+    # Put wall must be <= spot (4160)
+    assert all(w.strike <= spot for w in put_walls)
+    assert put_walls[0].strike == 4100.0  # Max OTM put OI
+    assert put_walls[1].strike == 4150.0

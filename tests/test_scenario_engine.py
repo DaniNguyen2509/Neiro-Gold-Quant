@@ -182,3 +182,36 @@ def test_scenario_kb5_never_triggers_when_price_above_support():
     kb5 = next(s for s in res.all_scenarios if s.code == "KB-5")
     assert kb5.is_active is False
 
+
+def test_scenario_kb3_kb5_invariants_with_adverse_walls():
+    """Verify KB-3 TP is strictly > entry and KB-5 TP is strictly < entry even if adverse walls are given."""
+    # KB-3 with rogue major_up_wall that is below entry
+    res_kb3 = evaluate_market_scenarios(
+        spot_price=4180.0,
+        atm_strike=4150.0,
+        strike_above=4175.0,
+        strike_below=4125.0,
+        call_wall=4200.0,
+        call_wall_oi=5000,
+        put_wall=4100.0,
+        put_wall_oi=6000,
+        major_up_wall=4170.0,  # Adverse wall below entry!
+    )
+    kb3 = next(s for s in res_kb3.all_scenarios if s.code == "KB-3")
+    assert kb3.take_profit > kb3.entry_trigger
+
+    # KB-5 with rogue major_down_wall that is above entry
+    res_kb5 = evaluate_market_scenarios(
+        spot_price=4120.0,
+        atm_strike=4150.0,
+        strike_above=4175.0,
+        strike_below=4125.0,
+        call_wall=4200.0,
+        call_wall_oi=5000,
+        put_wall=4100.0,
+        put_wall_oi=6000,
+        major_down_wall=4130.0,  # Adverse wall above entry!
+    )
+    kb5 = next(s for s in res_kb5.all_scenarios if s.code == "KB-5")
+    assert kb5.take_profit < kb5.entry_trigger
+
