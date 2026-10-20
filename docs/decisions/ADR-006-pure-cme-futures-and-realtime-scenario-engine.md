@@ -31,6 +31,7 @@ Trong các phiên bản trước:
 
 ## Hệ Quả (Consequences)
 - Loại bỏ hoàn toàn nguy cơ lệch giá ATM và sai lệch giá Spot MT5.
+- Triệt tiêu hoàn toàn nghịch lý Take Profit cao hơn giá Sell hoặc thấp hơn giá Buy khi mốc biên chạm sát trục ATM.
 - Trader nhìn vào màn hình trong 3 giây là biết ngay MM đang làm gì và action của mình là gì.
 - Dung lượng repository tiếp tục được duy trì siêu nhẹ (< 10MB), 100% Cloud-Native không tốn RAM laptop.
-- 100% kiểm thử pytest (84/84 tests) vượt qua thành công.
+- 100% kiểm thử pytest (93/93 tests) vượt qua thành công.

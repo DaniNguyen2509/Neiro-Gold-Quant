@@ -259,14 +259,14 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 
 - [x] Collector tự động quét Options Chain Barchart (JSON API Sniffer) & tự động Rollover (OGX26 -> OGZ26).
 - [x] Quant Engine tính đúng: Black-76, GEX, VEX (Vanna), CHEX (Charm), Level State Machine, Air Pockets.
-- [x] Pure CME Gold Futures Realtime & Dynamic Scenario Engine (ADR-006): Định vị chính xác 100% theo giá COMEX GC=F, tự động kích hoạt 6 kịch bản hành vi Market Maker.
+- [x] Pure CME Gold Futures Realtime & Dynamic Scenario Engine (ADR-006): Định vị chính xác 100% theo giá COMEX GC=F, tự động kích hoạt 6 kịch bản hành vi Market Maker. Khóa chuẩn Invariant cho Take-Profit (KB-2 TP < Entry, KB-4 TP > Entry), triệt tiêu hoàn toàn nghịch lý TP ngược khi giá chạm sát mốc ATM.
 - [x] Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse): Tự động phát hiện Volume Spike (>= 1.4x MA20) và nhận diện vi mô hấp thụ đáy rút chân hoặc chặn bán đè đỉnh.
 - [x] Khóa chuẩn OTM Dealer Boundary Walls: Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn lỗi nhận nhầm strike ITM.
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
 - [x] Khai tử hoàn toàn Spot Gold & Hiệu chỉnh Basis: Loại bỏ 100% việc lấy giá vàng giao ngay (Spot XAU/USD từ Gold-API / Binance PAXG). Toàn bộ hệ thống neo chuẩn 100% theo giá hợp đồng tương lai vàng CME GCZ26 (COMEX GC=F), triệt tiêu hoàn toàn sai số hiệu chỉnh và báo động kịch bản giả.
 - [x] Giao diện chuẩn Market Maker: Bảng tác chiến tức thì (3 giây), Thước đo vị trí MM, Ma trận 6 kịch bản mờ 55% khi chờ tín hiệu, 0 icon rườm rà, nút Làm mới chống cache trình duyệt.
 - [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.57MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 89/89 test cases passed 100%.
+- [x] Unit test coverage: 93/93 test cases passed 100%.
 
 ---
 

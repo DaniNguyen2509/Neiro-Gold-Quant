@@ -47,6 +47,44 @@ def test_scenario_kb2_call_defense():
     assert res.active_scenario.take_profit == 4150.0
 
 
+def test_scenario_kb2_call_defense_when_strike_above_equals_atm():
+    """Verify KB-2 take_profit is strictly lower than entry when strike_above is ATM (e.g. spot 4148.60)."""
+    res = evaluate_market_scenarios(
+        spot_price=4148.60,
+        atm_strike=4150.0,
+        strike_above=4150.0,
+        strike_below=4125.0,
+        call_wall=4250.0,
+        call_wall_oi=5000,
+        put_wall=4100.0,
+        put_wall_oi=6000,
+    )
+    assert res.active_scenario.code == "KB-2"
+    assert res.active_scenario.entry_trigger == 4149.0
+    assert res.active_scenario.take_profit < res.active_scenario.entry_trigger
+    assert res.active_scenario.take_profit == 4126.0
+    assert "4,125" in res.active_scenario.forecast
+
+
+def test_scenario_kb4_put_defense_when_strike_below_equals_atm():
+    """Verify KB-4 take_profit is strictly higher than entry when strike_below is ATM (e.g. spot 4151.40)."""
+    res = evaluate_market_scenarios(
+        spot_price=4151.40,
+        atm_strike=4150.0,
+        strike_above=4175.0,
+        strike_below=4150.0,
+        call_wall=4250.0,
+        call_wall_oi=5000,
+        put_wall=4100.0,
+        put_wall_oi=6000,
+    )
+    assert res.active_scenario.code == "KB-4"
+    assert res.active_scenario.entry_trigger == 4151.0
+    assert res.active_scenario.take_profit > res.active_scenario.entry_trigger
+    assert res.active_scenario.take_profit == 4174.0
+    assert "4,175" in res.active_scenario.forecast
+
+
 def test_scenario_kb3_gamma_squeeze():
     """Verify KB-3 Red Alert activation when price breaches above strike_above."""
     res = evaluate_market_scenarios(

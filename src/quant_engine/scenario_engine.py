@@ -109,6 +109,31 @@ def evaluate_market_scenarios(
         active_code = "KB-6"
         active_reason = f"Gia ${spot_price:,.2f} o vung trung lap, chua cham moc kich hoat"
 
+    # Dynamic Take-Profit & Forecast resolution for mean-reversion scenarios (KB-2 & KB-4)
+    # KB-2: MM Call Defense (SELL FADE)
+    kb2_entry = strike_above - 1.0
+    if atm_strike < kb2_entry:
+        kb2_tp = atm_strike
+        kb2_forecast = f"Giá bị cản dội ngược trở lại mốc cân bằng ATM ${atm_strike:,.0f}."
+    else:
+        # Khi mốc trần strike_above trùng hoặc nằm ngay ATM, giá bị dội từ trần rơi về sàn hỗ trợ phía dưới
+        kb2_tp = strike_below + 1.0 if strike_below > 0 else (strike_above - 10.0)
+        kb2_forecast = f"Giá bị cản dội ngược từ trần ${strike_above:,.0f} rơi về sàn hỗ trợ ${strike_below:,.0f}."
+    if kb2_tp >= kb2_entry:
+        kb2_tp = kb2_entry - 5.0
+
+    # KB-4: MM Put Defense (BUY REBOUND)
+    kb4_entry = strike_below + 1.0
+    if atm_strike > kb4_entry:
+        kb4_tp = atm_strike
+        kb4_forecast = f"Giá phản ứng rút chân tại đệm đỡ, bật hồi phục về trục ATM ${atm_strike:,.0f}."
+    else:
+        # Khi mốc sàn strike_below trùng hoặc nằm ngay ATM, giá bật tăng hướng lên trần cản phía trên
+        kb4_tp = strike_above - 1.0 if strike_above > 0 else (strike_below + 10.0)
+        kb4_forecast = f"Giá phản ứng rút chân tại sàn ${strike_below:,.0f}, bật tăng hướng về trần ${strike_above:,.0f}."
+    if kb4_tp <= kb4_entry:
+        kb4_tp = kb4_entry + 5.0
+
     # Define all 6 structured scenarios
     all_scenarios: List[ScenarioItem] = [
         ScenarioItem(
@@ -136,12 +161,12 @@ def evaluate_market_scenarios(
             alert_level=AlertLevel.YELLOW,
             action=ActionDirective.SELL_FADE,
             action_label="SELL BÁN ĐẢO CHIỀU (FADE)",
-            entry_trigger=strike_above - 1.0,
-            entry_desc=f"Bán khi giá chạm ${strike_above - 1.0:,.2f} có nến rút chân",
+            entry_trigger=kb2_entry,
+            entry_desc=f"Bán khi giá chạm ${kb2_entry:,.2f} có nến rút chân",
             hard_sl=strike_above + 2.50,
-            take_profit=atm_strike,
+            take_profit=kb2_tp,
             lot_size=recommended_lots,
-            forecast="Giá bị cản dội ngược trở lại mốc cân bằng ATM.",
+            forecast=kb2_forecast,
             is_active=(active_code == "KB-2"),
             active_reason=active_reason if active_code == "KB-2" else "",
         ),
@@ -170,12 +195,12 @@ def evaluate_market_scenarios(
             alert_level=AlertLevel.GREEN,
             action=ActionDirective.BUY_REBOUND,
             action_label="BUY BẮT HỒI (REBOUND)",
-            entry_trigger=strike_below + 1.0,
-            entry_desc=f"Mua khi giá chạm ${strike_below + 1.0:,.2f} có nến rút chân",
+            entry_trigger=kb4_entry,
+            entry_desc=f"Mua khi giá chạm ${kb4_entry:,.2f} có nến rút chân",
             hard_sl=strike_below - 3.50,
-            take_profit=atm_strike,
+            take_profit=kb4_tp,
             lot_size=recommended_lots,
-            forecast="Giá phản ứng rút chân tại đệm đỡ, bật hồi phục về trục ATM.",
+            forecast=kb4_forecast,
             is_active=(active_code == "KB-4"),
             active_reason=active_reason if active_code == "KB-4" else "",
         ),

@@ -25,6 +25,7 @@ Hệ thống **Neiro-Quant** được xây dựng không phải để đoán mò
      * **KB-5 (Thủng sàn & Xả lũ - Air Pocket Slide):** Rơi vào Air Pocket -> CẤM ĐỠ DAO / SELL BREAKDOWN.
      * **KB-6 (Vùng trung lập):** Chưa chạm mốc -> KIÊN NHẪN CHỜ.
    - **Giao diện ma trận chống hiểu lầm:** Thẻ chờ tín hiệu được làm mờ 55% opacity, viền xám tối, nhãn hành động mang đuôi `(Chưa áp dụng)`. Chỉ kích hoạt phát sáng khi giá thực tế chạm hoặc xuyên thủng ngưỡng.
+   - **Quy tắc bất biến cho Take-Profit (Invariant Enforcement):** Đối với kịch bản Mean-Reversion (KB-2 & KB-4), khi mốc biên cản trùng với trục ATM, hệ thống tự động dội mục tiêu về biên đối diện (`strike_below` hoặc `strike_above`), luôn đảm bảo nghiêm ngặt $TP < Entry$ cho lệnh SELL và $TP > Entry$ cho lệnh BUY.
 3. **Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse Radar):**
    - Theo dõi luồng nến M5 trực tiếp từ COMEX, phát hiện Volume Spike ($Volume \ge 1.4 \times MA_{20}$) và nhận diện vi mô hấp thụ đáy rút chân hoặc chặn bán đè đỉnh.
 3. **Bảng Tác Chiến Tức Thì (Instant Action UI):**
