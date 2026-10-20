@@ -17,6 +17,7 @@ import datetime
 import math
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -695,6 +696,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất không lưu cache">
                 Làm mới
             </button>
+            <span style="font-size: 10.5px; color: #64748B;">(Tự tải lại: <b id="timer-sec" style="color: #94A3B8;">300</b>s)</span>
         </div>
     </div>
 
@@ -1013,6 +1015,17 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         var base = window.location.pathname.split('?')[0];
         window.location.href = base + '?t=' + Date.now();
     }}
+    var secondsLeft = 300;
+    setInterval(function() {{
+        secondsLeft--;
+        var el = document.getElementById("timer-sec");
+        if (el) {{
+            el.innerText = secondsLeft;
+        }}
+        if (secondsLeft <= 0) {{
+            refreshWithCacheBuster();
+        }}
+    }}, 1000);
 </script>
 </body>
 </html>
@@ -1062,6 +1075,7 @@ def main():
     parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Optional)")
     parser.add_argument("--no-mt5", action="store_true", default=True, help="Disable MT5 Spot conversion and display pure CME Futures levels only (Default: True)")
     parser.add_argument("--with-mt5", dest="no_mt5", action="store_false", help="Enable MT5 Spot conversion column")
+    parser.add_argument("--loop", type=int, default=0, help="Continuous update interval in seconds (e.g. 300 for 5m). Default: 0 (run once)")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, 'reconfigure'):
@@ -1070,10 +1084,23 @@ def main():
         except Exception:
             pass
 
-    saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
-    print(f"[SUCCESS] Generated {len(saved)} dashboard files:")
-    for s in saved:
-        print(f"   -> {s}")
+    if args.loop > 0:
+        print(f"[LIVE RUNNER] Starting continuous dashboard update loop (Interval: {args.loop}s)... Press Ctrl+C to stop.")
+        iteration = 0
+        while True:
+            iteration += 1
+            now_vn = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%H:%M:%S")
+            try:
+                saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
+                print(f"[{now_vn}] Iteration #{iteration}: Generated {len(saved)} files. Sleeping {args.loop}s...")
+            except Exception as e:
+                print(f"[{now_vn}] Warning during iteration #{iteration}: {e}. Retrying in {args.loop}s...")
+            time.sleep(args.loop)
+    else:
+        saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
+        print(f"[SUCCESS] Generated {len(saved)} dashboard files:")
+        for s in saved:
+            print(f"   -> {s}")
 
 
 if __name__ == "__main__":
