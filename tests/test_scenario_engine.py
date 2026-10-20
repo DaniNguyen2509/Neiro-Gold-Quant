@@ -101,3 +101,46 @@ def test_scenario_kb5_air_pocket_breakdown():
     assert res.active_scenario.action == ActionDirective.SELL_BREAKDOWN
     assert "CẤM BẮT ĐÁY" in res.active_scenario.action_label
     assert res.active_scenario.take_profit == 4101.0
+
+
+def test_scenario_kb1_real_market_case_4140():
+    """Verify that when Gold price is at 4140.20 (between support 4125 and resistance 4150),
+    KB-1 is active and KB-5 is strictly INACTIVE, even if ITM put wall is passed.
+    """
+    res = evaluate_market_scenarios(
+        spot_price=4140.20,
+        atm_strike=4150.0,
+        strike_above=4150.0,
+        strike_below=4125.0,
+        call_wall=4200.0,
+        call_wall_oi=1362,
+        put_wall=4100.0,
+        put_wall_oi=394,
+    )
+    assert res.active_scenario.code == "KB-1"
+    assert res.active_scenario.is_active is True
+
+    # Assert KB-5 is NOT active
+    kb5 = next(s for s in res.all_scenarios if s.code == "KB-5")
+    assert kb5.is_active is False
+    assert "Thủng dứt khoát < $4,123.50 (Hiện tại: $4,140.20)" in kb5.condition_desc
+
+
+def test_scenario_kb5_never_triggers_when_price_above_support():
+    """Even if an erroneous ITM put strike (e.g. 4200) is passed, price at 4140.0
+    must NEVER trigger KB-5 because 4140.0 > 4125.0 - 1.50 = 4123.50.
+    """
+    res = evaluate_market_scenarios(
+        spot_price=4140.0,
+        atm_strike=4150.0,
+        strike_above=4150.0,
+        strike_below=4125.0,
+        call_wall=4200.0,
+        call_wall_oi=1362,
+        put_wall=4200.0,  # Rogue ITM strike
+        put_wall_oi=1271,
+    )
+    assert res.active_scenario.code != "KB-5"
+    kb5 = next(s for s in res.all_scenarios if s.code == "KB-5")
+    assert kb5.is_active is False
+

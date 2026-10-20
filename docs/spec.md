@@ -251,10 +251,12 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Collector tự động quét Options Chain Barchart (JSON API Sniffer) & tự động Rollover (OGX26 -> OGZ26).
 - [x] Quant Engine tính đúng: Black-76, GEX, VEX (Vanna), CHEX (Charm), Level State Machine, Air Pockets.
 - [x] Pure CME Gold Futures Realtime & Dynamic Scenario Engine (ADR-006): Định vị chính xác 100% theo giá COMEX GC=F, tự động kích hoạt 6 kịch bản hành vi Market Maker.
+- [x] Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse): Tự động phát hiện Volume Spike (>= 1.4x MA20) và nhận diện vi mô hấp thụ đáy rút chân hoặc chặn bán đè đỉnh.
+- [x] Khóa chuẩn OTM Dealer Boundary Walls: Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn lỗi nhận nhầm strike ITM.
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
-- [x] Giao diện chuẩn Market Maker: Bảng tác chiến tức thì (3 giây), Thước đo vị trí MM, Ma trận 6 kịch bản, 0 icon rườm rà.
-- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.50MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 84/84 test cases passed 100%.
+- [x] Giao diện chuẩn Market Maker: Bảng tác chiến tức thì (3 giây), Thước đo vị trí MM, Ma trận 6 kịch bản mờ 55% khi chờ tín hiệu, 0 icon rườm rà, nút Làm mới chống cache trình duyệt.
+- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.57MB), 0 MB rác trên laptop cá nhân.
+- [x] Unit test coverage: 89/89 test cases passed 100%.
 
 ---
 
@@ -267,9 +269,9 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
    - **Phiên Mỹ (18:45 VN & 19:45 - 23:45 VN):** Cập nhật định kỳ 60 phút/lần xuyên suốt giờ mở cửa NYSE & London Fix.
 2. **Cập nhật Giá Realtime:**
    - Mỗi lần workflow thực thi, giá CME Futures (`GC=F`) và Spot XAU/USD (`Gold-API`) được truy vấn trực tiếp theo thời gian thực để tính Basis Contango chuẩn xác.
-3. **Cơ chế Refresh phía Trình duyệt (Client-Side):**
+3. **Cơ chế Refresh phía Trình duyệt (Client-Side Cache-Busting):**
    - Thẻ `<meta http-equiv="refresh" content="300">` tự động làm mới trang mỗi 5 phút.
-   - Nút `↻ Làm mới` có tính năng cache-busting giúp tải ngay bản build mới nhất từ máy chủ CDN.
+   - Nút `Làm mới` tích hợp hàm JavaScript `refreshWithCacheBuster()` kèm chuỗi truy vấn timestamp động `?t=...`, buộc trình duyệt xóa sạch cache cục bộ và tải dữ liệu mới nhất.
 
 ---
 

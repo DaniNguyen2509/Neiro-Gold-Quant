@@ -1,6 +1,6 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v2.1 — 20/10/2026 (Chuyển giao 100% Thuần CME Futures & Realtime Scenario Engine)  
+> **Phiên bản:** v2.2 — 20/10/2026 (Chuẩn hóa OTM Dealer Walls, M5 Orderflow Pulse & Anti-Cache Dashboard)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
 > **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
 > **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md) & [decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md](decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md)
@@ -10,19 +10,23 @@
 ## I. MỤC TIÊU CỐT LÕI & TRIẾT LÝ VẬN HÀNH (FIRST PRINCIPLES)
 
 Thị trường tài chính phái sinh (Futures & Options) được chi phối bởi cấu trúc phòng hộ (Hedging Mechanics) của các Nhà tạo lập thị trường (Market Makers - MMs / Dealers).  
-Hệ thống **Neiro-Quant** được xây dựng không phải để đoán mò đỉnh đáy theo các chỉ báo kỹ thuật trễ thông thường (RSI, MACD, MA...), mà nhằm giải quyết 3 bài toán lớn:
+Hệ thống **Neiro-Quant** được xây dựng không phải để đoán mò đỉnh đáy theo các chỉ báo kỹ thuật trễ thông thường (RSI, MACD, MA...), mà nhằm giải quyết các bài toán định lượng:
 
 1. **Định vị chính xác các chốt chặn thực sự của dòng tiền lớn:**
    - Các bức tường quyền chọn: Call Wall, Put Wall, Absolute Gamma Strike, ATM Realtime Pivot, ±1.0σ & ±0.85σ Implied Bands.
    - Định vị 100% thuần theo Giá tương lai CME Gold Futures Realtime (`GC=F`), khóa chặt trục ATM theo bảng điện trực tiếp.
+   - **Quy tắc khóa OTM Dealer Walls:** Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn rủi ro lấy nhầm Strike ITM làm sàn/trần.
 2. **Giải mã trạng thái động và kích hoạt kịch bản tức thì (6-Scenario Realtime Engine):**
    - Đánh giá trực tiếp trong thời gian thực hành vi của Market Maker theo 6 kịch bản (KB-1 đến KB-6):
      * **KB-1 (Giằng co nén biên độ):** MM ghìm giá ăn phế -> ĐỨNG NGOÀI.
      * **KB-2 (MM chặn bán):** MM bảo vệ trần Call -> SELL FADE.
-     * **KB-3 (BÁO ĐỘNG ĐỎ Squeeze):** MM vỡ trần Short -> BUY BREAKOUT.
+     * **KB-3 (MM vỡ trận Short - Gamma Squeeze):** Vượt trần phòng hộ -> BUY BREAKOUT.
      * **KB-4 (MM đệm mua):** MM bảo vệ sàn Put -> BUY REBOUND.
-     * **KB-5 (BÁO ĐỘNG ĐỎ Thủng sàn):** Rơi vào Air Pocket -> CẤM ĐỠ DAO / SELL BREAKDOWN.
+     * **KB-5 (Thủng sàn & Xả lũ - Air Pocket Slide):** Rơi vào Air Pocket -> CẤM ĐỠ DAO / SELL BREAKDOWN.
      * **KB-6 (Vùng trung lập):** Chưa chạm mốc -> KIÊN NHẪN CHỜ.
+   - **Giao diện ma trận chống hiểu lầm:** Thẻ chờ tín hiệu được làm mờ 55% opacity, viền xám tối, nhãn hành động mang đuôi `(Chưa áp dụng)`. Chỉ kích hoạt phát sáng khi giá thực tế chạm hoặc xuyên thủng ngưỡng.
+3. **Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse Radar):**
+   - Theo dõi luồng nến M5 trực tiếp từ COMEX, phát hiện Volume Spike ($Volume \ge 1.4 \times MA_{20}$) và nhận diện vi mô hấp thụ đáy rút chân hoặc chặn bán đè đỉnh.
 3. **Bảng Tác Chiến Tức Thì (Instant Action UI):**
    - Giúp trader trong 3 giây nắm bắt ngay hành động cụ thể (Action), điểm vào lệnh, cắt lỗ, chốt lời.
    - Tối giản chữ, tuyệt đối không dùng icon trang trí rườm rà.

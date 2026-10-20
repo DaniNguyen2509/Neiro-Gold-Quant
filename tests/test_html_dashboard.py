@@ -145,6 +145,7 @@ def test_generate_html_terminal_content():
     assert "SELL THỦNG SÀN" in html
     assert "BÁN ĐỈNH CALL WALL" in html
     assert "MUA ĐÁY PUT WALL" in html
+    assert "refreshWithCacheBuster()" in html
 
 
 def test_run_pipeline_end_to_end():
@@ -164,4 +165,51 @@ def test_run_pipeline_end_to_end():
             assert "<!DOCTYPE html>" in content
             assert "GOLD OPTIONS TACTICAL TERMINAL" in content
             assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in content
+            assert "refreshWithCacheBuster()" in content
+
+
+def test_otm_wall_selection_filtering():
+    """Verify that OTM Wall selection never selects an ITM strike as a Dealer Wall.
+    - Call Wall MUST be OTM: strike >= spot_price
+    - Put Wall MUST be OTM: strike <= spot_price
+    """
+    df_sample = pd.DataFrame([
+        {
+            "strike": 4100.0,
+            "callOpenInterest": 9000,  # ITM Call (huge OI)
+            "putOpenInterest": 2000,   # OTM Put
+            "callBid": 50.0, "callAsk": 52.0, "putBid": 2.0, "putAsk": 3.0,
+        },
+        {
+            "strike": 4150.0,
+            "callOpenInterest": 1000,
+            "putOpenInterest": 1000,
+            "callBid": 15.0, "callAsk": 16.0, "putBid": 15.0, "putAsk": 16.0,
+        },
+        {
+            "strike": 4200.0,
+            "callOpenInterest": 3000,  # OTM Call
+            "putOpenInterest": 8000,   # ITM Put (huge OI)
+            "callBid": 2.0, "callAsk": 3.0, "putBid": 50.0, "putAsk": 52.0,
+        },
+    ])
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
+        df_sample.to_csv(f.name, index=False)
+        temp_csv = f.name
+
+    try:
+        with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4150.0):
+            df_res, meta = load_and_preprocess_options(temp_csv)
+            # Spot is 4150.0
+            # Call Wall must be chosen from strikes >= 4150 -> 4200 (OI 3000), NOT 4100 (even though 4100 has OI 9000)
+            assert meta["call_wall"] >= 4150.0
+            assert meta["call_wall"] == 4200.0
+
+            # Put Wall must be chosen from strikes <= 4150 -> 4100 (OI 2000), NOT 4200 (even though 4200 has OI 8000)
+            assert meta["put_wall"] <= 4150.0
+            assert meta["put_wall"] == 4100.0
+    finally:
+        pathlib.Path(temp_csv).unlink(missing_ok=True)
+
 
