@@ -285,7 +285,7 @@ def evaluate_tactical_level_states(
                     entry_trigger=f"Biên {lvl:.2f} - {lvl + 1.50:.2f}",
                     hard_sl=lvl - 2.50,
                     take_profit=atm_pivot,
-                    notes=f"Đang kiểm định {lvl:.0f}. Nếu rút chân +GEX -> Mua gom; nếu thủng > {slice_buffer} giá -> Bán đuổi.",
+                    notes=f"Áp sát hỗ trợ {lvl:.0f}. Ưu tiên MUA REBOUND vùng {lvl:.1f}-{lvl+1.5:.1f} (SL: {lvl-2.5:.1f}). Nếu thủng > {lvl-slice_buffer:.1f} -> CẮT LỖ, đánh SELL BREAKOUT.",
                 ))
             elif dist > dormant_distance:
                 evaluations.append(LevelEvaluation(
@@ -341,7 +341,7 @@ def evaluate_tactical_level_states(
                     entry_trigger=f"Biên {lvl - 1.50:.2f} - {lvl:.2f}",
                     hard_sl=lvl + 2.50,
                     take_profit=atm_pivot,
-                    notes=f"Đang kiểm định cản {lvl:.0f}. Canh nến đảo chiều để Short hoặc chờ phá vỡ để đánh Squeeze.",
+                    notes=f"Áp sát cản trần {lvl:.0f}. Ưu tiên SHORT FADE vùng {lvl-1.5:.1f}-{lvl:.1f} (SL: {lvl+2.5:.1f}). Nếu phá trần > {lvl+slice_buffer:.1f} -> HỦY SHORT, đánh BUY SQUEEZE.",
                 ))
             elif abs_dist > dormant_distance:
                 evaluations.append(LevelEvaluation(
