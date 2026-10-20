@@ -31,6 +31,7 @@ Xây dựng hệ thống định lượng dòng tiền quyền chọn (Options F
 | Cloud Orchestration | GitHub Actions (Ubuntu) | Lưới Cron thích ứng 2 mùa (07:15 VN, London 2 nấc, New York) |
 | Tactical Dashboard | Plotly HTML (Dark Theme) | Giao diện Web Terminal tương tác độc lập (mobile-ready) |
 | Web Hosting | GitHub Pages | Host tĩnh `https://daninguyen2509.github.io/Neiro-Quant/` |
+| Real-time Feeds | yfinance (`GC=F`) & Gold-API / Binance PAXG | Dual-Feed CME Futures & LBMA Spot XAU/USD |
 | Broker Basis Bridge | MetaTrader 5 Python / MQL5 | Auto-Basis Sync Futures <-> Spot (tùy chọn) |
 
 ---
@@ -74,7 +75,8 @@ Neiro-Quant/
 │   │   ├── ADR-001-cloud-native-tactical-terminal.md
 │   │   ├── ADR-002-cme-front-month-auto-rollover-and-scalping-view.md
 │   │   ├── ADR-003-level-state-engine-and-air-pocket-detection.md
-│   │   └── ADR-004-institutional-terminal-layout-and-anti-collision.md
+│   │   ├── ADR-004-institutional-terminal-layout-and-anti-collision.md
+│   │   └── ADR-005-realtime-dual-price-feed-and-dynamic-basis.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       └── DEEPSEEK_MATH_AUDIT_REPORT.md

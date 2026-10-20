@@ -46,11 +46,13 @@ def test_load_and_preprocess_options_with_basis():
 
     # 3. Test with mocked auto-resolved basis
     quote = SpotQuote(price=4156.0, source="Mock", fetched_at=pd.Timestamp.now("UTC"))
-    with mock.patch("src.quant_engine.basis.fetch_live_spot_gold_price", return_value=quote):
-        with mock.patch("src.quant_engine.basis.is_gold_spot_market_open", return_value=True):
-            df3, meta3 = load_and_preprocess_options(csv_path, basis=None)
-            expected_basis = round(4156.0 - meta3["spot_price"], 2)
-            assert meta3["basis"] == expected_basis
+    with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4180.0):
+        with mock.patch("src.quant_engine.basis.fetch_live_spot_gold_price", return_value=quote):
+            with mock.patch("src.quant_engine.basis.is_gold_spot_market_open", return_value=True):
+                df3, meta3 = load_and_preprocess_options(csv_path, basis=None)
+                expected_basis = round(4156.0 - meta3["spot_price"], 2)
+                assert meta3["basis"] == expected_basis
+                assert meta3["futures_feed"] == "LIVE (yfinance GC=F)"
 
 
 def test_generate_html_terminal_content():

@@ -284,3 +284,33 @@ def test_resolve_dynamic_basis_weekend_fallback():
             basis, source = resolve_dynamic_basis_with_source(futures_price, fallback_basis=-24.0)
             assert basis == -24.0
             assert source == "WEEKEND_FALLBACK"
+
+
+def test_resolve_dynamic_basis_with_none_futures():
+    """When futures price is None or invalid, safely return calibrated fallback."""
+    basis, source = resolve_dynamic_basis_with_source(None, fallback_basis=-24.0)
+    assert basis == -24.0
+    assert source == "CALIBRATED"
+
+
+def test_fetch_live_cme_futures_price_mock_success():
+    """Verify live CME futures price query with mocked yfinance."""
+    from src.quant_engine.basis import clear_spot_cache, fetch_live_cme_futures_price
+
+    clear_spot_cache()
+    mock_ticker = mock.MagicMock()
+    mock_ticker.fast_info = {"lastPrice": 4165.50}
+
+    with mock.patch("yfinance.Ticker", return_value=mock_ticker):
+        price = fetch_live_cme_futures_price()
+        assert price == 4165.50
+
+
+def test_fetch_live_cme_futures_price_mock_failure():
+    """When yfinance throws or fails, returns None without crashing."""
+    from src.quant_engine.basis import clear_spot_cache, fetch_live_cme_futures_price
+
+    clear_spot_cache()
+    with mock.patch("yfinance.Ticker", side_effect=RuntimeError("Network error")):
+        price = fetch_live_cme_futures_price()
+        assert price is None

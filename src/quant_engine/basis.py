@@ -72,14 +72,18 @@ class SpotQuote:
 _cache_lock = threading.Lock()
 _cached_quote: Optional[SpotQuote] = None
 _last_fetch_mono: float = 0.0
+_cached_futures: Optional[float] = None
+_last_fetch_futures_mono: float = 0.0
 
 
 def clear_spot_cache() -> None:
-    """Clears in-memory quote cache (useful for testing and manual resets)."""
-    global _cached_quote, _last_fetch_mono
+    """Clears in-memory quote and futures cache (useful for testing and manual resets)."""
+    global _cached_quote, _last_fetch_mono, _cached_futures, _last_fetch_futures_mono
     with _cache_lock:
         _cached_quote = None
         _last_fetch_mono = 0.0
+        _cached_futures = None
+        _last_fetch_futures_mono = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -188,14 +192,53 @@ def fetch_live_spot_gold_price(
     return None
 
 
+def fetch_live_cme_futures_price() -> Optional[float]:
+    """Fetches real-time CME Gold Futures price (GC=F) via yfinance.fast_info with TTL caching.
+
+    Returns:
+        Live futures price float, or None if unavailable/offline.
+    """
+    global _cached_futures, _last_fetch_futures_mono
+    with _cache_lock:
+        now_mono = time.monotonic()
+        if _cached_futures is not None and (now_mono - _last_fetch_futures_mono) < _CACHE_TTL_S:
+            return _cached_futures
+
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker("GC=F")
+        info = ticker.fast_info
+        last_price = None
+        if hasattr(info, "get"):
+            last_price = info.get("lastPrice") or info.get("last_price")
+        if last_price is None:
+            last_price = getattr(info, "last_price", None) or getattr(info, "lastPrice", None)
+        if last_price is None:
+            try:
+                last_price = info["last_price"]
+            except Exception:
+                pass
+
+        if last_price is not None and float(last_price) > 500.0:
+            price = round(float(last_price), 2)
+            with _cache_lock:
+                _cached_futures = price
+                _last_fetch_futures_mono = time.monotonic()
+            return price
+    except Exception as e:
+        logger.debug("Live CME futures fetch via yfinance failed: %s", e)
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Basis Resolution & Conversions
 # ---------------------------------------------------------------------------
 
 # Plausibility band for front-month Gold CME Futures Contango (fair value ~$24.0 USD)
 _DEFAULT_CONTANGO_BASIS: Final[float] = -24.0
-_MIN_PLAUSIBLE_SPREAD_USD: Final[float] = 21.0
-_MAX_PLAUSIBLE_SPREAD_USD: Final[float] = 27.0
+_MIN_PLAUSIBLE_SPREAD_USD: Final[float] = 5.0
+_MAX_PLAUSIBLE_SPREAD_USD: Final[float] = 32.0
 
 
 def compute_basis(spot_price: float, futures_price: float) -> float:
@@ -221,7 +264,7 @@ def convert_to_spot(futures_level: float, basis: float) -> float:
 
 
 def resolve_dynamic_basis_with_source(
-    futures_price: float,
+    futures_price: Optional[float],
     fallback_basis: float = _DEFAULT_CONTANGO_BASIS,
     min_spread: float = _MIN_PLAUSIBLE_SPREAD_USD,
     max_spread: float = _MAX_PLAUSIBLE_SPREAD_USD,
@@ -231,6 +274,8 @@ def resolve_dynamic_basis_with_source(
     Source label is one of: 'LIVE', 'CALIBRATED', 'WEEKEND_FALLBACK'.
     Guarantees basis never deviates wildly into absurd numbers (like -35$ or -41$).
     """
+    if futures_price is None or futures_price <= 0:
+        return fallback_basis, "CALIBRATED"
     # Guard 1: Market Hours
     if not is_gold_spot_market_open():
         logger.info(

@@ -111,9 +111,18 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None, no_mt
 
     dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
     T_years = max(dte_days / 365.0, 1.0 / 365.0)
-    spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
-    if spot_price <= 0 or math.isnan(spot_price):
-        spot_price = atm_strike
+
+    # 1.1 CME Futures Price Resolution: Try Live Feed (yfinance GC=F) first, fallback to Synthetic Put-Call Parity
+    from src.quant_engine.basis import fetch_live_cme_futures_price
+    live_futures = fetch_live_cme_futures_price()
+    if live_futures is not None and live_futures > 500.0:
+        spot_price = live_futures
+        futures_feed = "LIVE (yfinance GC=F)"
+    else:
+        spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
+        if spot_price <= 0 or math.isnan(spot_price):
+            spot_price = atm_strike
+        futures_feed = "SYNTHETIC (Put-Call Parity)"
 
     # 2. GEX Calculation ($M / 1% move)
     MULT = 100.0
@@ -195,6 +204,7 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None, no_mt
 
     meta = {
         "spot_price": spot_price,
+        "futures_feed": futures_feed,
         "atm_strike": atm_strike,
         "atm_straddle": atm_straddle,
         "sigma_atm": sigma_atm,

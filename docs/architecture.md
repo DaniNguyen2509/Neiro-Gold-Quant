@@ -67,6 +67,8 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - Dynamic Expiration & DTE: Trích xuất expirationDate từ sàn, tính DTE chính xác.     │
 │  - Lưới Cron thích ứng 2 mùa: 07:15 VN (Chốt OI), London 2 nấc (12:30/13:30 & 14:30/15:30),│
 │    18:45 VN (Pre-US) & 19:45 đến 23:45 VN (Đón đầu phiên New York & London Fix).           │
+│  - Real-Time Dual-Feed Engine (ADR-005): Tự động kéo giá CME Futures (yfinance GC=F)     │
+│    kết hợp Spot Gold (Gold-API/Binance PAXG), tính toán Dynamic Basis Contango [5, 32] USD.│
 │  - Lưu trữ CSV: data/options_prices_GCZ26.csv tự động commit vào repository.           │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │
