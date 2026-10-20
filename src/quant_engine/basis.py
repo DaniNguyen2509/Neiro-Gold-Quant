@@ -192,6 +192,12 @@ def fetch_live_spot_gold_price(
 # Basis Resolution & Conversions
 # ---------------------------------------------------------------------------
 
+# Plausibility band for front-month Gold CME Futures Contango (fair value ~$24.0 USD)
+_DEFAULT_CONTANGO_BASIS: Final[float] = -24.0
+_MIN_PLAUSIBLE_SPREAD_USD: Final[float] = 21.0
+_MAX_PLAUSIBLE_SPREAD_USD: Final[float] = 27.0
+
+
 def compute_basis(spot_price: float, futures_price: float) -> float:
     """Compute signed basis = Spot - Futures.
 
@@ -214,51 +220,77 @@ def convert_to_spot(futures_level: float, basis: float) -> float:
     return futures_level + basis
 
 
-def resolve_dynamic_basis(
+def resolve_dynamic_basis_with_source(
     futures_price: float,
-    fallback_basis: float = -24.0,
-) -> float:
-    """Computes dynamic basis: basis = spot_price - futures_price.
+    fallback_basis: float = _DEFAULT_CONTANGO_BASIS,
+    min_spread: float = _MIN_PLAUSIBLE_SPREAD_USD,
+    max_spread: float = _MAX_PLAUSIBLE_SPREAD_USD,
+) -> tuple[float, str]:
+    """Computes dynamic basis and returns (basis, source_label).
 
-    In contango, returns a negative value (e.g., -24.0).
-    If live spot is unavailable, market is closed, or outlier is detected,
-    gracefully returns fallback_basis.
+    Source label is one of: 'LIVE', 'CALIBRATED', 'WEEKEND_FALLBACK'.
+    Guarantees basis never deviates wildly into absurd numbers (like -35$ or -41$).
     """
     # Guard 1: Market Hours
     if not is_gold_spot_market_open():
         logger.info(
-            "OTC Gold Spot market is closed (weekend). Using fallback basis: %s",
+            "OTC Gold Spot market is closed (weekend). Using calibrated contango basis: %s",
             fallback_basis,
         )
-        return fallback_basis
+        return fallback_basis, "WEEKEND_FALLBACK"
 
     # Guard 2: Fetch Live Quote
     quote = fetch_live_spot_gold_price()
     if quote is None or quote.price <= 0:
         logger.warning(
-            "Live spot quote unavailable. Falling back to basis: %s",
+            "Live spot quote unavailable. Falling back to calibrated contango basis: %s",
             fallback_basis,
         )
-        return fallback_basis
+        return fallback_basis, "CALIBRATED"
 
     spot = quote.price
-    basis = spot - futures_price
+    candidate_basis = spot - futures_price
     spread = abs(futures_price - spot)
 
-    # Guard 3: Relative Sanity Check (within 5% of futures price)
-    max_tolerated_spread = futures_price * _BASIS_REL_TOLERANCE
-    if spread > max_tolerated_spread:
+    # Guard 3: Plausibility Band Check for CME Gold Contango (Fair value ~$24.0 USD)
+    # Public web APIs (Gold-API, Binance PAXG) frequently suffer from 10-20$ delays
+    # or synthetic conversions. Any spread outside [min_spread, max_spread] is rejected.
+    if not (min_spread <= spread <= max_spread):
         logger.warning(
-            "Basis spread outlier rejected: spread=%.2f > max_tolerated=%.2f (spot=%.2f, futures=%.2f). Fallback used: %.2f",
+            "Basis spread outlier rejected: spread=%.2f outside plausibility band [%.1f, %.1f] "
+            "(spot=%.2f, futures=%.2f, API=%s). Clamped to calibrated contango: %.2f",
             spread,
-            max_tolerated_spread,
+            min_spread,
+            max_spread,
             spot,
             futures_price,
+            quote.source,
             fallback_basis,
         )
-        return fallback_basis
+        return fallback_basis, "CALIBRATED"
 
-    return round(basis, 2)
+    return round(candidate_basis, 2), "LIVE"
+
+
+def resolve_dynamic_basis(
+    futures_price: float,
+    fallback_basis: float = _DEFAULT_CONTANGO_BASIS,
+    min_spread: float = _MIN_PLAUSIBLE_SPREAD_USD,
+    max_spread: float = _MAX_PLAUSIBLE_SPREAD_USD,
+) -> float:
+    """Computes dynamic basis: basis = spot_price - futures_price.
+
+    In contango, returns a negative value (e.g., -24.0).
+    If live spot is unavailable, market is closed, or outlier is detected
+    (outside plausibility band [21.0, 27.0]), safely returns fallback_basis (-24.0).
+    """
+    basis, _ = resolve_dynamic_basis_with_source(
+        futures_price,
+        fallback_basis=fallback_basis,
+        min_spread=min_spread,
+        max_spread=max_spread,
+    )
+    return basis
 
 
 def convert_levels_to_spot(levels: QuantLevels, basis: float) -> dict[str, float]:

@@ -181,6 +181,16 @@ def scrape_and_save(
         logger.info("[DRY RUN] Parsed %d strikes successfully. No file written.", len(df))
         return ""
 
+    if df is not None and len(df) > 0:
+        max_strike = float(df["strike"].max())
+        if max_strike < 3500.0 and out_file.exists():
+            logger.warning(
+                "Scraped strikes max=%.1f do not cover active gold market (> 3500). Preserving existing active dataset at %s",
+                max_strike,
+                out_file,
+            )
+            return str(out_file)
+
     out_file.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_file, index=False)
     logger.info("Saved %d strikes to %s (file size: %d bytes)", len(df), out_file, out_file.stat().st_size)

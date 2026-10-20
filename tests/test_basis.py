@@ -23,6 +23,7 @@ from src.quant_engine.basis import (
     convert_to_spot,
     convert_levels_to_spot,
     resolve_dynamic_basis,
+    resolve_dynamic_basis_with_source,
     fetch_live_spot_gold_price,
     is_gold_spot_market_open,
     clear_spot_cache,
@@ -253,13 +254,25 @@ def test_resolve_dynamic_basis_fallback_when_offline():
 
 
 def test_resolve_dynamic_basis_outlier_rejection():
-    """If API returns anomalous price (e.g. 3500 vs 4172, spread > 5%), reject and fallback."""
-    quote = SpotQuote(price=3500.0, source="Anomaly", fetched_at=datetime.datetime.now(datetime.timezone.utc))
+    """If API returns off-market price (e.g. 4146.15 vs 4181.0, spread=34.85 outside [21, 27]), reject and fallback."""
+    quote = SpotQuote(price=4146.15, source="Gold-API-Stale", fetched_at=datetime.datetime.now(datetime.timezone.utc))
     with mock.patch("src.quant_engine.basis.fetch_live_spot_gold_price", return_value=quote):
         with mock.patch("src.quant_engine.basis.is_gold_spot_market_open", return_value=True):
-            futures_price = 4172.0
-            basis = resolve_dynamic_basis(futures_price, fallback_basis=-24.0)
+            futures_price = 4181.0
+            basis, source = resolve_dynamic_basis_with_source(futures_price, fallback_basis=-24.0)
             assert basis == -24.0
+            assert source == "CALIBRATED"
+
+
+def test_resolve_dynamic_basis_with_source_live():
+    """If API returns valid price within [21, 27] spread (e.g. 4157.0 vs 4181.0), accept as LIVE."""
+    quote = SpotQuote(price=4157.0, source="Gold-API-Live", fetched_at=datetime.datetime.now(datetime.timezone.utc))
+    with mock.patch("src.quant_engine.basis.fetch_live_spot_gold_price", return_value=quote):
+        with mock.patch("src.quant_engine.basis.is_gold_spot_market_open", return_value=True):
+            futures_price = 4181.0
+            basis, source = resolve_dynamic_basis_with_source(futures_price, fallback_basis=-24.0)
+            assert basis == -24.0
+            assert source == "LIVE"
 
 
 def test_resolve_dynamic_basis_weekend_fallback():
@@ -268,5 +281,6 @@ def test_resolve_dynamic_basis_weekend_fallback():
     with mock.patch("src.quant_engine.basis.fetch_live_spot_gold_price", return_value=quote):
         with mock.patch("src.quant_engine.basis.is_gold_spot_market_open", return_value=False):
             futures_price = 4172.0
-            basis = resolve_dynamic_basis(futures_price, fallback_basis=-24.0)
+            basis, source = resolve_dynamic_basis_with_source(futures_price, fallback_basis=-24.0)
             assert basis == -24.0
+            assert source == "WEEKEND_FALLBACK"

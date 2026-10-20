@@ -114,10 +114,10 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 ┌─────────────────────────────────────────┐ ┌────────────────────────────────────────────┐
 │ [TẦNG 5: STRATEGY & RISK MATRICES]      │ │ [TẦNG 6: REAL-TIME BASIS & BROKER BRIDGE]  │
 │  - Bảng 1: Intraday Scalping (Ăn 20-25$)│ │  - Auto-Basis Sync: Live Gold-API & Binance│
-│    Entry, Hard SL, TP, Vol-Target Lot   │ │  - Dynamic Basis: S_Spot - F_CME (-24 USD) │
-│  - Bảng 2: Structural Swing Walls       │ │  - MetaTrader 5 Connector (Pepperstone)     │
-│    Bắt đáy Put Wall / Bán đỉnh Call Wall│ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5   │
-│  - CTA 20-Day Momentum Confluence       │ │                                            │
+│    Entry, Hard SL, TP, Vol-Target Lot   │ │  - Plausibility Band [21, 27] USD           │
+│  - Bảng 2: Structural Swing Walls       │ │  - Calibrated Contango Anchor (-24.00 USD) │
+│    Bắt đáy Put Wall / Bán đỉnh Call Wall│ │  - MetaTrader 5 Connector (Pepperstone)     │
+│  - CTA 20-Day Momentum Confluence       │ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5   │
 └─────────────────────────────────────────┘ └────────────────────────────────────────────┘
 ```
 

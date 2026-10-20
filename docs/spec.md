@@ -173,7 +173,12 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
   - **Thread-safe TTL Cache (5.0s):** Bảo vệ API không bị dội request/rate-limit khi tick chạy liên tục.
   - **Exponential Backoff & Retries:** 2 lần thử, timeout 5.0s, log lỗi rõ ràng (không nuốt exception).
   - **Kiểm soát giờ mở cửa OTC Spot Gold:** Thị trường đóng cửa từ Thứ 6 22:00 UTC đến Chủ Nhật 22:00 UTC. Vào cuối tuần, hệ thống tự động fallback về basis tham chiếu, tránh dùng proxy crypto bị lệch giá.
-  - **Sanity Relative Outlier Guard:** Từ chối mọi giá trị có $\text{Spread} > 5\%$ giá Futures (loại bỏ dữ liệu lỗi hoặc flash crash bất thường).
+  - **CME Contango Plausibility Band [21.0, 27.0] USD & Calibrated Contango Anchor:**
+    - Theo lý thuyết Cost-of-Carry $F = S \times e^{(r-q)T}$, độ lệch Contango chuẩn giữa CME Gold Futures và MT5 Spot (XAUUSD) là $\approx 23.8 - 24.2$ USD (fair value chuẩn: **$-24.00$ USD**).
+    - Các API web miễn phí (Gold-API, Binance PAXG) thường bị trễ hoặc lệch từ 10 - 20 USD (dẫn đến spread nhảy lên -35$ hoặc -48$).
+    - **Cơ chế Plausibility Band:** Hệ thống giới hạn nghiêm ngặt dải chênh lệch hợp lệ trong khoảng `[21.0, 27.0] USD`. Mọi báo giá API ngoài dải này bị lập tức từ chối và tự động khóa chặt về **Calibrated Contango (-24.00 USD)**, tuyệt đối không để lọt các giá trị sai lệch vô lý.
+    - **Hỗ trợ cờ `--no-mt5`:** Cho phép trader tắt quy đổi MT5 để xem 100% mức giá thuần CME Futures khi cần.
+    - **Gắn nhãn nguồn tin cậy:** KPI Card hiển thị rõ nhãn `[LIVE]`, `[CALIBRATED CONTANGO]` hoặc `[MANUAL]` để trader luôn nắm rõ độ tin cậy của Basis.
 
 ---
 

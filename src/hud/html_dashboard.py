@@ -23,7 +23,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.quant_engine.synthetic import compute_dynamic_dte
-from src.quant_engine.basis import resolve_dynamic_basis
+from src.quant_engine.basis import resolve_dynamic_basis, resolve_dynamic_basis_with_source
 from src.quant_engine.institutional import (
     extract_rr_bf,
     size_xauusd,
@@ -55,7 +55,7 @@ def clean_val(v: Any, default: float = 0.0) -> float:
         return default
 
 
-def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
+def load_and_preprocess_options(csv_path: str, basis: float | None = None, no_mt5: bool = False) -> tuple[pd.DataFrame, dict[str, Any]]:
     df_raw = pd.read_csv(csv_path)
 
     # Normalize column names
@@ -170,11 +170,19 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tu
     squeeze_trigger = call_wall + 2.50
     waterfall_trigger = put_wall - 2.50
 
-    if basis is None:
-        basis = resolve_dynamic_basis(spot_price, fallback_basis=-24.0)
+    basis_source = "CALIBRATED CONTANGO"
+    if no_mt5:
+        basis = 0.0
+        basis_source = "CME_ONLY"
+    elif basis is None:
+        basis, src_tag = resolve_dynamic_basis_with_source(spot_price, fallback_basis=-24.0)
+        basis_source = f"{src_tag} CONTANGO" if "CALIBRATED" in src_tag else src_tag
     elif basis > 0:
         # User passed positive spread e.g. 24.0 -> convert to signed basis (spot - futures = -24.0)
         basis = -basis
+        basis_source = "MANUAL"
+    else:
+        basis_source = "MANUAL"
 
     # 6. Institutional Skew & CTA Confluence
     skew_metrics = extract_rr_bf(df, atm_strike=atm_strike)
@@ -203,6 +211,8 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None) -> tu
         "squeeze_trigger": squeeze_trigger,
         "waterfall_trigger": waterfall_trigger,
         "basis": basis,
+        "basis_source": basis_source,
+        "no_mt5": no_mt5,
         "dte_days": dte_days,
         "expiration_date": f"OGX26 ({exp_val})" if exp_val else "OGX26 (2026-10-27)",
         "skew_rr25": skew_metrics.rr25,
@@ -469,10 +479,12 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     now_str = now_vn.strftime("%d/%m/%Y %H:%M:%S")
 
     spot = meta["spot_price"]
+    no_mt5 = bool(meta.get("no_mt5", False))
+    basis_source = str(meta.get("basis_source", "CALIBRATED CONTANGO"))
     basis = float(meta.get("basis", -24.0))
-    if basis > 0:
+    if not no_mt5 and basis > 0:
         basis = -basis
-    spot_mt5 = spot + basis
+    spot_mt5 = spot + basis if not no_mt5 else spot
     regime = meta["regime"]
     total_gex = meta["total_net_gex"]
     total_vex = meta["total_net_vex"]
@@ -516,6 +528,14 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     buffer_up = min(step * 0.10, 2.50)
     buffer_down = min(step * 0.10, 2.50)
     front_run_tp = 1.00
+
+    col_mt5_th = "MT5 Spot (TẮT)" if no_mt5 else f"MT5 Spot (~ {basis:+.1f}$)"
+    val_mt5_squeeze = "N/A (Thuần CME)" if no_mt5 else f"~{strike_above + buffer_up + 0.50 + basis:.2f}"
+    val_mt5_fade = "N/A (Thuần CME)" if no_mt5 else f"~{strike_above - 1.00 + basis:.2f}"
+    val_mt5_rebound = "N/A (Thuần CME)" if no_mt5 else f"~{strike_below + 1.00 + basis:.2f} (Vùng ~{spot_mt5:.0f})"
+    val_mt5_breakdown = "N/A (Thuần CME)" if no_mt5 else f"~{strike_below - buffer_down - 0.50 + basis:.2f}"
+    val_mt5_call_wall = "N/A (Thuần CME)" if no_mt5 else f"~{call_wall - 1.00 + basis:.2f}"
+    val_mt5_put_wall = "N/A (Thuần CME)" if no_mt5 else f"~{put_wall + 0.50 + basis:.2f}"
 
     # Level State Machine & Air Pocket Pipeline (Tầng 4)
     level_evals = evaluate_tactical_level_states(spot, df, meta)
@@ -643,9 +663,9 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
 
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-label">Spot CME Futures ↔ Spot MT5 (Quy Đổi)</div>
-            <div class="kpi-val" style="color: #FACC15;">${spot:,.2f} <span style="font-size: 16px; color: #38BDF8;">(MT5: ~${spot_mt5:,.2f})</span></div>
-            <div class="kpi-sub">Trục ATM CME: <b>${meta['atm_strike']:,.0f}</b> | Basis MT5 Spot: <b>{basis:+.2f} USD</b></div>
+            <div class="kpi-label">{'Spot CME Futures (Thuần CME)' if no_mt5 else 'Spot CME Futures ↔ Spot MT5 (Quy Đổi)'}</div>
+            <div class="kpi-val" style="color: #FACC15;">${spot:,.2f} <span style="font-size: {'13px' if no_mt5 else '16px'}; color: {'#94A3B8' if no_mt5 else '#38BDF8'};">({'MT5: Tắt' if no_mt5 else f'MT5: ~${spot_mt5:,.2f}'})</span></div>
+            <div class="kpi-sub">Trục ATM CME: <b>${meta['atm_strike']:,.0f}</b> | Basis MT5 Spot: <b>{basis:+.2f} USD</b> <span class="badge" style="background:rgba(56,189,248,0.15); color:#38BDF8; border:1px solid rgba(56,189,248,0.4); font-size:10px;">{basis_source}</span></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Market Regime & Net GEX</div>
@@ -715,7 +735,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>Chiến Lược</th>
                     <th>Vùng Kích Hoạt (CME)</th>
                     <th>Entry CME</th>
-                    <th>MT5 Spot (~ {basis:+.1f}$)</th>
+                    <th>{col_mt5_th}</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
                     <th>Lot Size ($10K, R: 1%)</th>
@@ -727,7 +747,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</td>
                     <td>Vượt > {strike_above + buffer_up:.2f}</td>
                     <td>{strike_above + buffer_up + 0.50:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_above + buffer_up + 0.50 + basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">{val_mt5_squeeze}</td>
                     <td style="color:#F87171;">{strike_above - 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{squeeze_tp:.2f} ({squeeze_tp_note})</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_squeeze.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_squeeze.risk_usd:.0f})</span></td>
@@ -737,7 +757,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</td>
                     <td>{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
                     <td>{strike_above - 1.00:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_above - 1.00 + basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">{val_mt5_fade}</td>
                     <td style="color:#F87171;">{strike_above + buffer_up + 1.50:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_fade.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_fade.risk_usd:.0f})</span></td>
@@ -747,7 +767,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</td>
                     <td>{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
                     <td>{strike_below + 1.00:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_below + 1.00 + basis:.2f} (Vùng ~{spot_mt5:.0f})</td>
+                    <td style="color:#38BDF8; font-weight:600;">{val_mt5_rebound}</td>
                     <td style="color:#F87171;">{strike_below - 4.00:.2f} ($5.0)</td>
                     <td style="color:#4ADE80;">{strike_above - front_run_tp:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_rebound.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_rebound.risk_usd:.0f})</span></td>
@@ -757,7 +777,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</td>
                     <td>Thủng < {strike_below - buffer_down:.2f}</td>
                     <td>{strike_below - buffer_down - 0.50:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{strike_below - buffer_down - 0.50 + basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">{val_mt5_breakdown}</td>
                     <td style="color:#F87171;">{strike_below + 1.50:.2f} ($4.5)</td>
                     <td style="color:#4ADE80;">{breakdown_tp:.2f} ({breakdown_tp_note})</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_breakdown.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_breakdown.risk_usd:.0f})</span></td>
@@ -775,7 +795,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <th>Chiến Lược</th>
                     <th>Vùng Kích Hoạt (CME)</th>
                     <th>Entry CME</th>
-                    <th>MT5 Spot (~ {basis:+.1f}$)</th>
+                    <th>{col_mt5_th}</th>
                     <th>Hard SL (CME)</th>
                     <th>Take Profit (TP)</th>
                     <th>Lot Size ($10K, R: 1%)</th>
@@ -787,7 +807,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f})</td>
                     <td>{call_wall - 1.50:.2f} - {call_wall:.2f}</td>
                     <td>{call_wall - 1.00:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{call_wall - 1.00 + basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">{val_mt5_call_wall}</td>
                     <td style="color:#F87171;">{call_wall + 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{strike_above:.2f} / {spot:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_call_wall.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_call_wall.risk_usd:.0f})</span></td>
@@ -797,7 +817,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                     <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f})</td>
                     <td>{put_wall:.2f} - {put_wall + 1.50:.2f}</td>
                     <td>{put_wall + 0.50:.2f}</td>
-                    <td style="color:#38BDF8; font-weight:600;">~{put_wall + 0.50 + basis:.2f}</td>
+                    <td style="color:#38BDF8; font-weight:600;">{val_mt5_put_wall}</td>
                     <td style="color:#F87171;">{put_wall - 4.00:.2f} ($4.0)</td>
                     <td style="color:#4ADE80;">{spot:.2f} / {strike_above:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_put_wall.recommended_lots:.2f} Lot <span style="font-size:10.5px; color:#94A3B8; font-weight:400;">(${size_put_wall.risk_usd:.0f})</span></td>
@@ -817,14 +837,19 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     return html
 
 
-def run_pipeline(input_csv: str = "data/options_prices_GCZ26.csv", output_files: list[str] | None = None, basis: float | None = None) -> list[str]:
+def run_pipeline(
+    input_csv: str = "data/options_prices_GCZ26.csv",
+    output_files: list[str] | None = None,
+    basis: float | None = None,
+    no_mt5: bool = False,
+) -> list[str]:
     if output_files is None:
         output_files = [
             "exports/latest_gold_dashboard.html",
             "exports/index.html",
         ]
 
-    df_raw, meta = load_and_preprocess_options(input_csv, basis=basis)
+    df_raw, meta = load_and_preprocess_options(input_csv, basis=basis, no_mt5=no_mt5)
     fig = build_plotly_figure(df_raw, meta)
     html_content = generate_html_terminal(df_raw, meta, fig)
 
@@ -851,7 +876,8 @@ def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Tactical HTML Dashboard Generator")
     parser.add_argument("--input", default="data/options_prices_GCZ26.csv", help="Input options CSV")
     parser.add_argument("--output", nargs="+", default=["exports/latest_gold_dashboard.html", "exports/index.html"], help="Output HTML paths")
-    parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Spot - Futures XAUUSD, e.g. -24.0 or positive spread 24.0, auto-resolves live if omitted)")
+    parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Spot - Futures XAUUSD, e.g. -24.0 or positive spread 24.0, defaults to calibrated contango -24.0)")
+    parser.add_argument("--no-mt5", action="store_true", help="Disable MT5 Spot conversion and display pure CME Futures levels only")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, 'reconfigure'):
@@ -860,7 +886,7 @@ def main():
         except Exception:
             pass
 
-    saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis)
+    saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
     print(f"[SUCCESS] Generated {len(saved)} dashboard files:")
     for s in saved:
         print(f"   -> {s}")
