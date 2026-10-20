@@ -118,6 +118,13 @@ def load_and_preprocess_options(csv_path: str, basis: float | None = None, no_mt
     if live_futures is not None and live_futures > 500.0:
         spot_price = live_futures
         futures_feed = "LIVE (yfinance GC=F)"
+        # Dynamically re-align ATM strike to the live futures price
+        atm_idx = (df["strike"] - spot_price).abs().idxmin()
+        atm_strike = float(df.loc[atm_idx, "strike"])
+        if float(df.loc[atm_idx, "callMid"]) > 0:
+            c_mid_atm = float(df.loc[atm_idx, "callMid"])
+        if float(df.loc[atm_idx, "putMid"]) > 0:
+            p_mid_atm = float(df.loc[atm_idx, "putMid"])
     else:
         spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
         if spot_price <= 0 or math.isnan(spot_price):

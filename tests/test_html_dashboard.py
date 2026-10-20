@@ -158,13 +158,14 @@ def test_run_pipeline_end_to_end():
     if not pathlib.Path(csv_path).exists():
         pytest.skip(f"Options test data {csv_path} not found")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        out_html = pathlib.Path(tmpdir) / "test_dashboard.html"
-        saved = run_pipeline(input_csv=csv_path, output_files=[str(out_html)], basis=-24.0)
+    with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4180.0):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_html = pathlib.Path(tmpdir) / "test_dashboard.html"
+            saved = run_pipeline(input_csv=csv_path, output_files=[str(out_html)], basis=-24.0)
 
-        assert len(saved) >= 1
-        assert out_html.exists()
-        content = out_html.read_text(encoding="utf-8")
-        assert "<!DOCTYPE html>" in content
-        assert "GOLD OPTIONS TACTICAL TERMINAL" in content
-        assert "4,156" in content or "4156" in content
+            assert len(saved) >= 1
+            assert out_html.exists()
+            content = out_html.read_text(encoding="utf-8")
+            assert "<!DOCTYPE html>" in content
+            assert "GOLD OPTIONS TACTICAL TERMINAL" in content
+            assert "4,156" in content or "4156" in content
