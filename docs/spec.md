@@ -48,8 +48,17 @@ python -m playwright install chromium
 # Cào dữ liệu Options Chain thủ công
 python -m src.collector.scraper --output data/options_prices_GCZ26.csv
 
-# Sinh Plotly Tactical Web Terminal (Dark Mode)
+# Sinh Plotly Tactical Web Terminal (Dark Mode - 1 lần)
 python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/index.html
+
+# Chạy Live Terminal liên tục (Cập nhật 15s/lần + Giám sát RAM + Tự giải phóng bộ nhớ)
+python -m src.hud.html_dashboard --loop 15
+
+# Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM
+python -m src.hud.html_dashboard --clear-cache
+
+# Hoặc khởi chạy 1-Click nhanh chóng qua batch script Windows:
+.\Chay_Live_Terminal.bat
 
 # Kiểm thử tự động (Unit Test & Math Verification)
 python -m pytest tests/ -v --tb=short

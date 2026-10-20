@@ -273,3 +273,22 @@ stateDiagram-v2
 2. **Loại bỏ hoàn toàn rác tạm:** Mọi file cào tạm thời, script scratch, file log thử nghiệm phải bị xóa sạch ngay sau khi hoàn thành.
 3. **Cloud-First:** Tính toán hoàn toàn trên đám mây, không cài đặt dữ liệu nặng vào ổ cứng của người dùng.
 4. **Không phụ thuộc Laptop:** Toàn bộ luồng sinh dữ liệu và xuất bản giao diện vận hành trơn tru ngay cả khi laptop tắt nguồn.
+
+---
+
+## IX. KIẾN TRÚC BẢO VỆ BỘ NHỚ & CHỐNG RÒ RỈ RAM (ZERO-LEAK MEMORY ARCHITECTURE)
+
+Khi trader chạy Live Terminal trên máy local trong nhiều giờ (hoặc cả ngày giao dịch 8-12 tiếng), hệ thống áp dụng cơ chế bảo vệ kép cho cả Backend Python và Frontend Browser:
+
+### 1. Phía Trình Duyệt Web (Frontend DOM & History Stack Protection):
+- **Triệt tiêu tích lũy History Stack:** Sử dụng `window.location.replace(...)` thay cho `window.location.href = ...`. Trình duyệt không bao giờ đẩy URL mới vào ngăn xếp lịch sử (`window.history.length` giữ nguyên là 1). Điều này ngăn chặn việc trình duyệt (Chrome/Edge) lưu lại hàng nghìn snapshot DOM gây tràn RAM sau 8 tiếng.
+- **Nút "Dọn RAM & Cache":** Cho phép trader chủ động xóa sạch `caches`, `sessionStorage`, `localStorage` và nạp lại trang sạch sẽ chỉ bằng 1 cú nhấp chuột.
+- **Đóng băng danh sách M5:** Giới hạn bảng nến M5 hiển thị tối đa 30 cây nến gần nhất (`m5_candles[-30:]`), triệt tiêu việc DOM phình to theo thời gian.
+
+### 2. Phía Python Backend (Zero-Waste Engine):
+- **Thu hồi rác chủ động (`gc.collect()`):** Giải phóng tường minh các đối tượng đồ họa nặng Plotly (`go.Figure`) và Pandas DataFrames ngay sau khi ghi file HTML.
+- **Xóa cache điểm giá (`clear_spot_cache()`):** Xóa bộ đệm giá sau mỗi chu kỳ lặp để đảm bảo không tồn đọng tham chiếu cũ.
+- **Giám sát RAM thời gian thực (Native Win32):** Sử dụng `GetProcessMemoryInfo` (qua Windows API `kernel32` & `psapi`) để theo dõi chính xác Working Set RSS trong console (`Iteration #N | RAM: XX.X MB`) mà không cần cài đặt thêm thư viện nặng ngoài chuẩn (`psutil`).
+- **Tự động dọn rác định kỳ:** Cứ mỗi 20 chu kỳ lặp (hoặc khi gọi `--clear-cache`), hệ thống tự động quét và xóa sạch mọi file tạm `.tmp`, `.bak`, `.log` trong `scratch/` và `logs/`.
+- **Khởi chạy tiện lợi 1-Click (`Chay_Live_Terminal.bat`):** Cung cấp bộ menu điều khiển trực quan bằng tiếng Việt: mở Live Terminal 15s/lần, dọn dẹp cache, cập nhật snapshot 1 lần hoặc thoát sạch sẽ không để lại tiến trình chạy ngầm.
+

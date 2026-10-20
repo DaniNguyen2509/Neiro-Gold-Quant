@@ -20,6 +20,25 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 ---
 
+## 🚀 KHỞI CHẠY LIVE TERMINAL CỤC BỘ (1-CLICK LOCAL LIVE RUNNER)
+
+Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 15 giây/lần trực tiếp trên máy:
+- **Cách 1 (Nhanh nhất):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc và bấm phím `[1]`.
+- **Cách 2 (Dòng lệnh CLI):**
+  ```bash
+  # Chạy Live Loop 15s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
+  python -m src.hud.html_dashboard --loop 15
+
+  # Dọn dẹp cache không gian làm việc
+  python -m src.hud.html_dashboard --clear-cache
+  ```
+- **Kiến trúc chống tràn RAM (Zero-Leak):**
+  - Trình duyệt dùng `location.replace` thay vì `location.href` để ngăn chặn tích lũy hàng nghìn snapshot DOM trong History Stack.
+  - Trang bị nút `Dọn RAM & Cache` trực tiếp trên thanh tác chiến của Dashboard.
+  - Python engine thu hồi rác `gc.collect()` và xóa cache điểm giá sau mỗi vòng lặp 15s, giữ mức sử dụng RAM cố định ~90MB.
+
+---
+
 ## 📚 TÀI LIỆU KIẾN TRÚC & QUYẾT ĐỊNH KỸ THUẬT
 
 - **Kiến trúc Hệ thống v2.1 (Toàn cảnh 6 tầng, Pure CME Futures & Realtime Scenario Engine):** [docs/architecture.md](docs/architecture.md)

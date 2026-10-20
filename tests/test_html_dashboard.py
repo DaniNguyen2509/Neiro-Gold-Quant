@@ -213,3 +213,74 @@ def test_otm_wall_selection_filtering():
         pathlib.Path(temp_csv).unlink(missing_ok=True)
 
 
+def test_clear_workspace_cache_and_memory_tracker():
+    """Verify memory tracking and workspace cache cleaner."""
+    from src.hud.html_dashboard import clear_workspace_cache, get_process_memory_mb
+
+    # 1. Test get_process_memory_mb
+    ram_mb = get_process_memory_mb()
+    assert isinstance(ram_mb, float)
+    assert ram_mb >= 0.0
+
+    # 2. Test clear_workspace_cache removes temporary scratch files
+    scratch_dir = pathlib.Path("scratch")
+    scratch_dir.mkdir(exist_ok=True)
+    dummy_tmp = scratch_dir / "temp_test_cache.tmp"
+    dummy_tmp.write_text("temporary test data", encoding="utf-8")
+    assert dummy_tmp.exists()
+
+    removed = clear_workspace_cache()
+    assert removed >= 1
+    assert not dummy_tmp.exists()
+
+
+def test_html_terminal_contains_clear_cache_controls():
+    """Verify generated terminal contains zero-leak cache clearing script and buttons."""
+    from src.hud.html_dashboard import generate_html_terminal
+    import plotly.graph_objects as go
+
+    df_sample = pd.DataFrame([
+        {
+            "strike": 4150.0,
+            "callOpenInterest": 1000, "putOpenInterest": 1000,
+            "callVolume": 100, "putVolume": 100,
+            "callMid": 10.0, "putMid": 10.0,
+            "netGEX": 50.0, "netVEX": 10.0, "netCHEX": 5.0,
+        },
+        {
+            "strike": 4200.0,
+            "callOpenInterest": 2000, "putOpenInterest": 500,
+            "callVolume": 200, "putVolume": 50,
+            "callMid": 20.0, "putMid": 5.0,
+            "netGEX": 80.0, "netVEX": -5.0, "netCHEX": 2.0,
+        },
+    ])
+    meta = {
+        "spot_price": 4150.0,
+        "atm_strike": 4150.0,
+        "atm_straddle": 40.0,
+        "sigma_atm": 0.15,
+        "expected_move_1s": 30.0,
+        "rule16_daily_move": 15.0,
+        "call_wall": 4200.0,
+        "call_wall_oi": 2000,
+        "put_wall": 4150.0,
+        "put_wall_oi": 1000,
+        "total_net_gex": 130.0,
+        "total_net_vex": 5.0,
+        "total_net_chex": 7.0,
+        "regime": "LONG GAMMA (VOLATILITY SUPPRESSION / MEAN REVERSION)",
+        "basis": -24.0,
+        "dte_days": 8.0,
+        "expiration_date": "OGX26 (2026-10-27)",
+        "m5_tape": {"candles": []},
+    }
+    fig = go.Figure()
+    html = generate_html_terminal(df_sample, meta, fig)
+
+    assert "clearHistoryAndCache()" in html
+    assert "Dọn RAM & Cache" in html
+    assert "location.replace" in html
+
+
+

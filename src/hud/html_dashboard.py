@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import gc
 import json
 import math
 import os
@@ -575,7 +576,8 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     m5_avg_vol = float(m5_tape.get("avg_m5_volume") or 300.0)
 
     m5_rows = []
-    for c in reversed(m5_candles):
+    # Cap candle history to most recent 30 candles to prevent memory growth
+    for c in reversed(m5_candles[-30:]):
         is_spike = c.get("is_spike", False)
         sig_cls = c.get("signal_class", "normal")
         if sig_cls == "spike-absorption":
@@ -696,6 +698,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất">
                 Làm mới
             </button>
+            <button onclick="clearHistoryAndCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #F87171; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Xóa sạch cache, giải phóng bộ nhớ RAM trình duyệt và đặt lại lịch sử">
+                Dọn RAM & Cache
+            </button>
+            <span style="font-size: 10.5px; color: #64748B;">(Tự nạp lại: <b id="timer-sec" style="color: #4ADE80;">15</b>s)</span>
             <span class="badge badge-gold">100% PURE CME FUTURES</span>
         </div>
     </div>
@@ -1013,8 +1019,46 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
 <script>
     function refreshWithCacheBuster() {{
         var base = window.location.pathname.split('?')[0];
-        window.location.href = base + '?t=' + Date.now();
+        // Dung location.replace de tranh tich luy history stack gay tran RAM trinh duyet
+        window.location.replace(base + '?t=' + Date.now());
     }}
+    function clearHistoryAndCache() {{
+        try {{
+            if (window.caches) {{
+                caches.keys().then(function(names) {{
+                    for (var name of names) caches.delete(name);
+                }});
+            }}
+            if (window.sessionStorage) sessionStorage.clear();
+            if (window.localStorage) localStorage.clear();
+        }} catch(e) {{}}
+        var base = window.location.pathname.split('?')[0];
+        window.location.replace(base + '?cleared=1');
+    }}
+    if (window.location.search.indexOf('cleared=1') !== -1) {{
+        var btn = document.querySelector("button[onclick='clearHistoryAndCache()']");
+        if (btn) {{
+            btn.innerText = "Đã dọn RAM!";
+            btn.style.borderColor = "#22C55E";
+            btn.style.color = "#4ADE80";
+            setTimeout(function() {{
+                btn.innerText = "Dọn RAM & Cache";
+                btn.style.borderColor = "rgba(239, 68, 68, 0.4)";
+                btn.style.color = "#F87171";
+            }}, 3000);
+        }}
+    }}
+    var countdown = 15;
+    setInterval(function() {{
+        countdown--;
+        var el = document.getElementById("timer-sec");
+        if (el) {{
+            el.innerText = countdown;
+        }}
+        if (countdown <= 0) {{
+            refreshWithCacheBuster();
+        }}
+    }}, 1000);
 </script>
 </body>
 </html>
@@ -1054,7 +1098,64 @@ def run_pipeline(
         except Exception:
             pass
 
+    # Zero-Waste Memory Cleanup: Giai phong doi tuong lon khoi RAM
+    del df_raw, meta, fig, html_content
+    gc.collect()
+
     return saved_paths
+
+
+def get_process_memory_mb() -> float:
+    """Returns current process RAM Working Set in MB without third-party dependencies."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        psapi = ctypes.windll.psapi
+        psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+        handle = ctypes.windll.kernel32.GetCurrentProcess()
+        if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+            return float(counters.WorkingSetSize) / (1024.0 * 1024.0)
+    except Exception:
+        pass
+    return 0.0
+
+
+def clear_workspace_cache() -> int:
+    """Clear memory, Python garbage, and temporary cache files."""
+    basis_engine.clear_spot_cache()
+    gc.collect()
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    removed = 0
+    # Clean temporary files in scratch or logs dirs
+    for folder in [repo_root / "scratch", repo_root / "logs"]:
+        if folder.exists():
+            for f in folder.iterdir():
+                if f.is_file() and (f.suffix in [".tmp", ".bak", ".log"] or f.name.startswith("temp_")):
+                    try:
+                        f.unlink()
+                        removed += 1
+                    except Exception:
+                        pass
+    return removed
 
 
 def main():
@@ -1064,7 +1165,8 @@ def main():
     parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Optional)")
     parser.add_argument("--no-mt5", action="store_true", default=True, help="Disable MT5 Spot conversion and display pure CME Futures levels only (Default: True)")
     parser.add_argument("--with-mt5", dest="no_mt5", action="store_false", help="Enable MT5 Spot conversion column")
-    parser.add_argument("--loop", type=int, default=0, help="Continuous update interval in seconds (e.g. 300 for 5m). Default: 0 (run once)")
+    parser.add_argument("--loop", type=int, default=0, help="Continuous update interval in seconds (e.g. 15 for live). Default: 0 (run once)")
+    parser.add_argument("--clear-cache", action="store_true", help="Clear temporary cache files, garbage collection, and spot cache")
     args = parser.parse_args()
 
     if hasattr(sys.stdout, 'reconfigure'):
@@ -1072,6 +1174,12 @@ def main():
             sys.stdout.reconfigure(encoding='utf-8')
         except Exception:
             pass
+
+    if args.clear_cache:
+        removed_count = clear_workspace_cache()
+        gc.collect()
+        ram_mb = get_process_memory_mb()
+        print(f"[CACHE CLEANUP] Flushed spot and memory caches. Removed {removed_count} temporary files. Current RAM: {ram_mb:.1f} MB.")
 
     if args.loop > 0:
         print(f"[LIVE RUNNER] Starting continuous dashboard update loop (Interval: {args.loop}s)... Press Ctrl+C to stop.")
@@ -1081,9 +1189,22 @@ def main():
             now_vn = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%H:%M:%S")
             try:
                 saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
-                print(f"[{now_vn}] Iteration #{iteration}: Generated {len(saved)} files. Sleeping {args.loop}s...")
+                
+                # Zero-Waste Memory Cleanup: Thu hoi ram, don sach cache sau moi chu ky
+                basis_engine.clear_spot_cache()
+                gc.collect()
+
+                if iteration % 20 == 0:
+                    removed_count = clear_workspace_cache()
+                    if removed_count > 0:
+                        print(f"[{now_vn}] [Zero-Waste] Cleaned {removed_count} temporary cache files.")
+
+                ram_mb = get_process_memory_mb()
+                ram_str = f" | RAM: {ram_mb:.1f} MB" if ram_mb > 0 else ""
+                print(f"[{now_vn}] Iteration #{iteration}{ram_str}: Updated {len(saved)} files. Sleeping {args.loop}s...")
             except Exception as e:
                 print(f"[{now_vn}] Warning during iteration #{iteration}: {e}. Retrying in {args.loop}s...")
+                gc.collect()
             time.sleep(args.loop)
     else:
         saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
