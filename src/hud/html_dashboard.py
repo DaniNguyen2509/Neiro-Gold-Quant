@@ -531,13 +531,14 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             badge_color = "#94A3B8"
             action_color = "#94A3B8"
 
-        active_glow = f"box-shadow: 0 0 16px {card_border}; transform: scale(1.01);" if is_active else "opacity: 0.7;"
-        active_tag = f'<span class="badge" style="background:{badge_bg}; color:{badge_color}; border:1px solid {card_border};">ĐANG DIỄN RA (ACTIVE)</span>' if is_active else '<span class="badge" style="background:rgba(148,163,184,0.1); color:#64748B;">CHỜ TÍN HIỆU</span>'
+        active_glow = f"box-shadow: 0 0 16px {card_border}; transform: scale(1.01); border: 2px solid {card_border};" if is_active else "opacity: 0.55; border: 1px solid #1E293B;"
+        active_tag = f'<span class="badge" style="background:{badge_bg}; color:{badge_color}; border:1px solid {card_border}; font-weight:800; box-shadow:0 0 8px {card_border};">ĐANG DIỄN RA (ACTIVE)</span>' if is_active else '<span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span>'
+        action_display = f'<span style="font-weight:800; color:{action_color};">{sc.action_label}</span>' if is_active else f'<span style="color:#64748B; font-weight:600;">{sc.action_label} <small style="color:#475569;">(Chưa áp dụng)</small></span>'
 
         scenario_cards_html.append(f"""
-        <div id="card-{sc.code}" class="scenario-card" style="border: 2px solid {card_border}; {active_glow} background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px;">
+        <div id="card-{sc.code}" class="scenario-card" style="{active_glow} background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-                <div style="font-size:13px; font-weight:800; color:#F8FAFC;">{sc.code}: {sc.title.upper()}</div>
+                <div style="font-size:13px; font-weight:800; color:{'#F8FAFC' if is_active else '#94A3B8'};">{sc.code}: {sc.title.upper()}</div>
                 {active_tag}
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
@@ -549,7 +550,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1E293B; padding-top:8px;">
                 <div style="font-size:11px; color:#94A3B8;">HÀNH ĐỘNG CẦN LÀM:</div>
-                <div style="font-size:12px; font-weight:800; color:{action_color}; font-family:'JetBrains Mono', monospace;">{sc.action_label}</div>
+                <div style="font-size:12px; font-family:'JetBrains Mono', monospace;">{action_display}</div>
             </div>
         </div>
         """)
