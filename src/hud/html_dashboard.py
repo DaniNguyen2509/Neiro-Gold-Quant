@@ -186,11 +186,20 @@ def load_and_preprocess_options(
     df["callDelta"] = df_disc * cdf_d1
     df["putDelta"] = df["callDelta"] - df_disc
 
-    # 5. Structural Walls & Regime
-    call_wall_row = df.loc[df["callOpenInterest"].idxmax()]
-    put_wall_row = df.loc[df["putOpenInterest"].idxmax()]
+    # 5. Structural Walls & Regime (OTM Dealer Boundary Walls)
+    df_calls_otm = df[df["strike"] >= spot_price]
+    if not df_calls_otm.empty and df_calls_otm["callOpenInterest"].max() > 0:
+        call_wall_row = df_calls_otm.loc[df_calls_otm["callOpenInterest"].idxmax()]
+    else:
+        call_wall_row = df.loc[df["callOpenInterest"].idxmax()]
     call_wall = float(call_wall_row["strike"])
     call_wall_oi = int(call_wall_row["callOpenInterest"])
+
+    df_puts_otm = df[df["strike"] <= spot_price]
+    if not df_puts_otm.empty and df_puts_otm["putOpenInterest"].max() > 0:
+        put_wall_row = df_puts_otm.loc[df_puts_otm["putOpenInterest"].idxmax()]
+    else:
+        put_wall_row = df.loc[df["putOpenInterest"].idxmax()]
     put_wall = float(put_wall_row["strike"])
     put_wall_oi = int(put_wall_row["putOpenInterest"])
 

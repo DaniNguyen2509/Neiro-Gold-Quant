@@ -90,10 +90,10 @@ def evaluate_market_scenarios(
     active_reason = ""
 
     # Priority 1: High-alert boundary breaches
-    if spot_price >= strike_above + buffer or spot_price >= call_wall + buffer:
+    if spot_price >= strike_above + buffer:
         active_code = "KB-3"
         active_reason = f"Gia ${spot_price:,.2f} vuot qua tran ${strike_above:,.0f} -> MM vo tran Short"
-    elif spot_price <= strike_below - buffer or spot_price <= put_wall - buffer:
+    elif spot_price <= strike_below - buffer:
         active_code = "KB-5"
         active_reason = f"Gia ${spot_price:,.2f} dam thung san ${strike_below:,.0f} -> MM buong xuoi xa lu"
     elif strike_above - 2.0 <= spot_price < strike_above + buffer:
