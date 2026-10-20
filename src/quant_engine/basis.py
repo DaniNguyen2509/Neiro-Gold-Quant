@@ -21,8 +21,8 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Final, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Final, Optional, Any
 
 from .models import QuantLevels
 
@@ -261,6 +261,138 @@ def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
         logger.debug("Live CME futures fetch via yfinance failed: %s", e)
 
     return None
+
+
+def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> dict[str, Any]:
+    """Fetches recent 5-minute candles and orderflow volume pulse for COMEX Gold Futures (GC=F).
+
+    Identifies volume spikes (>= 1.4x 20-bar avg) and absorption pin bars.
+    Returns:
+        dict with keys:
+            'available': bool
+            'candles': list of dicts (time_vn, open, high, low, close, volume, ratio, is_spike, note, signal_class)
+            'day_high': float
+            'day_low': float
+            'day_range': float
+            'avg_m5_volume': float
+            'latest_price': float
+    """
+    chart_urls = [
+        "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=1d",
+        "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=1d",
+    ]
+    for url in chart_urls:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    result = data.get("chart", {}).get("result", [])
+                    if result:
+                        res0 = result[0]
+                        meta = res0.get("meta", {})
+                        timestamps = res0.get("timestamp", [])
+                        quote = res0.get("indicators", {}).get("quote", [{}])[0]
+                        opens = quote.get("open", [])
+                        highs = quote.get("high", [])
+                        lows = quote.get("low", [])
+                        closes = quote.get("close", [])
+                        volumes = quote.get("volume", [])
+
+                        raw_candles = []
+                        for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
+                            if None in (t, o, h, l, c) or o <= 0:
+                                continue
+                            raw_candles.append({
+                                "t": int(t),
+                                "open": round(float(o), 2),
+                                "high": round(float(h), 2),
+                                "low": round(float(l), 2),
+                                "close": round(float(c), 2),
+                                "volume": int(v) if v is not None else 0,
+                            })
+
+                        if raw_candles:
+                            valid_vols = [rc["volume"] for rc in raw_candles if rc["volume"] > 0]
+                            window = valid_vols[-20:] if len(valid_vols) >= 5 else valid_vols
+                            avg_vol = float(sum(window) / len(window)) if window else 200.0
+
+                            selected = raw_candles[-limit:]
+                            processed = []
+                            for sc in selected:
+                                dt_vn = datetime.fromtimestamp(sc["t"], timezone.utc).astimezone(timezone(timedelta(hours=7)))
+                                time_str = dt_vn.strftime("%H:%M")
+                                vol = sc["volume"]
+                                ratio = round(vol / avg_vol, 2) if avg_vol > 0 else 1.0
+                                is_spike = ratio >= 1.4 and vol >= 350
+                                spread = max(0.1, sc["high"] - sc["low"])
+                                lower_wick = min(sc["open"], sc["close"]) - sc["low"]
+                                upper_wick = sc["high"] - max(sc["open"], sc["close"])
+                                is_bull_rebound = (sc["close"] > sc["open"]) and ((sc["close"] - sc["low"]) >= spread * 0.60)
+                                is_bear_rejection = (sc["close"] < sc["open"]) and ((sc["high"] - sc["close"]) >= spread * 0.60)
+                                is_pinbar_bull = lower_wick >= spread * 0.38
+
+                                if is_spike and (is_bull_rebound or is_pinbar_bull):
+                                    note = "[HẤP THỤ ĐÁY RÚT CHÂN]"
+                                    signal_class = "spike-absorption"
+                                elif is_spike and is_bear_rejection:
+                                    note = "[CHẶN BÁN ĐÈ ĐỈNH]"
+                                    signal_class = "spike-rejection"
+                                elif is_spike:
+                                    note = "[ĐỘT BIẾN KHỐI LƯỢNG]"
+                                    signal_class = "spike-neutral"
+                                elif ratio <= 0.6:
+                                    note = "[THANH KHOẢN CẠN KIỆT]"
+                                    signal_class = "low-vol"
+                                else:
+                                    note = "[BÌNH THƯỜNG]"
+                                    signal_class = "normal"
+
+                                processed.append({
+                                    "time_vn": time_str,
+                                    "open": sc["open"],
+                                    "high": sc["high"],
+                                    "low": sc["low"],
+                                    "close": sc["close"],
+                                    "volume": vol,
+                                    "ratio": ratio,
+                                    "is_spike": is_spike,
+                                    "note": note,
+                                    "signal_class": signal_class,
+                                })
+
+                            day_high = float(meta.get("regularMarketDayHigh") or raw_candles[-1]["high"])
+                            day_low = float(meta.get("regularMarketDayLow") or raw_candles[-1]["low"])
+                            last_p = float(meta.get("regularMarketPrice") or raw_candles[-1]["close"])
+
+                            return {
+                                "available": True,
+                                "candles": processed,
+                                "day_high": round(day_high, 2),
+                                "day_low": round(day_low, 2),
+                                "day_range": round(day_high - day_low, 2),
+                                "avg_m5_volume": round(avg_vol, 1),
+                                "latest_price": round(last_p, 2),
+                            }
+        except Exception as e:
+            logger.debug("Live M5 tape fetch from %s failed: %s", url, e)
+
+    return {
+        "available": False,
+        "candles": [],
+        "day_high": 0.0,
+        "day_low": 0.0,
+        "day_range": 0.0,
+        "avg_m5_volume": 0.0,
+        "latest_price": 0.0,
+    }
+
 
 
 # ---------------------------------------------------------------------------

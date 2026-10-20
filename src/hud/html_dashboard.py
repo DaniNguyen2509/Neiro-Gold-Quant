@@ -29,6 +29,7 @@ from src.quant_engine.synthetic import compute_dynamic_dte
 from src.quant_engine import basis as basis_engine
 from src.quant_engine.basis import (
     fetch_live_cme_futures_price,
+    fetch_live_cme_m5_tape,
     resolve_dynamic_basis,
     resolve_dynamic_basis_with_source,
 )
@@ -223,9 +224,13 @@ def load_and_preprocess_options(
         daily_move_1s=rule16_daily_move,
     )
 
+    # 7. Real-Time M5 Orderflow Tape & Volume Pulse
+    m5_tape = fetch_live_cme_m5_tape(limit=8)
+
     meta = {
         "spot_price": spot_price,
         "futures_feed": futures_feed,
+        "m5_tape": m5_tape,
         "atm_strike": atm_strike,
         "atm_straddle": atm_straddle,
         "sigma_atm": sigma_atm,
@@ -549,6 +554,49 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     squeeze_tp = major_up_wall - front_run_tp if has_up_air_pocket else next_above - front_run_tp
     breakdown_tp = major_down_wall + front_run_tp if has_down_air_pocket else next_below + front_run_tp
 
+    # M5 Orderflow Tape & Volume Pulse processing
+    m5_tape = meta.get("m5_tape") or {}
+    m5_candles = m5_tape.get("candles") or []
+    m5_high = float(m5_tape.get("day_high") or (spot + 10.0))
+    m5_low = float(m5_tape.get("day_low") or (spot - 10.0))
+    m5_range = float(m5_tape.get("day_range") or max(0.0, m5_high - m5_low))
+    m5_avg_vol = float(m5_tape.get("avg_m5_volume") or 300.0)
+
+    m5_rows = []
+    for c in reversed(m5_candles):
+        is_spike = c.get("is_spike", False)
+        sig_cls = c.get("signal_class", "normal")
+        if sig_cls == "spike-absorption":
+            badge_style = "background:rgba(34, 197, 94, 0.2); color:#4ADE80; border:1px solid #22C55E; font-weight:700;"
+            vol_style = "color:#4ADE80; font-weight:800;"
+        elif sig_cls == "spike-rejection":
+            badge_style = "background:rgba(239, 68, 68, 0.2); color:#F87171; border:1px solid #EF4444; font-weight:700;"
+            vol_style = "color:#F87171; font-weight:800;"
+        elif sig_cls == "spike-neutral":
+            badge_style = "background:rgba(234, 179, 8, 0.2); color:#FACC15; border:1px solid #EAB308; font-weight:700;"
+            vol_style = "color:#FACC15; font-weight:800;"
+        elif sig_cls == "low-vol":
+            badge_style = "background:rgba(71, 85, 105, 0.2); color:#94A3B8; border:1px solid #475569;"
+            vol_style = "color:#64748B;"
+        else:
+            badge_style = "background:transparent; color:#94A3B8; border:none;"
+            vol_style = "color:#CBD5E1;"
+
+        close_color = "#4ADE80" if c["close"] >= c["open"] else "#F87171"
+        row_bg = "background:rgba(30, 41, 59, 0.7); box-shadow:inset 0 0 8px rgba(250,204,21,0.15);" if is_spike else ""
+        m5_rows.append(f"""<tr style="{row_bg}">
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">{c['time_vn']}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace;">${c['open']:,.2f}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">${c['high']:,.2f}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#FACC15;">${c['low']:,.2f}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:{close_color}; font-weight:700;">${c['close']:,.2f}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {vol_style}">{c['volume']:,}</td>
+            <td style="text-align:center; font-family:'JetBrains Mono', monospace; {vol_style}">{c['ratio']:.1f}x</td>
+            <td><span class="badge" style="{badge_style}">{c['note']}</span></td>
+        </tr>""")
+
+    m5_table_rows_html = "".join(m5_rows) if m5_rows else "<tr><td colspan='8' style='text-align:center; color:#64748B; padding:16px;'>Dữ liệu Orderflow M5 đang cập nhật từ COMEX...</td></tr>"
+
     plotly_div = fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True, "displayModeBar": True})
 
     # Render complete HTML
@@ -732,7 +780,39 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
     </div>
 
-    <!-- KHỐI 3: MA TRẬN 6 KỊCH BẢN THỜI GIAN THỰC (6-SCENARIO DYNAMIC MATRIX) -->
+    <!-- KHỐI 3: BĂNG GIÁ & XUNG LỰC VOLUME M5 THỜI GIAN THỰC (ORDERFLOW & VOLUME PULSE) -->
+    <div class="table-box" style="margin-bottom: 16px; border: 1px solid #334155; background:#0B1120;">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge badge-gold">ORDERFLOW PULSE</span>
+                <span style="font-size:13.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">BĂNG GIÁ & XUNG LỰC VOLUME M5 REALTIME (COMEX GC=F)</span>
+            </div>
+            <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
+                Đỉnh ngày: <b style="color:#F87171;">${m5_high:,.2f}</b> &bull; Đáy ngày: <b style="color:#4ADE80;">${m5_low:,.2f}</b> &bull; Biên độ: <b style="color:#FACC15;">${m5_range:.2f}$</b> &bull; TB Vol M5: <b style="color:#38BDF8;">{m5_avg_vol:.0f} HĐ</b>
+            </div>
+        </div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Giờ VN (M5)</th>
+                        <th style="text-align:right;">Giá Mở</th>
+                        <th style="text-align:right;">Giá Cao</th>
+                        <th style="text-align:right;">Giá Thấp</th>
+                        <th style="text-align:right;">Giá Đóng</th>
+                        <th style="text-align:right;">Volume (HĐ)</th>
+                        <th style="text-align:center;">Xung Lực vs TB</th>
+                        <th style="text-align:left;">Nhận Diện Vi Mô Orderflow</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {m5_table_rows_html}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- KHỐI 4: MA TRẬN 6 KỊCH BẢN THỜI GIAN THỰC (6-SCENARIO DYNAMIC MATRIX) -->
     <div class="table-box">
         <div class="section-header">
             <div>MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER (TỰ ĐỘNG BẬT SÁNG THEO GIÁ REALTIME)</div>

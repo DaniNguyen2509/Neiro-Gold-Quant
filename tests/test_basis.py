@@ -320,3 +320,57 @@ def test_fetch_live_cme_futures_price_mock_failure():
             price = fetch_live_cme_futures_price()
             assert price is None
 
+
+def test_fetch_live_cme_m5_tape_mock_success():
+    """Validates M5 candle extraction, volume spike detection, and pattern recognition."""
+    from src.quant_engine.basis import fetch_live_cme_m5_tape
+
+    fake_response = mock.MagicMock()
+    fake_response.status = 200
+    fake_response.read.return_value = json.dumps({
+        "chart": {
+            "result": [{
+                "meta": {
+                    "regularMarketPrice": 4143.20,
+                    "regularMarketDayHigh": 4166.50,
+                    "regularMarketDayLow": 4134.50,
+                },
+                "timestamp": [1792482000, 1792482300, 1792482600, 1792482900],
+                "indicators": {
+                    "quote": [{
+                        "open": [4145.0, 4142.0, 4140.0, 4139.0],
+                        "high": [4148.0, 4144.0, 4142.0, 4143.2],
+                        "low": [4144.0, 4141.0, 4138.0, 4136.6],
+                        "close": [4147.0, 4143.0, 4139.0, 4143.2],
+                        "volume": [200, 250, 300, 722],
+                    }]
+                }
+            }]
+        }
+    }).encode("utf-8")
+    fake_response.__enter__.return_value = fake_response
+
+    with mock.patch("urllib.request.urlopen", return_value=fake_response):
+        tape = fetch_live_cme_m5_tape(limit=4)
+        assert tape["available"] is True
+        assert tape["day_high"] == 4166.50
+        assert tape["day_low"] == 4134.50
+        assert tape["day_range"] == 32.00
+        assert len(tape["candles"]) == 4
+
+        # Last candle (722 volume) should be recognized as spike + absorption
+        last_c = tape["candles"][-1]
+        assert last_c["volume"] == 722
+        assert last_c["is_spike"] is True
+        assert "[HẤP THỤ ĐÁY RÚT CHÂN]" in last_c["note"]
+
+
+def test_fetch_live_cme_m5_tape_mock_failure():
+    """When HTTP fails, returns fallback dictionary without throwing uncaught errors."""
+    from src.quant_engine.basis import fetch_live_cme_m5_tape
+
+    with mock.patch("urllib.request.urlopen", side_effect=RuntimeError("Network down")):
+        tape = fetch_live_cme_m5_tape()
+        assert tape["available"] is False
+        assert tape["candles"] == []
+
