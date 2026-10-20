@@ -52,7 +52,7 @@ def test_load_and_preprocess_options_with_basis():
                 df3, meta3 = load_and_preprocess_options(csv_path, basis=None)
                 expected_basis = round(4156.0 - meta3["spot_price"], 2)
                 assert meta3["basis"] == expected_basis
-                assert meta3["futures_feed"] == "LIVE (yfinance GC=F)"
+                assert "GC=F" in meta3["futures_feed"]
 
 
 def test_generate_html_terminal_content():
@@ -131,25 +131,20 @@ def test_generate_html_terminal_content():
 
     html = generate_html_terminal(df, meta, fig)
 
-    # Check key indicators in HTML
-    assert "CME Gold Futures (GCZ26) ↔ Spot XAU/USD (Quy Đổi)" in html
+    # Check key indicators in pure CME HTML
+    assert "CME Gold Futures GCZ26 (COMEX)" in html
     assert "$4,180.00" in html
-    # MT5 Spot = 4180.0 + (-24.0) = 4156.00
-    assert "MT5: ~$4,156.00" in html
-    assert "Basis MT5 Spot: <b>-24.00 USD</b>" in html
-    assert "Institutional Vol Skew" in html
-    assert "+1.50v" in html
-    assert "CTA MOMENTUM CONFLUENCE" in html
+    assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in html
+    assert "THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CÁC BỨC TƯỜNG CỦA MARKET MAKER" in html
+    assert "TỪ ĐIỂN THUẬT NGỮ BỎ TÚI" in html
     assert "Lot Size ($10K, R: 1%)" in html
-    # Check strategic tables
+    # Check strategic tables (pure CME)
     assert "BUY MUA ĐUỔI" in html
     assert "SELL CHẶN TIỀN TUYẾN" in html
     assert "BUY BẮT SÀN ATM" in html
     assert "SELL THỦNG SÀN" in html
     assert "BÁN ĐỈNH CALL WALL" in html
     assert "MUA ĐÁY PUT WALL" in html
-    # Check that MT5 converted price is inside table
-    assert "4156" in html or "4,156" in html
 
 
 def test_run_pipeline_end_to_end():
@@ -161,11 +156,12 @@ def test_run_pipeline_end_to_end():
     with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4180.0):
         with tempfile.TemporaryDirectory() as tmpdir:
             out_html = pathlib.Path(tmpdir) / "test_dashboard.html"
-            saved = run_pipeline(input_csv=csv_path, output_files=[str(out_html)], basis=-24.0)
+            saved = run_pipeline(input_csv=csv_path, output_files=[str(out_html)], no_mt5=True)
 
             assert len(saved) >= 1
             assert out_html.exists()
             content = out_html.read_text(encoding="utf-8")
             assert "<!DOCTYPE html>" in content
             assert "GOLD OPTIONS TACTICAL TERMINAL" in content
-            assert "4,156" in content or "4156" in content
+            assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in content
+

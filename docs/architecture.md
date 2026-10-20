@@ -1,9 +1,9 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v2.0 — 19/10/2026 (Chuyển giao 100% Cloud-Native Automation)  
+> **Phiên bản:** v2.1 — 20/10/2026 (Chuyển giao 100% Thuần CME Futures & Realtime Scenario Engine)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
-> **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26`), XAUUSD Spot (Pepperstone / Exness / IC Markets) & E-mini Gold.  
-> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md) & [tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
+> **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
+> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md) & [decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md](decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md)
 
 ---
 
@@ -13,13 +13,20 @@ Thị trường tài chính phái sinh (Futures & Options) được chi phối b
 Hệ thống **Neiro-Quant** được xây dựng không phải để đoán mò đỉnh đáy theo các chỉ báo kỹ thuật trễ thông thường (RSI, MACD, MA...), mà nhằm giải quyết 3 bài toán lớn:
 
 1. **Định vị chính xác các chốt chặn thực sự của dòng tiền lớn:**
-   - Các bức tường quyền chọn: Call Wall, Put Wall, Absolute Gamma Strike, ATM Synthetic Pivot, ±1.0σ & ±0.85σ Implied Bands.
-2. **Giải mã trạng thái động của Chốt chặn khi giá tiếp cận (Real-time Level State Engine):**
-   - **Chốt chặn có TRỤ VỮNG không (Absorption & Defense)?** 
-     - Xuất hiện lực đỡ/hấp thụ thụ động (Passive Absorption), Delta suy kiệt, nằm trong vùng Positive Net GEX (Dealer buộc phải mua đỡ khi giá rơi, bán ghìm khi giá tăng) -> Kích hoạt lệnh **ĐẢO CHIỀU (Fade Reversal)**.
-   - **Hay Chốt chặn sẽ BỊ ĐÂM THỦNG VÀ TRƯỢT DÀI (Sliced & Vacuum Cascade)?**
-     - Bên dưới chốt chặn là vùng **Chân không thanh khoản (Air Pocket / Low OI Gap)**, kết hợp Negative Net GEX (Dealer bị ép bán tháo phòng hộ khi giá phá vỡ) -> **TUYỆT ĐỐI CẤM BẮT ĐÁY / ĐỠ DAO**, chuyển trạng thái sang **ĐÁNH PHÁ VỠ (Breakout Vacuum Runner)** ăn trọn con sóng trượt giá.
-3. **Vận hành độc lập 100% trên Cloud (Zero-Touch Cloud Automation):**
+   - Các bức tường quyền chọn: Call Wall, Put Wall, Absolute Gamma Strike, ATM Realtime Pivot, ±1.0σ & ±0.85σ Implied Bands.
+   - Định vị 100% thuần theo Giá tương lai CME Gold Futures Realtime (`GC=F`), khóa chặt trục ATM theo bảng điện trực tiếp.
+2. **Giải mã trạng thái động và kích hoạt kịch bản tức thì (6-Scenario Realtime Engine):**
+   - Đánh giá trực tiếp trong thời gian thực hành vi của Market Maker theo 6 kịch bản (KB-1 đến KB-6):
+     * **KB-1 (Giằng co nén biên độ):** MM ghìm giá ăn phế -> ĐỨNG NGOÀI.
+     * **KB-2 (MM chặn bán):** MM bảo vệ trần Call -> SELL FADE.
+     * **KB-3 (BÁO ĐỘNG ĐỎ Squeeze):** MM vỡ trần Short -> BUY BREAKOUT.
+     * **KB-4 (MM đệm mua):** MM bảo vệ sàn Put -> BUY REBOUND.
+     * **KB-5 (BÁO ĐỘNG ĐỎ Thủng sàn):** Rơi vào Air Pocket -> CẤM ĐỠ DAO / SELL BREAKDOWN.
+     * **KB-6 (Vùng trung lập):** Chưa chạm mốc -> KIÊN NHẪN CHỜ.
+3. **Bảng Tác Chiến Tức Thì (Instant Action UI):**
+   - Giúp trader trong 3 giây nắm bắt ngay hành động cụ thể (Action), điểm vào lệnh, cắt lỗ, chốt lời.
+   - Tối giản chữ, tuyệt đối không dùng icon trang trí rườm rà.
+4. **Vận hành độc lập 100% trên Cloud (Zero-Touch Cloud Automation):**
    - Hoạt động tự động 24/5 trên máy chủ đám mây (GitHub Actions). Không phụ thuộc vào laptop của người dùng, tự động cào dữ liệu, tính toán ma trận Greeks và xuất bản Web Terminal xem trực tiếp trên điện thoại.
 
 ---

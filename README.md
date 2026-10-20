@@ -22,13 +22,14 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 ## 📚 TÀI LIỆU KIẾN TRÚC & QUYẾT ĐỊNH KỸ THUẬT
 
-- **Kiến trúc Hệ thống v2.0 (Toàn cảnh 6 tầng & Level State Engine):** [docs/architecture.md](docs/architecture.md)
+- **Kiến trúc Hệ thống v2.1 (Toàn cảnh 6 tầng, Pure CME Futures & Realtime Scenario Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
-- **Quyết định Kiến trúc Cloud-Native (ADR-001):** [docs/decisions/ADR-001-cloud-native-tactical-terminal.md](docs/decisions/ADR-001-cloud-native-tactical-terminal.md)
-- **Quyết định Rollover Tự động & Chế độ Scalping ATM ± 5 Strikes (ADR-002):** [docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md](docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md)
-- **Quyết định Level State Engine & Quét Túi Chân Không Air Pocket (ADR-003):** [docs/decisions/ADR-003-level-state-engine-and-air-pocket-detection.md](docs/decisions/ADR-003-level-state-engine-and-air-pocket-detection.md)
-- **Quyết định Tái Cấu Trúc Layout Chuẩn Market Maker & Chống Đè Chữ (ADR-004):** [docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md](docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md)
+- **Quyết định Định vị Thuần CME Futures & Bộ Đánh Giá 6 Kịch Bản MM Realtime (ADR-006):** [docs/decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md](docs/decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md)
 - **Quyết định Nguồn Giá Kép Realtime (yfinance GC=F + LBMA Spot) & Dynamic Basis (ADR-005):** [docs/decisions/ADR-005-realtime-dual-price-feed-and-dynamic-basis.md](docs/decisions/ADR-005-realtime-dual-price-feed-and-dynamic-basis.md)
+- **Quyết định Tái Cấu Trúc Layout Chuẩn Market Maker & Chống Đè Chữ (ADR-004):** [docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md](docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md)
+- **Quyết định Level State Engine & Quét Túi Chân Không Air Pocket (ADR-003):** [docs/decisions/ADR-003-level-state-engine-and-air-pocket-detection.md](docs/decisions/ADR-003-level-state-engine-and-air-pocket-detection.md)
+- **Quyết định Rollover Tự động & Chế độ Scalping ATM ± 5 Strikes (ADR-002):** [docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md](docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md)
+- **Quyết định Kiến trúc Cloud-Native (ADR-001):** [docs/decisions/ADR-001-cloud-native-tactical-terminal.md](docs/decisions/ADR-001-cloud-native-tactical-terminal.md)
 - **Công thức Toán học Định lượng (Black-76, GEX, Vanna, Charm, Expected Move):** [docs/tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](docs/tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
 
 ---

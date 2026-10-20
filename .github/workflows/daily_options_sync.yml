@@ -81,7 +81,7 @@ jobs:
 
       - name: Generate Plotly Tactical HTML Dashboard
         run: |
-          python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html --basis 24.0
+          python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html --no-mt5
           ls -lh exports/
 
       - name: Upload Tactical Dashboard Artifacts

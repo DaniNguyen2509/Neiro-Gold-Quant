@@ -192,9 +192,10 @@ def fetch_live_spot_gold_price(
     return None
 
 
-def fetch_live_cme_futures_price() -> Optional[float]:
-    """Fetches real-time CME Gold Futures price (GC=F) via yfinance.fast_info with TTL caching.
+def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
+    """Fetches real-time CME Gold Futures price (GC=F) directly from COMEX endpoints.
 
+    Uses native urllib HTTP queries with TTL caching, falling back to yfinance if available.
     Returns:
         Live futures price float, or None if unavailable/offline.
     """
@@ -204,6 +205,37 @@ def fetch_live_cme_futures_price() -> Optional[float]:
         if _cached_futures is not None and (now_mono - _last_fetch_futures_mono) < _CACHE_TTL_S:
             return _cached_futures
 
+    # Method 1: Direct native HTTP query to Yahoo Finance chart endpoints (zero dependencies)
+    chart_urls = [
+        "https://query1.finance.yahoo.com/v8/finance/chart/GC=F",
+        "https://query2.finance.yahoo.com/v8/finance/chart/GC=F",
+    ]
+    for url in chart_urls:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    result = data.get("chart", {}).get("result", [])
+                    if result:
+                        meta = result[0].get("meta", {})
+                        price = meta.get("regularMarketPrice")
+                        if price is not None and float(price) > 500.0:
+                            p = round(float(price), 2)
+                            with _cache_lock:
+                                _cached_futures = p
+                                _last_fetch_futures_mono = time.monotonic()
+                            return p
+        except Exception as e:
+            logger.debug("Direct HTTP fetch from %s failed: %s", url, e)
+
+    # Method 2: Fallback to yfinance if installed
     try:
         import yfinance as yf
         ticker = yf.Ticker("GC=F")

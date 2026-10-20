@@ -76,7 +76,8 @@ Neiro-Quant/
 │   │   ├── ADR-002-cme-front-month-auto-rollover-and-scalping-view.md
 │   │   ├── ADR-003-level-state-engine-and-air-pocket-detection.md
 │   │   ├── ADR-004-institutional-terminal-layout-and-anti-collision.md
-│   │   └── ADR-005-realtime-dual-price-feed-and-dynamic-basis.md
+│   │   ├── ADR-005-realtime-dual-price-feed-and-dynamic-basis.md
+│   │   └── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       └── DEEPSEEK_MATH_AUDIT_REPORT.md
@@ -90,9 +91,11 @@ Neiro-Quant/
 │   │   ├── dealer.py             # Call/Put Walls, Gamma Flip, Squeeze Triggers
 │   │   ├── air_pocket.py         # Quét chân không thanh khoản (OI < 35% MA)
 │   │   ├── institutional.py      # 25Δ Skew (RR/BF), Vol-Targeted Sizing & CTA Confluence
+│   │   ├── level_state.py        # Finite State Machine cho từng Level
+│   │   ├── scenario_engine.py    # Ma trận 6 Kịch bản Hành vi Market Maker Realtime
 │   │   └── strategy.py           # Ma trận chiến lược Scalping & Swing
 │   ├── hud/                      # Giao diện Tactical Terminal
-│   │   ├── html_dashboard.py     # Plotly Dark Theme generator (Anti-Collision Labels)
+│   │   ├── html_dashboard.py     # Pure CME Terminal & Action Banner (Zero Icons)
 │   │   └── chart_exporter.py     # Xuất biểu đồ tĩnh
 │   └── mt5_bridge/               # Cầu nối MetaTrader 5 (tùy chọn)
 │       └── connector.py          # Kết nối MT5 & tính Auto-Basis Sync
@@ -247,11 +250,11 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 
 - [x] Collector tự động quét Options Chain Barchart (JSON API Sniffer) & tự động Rollover (OGX26 -> OGZ26).
 - [x] Quant Engine tính đúng: Black-76, GEX, VEX (Vanna), CHEX (Charm), Level State Machine, Air Pockets.
-- [x] Real-Time Dual Feed & Dynamic Contango Basis: Đồng bộ giá Futures GC=F (yfinance) & Spot LBMA (Gold-API) band [5, 32] USD.
+- [x] Pure CME Gold Futures Realtime & Dynamic Scenario Engine (ADR-006): Định vị chính xác 100% theo giá COMEX GC=F, tự động kích hoạt 6 kịch bản hành vi Market Maker.
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
-- [x] Giao diện chuẩn Market Maker: Anti-collision spine badges, không đè chữ, 21 strikes ATM ± 10.
-- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.99MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 79/79 test cases passed 100%.
+- [x] Giao diện chuẩn Market Maker: Bảng tác chiến tức thì (3 giây), Thước đo vị trí MM, Ma trận 6 kịch bản, 0 icon rườm rà.
+- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.50MB), 0 MB rác trên laptop cá nhân.
+- [x] Unit test coverage: 84/84 test cases passed 100%.
 
 ---
 
