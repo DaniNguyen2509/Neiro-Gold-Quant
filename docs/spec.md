@@ -259,6 +259,7 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 
 1. **Chu kỳ cập nhật Options Chain (Cloud Cron Grid):**
    - **07:15 VN:** Chốt Open Interest chính thức ngày mới từ CME Clearing.
+   - **11:00 VN:** Cập nhật phiên Á / Tokyo Midday & chuẩn bị bước đệm trước phiên Âu.
    - **Phiên Âu (12:30/13:30 & 14:30/15:30 VN):** Cập nhật biến động trước và sau khi London mở cửa.
    - **Phiên Mỹ (18:45 VN & 19:45 - 23:45 VN):** Cập nhật định kỳ 60 phút/lần xuyên suốt giờ mở cửa NYSE & London Fix.
 2. **Cập nhật Giá Realtime:**

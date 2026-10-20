@@ -14,6 +14,7 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 - **Cơ chế cập nhật:** Hoàn toàn tự động 24/5 trên GitHub Actions (không cần mở laptop, không cần tài nguyên máy cá nhân).
 - **Lịch chạy tự động (Lưới Cron Pre-Session Radar & Dual-Stage thích ứng 2 mùa):**
   - **07:15 VN:** Chốt số liệu Open Interest (OI) chính thức ngày mới từ CME Clearing.
+  - **11:00 VN:** Cập nhật phiên Á / Tokyo Midday & chuẩn bị bước đệm trước phiên Âu.
   - **Phiên Âu 2 nấc (12:30 / 13:30 & 14:30 / 15:30 VN):** Cào nấc 1 trước giờ G để lên bài tác chiến, cào nấc 2 sau khi London mở cửa 30p để cập nhật Greeks.
   - **18:45 VN (Pre-US) & 19:45, 20:45, 21:45, 22:45, 23:45 VN:** Đón đầu trước giờ ra tin vĩ mô (CPI/NFP) và bao trọn mở cửa NYSE, chốt giá London Fix (00:00 VN).
 

@@ -4,13 +4,15 @@ on:
   schedule:
     # 1. Chot Open Interest ngay moi tu CME Clearing (07:15 VN):
     - cron: '15 0 * * 1-5'
-    # 2. Phien Au 2 nac (Pre-Europe & In-Session Europe thich ung ca 2 mua):
+    # 2. Phien A / Tokyo Midday (11:00 VN = 04:00 UTC):
+    - cron: '0 4 * * 1-5'
+    # 3. Phien Au 2 nac (Pre-Europe & In-Session Europe thich ung ca 2 mua):
     #    05:30 UTC = 12:30 VN (Pre-Europe Mua He: truoc Frankfurt 13:00 & London 14:00)
     #    06:30 UTC = 13:30 VN (Pre-Europe Mua Dong: truoc Frankfurt 14:00 & London 15:00)
     #    07:30 UTC = 14:30 VN (In-Session Europe Mua He sau khi London chay 30p)
     #    08:30 UTC = 15:30 VN (In-Session Europe Mua Dong sau khi London chay 30p)
     - cron: '30 5,6,7,8 * * 1-5'
-    # 3. Phien My don dau tin vi mo (18:45 VN) & gio cao diem NYSE / London Fix:
+    # 4. Phien My don dau tin vi mo (18:45 VN) & gio cao diem NYSE / London Fix:
     #    11:45 UTC = 18:45 VN (Pre-US: truoc tin vi mo 19:30 he / 20:30 dong)
     #    12:45, 13:45, 14:45, 15:45, 16:45 UTC = 19:45, 20:45, 21:45, 22:45, 23:45 VN
     - cron: '45 11,12,13,14,15,16 * * 1-5'
