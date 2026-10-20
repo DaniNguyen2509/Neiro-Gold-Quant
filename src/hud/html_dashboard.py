@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import json
 import math
 import os
 import sys
@@ -506,6 +507,26 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         recommended_lots=size_squeeze.recommended_lots,
     )
     active_sc = scenario_res.active_scenario
+    basis_val = float(meta.get("basis") if meta.get("basis") is not None else -14.50)
+
+    # Serialize scenarios for client-side JavaScript realtime evaluation
+    scenarios_json_data = {}
+    for s in scenario_res.all_scenarios:
+        scenarios_json_data[s.code] = {
+            "code": s.code,
+            "title": s.title,
+            "mm_state": s.mm_state,
+            "condition_desc": s.condition_desc,
+            "alert_level": s.alert_level.value.lower(),
+            "action_label": s.action_label,
+            "entry_trigger": s.entry_trigger,
+            "entry_desc": s.entry_desc,
+            "hard_sl": s.hard_sl,
+            "take_profit": s.take_profit,
+            "lot_size": s.lot_size,
+            "forecast": s.forecast,
+        }
+    scenarios_json_str = json.dumps(scenarios_json_data, ensure_ascii=False)
 
     # Scenario cards HTML
     scenario_cards_html = []
@@ -537,10 +558,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         action_display = f'<span style="font-weight:800; color:{action_color};">{sc.action_label}</span>' if is_active else f'<span style="color:#64748B; font-weight:600;">{sc.action_label} <small style="color:#475569;">(Chưa áp dụng)</small></span>'
 
         scenario_cards_html.append(f"""
-        <div id="card-{sc.code}" class="scenario-card" style="{active_glow} background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px;">
+        <div id="card-{sc.code}" class="scenario-card" style="{active_glow} background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px; transition: all 0.3s ease;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
                 <div style="font-size:13px; font-weight:800; color:{'#F8FAFC' if is_active else '#94A3B8'};">{sc.code}: {sc.title.upper()}</div>
-                {active_tag}
+                <div id="card-tag-{sc.code}">{active_tag}</div>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
                 <b>Điều kiện:</b> {sc.condition_desc}
@@ -551,7 +572,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1E293B; padding-top:8px;">
                 <div style="font-size:11px; color:#94A3B8;">HÀNH ĐỘNG CẦN LÀM:</div>
-                <div style="font-size:12px; font-family:'JetBrains Mono', monospace;">{action_display}</div>
+                <div id="card-act-{sc.code}" style="font-size:12px; font-family:'JetBrains Mono', monospace;">{action_display}</div>
             </div>
         </div>
         """)
@@ -619,7 +640,6 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta http-equiv="refresh" content="15">
     <title>NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -696,7 +716,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất không lưu cache">
                 Làm mới
             </button>
-            <span style="font-size: 10.5px; color: #64748B;">(Tự tải lại: <b id="timer-sec" style="color: #94A3B8;">15</b>s)</span>
+            <span id="live-ticker-badge" class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ADE80; border: 1px solid #22C55E; font-size: 11px;">CLIENT LIVE: ĐANG KẾT NỐI...</span>
         </div>
     </div>
 
@@ -705,32 +725,32 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         <div class="action-header-row">
             <div>
                 <span class="badge" style="background:#0F172A; color:#F8FAFC; border:1px solid #475569; font-size:12px; margin-right:6px;">KỊCH BẢN HIỆN TẠI</span>
-                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{active_sc.code}: {active_sc.title.upper()}</span>
+                <span id="banner-sc-title" style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{active_sc.code}: {active_sc.title.upper()}</span>
             </div>
             <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#FACC15;">
-                GIÁ REALTIME CME GCZ26: <b>${spot:,.2f}</b> (Trục ATM: ${atm_strike:,.0f})
+                GIÁ REALTIME CME GCZ26: <b id="banner-cme-price">${spot:,.2f}</b> (Trục ATM: <span id="banner-atm-strike">${atm_strike:,.0f}</span>)
             </div>
         </div>
         <div class="action-grid">
-            <div class="action-box" style="border-left: 4px solid {'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#22C55E' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
+            <div id="banner-action-card" class="action-box" style="border-left: 4px solid {'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#22C55E' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
                 <div class="action-cmd-title">HÀNH ĐỘNG CẦN THỰC HIỆN NGAY:</div>
-                <div class="action-cmd-val" style="color:{'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#4ADE80' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
+                <div id="banner-action-cmd" class="action-cmd-val" style="color:{'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#4ADE80' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
                     {active_sc.action_label}
                 </div>
-                <div style="font-size:11.5px; color:#94A3B8;">{active_sc.entry_desc}</div>
+                <div id="banner-action-desc" style="font-size:11.5px; color:#94A3B8;">{active_sc.entry_desc}</div>
             </div>
             <div class="action-box">
                 <div class="action-cmd-title">HÀNH VI CỦA MARKET MAKER:</div>
-                <div style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">{active_sc.mm_state}</div>
-                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b>{active_sc.forecast}</b></div>
+                <div id="banner-mm-state" style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">{active_sc.mm_state}</div>
+                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b id="banner-forecast">{active_sc.forecast}</b></div>
             </div>
             <div class="action-box">
                 <div class="action-cmd-title">THÔNG SỐ VÀO LỆNH (CME FUTURES):</div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;">
-                    <div>Kích hoạt: <b>{f'${active_sc.entry_trigger:,.2f}' if active_sc.entry_trigger > 0 else 'Chờ tín hiệu'}</b></div>
-                    <div>Khối lượng: <b style="color:#FACC15;">{f'~{active_sc.lot_size:.2f} Lot' if active_sc.lot_size > 0 else '0 Lot'}</b></div>
-                    <div>Cắt lỗ SL: <b style="color:#F87171;">{f'${active_sc.hard_sl:,.2f}' if active_sc.hard_sl > 0 else 'N/A'}</b></div>
-                    <div>Chốt lời TP: <b style="color:#4ADE80;">{f'${active_sc.take_profit:,.2f}' if active_sc.take_profit > 0 else 'N/A'}</b></div>
+                    <div>Kích hoạt: <b id="banner-entry-trigger">{f'${active_sc.entry_trigger:,.2f}' if active_sc.entry_trigger > 0 else 'Chờ tín hiệu'}</b></div>
+                    <div>Khối lượng: <b id="banner-lot-size" style="color:#FACC15;">{f'~{active_sc.lot_size:.2f} Lot' if active_sc.lot_size > 0 else '0 Lot'}</b></div>
+                    <div>Cắt lỗ SL: <b id="banner-hard-sl" style="color:#F87171;">{f'${active_sc.hard_sl:,.2f}' if active_sc.hard_sl > 0 else 'N/A'}</b></div>
+                    <div>Chốt lời TP: <b id="banner-take-profit" style="color:#4ADE80;">{f'${active_sc.take_profit:,.2f}' if active_sc.take_profit > 0 else 'N/A'}</b></div>
                 </div>
             </div>
         </div>
@@ -753,7 +773,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <div style="font-size:10px; color:#64748B;">({put_wall_oi:,} OI)</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
-                <div style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
+                <div id="spine-dist-put" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
                     {spot - put_wall:+.1f}$
                 </div>
             </div>
@@ -762,16 +782,16 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <div class="spine-node-price" style="color:#4ADE80;">${strike_below:,.0f}</div>
             </div>
             <div style="flex:1; height:2px; background:#FACC15; margin:0 8px; position:relative;">
-                <div style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
+                <div id="spine-dist-below" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
                     {spot - strike_below:+.1f}$
                 </div>
             </div>
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#FACC15; font-weight:800;">GIÁ HIỆN TẠI</div>
-                <div class="spine-node-current">${spot:,.2f}</div>
+                <div id="spine-current-price" class="spine-node-current">${spot:,.2f}</div>
             </div>
             <div style="flex:1; height:2px; background:#FACC15; margin:0 8px; position:relative;">
-                <div style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
+                <div id="spine-dist-above" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
                     {strike_above - spot:+.1f}$
                 </div>
             </div>
@@ -780,7 +800,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 <div class="spine-node-price" style="color:#F87171;">${strike_above:,.0f}</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
-                <div style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
+                <div id="spine-dist-call" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
                     {call_wall - spot:+.1f}$
                 </div>
             </div>
@@ -839,8 +859,8 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
-            <div class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
-            <div class="kpi-sub">Trục ATM: <b>${atm_strike:,.0f}</b> | Nguồn: <b>{meta.get('futures_feed', 'LIVE COMEX (GC=F)')}</b></div>
+            <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
+            <div class="kpi-sub">Trục ATM: <b id="kpi-atm-strike">${atm_strike:,.0f}</b> | Nguồn: <b id="kpi-price-source">{meta.get('futures_feed', 'LIVE COMEX (GC=F)')}</b></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Market Regime & Net GEX</div>
@@ -1011,21 +1031,220 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     </div>
 </div>
 <script>
+    const CONFIG = {{
+        spot: {spot:.2f},
+        basis: {basis_val:.2f},
+        strikeAbove: {strike_above:.2f},
+        strikeBelow: {strike_below:.2f},
+        callWall: {call_wall:.2f},
+        putWall: {put_wall:.2f},
+        buffer: 1.50
+    }};
+    const SCENARIOS = {scenarios_json_str};
+
+    let currentPrice = CONFIG.spot;
+    let activeCode = "{active_sc.code}";
+    let pollInterval = 3000;
+
+    function formatUsd(val) {{
+        return "$" + val.toLocaleString("en-US", {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+    }}
+
+    function formatDiff(val) {{
+        return (val >= 0 ? "+" : "") + val.toFixed(1) + "$";
+    }}
+
+    function updateScenarioUI(code, price) {{
+        if (!SCENARIOS[code]) return;
+        const sc = SCENARIOS[code];
+        activeCode = code;
+
+        const banner = document.getElementById("live-action-banner");
+        if (banner) {{
+            banner.className = "action-banner action-banner-" + sc.alert_level;
+        }}
+        const bTitle = document.getElementById("banner-sc-title");
+        if (bTitle) bTitle.innerText = sc.code + ": " + sc.title.toUpperCase();
+
+        const bActCard = document.getElementById("banner-action-card");
+        const bActCmd = document.getElementById("banner-action-cmd");
+        const bActDesc = document.getElementById("banner-action-desc");
+        const alertCol = sc.alert_level === "red" ? "#EF4444" : (sc.alert_level === "green" ? "#22C55E" : "#FACC15");
+
+        if (bActCard) bActCard.style.borderLeft = "4px solid " + alertCol;
+        if (bActCmd) {{
+            bActCmd.innerText = sc.action_label;
+            bActCmd.style.color = alertCol;
+        }}
+        if (bActDesc) bActDesc.innerText = sc.entry_desc;
+
+        const bMm = document.getElementById("banner-mm-state");
+        if (bMm) bMm.innerText = sc.mm_state;
+
+        const bFc = document.getElementById("banner-forecast");
+        if (bFc) bFc.innerText = sc.forecast;
+
+        const bTrig = document.getElementById("banner-entry-trigger");
+        if (bTrig) bTrig.innerText = sc.entry_trigger > 0 ? formatUsd(sc.entry_trigger) : "Chờ tín hiệu";
+
+        const bLot = document.getElementById("banner-lot-size");
+        if (bLot) bLot.innerText = sc.lot_size > 0 ? "~" + sc.lot_size.toFixed(2) + " Lot" : "0 Lot";
+
+        const bSl = document.getElementById("banner-hard-sl");
+        if (bSl) bSl.innerText = sc.hard_sl > 0 ? formatUsd(sc.hard_sl) : "N/A";
+
+        const bTp = document.getElementById("banner-take-profit");
+        if (bTp) bTp.innerText = sc.take_profit > 0 ? formatUsd(sc.take_profit) : "N/A";
+
+        Object.keys(SCENARIOS).forEach(function(c) {{
+            const card = document.getElementById("card-" + c);
+            const tag = document.getElementById("card-tag-" + c);
+            const act = document.getElementById("card-act-" + c);
+            if (!card) return;
+
+            const isAct = (c === code);
+            const scData = SCENARIOS[c];
+            const cLvl = scData.alert_level;
+            const borderCol = cLvl === "red" ? (isAct ? "#EF4444" : "#7F1D1D") :
+                              cLvl === "green" ? (isAct ? "#22C55E" : "#14532D") :
+                              cLvl === "yellow" ? (isAct ? "#EAB308" : "#713F12") :
+                              (isAct ? "#475569" : "#1E293B");
+            const badgeBg = cLvl === "red" ? "rgba(239, 68, 68, 0.2)" :
+                            cLvl === "green" ? "rgba(34, 197, 94, 0.2)" :
+                            cLvl === "yellow" ? "rgba(234, 179, 8, 0.2)" : "rgba(148, 163, 184, 0.15)";
+            const badgeCol = cLvl === "red" ? "#F87171" : (cLvl === "green" ? "#4ADE80" : (cLvl === "yellow" ? "#FACC15" : "#94A3B8"));
+
+            if (isAct) {{
+                card.style.boxShadow = "0 0 16px " + borderCol;
+                card.style.transform = "scale(1.01)";
+                card.style.border = "2px solid " + borderCol;
+                card.style.opacity = "1";
+                if (tag) tag.innerHTML = '<span class="badge" style="background:' + badgeBg + '; color:' + badgeCol + '; border:1px solid ' + borderCol + '; font-weight:800; box-shadow:0 0 8px ' + borderCol + ';">ĐANG DIỄN RA (ACTIVE)</span>';
+                if (act) act.innerHTML = '<span style="font-weight:800; color:' + badgeCol + ';">' + scData.action_label + '</span>';
+            }} else {{
+                card.style.boxShadow = "none";
+                card.style.transform = "scale(1.0)";
+                card.style.border = "1px solid #1E293B";
+                card.style.opacity = "0.55";
+                if (tag) tag.innerHTML = '<span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span>';
+                if (act) act.innerHTML = '<span style="color:#64748B; font-weight:600;">' + scData.action_label + ' <small style="color:#475569;">(Chưa áp dụng)</small></span>';
+            }}
+        }});
+    }}
+
+    function evaluateScenarioCode(price) {{
+        const buf = CONFIG.buffer;
+        if (price >= CONFIG.strikeAbove + buf) return "KB-3";
+        if (price <= CONFIG.strikeBelow - buf) return "KB-5";
+        if (CONFIG.strikeAbove - 2.0 <= price && price < CONFIG.strikeAbove + buf) return "KB-2";
+        if (CONFIG.strikeBelow - buf < price && price <= CONFIG.strikeBelow + 2.0) return "KB-4";
+        if (CONFIG.strikeBelow + 2.0 < price && price < CONFIG.strikeAbove - 2.0) return "KB-1";
+        return "KB-6";
+    }}
+
+    function updatePriceDOM(newPrice, source) {{
+        const prevPrice = currentPrice;
+        currentPrice = newPrice;
+
+        const priceColor = (newPrice > prevPrice) ? "#4ADE80" : (newPrice < prevPrice ? "#F87171" : "#FACC15");
+
+        const bPrice = document.getElementById("banner-cme-price");
+        if (bPrice) {{
+            bPrice.innerText = formatUsd(newPrice);
+            bPrice.style.color = priceColor;
+            setTimeout(function() {{ bPrice.style.color = "#FACC15"; }}, 800);
+        }}
+
+        const sPrice = document.getElementById("spine-current-price");
+        if (sPrice) {{
+            sPrice.innerText = formatUsd(newPrice);
+            sPrice.style.color = priceColor;
+            setTimeout(function() {{ sPrice.style.color = "#FACC15"; }}, 800);
+        }}
+
+        const sDistPut = document.getElementById("spine-dist-put");
+        if (sDistPut) sDistPut.innerText = formatDiff(newPrice - CONFIG.putWall);
+
+        const sDistBelow = document.getElementById("spine-dist-below");
+        if (sDistBelow) sDistBelow.innerText = formatDiff(newPrice - CONFIG.strikeBelow);
+
+        const sDistAbove = document.getElementById("spine-dist-above");
+        if (sDistAbove) sDistAbove.innerText = formatDiff(CONFIG.strikeAbove - newPrice);
+
+        const sDistCall = document.getElementById("spine-dist-call");
+        if (sDistCall) sDistCall.innerText = formatDiff(CONFIG.callWall - newPrice);
+
+        const kPrice = document.getElementById("kpi-cme-price");
+        if (kPrice) kPrice.innerText = formatUsd(newPrice);
+
+        const badge = document.getElementById("live-ticker-badge");
+        if (badge) {{
+            badge.style.display = "inline-flex";
+            badge.style.background = "rgba(34, 197, 94, 0.15)";
+            badge.style.color = "#4ADE80";
+            badge.style.border = "1px solid #22C55E";
+            badge.innerText = "CLIENT LIVE: " + source + " (" + formatUsd(newPrice) + ")";
+        }}
+
+        const targetCode = evaluateScenarioCode(newPrice);
+        if (targetCode !== activeCode) {{
+            updateScenarioUI(targetCode, newPrice);
+        }}
+    }}
+
+    async function fetchLiveGold() {{
+        let spotGold = null;
+        let sourceName = "";
+
+        try {{
+            const controller = new AbortController();
+            const timeoutId = setTimeout(function() {{ controller.abort(); }}, 2500);
+            const res = await fetch("https://api.gold-api.com/price/XAU", {{
+                cache: "no-store",
+                signal: controller.signal
+            }});
+            clearTimeout(timeoutId);
+            if (res.ok) {{
+                const data = await res.json();
+                if (data && data.price && !isNaN(data.price)) {{
+                    spotGold = parseFloat(data.price);
+                    sourceName = "Gold-API";
+                }}
+            }}
+        }} catch(e) {{}}
+
+        if (!spotGold) {{
+            try {{
+                const controller = new AbortController();
+                const timeoutId = setTimeout(function() {{ controller.abort(); }}, 2500);
+                const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", {{
+                    credentials: "omit",
+                    signal: controller.signal
+                }});
+                clearTimeout(timeoutId);
+                if (res.ok) {{
+                    const data = await res.json();
+                    if (data && data.price && !isNaN(data.price)) {{
+                        spotGold = parseFloat(data.price);
+                        sourceName = "Binance PAXG";
+                    }}
+                }}
+            }} catch(e) {{}}
+        }}
+
+        if (spotGold && !isNaN(spotGold)) {{
+            const cmePrice = spotGold - CONFIG.basis;
+            updatePriceDOM(cmePrice, sourceName);
+        }}
+    }}
+
+    fetchLiveGold();
+    setInterval(fetchLiveGold, pollInterval);
+
     function refreshWithCacheBuster() {{
         var base = window.location.pathname.split('?')[0];
         window.location.href = base + '?t=' + Date.now();
     }}
-    var secondsLeft = 15;
-    setInterval(function() {{
-        secondsLeft--;
-        var el = document.getElementById("timer-sec");
-        if (el) {{
-            el.innerText = secondsLeft;
-        }}
-        if (secondsLeft <= 0) {{
-            refreshWithCacheBuster();
-        }}
-    }}, 1000);
 </script>
 </body>
 </html>
