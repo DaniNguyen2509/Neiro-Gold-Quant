@@ -26,6 +26,8 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 - **Quyết định Kiến trúc Cloud-Native (ADR-001):** [docs/decisions/ADR-001-cloud-native-tactical-terminal.md](docs/decisions/ADR-001-cloud-native-tactical-terminal.md)
 - **Quyết định Rollover Tự động & Chế độ Scalping ATM ± 5 Strikes (ADR-002):** [docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md](docs/decisions/ADR-002-cme-front-month-auto-rollover-and-scalping-view.md)
 - **Quyết định Level State Engine & Quét Túi Chân Không Air Pocket (ADR-003):** [docs/decisions/ADR-003-level-state-engine-and-air-pocket-detection.md](docs/decisions/ADR-003-level-state-engine-and-air-pocket-detection.md)
+- **Quyết định Tái Cấu Trúc Layout Chuẩn Market Maker & Chống Đè Chữ (ADR-004):** [docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md](docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md)
+- **Quyết định Nguồn Giá Kép Realtime (yfinance GC=F + LBMA Spot) & Dynamic Basis (ADR-005):** [docs/decisions/ADR-005-realtime-dual-price-feed-and-dynamic-basis.md](docs/decisions/ADR-005-realtime-dual-price-feed-and-dynamic-basis.md)
 - **Công thức Toán học Định lượng (Black-76, GEX, Vanna, Charm, Expected Move):** [docs/tailieudacta/CÔNG THỨC CẦN TÍNH TOÁN.md](docs/tailieudacta/CÔNG%20THỨC%20CẦN%20TÍNH%20TOÁN.md)
 
 ---
@@ -55,6 +57,6 @@ Neiro-Quant/
 ## 🧹 QUY TẮC BẢO TỒN DUNG LƯỢNG (ZERO-WASTE MANDATE)
 
 Dự án tuân thủ nghiêm ngặt chuẩn dung lượng siêu nhẹ:
-- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~8.4MB).
+- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~9.99MB).
 - Mọi dữ liệu tạm, scratch scripts, cache đều được tự động dọn dẹp sạch sẽ sau mỗi lần thực thi.
 - Không lưu trữ tệp tin nhị phân nặng trên máy cục bộ của người dùng.
