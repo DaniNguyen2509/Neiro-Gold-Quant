@@ -101,10 +101,9 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 3: CLOUD TACTICAL TERMINAL & STATIC HOSTING (FRONTEND)]                          │
 │  - html_dashboard.py: Render độc lập file Plotly HTML Dark Mode cao cấp.               │
-│  - Client-Side Live Ticker (Zero-Waste Realtime): Trình duyệt web tự động fetch giá     │
-│    vàng trực tiếp qua API (Gold-API / Binance PAXG) mỗi 3 giây, tự động bù trừ Basis   │
-│    suy ra CME GCZ26, cập nhật tức thì Banner giá, Level Spine và chuyển đổi Kịch bản    │
-│    MM mà không cần tải lại trang và không cần bất kỳ phần mềm nào chạy trên laptop.    │
+│  - 100% Pure CME Gold Futures Engine: Định vị chuẩn xác theo giá COMEX GC=F / GCZ26,   │
+│    loại bỏ hoàn toàn cơ chế lấy Spot Gold (Gold-API/Binance PAXG) và hiệu chỉnh Basis. │
+│    Triệt tiêu 100% hiện tượng sai lệch giá và báo động giả.                             │
 │  - 5 Thẻ KPI Thống Kê: Spot-MT5, Net GEX, Expected Move, Greeks Bậc 2, 25Δ Skew.       │
 │  - Institutional Pinning Radar: Cảnh báo tự động hiện tượng Neo giá (Pinning Box & Charm Burn).│
 │  - CTA Momentum Confluence Banner: Cảnh báo bứt phá đồng pha giữa Quỹ & Dealer.        │

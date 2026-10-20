@@ -254,7 +254,7 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse): Tự động phát hiện Volume Spike (>= 1.4x MA20) và nhận diện vi mô hấp thụ đáy rút chân hoặc chặn bán đè đỉnh.
 - [x] Khóa chuẩn OTM Dealer Boundary Walls: Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn lỗi nhận nhầm strike ITM.
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
-- [x] Client-Side Realtime Live Ticker: Trình duyệt tự động lấy giá vàng trực tiếp qua Gold-API / Binance PAXG mỗi 3s, bù trừ Basis CME GCZ26, tự động cập nhật Banner giá, Thước đo khoảng cách Level Spine và Kịch bản MM tức thì mà không cần bất kỳ tiến trình nào chạy trên máy tính cá nhân.
+- [x] Khai tử hoàn toàn Spot Gold & Hiệu chỉnh Basis: Loại bỏ 100% việc lấy giá vàng giao ngay (Spot XAU/USD từ Gold-API / Binance PAXG). Toàn bộ hệ thống neo chuẩn 100% theo giá hợp đồng tương lai vàng CME GCZ26 (COMEX GC=F), triệt tiêu hoàn toàn sai số hiệu chỉnh và báo động kịch bản giả.
 - [x] Giao diện chuẩn Market Maker: Bảng tác chiến tức thì (3 giây), Thước đo vị trí MM, Ma trận 6 kịch bản mờ 55% khi chờ tín hiệu, 0 icon rườm rà, nút Làm mới chống cache trình duyệt.
 - [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.57MB), 0 MB rác trên laptop cá nhân.
 - [x] Unit test coverage: 89/89 test cases passed 100%.
