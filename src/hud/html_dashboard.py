@@ -619,7 +619,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta http-equiv="refresh" content="300">
+    <meta http-equiv="refresh" content="15">
     <title>NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -696,7 +696,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất không lưu cache">
                 Làm mới
             </button>
-            <span style="font-size: 10.5px; color: #64748B;">(Tự tải lại: <b id="timer-sec" style="color: #94A3B8;">300</b>s)</span>
+            <span style="font-size: 10.5px; color: #64748B;">(Tự tải lại: <b id="timer-sec" style="color: #94A3B8;">15</b>s)</span>
         </div>
     </div>
 
@@ -1015,7 +1015,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         var base = window.location.pathname.split('?')[0];
         window.location.href = base + '?t=' + Date.now();
     }}
-    var secondsLeft = 300;
+    var secondsLeft = 15;
     setInterval(function() {{
         secondsLeft--;
         var el = document.getElementById("timer-sec");

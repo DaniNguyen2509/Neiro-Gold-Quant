@@ -1,9 +1,9 @@
 @echo off
-title Neiro-Quant Live Tactical HUD Runner (M5 Tape Auto-Sync)
+title Neiro-Quant Live Tactical HUD Runner (Realtime M5 Auto-Sync)
 echo ==============================================================================
 echo [NEIRO-QUANT] CHAY TIEN TRINH CAP NHAT DASHBOARD VA BANG GIA M5 LIEN TUC
-echo Chu ky cap nhat: 300 giay (5 phut)
+echo Chu ky cap nhat: 15 giay (Realtime Auto-Sync)
 echo Nhan Ctrl + C de dung lai.
 echo ==============================================================================
-python -m src.hud.html_dashboard --loop 300
+python -m src.hud.html_dashboard --loop 15
 pause
