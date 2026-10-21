@@ -74,6 +74,9 @@ def evaluate_market_scenarios(
     major_up_wall: float = 0.0,
     major_down_wall: float = 0.0,
     recommended_lots: float = 0.22,
+    zero_gamma: Optional[float] = None,
+    call_wall_siege: float = 0.0,
+    put_wall_siege: float = 0.0,
 ) -> ScenarioEvaluationResult:
     """Evaluates the 6 real-time Market Maker scenarios based on pure CME Gold Futures price.
 
@@ -92,16 +95,20 @@ def evaluate_market_scenarios(
     # Priority 1: High-alert boundary breaches
     if spot_price >= strike_above + buffer:
         active_code = "KB-3"
-        active_reason = f"Gia ${spot_price:,.2f} vuot qua tran ${strike_above:,.0f} -> MM vo tran Short"
+        zg_tag = f" (Short Gamma < Zero Gamma ${zero_gamma:,.2f})" if (zero_gamma and spot_price < zero_gamma) else ""
+        active_reason = f"Gia ${spot_price:,.2f} vuot qua tran ${strike_above:,.0f} -> MM vo tran Short{zg_tag}"
     elif spot_price <= strike_below - buffer:
         active_code = "KB-5"
-        active_reason = f"Gia ${spot_price:,.2f} dam thung san ${strike_below:,.0f} -> MM buong xuoi xa lu"
+        zg_tag = f" (Short Gamma < Zero Gamma ${zero_gamma:,.2f})" if (zero_gamma and spot_price < zero_gamma) else ""
+        active_reason = f"Gia ${spot_price:,.2f} dam thung san ${strike_below:,.0f} -> MM buong xuoi xa lu{zg_tag}"
     elif strike_above - 2.0 <= spot_price < strike_above + buffer:
         active_code = "KB-2"
-        active_reason = f"Gia ${spot_price:,.2f} cham vung tran ${strike_above:,.0f} -> MM ban chan phong thu"
+        siege_tag = f" | TƯỜNG BỊ CÔNG PHÁ (Siege: {call_wall_siege:.2f})" if call_wall_siege >= 0.8 else ""
+        active_reason = f"Gia ${spot_price:,.2f} cham vung tran ${strike_above:,.0f} -> MM ban chan phong thu{siege_tag}"
     elif strike_below - buffer < spot_price <= strike_below + 2.0:
         active_code = "KB-4"
-        active_reason = f"Gia ${spot_price:,.2f} cham vung san ${strike_below:,.0f} -> MM dem mua do gia"
+        siege_tag = f" | TƯỜNG BỊ CÔNG PHÁ (Siege: {put_wall_siege:.2f})" if put_wall_siege >= 0.8 else ""
+        active_reason = f"Gia ${spot_price:,.2f} cham vung san ${strike_below:,.0f} -> MM dem mua do gia{siege_tag}"
     elif (strike_below + 2.0 < spot_price < strike_above - 2.0):
         active_code = "KB-1"
         active_reason = f"Gia ${spot_price:,.2f} kep trong bien do ${strike_below:,.0f} - ${strike_above:,.0f} -> MM ghim gia"

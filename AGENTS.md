@@ -62,6 +62,8 @@ Cac model **TUYET DOI KHONG DUOC** tu bien ho de bo qua viec goi skill.
 5. **Python code phai tuan thu performance constraints:** CPU < 5%, RAM co dinh, khong memory leak.
 6. **BAT BUOC DONG BO TAI LIEU (DOCUMENTATION-FIRST MANDATE):**
    Sau khi hoan thanh bat ky thay doi, toi uu tinh nang, kien truc hoac sua loi (fix bug) nao trong repository, AI model **BAT BUOC PHAI CAP NHAT LAI TAI LIEU** tuong ung (`docs/spec.md`, `docs/architecture.md`, `README.md`, hoac tao ADR trong `docs/decisions/` neu co quyet dinh kien truc moi) truoc khi ket thuc phien lam viec. Tuyet doi khong de ma nguon di truoc ma tai lieu bi lac hau.
+7. **CME OPTIONS MICROSTRUCTURE & ZERO GAMMA INVARIANT:**
+   Dữ liệu Open Interest (OI) của CME Options là tĩnh trong phiên (chỉ cập nhật qua đêm bởi Clearing House). Mọi đánh giá áp lực thành trì trong ngày (Intraday Pressure/Flow Rate) phải đo lường bằng tỷ lệ Volume so với OI nền (`Wall Siege Ratio = Volume / OI`). Mốc Zero Gamma Flip ($S^*$) bắt buộc phải giải liên tục bằng phương trình hàm giải nghiệm số (Dekker-Brent `_brentq` thuần Python), không được dùng xấp xỉ strike thô để tránh sai lệch toán học do bất đẳng thức Jensen và Black-76 convexity.
 
 
 

@@ -50,6 +50,8 @@ class Wall:
     volume: int
     side: str  # "call" or "put"
     rank: int  # 1 = primary wall
+    siege_ratio: float = 0.0
+    is_under_siege: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,3 +83,5 @@ class QuantLevels:
     pin_risk_strike: float | None = None
     air_pockets: tuple[AirPocket, ...] = field(default_factory=tuple)
     basis: float = 0.0
+    zero_gamma_flip: float | None = None
+    gamma_regime: str = "NEUTRAL"

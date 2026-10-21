@@ -52,6 +52,8 @@ from src.quant_engine.scenario_engine import (
     ActionDirective,
     evaluate_market_scenarios,
 )
+from src.quant_engine.dealer import compute_exact_gamma_flip, compute_wall_siege_ratio
+from src.quant_engine.loader import to_options_snapshot
 
 
 def clean_val(v: Any, default: float = 0.0) -> float:
@@ -242,6 +244,16 @@ def load_and_preprocess_options(
     # 7. Real-Time M5 Orderflow Tape & Volume Pulse
     m5_tape = fetch_live_cme_m5_tape(limit=8)
 
+    call_wall_vol = int(call_wall_row["callVolume"]) if "callVolume" in call_wall_row else 0
+    put_wall_vol = int(put_wall_row["putVolume"]) if "putVolume" in put_wall_row else 0
+    call_wall_siege = compute_wall_siege_ratio(call_wall_vol, call_wall_oi)
+    put_wall_siege = compute_wall_siege_ratio(put_wall_vol, put_wall_oi)
+
+    snap = to_options_snapshot(df)
+    exact_gamma_flip = compute_exact_gamma_flip(
+        snap, spot_price=spot_price, r=r, dte_days=dte_days, default_iv=sigma_atm
+    )
+
     meta = {
         "spot_price": spot_price,
         "futures_feed": futures_feed,
@@ -253,14 +265,17 @@ def load_and_preprocess_options(
         "rule16_daily_move": rule16_daily_move,
         "call_wall": call_wall,
         "call_wall_oi": call_wall_oi,
+        "call_wall_siege": call_wall_siege,
         "put_wall": put_wall,
         "put_wall_oi": put_wall_oi,
+        "put_wall_siege": put_wall_siege,
         "total_net_gex": total_net_gex,
         "total_net_vex": total_net_vex,
         "total_net_chex": total_net_chex,
         "regime": regime,
         "squeeze_trigger": squeeze_trigger,
         "waterfall_trigger": waterfall_trigger,
+        "zero_gamma_flip": exact_gamma_flip,
         "basis": basis,
         "basis_source": basis_source,
         "no_mt5": no_mt5,
@@ -285,10 +300,19 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     call_wall = meta["call_wall"]
     put_wall = meta["put_wall"]
 
-    atm_idx = (df_full["strike"] - atm_strike).abs().idxmin()
-    half = 10
-    s_idx = max(0, atm_idx - half)
-    e_idx = min(len(df_full), atm_idx + half + 1)
+    atm_idx = int((df_full["strike"] - atm_strike).abs().idxmin())
+    targets = [call_wall, put_wall, spot_price]
+    zg = meta.get("zero_gamma_flip")
+    if zg is not None and not np.isnan(zg):
+        if 0.85 * spot_price <= zg <= 1.15 * spot_price:
+            targets.append(zg)
+
+    min_idx = int((df_full["strike"] - min(targets)).abs().idxmin())
+    max_idx = int((df_full["strike"] - max(targets)).abs().idxmin())
+
+    half = 12
+    s_idx = max(0, min(atm_idx - half, min_idx - 1))
+    e_idx = min(len(df_full), max(atm_idx + half + 1, max_idx + 2))
     df = df_full.iloc[s_idx:e_idx].copy().reset_index(drop=True)
 
     strikes = df["strike"].values
@@ -397,6 +421,9 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
         (strike_below, "#4ADE80", f"SÀN DƯỚI (${strike_below:.0f})", "bottom right", "dot"),
         (spot_price, "#FACC15", f"CME LIVE (${spot_price:.2f})", "top right", "solid"),
     ]
+    zero_gamma = meta.get("zero_gamma_flip")
+    if zero_gamma is not None and y_min <= zero_gamma <= y_max:
+        levels.append((zero_gamma, "#F59E0B", f"ZERO GAMMA (${zero_gamma:.2f})", "top left", "longdash"))
 
     for lvl, color, label, pos, dash in levels:
         if y_min <= lvl <= y_max:
@@ -453,6 +480,9 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     call_wall_oi = meta["call_wall_oi"]
     put_wall = meta["put_wall"]
     put_wall_oi = meta["put_wall_oi"]
+    zero_gamma = meta.get("zero_gamma_flip")
+    call_wall_siege = float(meta.get("call_wall_siege", 0.0))
+    put_wall_siege = float(meta.get("put_wall_siege", 0.0))
 
     # Institutional metrics
     rr25 = float(meta.get("skew_rr25", 0.0))
@@ -536,6 +566,9 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         major_up_wall=major_up_wall,
         major_down_wall=major_down_wall,
         recommended_lots=size_squeeze.recommended_lots,
+        zero_gamma=zero_gamma,
+        call_wall_siege=call_wall_siege,
+        put_wall_siege=put_wall_siege,
     )
     active_sc = scenario_res.active_scenario
 
@@ -804,7 +837,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#22C55E;">PUT WALL (ĐÁY MM)</div>
                 <div class="spine-node-price" style="color:#22C55E;">${put_wall:,.0f}</div>
-                <div style="font-size:10px; color:#64748B;">({put_wall_oi:,} OI)</div>
+                <div style="font-size:10px; color:#64748B;">({put_wall_oi:,} OI | Siege: {put_wall_siege:.2f}x)</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
                 <div id="spine-dist-put" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
@@ -841,7 +874,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#EF4444;">CALL WALL (TRẦN MM)</div>
                 <div class="spine-node-price" style="color:#EF4444;">${call_wall:,.0f}</div>
-                <div style="font-size:10px; color:#64748B;">({call_wall_oi:,} OI)</div>
+                <div style="font-size:10px; color:#64748B;">({call_wall_oi:,} OI | Siege: {call_wall_siege:.2f}x)</div>
             </div>
         </div>
     </div>
@@ -899,7 +932,12 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         <div class="kpi-card">
             <div class="kpi-label">Market Regime & Net GEX</div>
             <div class="kpi-val" style="color: {'#4ADE80' if total_gex >= 0 else '#F87171'};">{total_gex:+.1f}M GEX</div>
-            <div class="kpi-sub"><span class="badge badge-gold">{regime}</span></div>
+            <div class="kpi-sub"><span class="badge badge-gold">{regime}</span>{f' <span style="color:#94A3B8; font-size:10.5px;">(Flip: ${zero_gamma:,.1f})</span>' if zero_gamma else ''}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Zero Gamma Flip ($S^*) & Wall Siege</div>
+            <div class="kpi-val" style="color: #F59E0B; font-size: 20px;">{f'${zero_gamma:,.2f}' if zero_gamma else 'N/A (Pure)'}</div>
+            <div class="kpi-sub">CW Siege: <b>{call_wall_siege:.2f}x</b> | PW Siege: <b>{put_wall_siege:.2f}x</b></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Biên Độ 1-Sigma Expected Move</div>
@@ -1052,6 +1090,14 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <div class="glossary-item">
                 <div class="glossary-term">25 Delta Skew (Risk Reversal)</div>
                 <div>Thước đo dòng tiền của các quỹ lớn đang bỏ tiền cược vào chiều vàng phá đỉnh (Call) hay phòng hộ sập giá (Put).</div>
+            </div>
+            <div class="glossary-item">
+                <div class="glossary-term">Zero Gamma Flip ($S^*)</div>
+                <div>Mốc đảo chiều xu hướng sống còn. Trên Zero Gamma: MM mua thấp bán cao (Long Gamma / Hấp thụ biến động / Mean-reversion); Dưới Zero Gamma: MM bán tháo mua đuổi (Short Gamma / Kích hoạt bão giá Trend-following).</div>
+            </div>
+            <div class="glossary-item">
+                <div class="glossary-term">Wall Siege Ratio (Tỷ Lệ Công Thành)</div>
+                <div>Tốc độ dồn volume quyền chọn so với OI nền (Volume/OI). Nếu > 0.25 (Siege Alert): Phe tấn công đang dồn hỏa lực phá vỡ bức tường MM; MM có nguy cơ buông súng đầu hàng.</div>
             </div>
             <div class="glossary-item">
                 <div class="glossary-term">Hard SL / Take Profit</div>

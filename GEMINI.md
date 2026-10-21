@@ -37,6 +37,7 @@ Nghiêm cấm Gemini tự đưa ra các lý do sau để bỏ qua việc mở sk
 4. **Không tự chế luật hoặc backtest ngoài lề.** Mọi thay đổi logic do owner trực tiếp chỉ đạo.
 5. **Performance constraints:** Python code phải đảm bảo CPU < 5%, RAM cố định, zero memory leak.
 6. **BẮT BUỘC ĐỒNG BỘ TÀI LIỆU (DOCUMENTATION-FIRST MANDATE):** Sau khi hoàn thành bất kỳ thay đổi, tối ưu tính năng, kiến trúc hoặc sửa lỗi (fix bug) nào trong repository, AI model **BẮT BUỘC PHẢI CẬP NHẬT LẠI TÀI LIỆU** tương ứng (`docs/spec.md`, `docs/architecture.md`, `README.md`, hoặc tạo ADR trong `docs/decisions/` nếu có quyết định kiến trúc mới) trước khi kết thúc phiên làm việc. Tuyệt đối không để mã nguồn đi trước mà tài liệu bị lạc hậu.
+7. **CME OPTIONS MICROSTRUCTURE & ZERO GAMMA INVARIANT:** Dữ liệu Open Interest (OI) của CME Options là tĩnh trong phiên (chỉ cập nhật qua đêm bởi Clearing House). Mọi đánh giá áp lực thành trì trong ngày (Intraday Pressure/Flow Rate) phải đo lường bằng tỷ lệ Volume so với OI nền (`Wall Siege Ratio = Volume / OI`). Mốc Zero Gamma Flip ($S^*$) bắt buộc phải giải liên tục bằng phương trình hàm giải nghiệm số (Dekker-Brent `_brentq` thuần Python), không được dùng xấp xỉ strike thô để tránh sai lệch toán học do bất đẳng thức Jensen và Black-76 convexity.
 
 
 ---

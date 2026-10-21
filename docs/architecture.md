@@ -91,7 +91,8 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - iv_solver.py: Giải ngược Implied Volatility (Newton-Raphson + Brent fallback).      │
 │  - Put-Call Parity Implied Spot: S_Implied = K_ATM + exp(r*T)*(C_ATM - P_ATM).         │
 │  - Liquid Strike Weighting: Lọc mốc ATM thực theo Open Interest và Volume thanh khoản. │
-│  - gex.py: Net GEX ($/1% move), Gamma Flip Point, Gamma Squeeze / Waterfall Triggers.   │
+│  - dealer.py: Zero Gamma Continuous Solver (_brentq Dekker-Brent), Wall Siege Ratio    │
+│    (compute_wall_siege_ratio), Call/Put Walls, Gamma Flip, Squeeze Triggers.           │
 │  - advanced_greeks.py: Net VEX ($M/1% IV - Vanna) & Net CHEX ($M/ngày - Charm).        │
 │  - expected_move.py: Biên độ 1-Sigma (Straddle / 0.7979) & Intraday Rule of 16.        │
 │  - institutional.py: 25Δ Risk Reversal (RR25), Butterfly (BF25), Volatility-Targeted   │
@@ -105,10 +106,13 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - 100% Pure CME Gold Futures Engine: Định vị chuẩn xác theo giá COMEX GC=F / GCZ26,   │
 │    loại bỏ hoàn toàn cơ chế lấy Spot Gold (Gold-API/Binance PAXG) và hiệu chỉnh Basis. │
 │    Triệt tiêu 100% hiện tượng sai lệch giá và báo động giả.                             │
-│  - 5 Thẻ KPI Thống Kê: Spot-MT5, Net GEX, Expected Move, Greeks Bậc 2, 25Δ Skew.       │
-│  - Institutional Pinning Radar: Cảnh báo tự động hiện tượng Neo giá (Pinning Box & Charm Burn).│
+│  - 6 Thẻ KPI Thống Kê: Spot CME, Net GEX Regime, Zero Gamma Flip ($S*) & Wall Siege,    │
+│    Expected Move, Greeks Bậc 2, 25Δ Skew.                                              │
+│  - Đường Zero Gamma Flip ($S*): Vẽ trực quan trên Panel 1, đánh dấu ranh giới đảo chiều.│
+│  - Visual Level Spine: Thước đo vị trí giá tích hợp tỷ lệ Siege tại Call/Put Wall.     │
+│  - Institutional Pinning Radar: Cảnh báo tự động hiện tượng Neo giá (Pinning Box).     │
 │  - CTA Momentum Confluence Banner: Cảnh báo bứt phá đồng pha giữa Quỹ & Dealer.        │
-│  - Chế độ ATM ± 10 Strikes (Broad Tactical View): Cắt lớp 20-21 strikes (height 900px).  │
+│  - Chế độ ATM Broad Tactical View: Tự động co giãn dải strikes bao trọn Walls & Flip.  │
 │  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
 │  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │

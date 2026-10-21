@@ -86,7 +86,8 @@ Neiro-Quant/
 │   │   ├── ADR-003-level-state-engine-and-air-pocket-detection.md
 │   │   ├── ADR-004-institutional-terminal-layout-and-anti-collision.md
 │   │   ├── ADR-005-realtime-dual-price-feed-and-dynamic-basis.md
-│   │   └── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
+│   │   ├── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
+│   │   └── ADR-007-zero-gamma-flip-and-wall-siege-velocity.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       ├── DEEPSEEK_MATH_AUDIT_REPORT.md
@@ -152,6 +153,14 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 
 4. **OI Air Pockets (oi_air_pocket_zones):**
    - Dai Strike giua ATM va Walls co OI < 30-40% muc trung binh -> Vung chan khong
+
+5. **Continuous Zero Gamma Flip ($S^*$):**
+   - Nghiệm giải phương trình liên tục $\sum_k \text{NetGEX}_k(S^*) = 0$ bằng thuật toán Dekker-Brent (`_brentq`, pure Python zero-dependency).
+   - Ranh giới đổi pha thị trường: Giá > $S^*$ $\Rightarrow$ Long Gamma (Mean-reversion / Hấp thụ biến động); Giá < $S^*$ $\Rightarrow$ Short Gamma (Trend-momentum / Breakout).
+
+6. **Intraday Wall Siege Velocity Ratio (Tỷ Lệ Công Thành):**
+   - Đo lường áp lực tấn công trực tiếp trong ngày: $\text{Siege Ratio} = \frac{\text{Volume}}{\max(\text{Baseline OI}, 1)}$.
+   - Ngưỡng $\ge 0.25$: Cảnh báo `is_under_siege = True`, MM có nguy cơ vỡ trận hoặc buông phòng thủ.
 
 ### Tier 4 (Hedge Fund Quantitative Mechanisms - src/quant_engine/institutional.py)
 

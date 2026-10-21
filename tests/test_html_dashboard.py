@@ -122,7 +122,9 @@ def test_generate_html_terminal_content():
         "skew_sentiment": "BULLISH CALL SKEW (DÒNG TIỀN QUỸ GOM CALL CƯỢC PHÁ ĐỈNH)",
         "cta_badge": "INDEPENDENT DEALER WALLS",
         "cta_description": "Các chốt chặn hiện tại do Market Maker độc lập phòng thủ trong biên độ thông thường.",
-        "cta_range": "$4,108.3 - $4,251.2",
+        "zero_gamma_flip": 4175.5,
+        "call_wall_siege": 0.21,
+        "put_wall_siege": 0.85,
     }
 
     import plotly.graph_objects as go
@@ -134,6 +136,9 @@ def test_generate_html_terminal_content():
     # Check key indicators in pure CME HTML
     assert "CME Gold Futures GCZ26 (COMEX)" in html
     assert "$4,180.00" in html
+    assert "Zero Gamma Flip" in html
+    assert "$4,175.50" in html
+    assert "Siege" in html
     assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in html
     assert "THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CÁC BỨC TƯỜNG CỦA MARKET MAKER" in html
     assert "TỪ ĐIỂN THUẬT NGỮ BỎ TÚI" in html

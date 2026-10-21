@@ -27,6 +27,7 @@ from typing import Optional, Union, Dict, Any, Tuple
 import numpy as np
 import pandas as pd
 
+from .dealer import compute_exact_gamma_flip, compute_wall_siege_ratio
 from .models import OptionsSnapshot, OptionsStrike, QuantLevels, Wall
 from .strategy import MarketSnapshot, OptionQuote, compute_implied_spot
 from .synthetic import compute_dynamic_dte
@@ -749,9 +750,15 @@ def compute_tactical_matrix(
     total_net_chex = float(df['netCHEX'].sum())
     regime = "LONG_GAMMA" if total_net_gex > 10.0 else ("SHORT_GAMMA" if total_net_gex < -10.0 else "NEUTRAL")
 
-    # Gamma Flip: Strike where cumulative net GEX transitions
-    pos_gex_df = df[df['netGEX'] >= 0]
-    gamma_flip_floor = float(pos_gex_df['strike'].min()) if not pos_gex_df.empty else (spot_price - 10.0)
+    call_wall_siege = compute_wall_siege_ratio(int(call_wall_row['callVolume']), call_wall_oi)
+    put_wall_siege = compute_wall_siege_ratio(int(put_wall_row['putVolume']), put_wall_oi)
+
+    # Gamma Flip: Solve exact continuous S* where aggregate net dealer GEX = 0
+    snap = to_options_snapshot(df)
+    exact_gamma_flip = compute_exact_gamma_flip(
+        snap, spot_price=spot_price, r=r, dte_days=effective_dte, default_iv=sigma_atm
+    )
+    gamma_flip_floor = exact_gamma_flip if exact_gamma_flip is not None else float(call_wall if total_net_gex < 0 else put_wall)
 
     squeeze_trigger = call_wall + 2.50
     waterfall_trigger = put_wall - 2.50
@@ -803,14 +810,18 @@ def compute_tactical_matrix(
         'atm_strike': atm_strike,
         'call_wall': call_wall,
         'call_wall_oi': call_wall_oi,
+        'call_wall_siege': call_wall_siege,
         'put_wall': put_wall,
         'put_wall_oi': put_wall_oi,
+        'put_wall_siege': put_wall_siege,
         'total_net_gex': total_net_gex,
         'total_net_vex': total_net_vex,
         'total_net_chex': total_net_chex,
         'sigma_atm': sigma_atm,
         'regime': regime,
         'gamma_flip_floor': gamma_flip_floor,
+        'exact_gamma_flip': exact_gamma_flip,
+        'zero_gamma_flip': exact_gamma_flip,
         'squeeze_trigger': squeeze_trigger,
         'waterfall_trigger': waterfall_trigger,
         'atm_straddle': atm_straddle,

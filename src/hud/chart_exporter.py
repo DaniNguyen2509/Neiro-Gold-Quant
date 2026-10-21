@@ -27,6 +27,7 @@ def export_quant_chart(
     gamma_flip_ceil: float = 4201.00,
     squeeze_trigger: float = 4202.50,
     waterfall_trigger: float = 4147.50,
+    zero_gamma: float | None = None,
     output_png: str = "quant_truevision_map.png"
 ):
     t0 = time.time()
@@ -80,12 +81,19 @@ def export_quant_chart(
         df['putCHEX'] = - ((charm_put / 365.0) * df['putOpenInterest'] * MULT * futures_price / 1e6)
         df['netCHEX'] = df['callCHEX'] + df['putCHEX']
         
-    # Filter Near-The-Money strikes for tactical intraday scalping (ATM ± 5 strikes)
+    # Filter Near-The-Money strikes for tactical intraday scalping (ensure Call/Put wall & Zero Gamma are covered if reasonable)
     if len(df) > 11:
-        atm_idx = (df['strike'] - k_atm).abs().idxmin()
-        half = 5
-        start_idx = max(0, atm_idx - half)
-        end_idx = min(len(df), atm_idx + half + 1)
+        atm_idx = int((df['strike'] - k_atm).abs().idxmin())
+        targets = [futures_price, call_wall, put_wall]
+        target_zg = zero_gamma if zero_gamma is not None else gamma_flip_floor
+        if target_zg is not None and not np.isnan(target_zg):
+            if 0.85 * futures_price <= target_zg <= 1.15 * futures_price:
+                targets.append(target_zg)
+        min_idx = int((df['strike'] - min(targets)).abs().idxmin())
+        max_idx = int((df['strike'] - max(targets)).abs().idxmin())
+        half = 6
+        start_idx = max(0, min(atm_idx - half, min_idx - 1))
+        end_idx = min(len(df), max(atm_idx + half + 1, max_idx + 2))
         plot_df = df.iloc[start_idx:end_idx].copy().reset_index(drop=True)
     else:
         plot_df = df.copy()
@@ -165,6 +173,14 @@ def export_quant_chart(
                  bbox=dict(boxstyle='round,pad=0.25', facecolor='#FFF3E0', edgecolor='#E65100', alpha=0.92, linewidth=1.0))
                  
         ax1.axhline(waterfall_trigger, color='#D32F2F', linewidth=1.2, linestyle=':')
+
+    # 3.1. ĐƯỜNG ZERO GAMMA (GAMMA FLIP LINE)
+    target_zg = zero_gamma if zero_gamma is not None else gamma_flip_floor
+    if target_zg is not None and strikes.min() <= target_zg <= strikes.max():
+        ax1.axhline(target_zg, color='#F59E0B', linewidth=1.6, linestyle='--', zorder=3)
+        ax1.text(gex_span * 0.12, target_zg, f"--- ZERO GAMMA FLIP: ${target_zg:.2f} ---", 
+                 color='#B45309', fontsize=7.2, fontweight='bold', va='center',
+                 bbox=dict(boxstyle='round,pad=0.2', facecolor='#FEF3C7', edgecolor='#F59E0B', alpha=0.92, linewidth=0.8), zorder=4)
 
     # 4. CÁC MỐC CHIẾN THUẬT LƯỚT SÓNG TRONG NGÀY (100% TỰ ĐỘNG THEO GIÁ SPOT & GEX)
     strikes_above = strikes[strikes > futures_price]
