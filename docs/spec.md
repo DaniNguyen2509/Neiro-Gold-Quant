@@ -162,6 +162,16 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
    - Đo lường áp lực tấn công trực tiếp trong ngày: $\text{Siege Ratio} = \frac{\text{Volume}}{\max(\text{Baseline OI}, 1)}$.
    - Ngưỡng $\ge 0.25$: Cảnh báo `is_under_siege = True`, MM có nguy cơ vỡ trận hoặc buông phòng thủ.
 
+7. **Dealer Net Delta Position & Book Tilt (DEX - Sổ Sách Hợp Đồng Ròng):**
+   - Định lượng số lượng hợp đồng Futures CME ròng mà Dealer đang gánh trên sổ sách tại mỗi Strike:
+     $$\text{Net Delta}_K = \left( \text{OI}_{\text{Call}, K} \times \Delta_{\text{Call}, K} \right) + \left( \text{OI}_{\text{Put}, K} \times \Delta_{\text{Put}, K} \right)$$
+   - Xác định tổng độ lệch toàn thị trường (`Total Net Delta Contracts`) và tâm chấn lệch cực đại (`Max Tilt Strike`).
+   - Phân loại chế độ:
+     - `Total Net Delta > +200 HĐ`: Sổ sách nghiêng Call (Bullish Tilt).
+     - `Total Net Delta < -200 HĐ`: Sổ sách nghiêng Put (Bearish Tilt).
+     - $|Total Net Delta| \le 200 HĐ`: Trạng thái Delta Neutral cân bằng.
+   - Trực quan hóa: Thẻ KPI `NET DELTA BIAS` đầu trang và thanh ngang `Net Delta Bar` kèm Tooltip đa tầng trên Panel 2 biểu đồ Plotly.
+
 ### Tier 4 (Hedge Fund Quantitative Mechanisms - src/quant_engine/institutional.py)
 
 1. **25-Delta Risk Reversal ($RR_{25}$) & Butterfly ($BF_{25}$) Volatility Skew:**

@@ -1,4 +1,5 @@
 import math
+from typing import Any
 import numpy as np
 
 from .models import OptionsSnapshot, Wall
@@ -241,3 +242,99 @@ def detect_pin_risk(snapshot: OptionsSnapshot) -> float | None:
             s.call_oi + s.put_oi for s in snapshot.strikes if s.strike == k
         ),
     )
+
+
+def compute_net_delta_positions(
+    snapshot: OptionsSnapshot,
+    spot_price: float,
+    r: float = 0.045,
+    dte_days: float = 30.0,
+    default_iv: float = 0.16,
+) -> dict[str, Any]:
+    """Compute exact Black-76 Net Delta Position (DEX) per strike and aggregate book tilt.
+
+    Formulas:
+        d1 = (ln(spot / strike) + 0.5 * sigma^2 * T) / (sigma * sqrt(T))
+        call_delta = exp(-r * T) * N(d1)
+        put_delta = call_delta - exp(-r * T)
+        call_delta_contracts = call_oi * call_delta
+        put_delta_contracts = put_oi * put_delta
+        net_delta_contracts = call_delta_contracts + put_delta_contracts
+        net_dex_usd = net_delta_contracts * 100.0 * spot_price
+
+    Returns:
+        Dictionary with per-strike details, total net delta, max tilt strike, and regime.
+    """
+    if not snapshot.strikes or spot_price <= 0:
+        return {
+            "strikes": {},
+            "total_net_delta": 0.0,
+            "max_tilt_strike": None,
+            "max_tilt_contracts": 0.0,
+            "regime": "NEUTRAL",
+            "regime_label": "CÂN BẰNG (DELTA NEUTRAL)",
+            "total_dex_usd": 0.0,
+        }
+
+    t_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
+    sigma = max(0.01, float(default_iv))
+    denom = sigma * math.sqrt(t_years)
+    half_sig2_t = 0.5 * (sigma ** 2) * t_years
+    df_disc = math.exp(-r * t_years)
+
+    strike_records: dict[float, dict[str, Any]] = {}
+    total_net = 0.0
+
+    for s in snapshot.strikes:
+        if s.strike <= 0:
+            continue
+        d1 = (math.log(spot_price / s.strike) + half_sig2_t) / denom
+        cdf_d1 = 0.5 * (1.0 + math.erf(d1 / math.sqrt(2.0)))
+        c_delta = df_disc * cdf_d1
+        p_delta = c_delta - df_disc
+
+        c_contracts = round(s.call_oi * c_delta, 1)
+        p_contracts = round(s.put_oi * p_delta, 1)
+        net_contracts = round(c_contracts + p_contracts, 1)
+        total_net += net_contracts
+
+        strike_records[s.strike] = {
+            "strike": s.strike,
+            "call_oi": s.call_oi,
+            "put_oi": s.put_oi,
+            "call_delta": round(c_delta, 4),
+            "put_delta": round(p_delta, 4),
+            "call_contracts": c_contracts,
+            "put_contracts": p_contracts,
+            "net_contracts": net_contracts,
+            "dex_usd": round(net_contracts * 100.0 * spot_price, 2),
+        }
+
+    total_net = round(total_net, 1)
+    if strike_records:
+        max_strike = max(strike_records.values(), key=lambda x: abs(x["net_contracts"]))
+        max_tilt_strike = max_strike["strike"]
+        max_tilt_contracts = max_strike["net_contracts"]
+    else:
+        max_tilt_strike = None
+        max_tilt_contracts = 0.0
+
+    if total_net > 200.0:
+        regime = "BULLISH_CALL_TILT"
+        regime_label = "NGHIÊNG CALL (BULLISH)"
+    elif total_net < -200.0:
+        regime = "BEARISH_PUT_TILT"
+        regime_label = "NGHIÊNG PUT (BEARISH)"
+    else:
+        regime = "NEUTRAL"
+        regime_label = "CÂN BẰNG (DELTA NEUTRAL)"
+
+    return {
+        "strikes": strike_records,
+        "total_net_delta": total_net,
+        "max_tilt_strike": max_tilt_strike,
+        "max_tilt_contracts": max_tilt_contracts,
+        "regime": regime,
+        "regime_label": regime_label,
+        "total_dex_usd": round(total_net * 100.0 * spot_price, 2),
+    }

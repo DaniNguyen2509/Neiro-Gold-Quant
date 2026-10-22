@@ -36,9 +36,12 @@ def test_load_and_preprocess_options_with_basis():
     assert meta["put_wall"] > 0
     assert "strike" in df.columns
     assert "netGEX" in df.columns
+    assert "netDeltaContracts" in df.columns
     assert "skew_rr25" in meta
     assert "skew_bf25" in meta
     assert "cta_badge" in meta
+    assert "total_net_delta_contracts" in meta
+    assert "max_tilt_strike" in meta
 
     # 2. Test with positive spread passed (should normalize to negative basis)
     df2, meta2 = load_and_preprocess_options(csv_path, basis=24.0)
@@ -142,6 +145,8 @@ def test_generate_html_terminal_content():
     assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in html
     assert "THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CÁC BỨC TƯỜNG CỦA MARKET MAKER" in html
     assert "TỪ ĐIỂN THUẬT NGỮ BỎ TÚI" in html
+    assert "Sổ Sách Dealer (Net Delta / DEX)" in html
+    assert "Net Delta / DEX (Sổ Sách Dealer)" in html
     assert "Lot Size ($10K, R: 1%)" in html
     # Check strategic tables (pure CME)
     assert "BUY MUA ĐUỔI" in html

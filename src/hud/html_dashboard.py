@@ -190,9 +190,37 @@ def load_and_preprocess_options(
     df["putCHEX"] = - ((charm_put / 365.0) * df["putOpenInterest"] * MULT * spot_price / 1e6)
     df["netCHEX"] = df["callCHEX"] + df["putCHEX"]
 
-    # 4. Deltas
+    # 4. Deltas & Dealer Net Position Delta (Contracts & DEX)
     df["callDelta"] = df_disc * cdf_d1
     df["putDelta"] = df["callDelta"] - df_disc
+    df["callDeltaContracts"] = np.round(df["callOpenInterest"] * df["callDelta"], 1)
+    df["putDeltaContracts"] = np.round(df["putOpenInterest"] * df["putDelta"], 1)
+    df["netDeltaContracts"] = np.round(df["callDeltaContracts"] + df["putDeltaContracts"], 1)
+    df["netDEX"] = df["netDeltaContracts"] * MULT * spot_price / 1e6
+
+    total_net_delta_contracts = float(df["netDeltaContracts"].sum())
+    total_net_dex = float(df["netDEX"].sum())
+
+    if not df.empty and (df["netDeltaContracts"].abs().max() > 0):
+        max_tilt_row = df.loc[df["netDeltaContracts"].abs().idxmax()]
+        max_tilt_strike = float(max_tilt_row["strike"])
+        max_tilt_contracts = float(max_tilt_row["netDeltaContracts"])
+    else:
+        max_tilt_strike = float(atm_strike)
+        max_tilt_contracts = 0.0
+
+    if total_net_delta_contracts > 200.0:
+        delta_tilt_regime = "BULLISH_CALL_TILT"
+        delta_tilt_label = "NGHIÊNG CALL (BULLISH)"
+        delta_tilt_color = "#22C55E"
+    elif total_net_delta_contracts < -200.0:
+        delta_tilt_regime = "BEARISH_PUT_TILT"
+        delta_tilt_label = "NGHIÊNG PUT (BEARISH)"
+        delta_tilt_color = "#EF4444"
+    else:
+        delta_tilt_regime = "NEUTRAL"
+        delta_tilt_label = "CÂN BẰNG (DELTA NEUTRAL)"
+        delta_tilt_color = "#FACC15"
 
     # 5. Structural Walls & Regime (OTM Dealer Boundary Walls)
     df_calls_otm = df[df["strike"] >= spot_price]
@@ -290,6 +318,13 @@ def load_and_preprocess_options(
         "cta_l20": cta_conf.l20,
         "cta_badge": cta_conf.confluence_badge,
         "cta_desc": cta_conf.confluence_desc,
+        "total_net_delta_contracts": total_net_delta_contracts,
+        "total_net_dex": total_net_dex,
+        "max_tilt_strike": max_tilt_strike,
+        "max_tilt_contracts": max_tilt_contracts,
+        "delta_tilt_regime": delta_tilt_regime,
+        "delta_tilt_label": delta_tilt_label,
+        "delta_tilt_color": delta_tilt_color,
     }
     return df, meta
 
@@ -326,13 +361,24 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     strike_below = float(strikes_below[-1]) if len(strikes_below) > 0 else put_wall
     next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else strike_below - step
 
+    if "callDelta" not in df.columns:
+        df["callDelta"] = 0.50
+    if "putDelta" not in df.columns:
+        df["putDelta"] = -0.50
+    if "callDeltaContracts" not in df.columns:
+        df["callDeltaContracts"] = np.round(df["callOpenInterest"] * df["callDelta"], 1)
+    if "putDeltaContracts" not in df.columns:
+        df["putDeltaContracts"] = np.round(df["putOpenInterest"] * df["putDelta"], 1)
+    if "netDeltaContracts" not in df.columns:
+        df["netDeltaContracts"] = np.round(df["callDeltaContracts"] + df["putDeltaContracts"], 1)
+
     fig = make_subplots(
         rows=1, cols=3,
         shared_yaxes=True,
         horizontal_spacing=0.035,
         subplot_titles=(
             "<b>Panel 1: Net GEX ($M) & Mốc Chiến Thuật (SL/TP)</b>",
-            "<b>Panel 2: Dòng Tiền Volume vs Open Interest Nén</b>",
+            "<b>Panel 2: Volume, OI & Sổ Sách Net Delta (HĐ)</b>",
             "<b>Panel 3: Greeks Bậc 2 (Vanna & Charm)</b>",
         ),
         column_widths=[0.36, 0.36, 0.28],
@@ -350,7 +396,36 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     )
     fig.add_vline(x=0, line_dash="solid", line_color="#475569", row=1, col=1)
 
-    # Panel 2: Volume vs OI
+    # Panel 2: Volume vs OI & Sổ Sách Net Delta
+    net_delta_colors = ["#4ADE80" if x >= 0 else "#F87171" for x in df["netDeltaContracts"]]
+    net_customdata = np.stack(
+        [
+            df["callDelta"],
+            df["callOpenInterest"],
+            df["callDeltaContracts"],
+            df["putDelta"],
+            df["putOpenInterest"],
+            df["putDeltaContracts"],
+        ],
+        axis=-1,
+    )
+    fig.add_trace(
+        go.Bar(
+            y=df["strike"],
+            x=df["netDeltaContracts"],
+            orientation="h",
+            marker=dict(color=net_delta_colors, opacity=0.45, line=dict(color=net_delta_colors, width=1)),
+            name="Net Delta (HĐ GC)",
+            hovertemplate=(
+                "<b>Strike: $%{y}</b><br>"
+                "Call Δ: %{customdata[0]:+.4f} (OI: %{customdata[1]:,} &rarr; %{customdata[2]:+,.1f} HĐ)<br>"
+                "Put Δ:  %{customdata[3]:+.4f} (OI: %{customdata[4]:,} &rarr; %{customdata[5]:+,.1f} HĐ)<br>"
+                "<b>Net Delta Sổ Sách: %{x:+,.1f} HĐ GC</b><extra></extra>"
+            ),
+            customdata=net_customdata,
+        ),
+        row=1, col=2,
+    )
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=-df["putVolume"], orientation="h",
@@ -492,6 +567,14 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     cta_desc = str(meta.get("cta_desc", "Biên độ phòng thủ của Market Maker"))
     cta_h20 = float(meta.get("cta_h20", spot + 50.0))
     cta_l20 = float(meta.get("cta_l20", spot - 50.0))
+
+    # Dealer Net Position Delta (Contracts & DEX)
+    total_net_delta_contracts = float(meta.get("total_net_delta_contracts", 0.0))
+    total_net_dex = float(meta.get("total_net_dex", 0.0))
+    max_tilt_strike = float(meta.get("max_tilt_strike", atm_strike))
+    max_tilt_contracts = float(meta.get("max_tilt_contracts", 0.0))
+    delta_tilt_label = str(meta.get("delta_tilt_label", "CÂN BẰNG"))
+    delta_tilt_color = str(meta.get("delta_tilt_color", "#FACC15"))
 
     # Strikes and Geometry
     strikes = df["strike"].values
@@ -934,6 +1017,11 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <div class="kpi-val" style="color: {'#4ADE80' if total_gex >= 0 else '#F87171'};">{total_gex:+.1f}M GEX</div>
             <div class="kpi-sub"><span class="badge badge-gold">{regime}</span>{f' <span style="color:#94A3B8; font-size:10.5px;">(Flip: ${zero_gamma:,.1f})</span>' if zero_gamma else ''}</div>
         </div>
+        <div class="kpi-card" style="border: 1px solid {delta_tilt_color}66; box-shadow: 0 0 10px {delta_tilt_color}22;">
+            <div class="kpi-label">Sổ Sách Dealer (Net Delta / DEX)</div>
+            <div class="kpi-val" style="color: {delta_tilt_color}; font-size: 20px;">{total_net_delta_contracts:+,.0f} HĐ</div>
+            <div class="kpi-sub"><span class="badge" style="background:{delta_tilt_color}22; color:{delta_tilt_color}; border:1px solid {delta_tilt_color}55;">{delta_tilt_label}</span> <span style="color:#94A3B8; font-size:10.5px;">(Tâm: ${max_tilt_strike:,.0f} &bull; {max_tilt_contracts:+,.0f} HĐ)</span></div>
+        </div>
         <div class="kpi-card">
             <div class="kpi-label">Zero Gamma Flip ($S^*) & Wall Siege</div>
             <div class="kpi-val" style="color: #F59E0B; font-size: 20px;">{f'${zero_gamma:,.2f}' if zero_gamma else 'N/A (Pure)'}</div>
@@ -1098,6 +1186,10 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             <div class="glossary-item">
                 <div class="glossary-term">Wall Siege Ratio (Tỷ Lệ Công Thành)</div>
                 <div>Tốc độ dồn volume quyền chọn so với OI nền (Volume/OI). Nếu > 0.25 (Siege Alert): Phe tấn công đang dồn hỏa lực phá vỡ bức tường MM; MM có nguy cơ buông súng đầu hàng.</div>
+            </div>
+            <div class="glossary-item">
+                <div class="glossary-term">Net Delta / DEX (Sổ Sách Dealer)</div>
+                <div>Độ lệch số lượng hợp đồng Futures ròng (OI × Delta) mà Market Maker đang gánh trên sổ sách. Âm sâu (lệch Put): MM rủi ro cao nếu giá sập; Dương lớn (lệch Call): MM nghiêng về phe giữ hàng.</div>
             </div>
             <div class="glossary-item">
                 <div class="glossary-term">Hard SL / Take Profit</div>
