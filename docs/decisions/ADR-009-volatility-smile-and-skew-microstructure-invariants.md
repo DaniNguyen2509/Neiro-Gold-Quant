@@ -145,3 +145,4 @@ Học thuyết Volatility Smile & Skew được ánh xạ hoàn chỉnh vào cá
 
 ### Hạn chế & Giám sát (Trade-offs & Monitoring):
 1. **Phụ thuộc chất lượng dữ liệu nguồn:** Tại các chuỗi kỳ hạn rất xa hoặc thanh khoản kém, $IV$ của các strike Deep OTM có thể bị thiếu hoặc nhiễu. Hệ thống duy trì thuật toán fallback nội suy ATM an toàn trong `extract_rr_bf()`.
+2. **Hiệu chỉnh ATM Implied Volatility ($IV_{ATM}$ Calibration):** Khi tính toán nụ cười biến động thực nghiệm và biên độ 1-Sigma / Rule 16, hệ thống ưu tiên lấy trực tiếp Median IV thực tế từ sàn COMEX (`callIV` và `putIV` quanh ATM). Tuyệt đối triệt tiêu thành phần giá trị nội tại (Intrinsic Value) trong trường hợp dùng Straddle tổng hợp để tránh thổi phồng $\sigma_{ATM}$ ảo khi giá Spot lệch xa so với phiên chốt sổ trước đó.
