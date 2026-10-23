@@ -1064,18 +1064,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
     </div>
 
-    <!-- KHỐI 4: MA TRẬN 6 KỊCH BẢN THỜI GIAN THỰC (6-SCENARIO DYNAMIC MATRIX) -->
-    <div class="table-box">
-        <div class="section-header">
-            <div>MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER (TỰ ĐỘNG BẬT SÁNG THEO GIÁ REALTIME)</div>
-            <div style="font-size:11.5px; font-weight:400; color:#94A3B8;">Kịch bản trùng khớp sẽ được viền sáng và báo động</div>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:12px;">
-            {scenario_cards_str}
-        </div>
-    </div>
-
-    <!-- KHỐI 4: KPI THỐNG KÊ TOÀN CẢNH -->
+    <!-- KHỐI: KPI THỐNG KÊ TOÀN CẢNH -->
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
@@ -1212,6 +1201,17 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- MA TRẬN 6 KỊCH BẢN THỜI GIAN THỰC (6-SCENARIO DYNAMIC MATRIX) -->
+    <div class="table-box">
+        <div class="section-header">
+            <div>MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER (TỰ ĐỘNG BẬT SÁNG THEO GIÁ REALTIME)</div>
+            <div style="font-size:11.5px; font-weight:400; color:#94A3B8;">Kịch bản trùng khớp sẽ được viền sáng và báo động</div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:12px;">
+            {scenario_cards_str}
+        </div>
     </div>
 
     <!-- KHỐI 7: TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (QUICK GLOSSARY - 1 DÒNG DỄ HIỂU, KHÔNG ICON) -->
