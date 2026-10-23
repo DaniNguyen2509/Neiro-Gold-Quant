@@ -57,10 +57,12 @@ python -m src.hud.html_dashboard --loop 15
 # Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM
 python -m src.hud.html_dashboard --clear-cache
 
-# Hoặc khởi chạy 1-Click nhanh chóng qua batch script Windows:
+# Hoặc khởi chạy 1-Click nhanh chóng qua batch script Windows (Bộ điều khiển trung tâm 6-trong-1):
 .\Chay_Live_Terminal.bat
+# [1] Chạy Live Loop 15s | [2] Cào Options Chain | [3] Dọn Cache & RAM
+# [4] Snapshot 1 lần    | [5] Chạy 118 Unit Tests | [6] Thoát
 
-# Kiểm thử tự động (Unit Test & Math Verification)
+# Kiểm thử tự động (Unit Test & Math Verification - 118 Tests)
 python -m pytest tests/ -v --tb=short
 
 # Kiểm tra quy chuẩn mã nguồn (Lint & Format)
@@ -78,7 +80,7 @@ Neiro-Quant/
 │   └── daily_options_sync.yml    # Workflow cào Barchart, tính Greeks & xuất bản GitHub Pages
 ├── .agents/skills/               # 24 bộ kỹ năng kỹ thuật chuẩn (Agent Skills)
 ├── docs/
-│   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.0 (Single Source of Truth)
+│   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
 │   ├── spec.md                   # Bản đặc tả kỹ thuật chi tiết
 │   ├── decisions/                # Architecture Decision Records (ADRs)
 │   │   ├── ADR-001-cloud-native-tactical-terminal.md
@@ -88,7 +90,8 @@ Neiro-Quant/
 │   │   ├── ADR-005-realtime-dual-price-feed-and-dynamic-basis.md
 │   │   ├── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
 │   │   ├── ADR-007-zero-gamma-flip-and-wall-siege-velocity.md
-│   │   └── ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md
+│   │   ├── ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md
+│   │   └── ADR-009-volatility-smile-and-skew-microstructure-invariants.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       ├── DEEPSEEK_MATH_AUDIT_REPORT.md
@@ -99,21 +102,23 @@ Neiro-Quant/
 │   │   └── parser.py             # Chuẩn hóa OptionsSnapshot
 │   ├── quant_engine/             # Lõi tính toán định lượng
 │   │   ├── models.py             # Dataclasses & kiểu dữ liệu
+│   │   ├── loader.py             # Ingestion & cleaning pipeline, đa kỳ hạn & benchmark fallback
+│   │   ├── basis.py              # Realtime COMEX GC=F, Dynamic Basis & OTC Spot checking
 │   │   ├── synthetic.py          # Put-Call Parity Implied Spot & Expected Move Bands
-│   │   ├── dealer.py             # Call/Put Walls, Gamma Flip, Squeeze Triggers
+│   │   ├── dealer.py             # Call/Put Walls, Gamma Flip, Squeeze Triggers, Wall Siege Ratio
 │   │   ├── air_pocket.py         # Quét chân không thanh khoản (OI < 35% MA)
 │   │   ├── institutional.py      # 25Δ Skew (RR/BF), Vol-Targeted Sizing & CTA Confluence
 │   │   ├── level_state.py        # Finite State Machine cho từng Level
 │   │   ├── scenario_engine.py    # Ma trận 6 Kịch bản Hành vi Market Maker Realtime
 │   │   └── strategy.py           # Ma trận chiến lược Scalping & Swing
 │   ├── hud/                      # Giao diện Tactical Terminal
-│   │   ├── html_dashboard.py     # Pure CME Terminal & Action Banner (Zero Icons)
-│   │   └── chart_exporter.py     # Xuất biểu đồ tĩnh
+│   │   └── html_dashboard.py     # Pure CME Terminal, Volatility Smile SVI, Action Banner
 │   └── mt5_bridge/               # Cầu nối MetaTrader 5 (tùy chọn)
 │       └── connector.py          # Kết nối MT5 & tính Auto-Basis Sync
 ├── data/
 │   └── options_prices_GCZ26.csv  # Chuỗi Options Chain mới nhất từ CME
-├── tests/                        # Bộ kiểm thử pytest
+├── tests/                        # 118 Unit & Integration tests (100% pass)
+├── Chay_Live_Terminal.bat        # Bảng điều khiển trung tâm 6-trong-1 tiện lợi
 ├── AGENTS.md / GEMINI.md         # Quy tắc cốt lõi & Quy trình kích hoạt Skill
 └── README.md                     # Hướng dẫn truy cập và tổng quan dự án
 ```

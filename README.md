@@ -23,13 +23,22 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 ## 🚀 KHỞI CHẠY LIVE TERMINAL CỤC BỘ (1-CLICK LOCAL LIVE RUNNER)
 
 Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 15 giây/lần trực tiếp trên máy:
-- **Cách 1 (Nhanh nhất):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc và bấm phím `[1]`.
+- **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 6-trong-1:
+  - `[1]` Chạy Live Terminal Realtime (cập nhật 15s/lần + tự động dọn RAM)
+  - `[2]` Cào dữ liệu CME Options Chain mới nhất (Multi-Expiry Scraper)
+  - `[3]` Dọn sạch Cache & giải phóng bộ nhớ RAM
+  - `[4]` Cập nhật Snapshot 1 lần
+  - `[5]` Chạy toàn bộ 118 Unit Tests tự động
+  - `[6]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
   # Chạy Live Loop 15s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
   python -m src.hud.html_dashboard --loop 15
 
-  # Dọn dẹp cache không gian làm việc
+  # Cào dữ liệu Options Chain đa kỳ hạn từ CME Barchart
+  python -m src.collector.scraper --output data/options_prices_GCZ26.csv
+
+  # Dọn dẹp cache không gian làm việc và giải phóng RAM
   python -m src.hud.html_dashboard --clear-cache
   ```
 - **Kiến trúc chống tràn RAM (Zero-Leak):**
@@ -43,6 +52,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 
 - **Kiến trúc Hệ thống v2.3 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quy chuẩn Đường cong Nụ cười Biến động (Volatility Smile & Skew Curve SVI) & 3 Bất biến Vi cấu trúc (ADR-009):** [docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md](docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
 - **Quyết định Phân Tích GEX Đa Kỳ Hạn (Multi-Expiry) & Chấm Điểm Bức Tường Theo Gamma Power (ADR-008):** [docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md](docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md)
 - **Quyết định Giải Nghiệm Số Zero Gamma Flip & Đo Vận Tốc Công Thành Wall Siege Ratio (ADR-007):** [docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md](docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md)
 - **Quyết định Định vị Thuần CME Futures & Bộ Đánh Giá 6 Kịch Bản MM Realtime (ADR-006):** [docs/decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md](docs/decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md)
@@ -62,17 +72,35 @@ Neiro-Quant/
 ├── .github/workflows/
 │   └── daily_options_sync.yml   # Workflow cào Barchart, tính toán Greeks & xuất bản GitHub Pages
 ├── docs/
-│   ├── architecture.md          # Tài liệu kiến trúc hệ thống chính (v2.0)
+│   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
 │   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
-│   ├── decisions/               # Architecture Decision Records (ADRs)
+│   ├── decisions/               # 9 bản Architecture Decision Records (ADR-001 đến ADR-009)
 │   └── tailieudacta/            # Công thức toán học và tài liệu đặc tả vi mô
 ├── src/
 │   ├── collector/               # Playwright headless scraper & API interceptor
-│   ├── quant_engine/            # Lõi Black-76, IV solver, GEX, Vanna, Charm, Expected Move
-│   └── hud/                     # Plotly Dark Mode tactical dashboard generator
+│   │   ├── scraper.py           # Bộ cào Options Chain đa kỳ hạn (Weekly + Monthly)
+│   │   └── parser.py            # Chuẩn hóa OptionsSnapshot
+│   ├── quant_engine/            # Lõi tính toán Black-76, IV solver, GEX, DEX, VEX, CHEX
+│   │   ├── models.py            # Dataclasses & kiểu dữ liệu
+│   │   ├── loader.py            # Ingestion, cleaning pipeline & benchmark fallback
+│   │   ├── basis.py             # Realtime COMEX GC=F, Dynamic Basis & OTC Spot checking
+│   │   ├── synthetic.py         # Put-Call Parity Implied Spot & Expected Move Bands
+│   │   ├── dealer.py            # Gamma-Weighted Walls, Zero Gamma Flip (_brentq), Wall Siege
+│   │   ├── air_pocket.py        # Quét chân không thanh khoản (Air Pocket)
+│   │   ├── institutional.py     # 25Δ Skew (RR/BF), Vol-Targeted Sizing & CTA Confluence
+│   │   ├── level_state.py       # Finite State Machine cho từng Level
+│   │   ├── scenario_engine.py   # Ma trận 6 Kịch bản Hành vi Market Maker Realtime
+│   │   └── strategy.py          # Ma trận chiến lược Scalping & Swing
+│   ├── hud/                     # Giao diện Tactical Terminal
+│   │   └── html_dashboard.py    # Standalone Plotly Dark Mode Terminal, Volatility Smile SVI
+│   └── mt5_bridge/              # Cầu nối MetaTrader 5 (tùy chọn)
+│       └── connector.py         # Kết nối MT5 & tính Auto-Basis Sync
 ├── data/
 │   └── options_prices_GCZ26.csv # Dữ liệu CME Options Chain tự động cập nhật
-└── notebooks/                   # File nghiên cứu cũ (đã chuyển giao sang Cloud Pipeline)
+├── tests/                       # 118 Unit & Integration tests (100% pass)
+├── Chay_Live_Terminal.bat       # Bảng điều khiển trung tâm 6-trong-1 tiện lợi
+├── AGENTS.md / GEMINI.md        # Quy tắc cốt lõi & Quy trình kích hoạt Skill
+└── README.md                    # Hướng dẫn truy cập và tổng quan dự án
 ```
 
 ---
@@ -80,6 +108,6 @@ Neiro-Quant/
 ## 🧹 QUY TẮC BẢO TỒN DUNG LƯỢNG (ZERO-WASTE MANDATE)
 
 Dự án tuân thủ nghiêm ngặt chuẩn dung lượng siêu nhẹ:
-- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~9.99MB).
+- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~9.95MB).
 - Mọi dữ liệu tạm, scratch scripts, cache đều được tự động dọn dẹp sạch sẽ sau mỗi lần thực thi.
 - Không lưu trữ tệp tin nhị phân nặng trên máy cục bộ của người dùng.
