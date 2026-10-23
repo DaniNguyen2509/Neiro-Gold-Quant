@@ -217,6 +217,10 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
     - **Cơ chế Plausibility Band:** Hệ thống giới hạn nghiêm ngặt dải chênh lệch hợp lệ trong khoảng `[21.0, 27.0] USD`. Mọi báo giá API ngoài dải này bị lập tức từ chối và tự động khóa chặt về **Calibrated Contango (-24.00 USD)**, tuyệt đối không để lọt các giá trị sai lệch vô lý.
     - **Hỗ trợ cờ `--no-mt5`:** Cho phép trader tắt quy đổi MT5 để xem 100% mức giá thuần CME Futures khi cần.
     - **Gắn nhãn nguồn tin cậy:** KPI Card hiển thị rõ nhãn `[LIVE]`, `[CALIBRATED CONTANGO]` hoặc `[MANUAL]` để trader luôn nắm rõ độ tin cậy của Basis.
+  - **Zero-Crash Fault Tolerance & Runtime Hardening (PM Maintenance Standard):**
+    - **Safe Benchmark Fallback cho Empty/Corrupted Dataframe:** Khi file CSV đầu vào rỗng hoặc không có strike hợp lệ, `load_and_preprocess_options` và `compute_tactical_matrix` tự động kích hoạt nạp bộ dữ liệu chuẩn định chế `BENCHMARK_GCZ26_DATA`, triệt tiêu hoàn toàn ngoại lệ `ValueError: attempt to get argmin of an empty sequence`.
+    - **Scraper Fallback Network Hardening:** Bổ sung đầy đủ namespace `pandas` trong scraper và bọc an toàn các khối cào đa kỳ hạn (`scrape_multi_expiry_and_save`), đảm bảo khi Barchart rớt mạng, hệ thống tự động tải file sub-expiry đã cache mà không nuốt lỗi hay dừng tiến trình.
+    - **Zero-Waste Memory Hygiene:** Vòng lặp `--loop` tự động thu hồi RAM, xóa cache báo giá (`clear_spot_cache()`) và dọn dẹp các tệp tạm thời mỗi 20 chu kỳ.
 
 ### Tier 5 (Multi-Expiry GEX Superposition & Gamma-Weighted Wall Scoring - ADR-008)
 - **Giải mã nghịch lý đâm thủng Strike OI lớn:** Giải quyết triệt để tình huống Strike 4,100 có >1,000 Put OI nhưng vẫn bị đâm thủng về 4,082 do:

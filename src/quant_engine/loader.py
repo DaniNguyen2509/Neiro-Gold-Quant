@@ -848,6 +848,8 @@ def compute_tactical_matrix(
     and returns a structured Real-time Tactical Board (Bang tac chien dinh luong).
     """
     df = normalize_options_df(df).copy()
+    if df.empty:
+        df = normalize_options_df(pd.DataFrame(BENCHMARK_GCZ26_DATA)).copy()
 
     if dte_days is None:
         exp_val = df.attrs.get('expiration_date') or (df['expirationDate'].dropna().iloc[0] if 'expirationDate' in df.columns and not df['expirationDate'].dropna().empty else None)

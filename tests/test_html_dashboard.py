@@ -388,5 +388,14 @@ def test_volatility_smile_figure_and_layout_ordering():
     assert pos_smile < pos_micro < pos_kpi < pos_orderflow < pos_strategy < pos_banner < pos_matrix < pos_glossary
 
 
+def test_load_and_preprocess_options_empty_csv_fallback(tmp_path):
+    """Verify that empty CSV does not crash load_and_preprocess_options and falls back safely."""
+    empty_csv = tmp_path / "empty_options.csv"
+    empty_csv.write_text("strike,callBid,callAsk,callMid,callOpenInterest,callVolume\n")
 
-
+    df, meta = load_and_preprocess_options(str(empty_csv))
+    assert not df.empty
+    assert len(df) > 0
+    assert meta["spot_price"] > 0
+    assert meta["call_wall"] > 0
+    assert meta["put_wall"] > 0

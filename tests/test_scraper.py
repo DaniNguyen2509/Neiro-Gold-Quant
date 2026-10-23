@@ -201,3 +201,12 @@ class TestScraperWorkflow:
         with mock.patch("src.collector.scraper.fetch_barchart_options_playwright", side_effect=RuntimeError("Cloudflare timeout")):
             with pytest.raises(RuntimeError, match="Cloudflare timeout"):
                 scrape_and_save(output_path=str(out_csv))
+
+    def test_scrape_multi_expiry_fallback_on_network_error(self, tmp_path):
+        from src.collector.scraper import scrape_multi_expiry_and_save
+        sub_csv = tmp_path / "options_prices_GCZ26_OGX26.csv"
+        sub_csv.write_text("strike,callBid,callAsk\n4180,20,21\n", encoding="utf-8")
+
+        with mock.patch("src.collector.scraper.fetch_barchart_options_playwright", side_effect=RuntimeError("Network down")):
+            saved = scrape_multi_expiry_and_save(output_dir=str(tmp_path), underlying_futures="GCZ26", weekly_count=1)
+            assert isinstance(saved, list)

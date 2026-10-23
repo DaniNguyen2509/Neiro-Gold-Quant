@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from .parser import parse_barchart_json
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

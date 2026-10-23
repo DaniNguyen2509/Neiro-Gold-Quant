@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title NEIRO-QUANT TACTICAL LIVE TERMINAL
+title NEIRO-QUANT TACTICAL TERMINAL CONTROLLER
 color 0A
 
 :MENU
@@ -11,20 +11,24 @@ echo               Zero-Touch Automation ^| Zero-Leak Memory Architecture
 echo ===============================================================================
 echo.
 echo   [1] CHAY LIVE TERMINAL REALTIME (Cap nhat 15s/lan + Tu dong don RAM)
-echo   [2] DON SACH CACHE & GIAI PHONG BO NHO (Clear Workspace Cache)
-echo   [3] CAP NHAT SNAPSHOT 1 LAN (Generate 1-Shot Dashboard)
-echo   [4] THOAT
+echo   [2] CAO DU LIEU OPTIONS CHAIN CME MOI NHAT (Multi-Expiry Scraper)
+echo   [3] DON SACH CACHE & GIAI PHONG BO NHO (Clear Cache & Flush RAM)
+echo   [4] CAP NHAT SNAPSHOT 1 LAN (Generate 1-Shot Dashboard)
+echo   [5] KIEM THU HE THONG TOAN DIEN (Run Pytest Suite)
+echo   [6] THOAT
 echo.
 echo ===============================================================================
-set /p opt="Nhap lua chon cua ban [1-4]: "
+set /p opt="Nhap lua chon cua ban [1-6]: "
 
 if "%opt%"=="1" goto RUN_LIVE
-if "%opt%"=="2" goto CLEAR_CACHE
-if "%opt%"=="3" goto RUN_ONCE
-if "%opt%"=="4" goto EXIT_SCRIPT
+if "%opt%"=="2" goto RUN_SCRAPER
+if "%opt%"=="3" goto CLEAR_CACHE
+if "%opt%"=="4" goto RUN_ONCE
+if "%opt%"=="5" goto RUN_TESTS
+if "%opt%"=="6" goto EXIT_SCRIPT
 
 echo.
-echo [LOI] Lua chon khong hop le. Vui long chon tu 1 den 4.
+echo [LOI] Lua chon khong hop le. Vui long chon tu 1 den 6.
 timeout /t 2 >nul
 goto MENU
 
@@ -37,6 +41,18 @@ echo [RAM MONITOR] Bo nho duoc thu hoi lien tuc bang gc.collect(). Khong tran RA
 echo [THONG BAO] Nhan Ctrl+C de dung terminal bat cu luc nao.
 echo.
 python -m src.hud.html_dashboard --loop 15
+pause
+goto MENU
+
+:RUN_SCRAPER
+cls
+echo ===============================================================================
+echo [SCRAPER] Dang khoi chay Playwright Chromium cao du lieu CME Options Chain...
+echo ===============================================================================
+echo.
+python -m src.collector.scraper --output data/options_prices_GCZ26.csv
+echo.
+echo [HOAN TAT] Da cap nhat Options Chain GCZ26 thanh cong.
 pause
 goto MENU
 
@@ -55,6 +71,17 @@ echo [DANG TAO SNAPSHOT] Dang cap nhat dashboard tu CME Futures...
 python -m src.hud.html_dashboard
 echo.
 echo [HOAN TAT] Da cap nhat exports\index.html thanh cong.
+pause
+goto MENU
+
+:RUN_TESTS
+cls
+echo ===============================================================================
+echo [KIEM THU] Dang chay toan bo 118 Unit & Math Verification Tests...
+echo ===============================================================================
+echo.
+python -m pytest tests/ -v --tb=short
+echo.
 pause
 goto MENU
 
