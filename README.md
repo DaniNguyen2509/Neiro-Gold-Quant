@@ -28,7 +28,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
   - `[2]` Cào dữ liệu CME Options Chain mới nhất (Multi-Expiry Scraper)
   - `[3]` Dọn sạch Cache & giải phóng bộ nhớ RAM
   - `[4]` Cập nhật Snapshot 1 lần
-  - `[5]` Chạy toàn bộ 118 Unit Tests tự động
+  - `[5]` Chạy toàn bộ 119 Unit Tests tự động
   - `[6]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
@@ -97,7 +97,7 @@ Neiro-Quant/
 │       └── connector.py         # Kết nối MT5 & tính Auto-Basis Sync
 ├── data/
 │   └── options_prices_GCZ26.csv # Dữ liệu CME Options Chain tự động cập nhật
-├── tests/                       # 118 Unit & Integration tests (100% pass)
+├── tests/                       # 119 Unit & Integration tests (100% pass)
 ├── Chay_Live_Terminal.bat       # Bảng điều khiển trung tâm 6-trong-1 tiện lợi
 ├── AGENTS.md / GEMINI.md        # Quy tắc cốt lõi & Quy trình kích hoạt Skill
 └── README.md                    # Hướng dẫn truy cập và tổng quan dự án
@@ -108,6 +108,6 @@ Neiro-Quant/
 ## 🧹 QUY TẮC BẢO TỒN DUNG LƯỢNG (ZERO-WASTE MANDATE)
 
 Dự án tuân thủ nghiêm ngặt chuẩn dung lượng siêu nhẹ:
-- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~9.95MB).
+- Toàn bộ kho lưu trữ luôn duy trì **< 15MB** (hiện tại: ~9.23MB).
 - Mọi dữ liệu tạm, scratch scripts, cache đều được tự động dọn dẹp sạch sẽ sau mỗi lần thực thi.
 - Không lưu trữ tệp tin nhị phân nặng trên máy cục bộ của người dùng.

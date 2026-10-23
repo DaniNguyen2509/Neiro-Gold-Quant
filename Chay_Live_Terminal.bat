@@ -77,7 +77,7 @@ goto MENU
 :RUN_TESTS
 cls
 echo ===============================================================================
-echo [KIEM THU] Dang chay toan bo 118 Unit & Math Verification Tests...
+echo [KIEM THU] Dang chay toan bo 119 Unit & Math Verification Tests...
 echo ===============================================================================
 echo.
 python -m pytest tests/ -v --tb=short

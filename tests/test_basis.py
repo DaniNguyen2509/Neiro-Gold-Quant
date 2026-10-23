@@ -374,3 +374,61 @@ def test_fetch_live_cme_m5_tape_mock_failure():
         assert tape["available"] is False
         assert tape["candles"] == []
 
+
+def test_fetch_live_cme_m5_tape_pinbar_bear_and_tick_filter():
+    """Validates shooting star rejection (green body with large upper wick), churn doji, and trailing tick discard."""
+    from src.quant_engine.basis import fetch_live_cme_m5_tape
+
+    fake_response = mock.MagicMock()
+    fake_response.status = 200
+    fake_response.read.return_value = json.dumps({
+        "chart": {
+            "result": [{
+                "meta": {
+                    # Deliberately omit regularMarketDayHigh / Low to test fallback to max/min
+                    "regularMarketPrice": 4145.0,
+                },
+                "timestamp": [1792481100, 1792481400, 1792481700, 1792482000, 1792482300, 1792482600, 1792482603],
+                "indicators": {
+                    "quote": [{
+                        # Candle 0..3: Baseline volume
+                        # Candle 4: Shooting Star / Rejection at high with slight green close
+                        # Candle 5: Long-legged Doji Churn with spike
+                        # Candle 6: Trailing live tick snapshot (0 volume, 0 spread) -> should be discarded
+                        "open": [4140.0, 4140.0, 4140.0, 4140.0, 4140.0, 4145.0, 4145.0],
+                        "high": [4142.0, 4142.0, 4142.0, 4142.0, 4155.0, 4155.0, 4145.0],
+                        "low": [4139.0, 4139.0, 4139.0, 4139.0, 4139.5, 4135.0, 4145.0],
+                        "close": [4141.0, 4141.0, 4141.0, 4141.0, 4140.5, 4145.0, 4145.0],
+                        "volume": [200, 200, 200, 200, 850, 920, 0],
+                    }]
+                }
+            }]
+        }
+    }).encode("utf-8")
+    fake_response.__enter__.return_value = fake_response
+
+    with mock.patch("urllib.request.urlopen", return_value=fake_response):
+        tape = fetch_live_cme_m5_tape(limit=10)
+        assert tape["available"] is True
+        # Trailing 0-vol tick was discarded, leaving 6 candles
+        assert len(tape["candles"]) == 6
+
+        # Day High / Day Low fallback accurately found the extremes across candles
+        assert tape["day_high"] == 4155.0
+        assert tape["day_low"] == 4135.0
+
+        # Candle 4 (Shooting star with green body) -> CHẶN BÁN ĐÈ ĐỈNH
+        bear_pinbar = tape["candles"][4]
+        assert bear_pinbar["volume"] == 850
+        assert bear_pinbar["is_spike"] is True
+        assert "[CHẶN BÁN ĐÈ ĐỈNH]" in bear_pinbar["note"]
+        assert bear_pinbar["signal_class"] == "spike-rejection"
+
+        # Candle 5 (Long-legged Doji) -> ĐỘT BIẾN GIẰNG CO
+        churn_candle = tape["candles"][5]
+        assert churn_candle["volume"] == 920
+        assert churn_candle["is_spike"] is True
+        assert "[ĐỘT BIẾN GIẰNG CO]" in churn_candle["note"]
+        assert churn_candle["signal_class"] == "spike-neutral"
+
+

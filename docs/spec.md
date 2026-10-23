@@ -300,7 +300,7 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Collector tự động quét Options Chain Barchart (JSON API Sniffer) & tự động Rollover (OGX26 -> OGZ26).
 - [x] Quant Engine tính đúng: Black-76, GEX, VEX (Vanna), CHEX (Charm), Level State Machine, Air Pockets.
 - [x] Pure CME Gold Futures Realtime & Dynamic Scenario Engine (ADR-006): Định vị chính xác 100% theo giá COMEX GC=F, tự động kích hoạt 6 kịch bản hành vi Market Maker. Khóa chuẩn Invariant cho Take-Profit (KB-2 TP < Entry, KB-4 TP > Entry), triệt tiêu hoàn toàn nghịch lý TP ngược khi giá chạm sát mốc ATM.
-- [x] Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse): Tự động phát hiện Volume Spike (>= 1.4x MA20) và nhận diện vi mô hấp thụ đáy rút chân hoặc chặn bán đè đỉnh.
+- [x] Băng Giá & Xung Lực Volume M5 Realtime (Orderflow Pulse): Tự động phát hiện Volume Spike (>= 1.4x MA20 và Volume >= 350 HĐ), lọc bỏ tick ảo Yahoo Finance, đối xứng hóa nhận diện vi mô hấp thụ đáy rút chân (`is_pinbar_bull`), chặn bán đè đỉnh (`is_pinbar_bear`) và đột biến giằng co lưỡng lự (`is_churn`). Fallback đỉnh/đáy ngày chuẩn hóa cực trị toàn phiên.
 - [x] Khóa chuẩn OTM Dealer Boundary Walls: Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn lỗi nhận nhầm strike ITM.
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
 - [x] Khai tử hoàn toàn Spot Gold & Hiệu chỉnh Basis: Loại bỏ 100% việc lấy giá vàng giao ngay (Spot XAU/USD từ Gold-API / Binance PAXG). Toàn bộ hệ thống neo chuẩn 100% theo giá hợp đồng tương lai vàng CME GCZ26 (COMEX GC=F), triệt tiêu hoàn toàn sai số hiệu chỉnh và báo động kịch bản giả.
@@ -309,7 +309,7 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Multi-Expiry GEX Superposition & Gamma-Weighted Wall Scoring (ADR-008): Tự động phân giải và xếp chồng tuyến tính Greeks giữa Weekly (OG1..OG5) và Monthly, phân loại chính xác `[BOUNCE_WALL]` vs `[MAGNET_WALL]`, xóa bỏ điểm mù OI thô.
 - [x] Volatility Smile & Skew Microstructure Invariants (ADR-009): Khóa 3 bất biến tác chiến vi cấu trúc (Tâm bão Pinning ATM, Hố đen giảm tốc Skew Dip và Bẫy thuốc nổ mép vểnh), tham số hóa Malz SVI (RR25 & BF25) kết nối chặt chẽ với Vanna & Charm. Thiết lập Panel độc lập toàn màn hình hiển thị trực quan Nụ cười biến động lên đầu trang Dashboard, sắp xếp thứ tự chart-first tối ưu trải nghiệm đọc lệnh trước kịch bản tác chiến.
 - [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~10.5MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 116/116 test cases passed 100%.
+- [x] Unit test coverage: 119/119 test cases passed 100%.
 
 ---
 

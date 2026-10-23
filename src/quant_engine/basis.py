@@ -318,6 +318,10 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                                 "volume": int(v) if v is not None else 0,
                             })
 
+                        # Discard Yahoo Finance trailing live tick snapshot (0 volume and zero spread)
+                        if len(raw_candles) > 1 and raw_candles[-1]["volume"] <= 0 and (raw_candles[-1]["high"] - raw_candles[-1]["low"]) < 0.05:
+                            raw_candles.pop()
+
                         if raw_candles:
                             valid_vols = [rc["volume"] for rc in raw_candles if rc["volume"] > 0]
                             window = valid_vols[-20:] if len(valid_vols) >= 5 else valid_vols
@@ -337,11 +341,16 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                                 is_bull_rebound = (sc["close"] > sc["open"]) and ((sc["close"] - sc["low"]) >= spread * 0.60)
                                 is_bear_rejection = (sc["close"] < sc["open"]) and ((sc["high"] - sc["close"]) >= spread * 0.60)
                                 is_pinbar_bull = lower_wick >= spread * 0.38
+                                is_pinbar_bear = upper_wick >= spread * 0.38
+                                is_churn = lower_wick >= spread * 0.30 and upper_wick >= spread * 0.30
 
-                                if is_spike and (is_bull_rebound or is_pinbar_bull):
+                                if is_spike and is_churn:
+                                    note = "[ĐỘT BIẾN GIẰNG CO]"
+                                    signal_class = "spike-neutral"
+                                elif is_spike and (is_bull_rebound or is_pinbar_bull):
                                     note = "[HẤP THỤ ĐÁY RÚT CHÂN]"
                                     signal_class = "spike-absorption"
-                                elif is_spike and is_bear_rejection:
+                                elif is_spike and (is_bear_rejection or is_pinbar_bear):
                                     note = "[CHẶN BÁN ĐÈ ĐỈNH]"
                                     signal_class = "spike-rejection"
                                 elif is_spike:
@@ -367,8 +376,8 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                                     "signal_class": signal_class,
                                 })
 
-                            day_high = float(meta.get("regularMarketDayHigh") or raw_candles[-1]["high"])
-                            day_low = float(meta.get("regularMarketDayLow") or raw_candles[-1]["low"])
+                            day_high = float(meta.get("regularMarketDayHigh") or max(rc["high"] for rc in raw_candles))
+                            day_low = float(meta.get("regularMarketDayLow") or min(rc["low"] for rc in raw_candles))
                             last_p = float(meta.get("regularMarketPrice") or raw_candles[-1]["close"])
 
                             return {

@@ -1266,11 +1266,17 @@ def generate_html_terminal(
 
     # M5 Orderflow Tape & Volume Pulse processing
     m5_tape = meta.get("m5_tape") or {}
+    m5_available = bool(m5_tape.get("available", False))
     m5_candles = m5_tape.get("candles") or []
     m5_high = float(m5_tape.get("day_high") or (spot + 10.0))
     m5_low = float(m5_tape.get("day_low") or (spot - 10.0))
     m5_range = float(m5_tape.get("day_range") or max(0.0, m5_high - m5_low))
     m5_avg_vol = float(m5_tape.get("avg_m5_volume") or 300.0)
+
+    if m5_available:
+        m5_header_summary = f"Đỉnh ngày: <b style='color:#F87171;'>${m5_high:,.2f}</b> &bull; Đáy ngày: <b style='color:#4ADE80;'>${m5_low:,.2f}</b> &bull; Biên độ: <b style='color:#FACC15;'>${m5_range:.2f}$</b> &bull; TB Vol M5: <b style='color:#38BDF8;'>{m5_avg_vol:.0f} HĐ</b>"
+    else:
+        m5_header_summary = "<span style='color:#64748B;'>Đang đồng bộ dữ liệu Orderflow trực tiếp từ sàn COMEX...</span>"
 
     m5_rows = []
     # Cap candle history to most recent 30 candles to prevent memory growth
@@ -1540,7 +1546,7 @@ def generate_html_terminal(
                 <span style="font-size:13.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">BĂNG GIÁ & XUNG LỰC VOLUME M5 REALTIME (COMEX GC=F)</span>
             </div>
             <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
-                Đỉnh ngày: <b style="color:#F87171;">${m5_high:,.2f}</b> &bull; Đáy ngày: <b style="color:#4ADE80;">${m5_low:,.2f}</b> &bull; Biên độ: <b style="color:#FACC15;">${m5_range:.2f}$</b> &bull; TB Vol M5: <b style="color:#38BDF8;">{m5_avg_vol:.0f} HĐ</b>
+                {m5_header_summary}
             </div>
         </div>
         <div style="overflow-x:auto;">
