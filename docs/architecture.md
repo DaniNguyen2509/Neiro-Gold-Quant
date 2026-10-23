@@ -283,6 +283,12 @@ stateDiagram-v2
 - Theo dõi ngưỡng bứt phá Donchian 20 phiên (20-Day High / Low) của các quỹ CTA (Commodity Trading Advisors).
 - Khi **20D Breakout High $\ge$ Call Wall**: Kích hoạt trạng thái `SUPER_SQUEEZE_CONFLUENCE`. Tại đây xảy ra hiệu ứng cộng hưởng kép (Double Squeeze): Quỹ CTA ồ ạt kích hoạt thuật toán mua gom theo xu hướng + Dealer Short Gamma bị chạm ngưỡng stop loss buộc phải vào lệnh Long Futures phòng hộ $\Rightarrow$ Cú đẩy giá vượt bậc.
 
+### 4. Volatility Smile & Skew Microstructure Invariants (Chi Tiết Tại ADR-009)
+Thiết lập 3 bất biến vi cấu trúc dựa trên hình thái đường cong nụ cười biến động $IV(K)$:
+- **Bất biến 1: "Tâm Bão" (Sweet Spot / Pinning Center):** Đáy thấp nhất của đường cong $IV$ (nơi $IV$ chạm đáy và $IV$ Skew xấp xỉ $0\%$ quanh ATM). Vùng hội tụ Long Gamma + Long Vanna tối đa của Dealer, MM có động cơ tài chính cao nhất để ghìm giá vàng đứng yên thu phí Theta. Kích hoạt trạng thái **Sideway / Mean-Reversion**.
+- **Bất biến 2: "Hố Đen Giảm Tốc" (Bức Tường Thật / Skew Dip):** Vết lõm sâu bất thường của Skew tại mức cản (ví dụ Put Skew âm sâu $-4.6\%$ đến $-8.8\%$ tại $4,045 - $4,050). Minh chứng MM đang chủ động **bán đè quyền chọn (Short Vega)** để xây đập ngăn lũ $\Rightarrow$ **Điểm đặt lệnh Limit đánh đảo chiều (Bounce) an toàn nhất!**
+- **Bất biến 3: "Bẫy Thuốc Nổ" (Mép Vểnh / Volatility Squeeze Trap):** Vùng hai cánh vểnh dốc đứng của nụ cười ($IV$ Skew dương cao vọt $> +6.0\%$). Nếu giá phá vỡ tường cản và lọt vào mép vểnh, MM rơi vào Short Gamma hoảng loạn và buộc phải mua/bán đuổi Futures phòng hộ, tạo bão giá gia tốc $\Rightarrow$ **VÙNG BẮT BUỘC ĐẶT STOP LOSS, CẤM BẮT ĐỈNH/ĐÁY LIMIT!**
+
 ---
 
 ## VIII. QUY ĐỊNH BẢO TỒN DUNG LƯỢNG & HIỆU NĂNG (ZERO-WASTE MANDATE)
