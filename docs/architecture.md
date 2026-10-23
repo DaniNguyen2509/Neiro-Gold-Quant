@@ -289,6 +289,9 @@ Thiết lập 3 bất biến vi cấu trúc dựa trên hình thái đường co
 - **Bất biến 2: "Hố Đen Giảm Tốc" (Bức Tường Thật / Skew Dip):** Vết lõm sâu bất thường của Skew tại mức cản (ví dụ Put Skew âm sâu $-4.6\%$ đến $-8.8\%$ tại $4,045 - $4,050). Minh chứng MM đang chủ động **bán đè quyền chọn (Short Vega)** để xây đập ngăn lũ $\Rightarrow$ **Điểm đặt lệnh Limit đánh đảo chiều (Bounce) an toàn nhất!**
 - **Bất biến 3: "Bẫy Thuốc Nổ" (Mép Vểnh / Volatility Squeeze Trap):** Vùng hai cánh vểnh dốc đứng của nụ cười ($IV$ Skew dương cao vọt $> +6.0\%$). Nếu giá phá vỡ tường cản và lọt vào mép vểnh, MM rơi vào Short Gamma hoảng loạn và buộc phải mua/bán đuổi Futures phòng hộ, tạo bão giá gia tốc $\Rightarrow$ **VÙNG BẮT BUỘC ĐẶT STOP LOSS, CẤM BẮT ĐỈNH/ĐÁY LIMIT!**
 
+**Giao diện Tactical HUD (Chart-First Top-to-Bottom Sequence):**
+Hệ thống thiết lập Panel độc lập toàn màn hình hiển thị trực quan Đường cong Nụ cười Biến động (`build_volatility_smile_figure`), đặt lên vị trí đầu tiên của Dashboard, tiếp nối bởi Biểu đồ 3 Panel vi mô mặc định tinh gọn, 7 Thẻ KPI toàn cảnh, thước đo Level Spine & Băng giá M5, và đưa toàn bộ Bảng tác chiến & Ma trận 6 kịch bản xuống nửa dưới trang web để tối ưu hóa quy trình phân tích định lượng trước khi đọc lệnh.
+
 ---
 
 ## VIII. QUY ĐỊNH BẢO TỒN DUNG LƯỢNG & HIỆU NĂNG (ZERO-WASTE MANDATE)

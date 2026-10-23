@@ -298,9 +298,9 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] DeepSeek-R1 Adversarial Audit & Hardening (20/10/2026): Thẩm tra toàn diện mã nguồn src/ bằng DeepSeek-Reasoner (R1), vá triệt để 5 lỗi Critical (Invariant TP/SL HUD, OTM Wall filtering, giải ngược Black-76 Gamma loại bỏ hằng số fake 0.0037/0.0005, Expiry cutoff 18:30 UTC rollover và ưu tiên liquid strike cho ATM).
 - [x] Zero Gamma Flip Solver & Wall Siege Ratio (ADR-007): Giải nghiệm liên tục $S^*$ bằng Dekker-Brent `_brentq` thuần Python (<2ms), giám sát tỷ lệ công thành Intraday Wall Siege ($Volume / OI$) cảnh báo trước nguy cơ vỡ trận.
 - [x] Multi-Expiry GEX Superposition & Gamma-Weighted Wall Scoring (ADR-008): Tự động phân giải và xếp chồng tuyến tính Greeks giữa Weekly (OG1..OG5) và Monthly, phân loại chính xác `[BOUNCE_WALL]` vs `[MAGNET_WALL]`, xóa bỏ điểm mù OI thô.
-- [x] Volatility Smile & Skew Microstructure Invariants (ADR-009): Khóa 3 bất biến tác chiến vi cấu trúc (Tâm bão Pinning ATM, Hố đen giảm tốc Skew Dip và Bẫy thuốc nổ mép vểnh), tham số hóa Malz SVI (RR25 & BF25) kết nối chặt chẽ với Vanna & Charm.
-- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.58MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 115/115 test cases passed 100%.
+- [x] Volatility Smile & Skew Microstructure Invariants (ADR-009): Khóa 3 bất biến tác chiến vi cấu trúc (Tâm bão Pinning ATM, Hố đen giảm tốc Skew Dip và Bẫy thuốc nổ mép vểnh), tham số hóa Malz SVI (RR25 & BF25) kết nối chặt chẽ với Vanna & Charm. Thiết lập Panel độc lập toàn màn hình hiển thị trực quan Nụ cười biến động lên đầu trang Dashboard, sắp xếp thứ tự chart-first tối ưu trải nghiệm đọc lệnh trước kịch bản tác chiến.
+- [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~10.5MB), 0 MB rác trên laptop cá nhân.
+- [x] Unit test coverage: 116/116 test cases passed 100%.
 
 ---
 

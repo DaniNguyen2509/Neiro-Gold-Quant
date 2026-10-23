@@ -293,4 +293,100 @@ def test_html_terminal_contains_clear_cache_controls():
     assert "location.replace" in html
 
 
+def test_volatility_smile_figure_and_layout_ordering():
+    """Verify standalone Volatility Smile panel and strict chart-first top-to-bottom layout sequence."""
+    from src.hud.html_dashboard import build_volatility_smile_figure, generate_html_terminal
+    import plotly.graph_objects as go
+
+    df_sample = pd.DataFrame([
+        {
+            "strike": 4000.0,
+            "callOpenInterest": 1500, "putOpenInterest": 6000,
+            "callVolume": 100, "putVolume": 500,
+            "callMid": 45.0, "putMid": 8.0,
+            "callIV": 0.22, "putIV": 0.25,
+            "netGEX": -30.0, "netVEX": 10.0, "netCHEX": -5.0,
+        },
+        {
+            "strike": 4025.0,
+            "callOpenInterest": 4000, "putOpenInterest": 4000,
+            "callVolume": 800, "putVolume": 800,
+            "callMid": 22.0, "putMid": 22.0,
+            "callIV": 0.19, "putIV": 0.19,
+            "netGEX": 80.0, "netVEX": 25.0, "netCHEX": 10.0,
+        },
+        {
+            "strike": 4150.0,
+            "callOpenInterest": 8000, "putOpenInterest": 1000,
+            "callVolume": 1200, "putVolume": 100,
+            "callMid": 5.0, "putMid": 40.0,
+            "callIV": 0.26, "putIV": 0.21,
+            "netGEX": 120.0, "netVEX": -15.0, "netCHEX": 8.0,
+        },
+    ])
+    meta = {
+        "spot_price": 4028.0,
+        "atm_strike": 4025.0,
+        "atm_straddle": 44.0,
+        "sigma_atm": 0.193,
+        "expected_move_1s": 207.23,
+        "rule16_daily_move": 117.74,
+        "call_wall": 4150.0,
+        "call_wall_oi": 8000,
+        "put_wall": 4000.0,
+        "put_wall_oi": 6000,
+        "total_net_gex": -108.1,
+        "total_net_vex": 1.0,
+        "total_net_chex": -4.5,
+        "regime": "SHORT_GAMMA",
+        "zero_gamma_flip": 4266.52,
+        "basis": -24.0,
+        "dte_days": 8.0,
+        "expiration_date": "OGX26 (2026-10-27)",
+        "skew_rr25": 0.0243,
+        "skew_bf25": 0.0222,
+        "skew_label": "BULLISH CALL SKEW",
+        "m5_tape": {"candles": []},
+    }
+
+    fig_micro = go.Figure()
+    fig_micro.add_trace(go.Bar(x=[4000, 4025, 4150], y=[10, 20, 30]))
+
+    # 1. Test standalone Volatility Smile figure
+    fig_smile = build_volatility_smile_figure(df_sample, meta)
+    assert fig_smile is not None
+    assert len(fig_smile.data) >= 1  # Malz continuous curve + scatter points
+    # Check annotations on smile figure
+    annot_texts = " ".join([a.text for a in fig_smile.layout.annotations if hasattr(a, "text") and a.text])
+    assert "TÂM BÃO PINNING" in annot_texts
+    assert "HỐ ĐEN GIẢM TỐC" in annot_texts
+    assert "BẪY THUỐC NỔ" in annot_texts
+    assert "SPOT" in annot_texts
+
+    # 2. Test HTML layout sequence
+    html = generate_html_terminal(df_sample, meta, fig_micro, fig_smile=fig_smile)
+    pos_smile = html.find("KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW")
+    pos_micro = html.find("KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX")
+    pos_kpi = html.find("KHỐI 3: KPI THỐNG KÊ TOÀN CẢNH CME GOLD FUTURES")
+    pos_orderflow = html.find("KHỐI 5: BĂNG GIÁ & XUNG LỰC VOLUME M5")
+    pos_strategy = html.find("KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN")
+    pos_banner = html.find("KHỐI 7: BẢNG TÁC CHIẾN TỨC THÌ")
+    pos_matrix = html.find("MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER")
+    pos_glossary = html.find("TỪ ĐIỂN THUẬT NGỮ BỎ TÚI")
+
+    assert pos_smile != -1, "Smile panel must be present"
+    assert pos_micro != -1, "3-panel micro chart must be present"
+    assert pos_kpi != -1, "7 KPI cards must be present"
+    assert pos_orderflow != -1, "Orderflow must be present"
+    assert pos_strategy != -1, "Strategy tables must be present"
+    assert pos_banner != -1, "Action banner must be present"
+    assert pos_matrix != -1, "Scenario matrix must be present"
+    assert pos_glossary != -1, "Glossary must be present"
+
+    # Enforce strict top-to-bottom layout ordering:
+    # 1. Smile Panel -> 2. 3-Panel Micro Chart -> 3. 7 KPIs -> 4. Spine & Tape -> 5. Strategy -> 6. Banner -> 7. Matrix -> 8. Glossary
+    assert pos_smile < pos_micro < pos_kpi < pos_orderflow < pos_strategy < pos_banner < pos_matrix < pos_glossary
+
+
+
 

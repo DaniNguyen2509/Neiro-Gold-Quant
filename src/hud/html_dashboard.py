@@ -626,15 +626,12 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
             xanchor="left", yanchor="bottom",
         )
 
-    scalp_min = max(spot_price - 50.0, float(df_full["strike"].min()))
-    scalp_max = min(spot_price + 50.0, float(df_full["strike"].max()))
-
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#0F172A",
         plot_bgcolor="#0A0F1D",
-        height=620,
-        margin=dict(l=65, r=40, t=65, b=40),
+        height=600,
+        margin=dict(l=65, r=40, t=45, b=40),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -644,37 +641,6 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
             font=dict(size=11, family="JetBrains Mono"),
         ),
         barmode="relative",
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="right",
-                x=0.5,
-                y=1.14,
-                xanchor="center",
-                yanchor="bottom",
-                bgcolor="#1E293B",
-                bordercolor="#334155",
-                borderwidth=1,
-                font=dict(size=11, family="JetBrains Mono", color="#F8FAFC"),
-                buttons=[
-                    dict(
-                        label="🛡️ Thành Trì MM (Mặc Định)",
-                        method="relayout",
-                        args=[{"yaxis.range": [y_min, y_max]}],
-                    ),
-                    dict(
-                        label="🎯 Scalping Tinh Gọn (ATM ± $50)",
-                        method="relayout",
-                        args=[{"yaxis.range": [scalp_min, scalp_max]}],
-                    ),
-                    dict(
-                        label="🌐 Toàn Cảnh (Macro Range)",
-                        method="relayout",
-                        args=[{"yaxis.range": [float(df_full["strike"].min()) - 10.0, float(df_full["strike"].max()) + 10.0]}],
-                    ),
-                ],
-            )
-        ],
     )
     fig.update_yaxes(
         range=[y_min, y_max],
@@ -688,7 +654,359 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     return fig
 
 
-def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figure) -> str:
+def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figure:
+    """Build a standalone, full-width Plotly figure for the Volatility Smile & Skew Curve.
+
+    Implements the Malz (1997) closed-form SVI parametrization in delta space:
+        sigma(Delta) = sigma_atm - 2 * RR25 * (Delta - 0.5) + 16 * BF25 * (Delta - 0.5)^2
+    Annotates the 3 Tactical Microstructure Invariants:
+        - 🎯 Tâm Bão Pinning (ATM Strike - minimum IV sweet spot / theta decay)
+        - 🛡️ Hố Đen Giảm Tốc (Put Wall - structural skew dip / safe fade limit)
+        - ⚠️ Bẫy Thuốc Nổ (Call Wall - wing skew explosion / hard SL boundary)
+        - ⚡ Giá Realtime CME Gold Futures (Spot price)
+        - Zero Gamma Flip ($S^*)
+    """
+    spot_price = float(meta.get("spot_price", 4000.0))
+    atm_strike = float(meta.get("atm_strike", spot_price))
+    sigma_atm = float(meta.get("sigma_atm", 0.20))
+    if sigma_atm <= 0:
+        sigma_atm = 0.20
+
+    dte_days = float(meta.get("dte_days", 8.0))
+    t_years = max(dte_days / 365.0, 1.0 / 365.0)
+
+    rr25 = float(meta.get("skew_rr25", 0.0))
+    bf25 = float(meta.get("skew_bf25", 0.02))
+    skew_label = str(meta.get("skew_label", "CÂN BẰNG"))
+    delta_tilt_color = str(meta.get("delta_tilt_color", "#FACC15"))
+
+    call_wall = float(meta.get("call_wall", spot_price + 50.0))
+    put_wall = float(meta.get("put_wall", spot_price - 50.0))
+    zero_gamma = meta.get("zero_gamma_flip")
+    if zero_gamma is not None:
+        zero_gamma = float(zero_gamma)
+
+    # Strike bounds around spot price
+    min_k_avail = float(df_full["strike"].min()) if not df_full.empty and "strike" in df_full.columns else spot_price - 220.0
+    max_k_avail = float(df_full["strike"].max()) if not df_full.empty and "strike" in df_full.columns else spot_price + 220.0
+
+    k_min = max(spot_price - 220.0, min_k_avail)
+    k_max = min(spot_price + 220.0, max_k_avail)
+    if k_max <= k_min:
+        k_min = spot_price - 100.0
+        k_max = spot_price + 100.0
+
+    # 1. Theoretical Malz (1997) SVI Smile Curve
+    k_grid = np.linspace(k_min, k_max, 150)
+    denom = sigma_atm * math.sqrt(t_years)
+    d1_grid = (np.log(spot_price / k_grid) + 0.5 * (sigma_atm ** 2) * t_years) / denom
+    delta_grid = 0.5 * (1.0 + np.vectorize(math.erf)(d1_grid / math.sqrt(2.0)))
+    delta_grid = np.clip(delta_grid, 0.01, 0.99)
+    diff = delta_grid - 0.5
+    model_iv_grid = sigma_atm - 2.0 * rr25 * diff + 16.0 * bf25 * (diff ** 2)
+    model_iv_grid = np.maximum(0.02, model_iv_grid) * 100.0
+
+    fig = go.Figure()
+
+    # Trace 1: Malz SVI continuous curve
+    fig.add_trace(
+        go.Scatter(
+            x=k_grid,
+            y=model_iv_grid,
+            mode="lines",
+            name="Nụ Cười Chuẩn Hóa (Malz 1997 SVI)",
+            line=dict(color="#FACC15", width=3.5),
+            hovertemplate="<b>Mức Giá Strike</b>: $%{x:,.0f}<br><b>Model IV</b>: %{y:.2f}%<extra>Malz SVI Curve</extra>",
+        )
+    )
+
+    # Traces 2 & 3: Market Observed Call & Put IV Scatter
+    call_iv_col = "callIV" if "callIV" in df_full.columns else ("call_iv" if "call_iv" in df_full.columns else None)
+    put_iv_col = "putIV" if "putIV" in df_full.columns else ("put_iv" if "put_iv" in df_full.columns else None)
+    call_oi_col = "callOpenInterest" if "callOpenInterest" in df_full.columns else None
+    put_oi_col = "putOpenInterest" if "putOpenInterest" in df_full.columns else None
+
+    if call_iv_col and not df_full.empty:
+        c_mask = (df_full["strike"] >= k_min) & (df_full["strike"] <= k_max) & (df_full[call_iv_col] > 0.03)
+        df_c = df_full[c_mask]
+        if not df_c.empty:
+            c_oi = df_c[call_oi_col].values if call_oi_col else np.zeros(len(df_c))
+            fig.add_trace(
+                go.Scatter(
+                    x=df_c["strike"],
+                    y=df_c[call_iv_col] * 100.0,
+                    mode="markers",
+                    name="Call IV Thực Tế (COMEX)",
+                    marker=dict(
+                        size=7,
+                        color="#38BDF8",
+                        symbol="circle",
+                        opacity=0.85,
+                        line=dict(width=1, color="#0284C7"),
+                    ),
+                    customdata=c_oi,
+                    hovertemplate="<b>Call Strike</b>: $%{x:,.0f}<br><b>Call IV</b>: %{y:.2f}%<br><b>Call OI</b>: %{customdata:,.0f} HĐ<extra>CME Call</extra>",
+                )
+            )
+
+    if put_iv_col and not df_full.empty:
+        p_mask = (df_full["strike"] >= k_min) & (df_full["strike"] <= k_max) & (df_full[put_iv_col] > 0.03)
+        df_p = df_full[p_mask]
+        if not df_p.empty:
+            p_oi = df_p[put_oi_col].values if put_oi_col else np.zeros(len(df_p))
+            fig.add_trace(
+                go.Scatter(
+                    x=df_p["strike"],
+                    y=df_p[put_iv_col] * 100.0,
+                    mode="markers",
+                    name="Put IV Thực Tế (COMEX)",
+                    marker=dict(
+                        size=7,
+                        color="#F87171",
+                        symbol="diamond",
+                        opacity=0.85,
+                        line=dict(width=1, color="#DC2626"),
+                    ),
+                    customdata=p_oi,
+                    hovertemplate="<b>Put Strike</b>: $%{x:,.0f}<br><b>Put IV</b>: %{y:.2f}%<br><b>Put OI</b>: %{customdata:,.0f} HĐ<extra>CME Put</extra>",
+                )
+            )
+
+    # Invariant helper for model IV at specific strike
+    def get_model_iv(k_val: float) -> float:
+        d1_val = (math.log(spot_price / max(1.0, k_val)) + 0.5 * (sigma_atm ** 2) * t_years) / denom
+        delta_val = 0.5 * (1.0 + math.erf(d1_val / math.sqrt(2.0)))
+        delta_val = min(0.99, max(0.01, delta_val))
+        diff_val = delta_val - 0.5
+        iv_val = sigma_atm - 2.0 * rr25 * diff_val + 16.0 * bf25 * (diff_val ** 2)
+        return max(0.02, iv_val) * 100.0
+
+    iv_atm = get_model_iv(atm_strike)
+    iv_pw = get_model_iv(put_wall)
+    iv_cw = get_model_iv(call_wall)
+
+    annotations = [
+        # ATM Pinning Annotation
+        dict(
+            x=atm_strike,
+            y=iv_atm,
+            text=f"<b>🎯 TÂM BÃO PINNING</b><br>ATM ${atm_strike:,.0f} (IV: {iv_atm:.1f}%)<br><span style='font-size:9.5px;color:#334155;'>Vùng thu Theta & Pinning của MM</span>",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=1.5,
+            arrowcolor="#FACC15",
+            ax=0,
+            ay=55,
+            font=dict(color="#000000", size=10, family="JetBrains Mono"),
+            bgcolor="#FACC15",
+            bordercolor="#EAB308",
+            borderwidth=1,
+            borderpad=4,
+            opacity=0.95,
+        ),
+        # Live Spot Annotation
+        dict(
+            x=spot_price,
+            y=1.02,
+            yref="paper",
+            text=f"<b>⚡ SPOT: ${spot_price:,.2f}</b>",
+            showarrow=False,
+            font=dict(color="#FACC15", size=10.5, family="JetBrains Mono"),
+            bgcolor="rgba(15, 23, 42, 0.90)",
+            bordercolor="#FACC15",
+            borderwidth=1,
+            borderpad=3,
+        ),
+    ]
+
+    if k_min <= put_wall <= k_max:
+        annotations.append(
+            dict(
+                x=put_wall,
+                y=iv_pw,
+                text=f"<b>🛡️ HỐ ĐEN GIẢM TỐC</b><br>Put Wall ${put_wall:,.0f} (IV: {iv_pw:.1f}%)<br><span style='font-size:9.5px;color:#CBD5E1;'>MM bán đè Vol &bull; Điểm Limit Fade an toàn</span>",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1,
+                arrowwidth=1.5,
+                arrowcolor="#22C55E",
+                ax=-40,
+                ay=-50,
+                font=dict(color="#F8FAFC", size=10, family="JetBrains Mono"),
+                bgcolor="#14532D",
+                bordercolor="#22C55E",
+                borderwidth=1,
+                borderpad=4,
+                opacity=0.95,
+            )
+        )
+
+    if k_min <= call_wall <= k_max:
+        annotations.append(
+            dict(
+                x=call_wall,
+                y=iv_cw,
+                text=f"<b>⚠️ BẪY THUỐC NỔ</b><br>Call Wall ${call_wall:,.0f} (IV: {iv_cw:.1f}%)<br><span style='font-size:9.5px;color:#CBD5E1;'>Mép vểnh Squeeze &bull; Bắt buộc cắt lỗ Hard SL</span>",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1,
+                arrowwidth=1.5,
+                arrowcolor="#EF4444",
+                ax=40,
+                ay=-50,
+                font=dict(color="#F8FAFC", size=10, family="JetBrains Mono"),
+                bgcolor="#7F1D1D",
+                bordercolor="#EF4444",
+                borderwidth=1,
+                borderpad=4,
+                opacity=0.95,
+            )
+        )
+
+    if zero_gamma and (k_min <= zero_gamma <= k_max):
+        iv_zg = get_model_iv(zero_gamma)
+        annotations.append(
+            dict(
+                x=zero_gamma,
+                y=iv_zg,
+                text=f"<b>ZERO GAMMA FLIP</b><br>${zero_gamma:,.1f}",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1,
+                arrowwidth=1.5,
+                arrowcolor="#F59E0B",
+                ax=0,
+                ay=-40,
+                font=dict(color="#000000", size=9.5, family="JetBrains Mono"),
+                bgcolor="#F59E0B",
+                bordercolor="#D97706",
+                borderwidth=1,
+                borderpad=3,
+                opacity=0.95,
+            )
+        )
+
+    shapes = [
+        # Spot Price Line
+        dict(
+            type="line",
+            x0=spot_price,
+            x1=spot_price,
+            y0=0,
+            y1=1,
+            yref="paper",
+            line=dict(color="#FACC15", width=2, dash="dash"),
+        ),
+        # ATM Strike Line
+        dict(
+            type="line",
+            x0=atm_strike,
+            x1=atm_strike,
+            y0=0,
+            y1=1,
+            yref="paper",
+            line=dict(color="#94A3B8", width=1.2, dash="dot"),
+        ),
+    ]
+
+    if k_min <= put_wall <= k_max:
+        shapes.append(
+            dict(
+                type="line",
+                x0=put_wall,
+                x1=put_wall,
+                y0=0,
+                y1=1,
+                yref="paper",
+                line=dict(color="#22C55E", width=1.8, dash="dashdot"),
+            )
+        )
+
+    if k_min <= call_wall <= k_max:
+        shapes.append(
+            dict(
+                type="line",
+                x0=call_wall,
+                x1=call_wall,
+                y0=0,
+                y1=1,
+                yref="paper",
+                line=dict(color="#EF4444", width=1.8, dash="dashdot"),
+            )
+        )
+
+    if zero_gamma and (k_min <= zero_gamma <= k_max):
+        shapes.append(
+            dict(
+                type="line",
+                x0=zero_gamma,
+                x1=zero_gamma,
+                y0=0,
+                y1=1,
+                yref="paper",
+                line=dict(color="#F59E0B", width=1.5, dash="dot"),
+            )
+        )
+
+    fig.update_layout(
+        title=dict(
+            text=f"<b>CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW CURVE)</b><br>"
+                 f"<span style='font-size:12px; color:#94A3B8; font-weight:normal;'>"
+                 f"Mô hình Vi Cấu Trúc Malz (1997) SVI &bull; ATM IV: <b>{sigma_atm*100:.2f}%</b> &bull; "
+                 f"25Δ Skew (RR25): <b style='color:{delta_tilt_color};'>{rr25*100:+.2f}v</b> ({skew_label}) &bull; "
+                 f"Curvature (BF25): <b>{bf25*100:+.2f}v</b> &bull; Hạn: {meta.get('expiration_date', 'OGX26')}</span>",
+            x=0.01,
+            y=0.96,
+            xanchor="left",
+            yanchor="top",
+            font=dict(family="JetBrains Mono, Inter, sans-serif", size=15, color="#F8FAFC"),
+        ),
+        template="plotly_dark",
+        paper_bgcolor="#0F172A",
+        plot_bgcolor="#0A0F1D",
+        height=450,
+        margin=dict(l=65, r=40, t=75, b=45),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1.0,
+            font=dict(size=11, family="JetBrains Mono"),
+            bgcolor="rgba(15, 23, 42, 0.8)",
+            bordercolor="#334155",
+            borderwidth=1,
+        ),
+        xaxis=dict(
+            title=dict(text="Mức Giá Thực Hiện (Strike Price $K) - USD/oz", font=dict(size=12, color="#94A3B8")),
+            gridcolor="#1E293B",
+            tickfont=dict(size=11, family="JetBrains Mono", color="#94A3B8"),
+            tickformat="$,.0f",
+            range=[k_min - 2.0, k_max + 2.0],
+        ),
+        yaxis=dict(
+            title=dict(text="Độ Biến Động Hàm Ý (Implied Volatility - IV %)", font=dict(size=12, color="#94A3B8")),
+            gridcolor="#1E293B",
+            tickfont=dict(size=11, family="JetBrains Mono", color="#94A3B8"),
+            ticksuffix="%",
+        ),
+        annotations=annotations,
+        shapes=shapes,
+    )
+
+    return fig
+
+
+def generate_html_terminal(
+    df: pd.DataFrame,
+    meta: dict[str, Any],
+    fig: go.Figure,
+    fig_smile: go.Figure | None = None,
+) -> str:
+    if fig_smile is None:
+        fig_smile = build_volatility_smile_figure(df, meta)
+
     now_vn = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))
     now_str = now_vn.strftime("%d/%m/%Y %H:%M:%S")
 
@@ -942,7 +1260,16 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
 
     m5_table_rows_html = "".join(m5_rows) if m5_rows else "<tr><td colspan='8' style='text-align:center; color:#64748B; padding:16px;'>Dữ liệu Orderflow M5 đang cập nhật từ COMEX...</td></tr>"
 
-    plotly_div = fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True, "displayModeBar": True})
+    smile_plotly_div = fig_smile.to_html(
+        full_html=False,
+        include_plotlyjs="cdn",
+        config={"responsive": True, "displayModeBar": True},
+    )
+    plotly_div = fig.to_html(
+        full_html=False,
+        include_plotlyjs=False,
+        config={"responsive": True, "displayModeBar": True},
+    )
 
     # Render complete HTML
     html = f"""<!DOCTYPE html>
@@ -1037,43 +1364,58 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
     </div>
 
-    <!-- KHỐI 1: BẢNG TÁC CHIẾN TỨC THÌ (GLANCEABLE 3-SECOND ACTION BANNER) -->
-    <div id="live-action-banner" class="action-banner action-banner-{active_sc.alert_level.value.lower()}">
-        <div class="action-header-row">
-            <div>
-                <span class="badge" style="background:#0F172A; color:#F8FAFC; border:1px solid #475569; font-size:12px; margin-right:6px;">KỊCH BẢN HIỆN TẠI</span>
-                <span id="banner-sc-title" style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{active_sc.code}: {active_sc.title.upper()}</span>
-            </div>
-            <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#FACC15;">
-                GIÁ REALTIME CME GCZ26: <b id="banner-cme-price">${spot:,.2f}</b> (Trục ATM: <span id="banner-atm-strike">${atm_strike:,.0f}</span>)
-            </div>
+    <!-- KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW (PANEL LỚN HẲN MALZ 1997 SVI) -->
+    <div class="chart-box" style="margin-bottom: 16px;">
+        {smile_plotly_div}
+    </div>
+
+    <!-- KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX, VOLUME/OI, GREEKS BẬC 2 (MẶC ĐỊNH TINH GỌN) -->
+    <div class="chart-box" style="margin-bottom: 16px;">
+        {plotly_div}
+    </div>
+
+    <!-- KHỐI 3: KPI THỐNG KÊ TOÀN CẢNH CME GOLD FUTURES (7 THẺ TOÀN CẢNH) -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
+            <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
+            <div class="kpi-sub">Trục ATM: <b id="kpi-atm-strike">${atm_strike:,.0f}</b> | Nguồn: <b id="kpi-price-source">{meta.get('futures_feed', 'LIVE COMEX (GC=F)')}</b></div>
         </div>
-        <div class="action-grid">
-            <div id="banner-action-card" class="action-box" style="border-left: 4px solid {'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#22C55E' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
-                <div class="action-cmd-title">HÀNH ĐỘNG CẦN THỰC HIỆN NGAY:</div>
-                <div id="banner-action-cmd" class="action-cmd-val" style="color:{'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#4ADE80' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
-                    {active_sc.action_label}
-                </div>
-                <div id="banner-action-desc" style="font-size:11.5px; color:#94A3B8;">{active_sc.entry_desc}</div>
+        <div class="kpi-card">
+            <div class="kpi-label">Market Regime & Net GEX</div>
+            <div class="kpi-val" style="color: {'#4ADE80' if total_gex >= 0 else '#F87171'};">{total_gex:+.1f}M GEX</div>
+            <div class="kpi-sub"><span class="badge badge-gold">{regime}</span>{f' <span style="color:#94A3B8; font-size:10.5px;">(Flip: ${zero_gamma:,.1f})</span>' if zero_gamma else ''}</div>
+        </div>
+        <div class="kpi-card" style="border: 1px solid {delta_tilt_color}66; box-shadow: 0 0 10px {delta_tilt_color}22;">
+            <div class="kpi-label">Sổ Sách Dealer (Net Delta / DEX)</div>
+            <div class="kpi-val" style="color: {delta_tilt_color}; font-size: 20px;">{total_net_delta_contracts:+,.0f} HĐ</div>
+            <div class="kpi-sub"><span class="badge" style="background:{delta_tilt_color}22; color:{delta_tilt_color}; border:1px solid {delta_tilt_color}55;">{delta_tilt_label}</span> <span style="color:#94A3B8; font-size:10.5px;">(Tâm: ${max_tilt_strike:,.0f} &bull; {max_tilt_contracts:+,.0f} HĐ)</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Zero Gamma Flip ($S^*) & Wall Siege</div>
+            <div class="kpi-val" style="color: #F59E0B; font-size: 20px;">{f'${zero_gamma:,.2f}' if zero_gamma else 'N/A (Pure)'}</div>
+            <div class="kpi-sub">CW Siege: <b>{call_wall_siege:.2f}x</b> | PW Siege: <b>{put_wall_siege:.2f}x</b></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Biên Độ 1-Sigma Expected Move</div>
+            <div class="kpi-val" style="color: #F59E0B;">±${expected_move:.2f}</div>
+            <div class="kpi-sub">Trong ngày (Rule 16): <b>±${intraday_move:.2f}</b> (${spot-intraday_move:.1f} - ${spot+intraday_move:.1f})</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Greeks Bậc 2 (Vanna & Charm)</div>
+            <div class="kpi-val" style="color: #38BDF8;">{total_vex:+.1f}M / {total_chex:+.1f}M</div>
+            <div class="kpi-sub">VEX: {total_vex:+.1f}M | CHEX: {total_chex:+.1f}M/ngày</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Dòng Tiền Quỹ (25Δ Skew)</div>
+            <div class="kpi-val" style="color: {'#4ADE80' if rr25 > 0.005 else ('#F87171' if rr25 < -0.005 else '#38BDF8')}; font-size: 19px;">
+                {rr25*100:+.2f}v <span style="font-size:12px; color:#94A3B8;">(Fly: {bf25*100:+.2f}v)</span>
             </div>
-            <div class="action-box">
-                <div class="action-cmd-title">HÀNH VI CỦA MARKET MAKER:</div>
-                <div id="banner-mm-state" style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">{active_sc.mm_state}</div>
-                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b id="banner-forecast">{active_sc.forecast}</b></div>
-            </div>
-            <div class="action-box">
-                <div class="action-cmd-title">THÔNG SỐ VÀO LỆNH (CME FUTURES):</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;">
-                    <div>Kích hoạt: <b id="banner-entry-trigger">{f'${active_sc.entry_trigger:,.2f}' if active_sc.entry_trigger > 0 else 'Chờ tín hiệu'}</b></div>
-                    <div>Khối lượng: <b id="banner-lot-size" style="color:#FACC15;">{f'~{active_sc.lot_size:.2f} Lot' if active_sc.lot_size > 0 else '0 Lot'}</b></div>
-                    <div>Cắt lỗ SL: <b id="banner-hard-sl" style="color:#F87171;">{f'${active_sc.hard_sl:,.2f}' if active_sc.hard_sl > 0 else 'N/A'}</b></div>
-                    <div>Chốt lời TP: <b id="banner-take-profit" style="color:#4ADE80;">{f'${active_sc.take_profit:,.2f}' if active_sc.take_profit > 0 else 'N/A'}</b></div>
-                </div>
-            </div>
+            <div class="kpi-sub"><span class="badge badge-gold">{skew_label}</span></div>
         </div>
     </div>
 
-    <!-- KHỐI 2: THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CHỐT CHẶN MM (VISUAL LEVEL SPINE) -->
+    <!-- KHỐI 4: THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CHỐT CHẶN MM (VISUAL LEVEL SPINE) -->
     <div class="spine-container">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
             <div style="font-size:11.5px; font-weight:700; color:#94A3B8; text-transform:uppercase;">
@@ -1129,7 +1471,7 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
     </div>
 
-    <!-- KHỐI 3: BĂNG GIÁ & XUNG LỰC VOLUME M5 THỜI GIAN THỰC (ORDERFLOW & VOLUME PULSE) -->
+    <!-- KHỐI 5: BĂNG GIÁ & XUNG LỰC VOLUME M5 THỜI GIAN THỰC (ORDERFLOW & VOLUME PULSE) -->
     <div class="table-box" style="margin-bottom: 16px; border: 1px solid #334155; background:#0B1120;">
         <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
             <div style="display:flex; align-items:center; gap:8px;">
@@ -1159,52 +1501,6 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 </tbody>
             </table>
         </div>
-    </div>
-
-    <!-- KHỐI: KPI THỐNG KÊ TOÀN CẢNH -->
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
-            <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
-            <div class="kpi-sub">Trục ATM: <b id="kpi-atm-strike">${atm_strike:,.0f}</b> | Nguồn: <b id="kpi-price-source">{meta.get('futures_feed', 'LIVE COMEX (GC=F)')}</b></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Market Regime & Net GEX</div>
-            <div class="kpi-val" style="color: {'#4ADE80' if total_gex >= 0 else '#F87171'};">{total_gex:+.1f}M GEX</div>
-            <div class="kpi-sub"><span class="badge badge-gold">{regime}</span>{f' <span style="color:#94A3B8; font-size:10.5px;">(Flip: ${zero_gamma:,.1f})</span>' if zero_gamma else ''}</div>
-        </div>
-        <div class="kpi-card" style="border: 1px solid {delta_tilt_color}66; box-shadow: 0 0 10px {delta_tilt_color}22;">
-            <div class="kpi-label">Sổ Sách Dealer (Net Delta / DEX)</div>
-            <div class="kpi-val" style="color: {delta_tilt_color}; font-size: 20px;">{total_net_delta_contracts:+,.0f} HĐ</div>
-            <div class="kpi-sub"><span class="badge" style="background:{delta_tilt_color}22; color:{delta_tilt_color}; border:1px solid {delta_tilt_color}55;">{delta_tilt_label}</span> <span style="color:#94A3B8; font-size:10.5px;">(Tâm: ${max_tilt_strike:,.0f} &bull; {max_tilt_contracts:+,.0f} HĐ)</span></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Zero Gamma Flip ($S^*) & Wall Siege</div>
-            <div class="kpi-val" style="color: #F59E0B; font-size: 20px;">{f'${zero_gamma:,.2f}' if zero_gamma else 'N/A (Pure)'}</div>
-            <div class="kpi-sub">CW Siege: <b>{call_wall_siege:.2f}x</b> | PW Siege: <b>{put_wall_siege:.2f}x</b></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Biên Độ 1-Sigma Expected Move</div>
-            <div class="kpi-val" style="color: #F59E0B;">±${expected_move:.2f}</div>
-            <div class="kpi-sub">Trong ngày (Rule 16): <b>±${intraday_move:.2f}</b> (${spot-intraday_move:.1f} - ${spot+intraday_move:.1f})</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Greeks Bậc 2 (Vanna & Charm)</div>
-            <div class="kpi-val" style="color: #38BDF8;">{total_vex:+.1f}M / {total_chex:+.1f}M</div>
-            <div class="kpi-sub">VEX: {total_vex:+.1f}M | CHEX: {total_chex:+.1f}M/ngày</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Dòng Tiền Quỹ (25Δ Skew)</div>
-            <div class="kpi-val" style="color: {'#4ADE80' if rr25 > 0.005 else ('#F87171' if rr25 < -0.005 else '#38BDF8')}; font-size: 19px;">
-                {rr25*100:+.2f}v <span style="font-size:12px; color:#94A3B8;">(Fly: {bf25*100:+.2f}v)</span>
-            </div>
-            <div class="kpi-sub"><span class="badge badge-gold">{skew_label}</span></div>
-        </div>
-    </div>
-
-    <!-- KHỐI 5: BIỂU ĐỒ GEX & CHỐT CHẶN (PLOTLY COMPACT) -->
-    <div class="chart-box">
-        {plotly_div}
     </div>
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
@@ -1298,6 +1594,42 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- KHỐI 7: BẢNG TÁC CHIẾN TỨC THÌ (GLANCEABLE 3-SECOND ACTION BANNER) -->
+    <div id="live-action-banner" class="action-banner action-banner-{active_sc.alert_level.value.lower()}">
+        <div class="action-header-row">
+            <div>
+                <span class="badge" style="background:#0F172A; color:#F8FAFC; border:1px solid #475569; font-size:12px; margin-right:6px;">KỊCH BẢN HIỆN TẠI</span>
+                <span id="banner-sc-title" style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{active_sc.code}: {active_sc.title.upper()}</span>
+            </div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#FACC15;">
+                GIÁ REALTIME CME GCZ26: <b id="banner-cme-price">${spot:,.2f}</b> (Trục ATM: <span id="banner-atm-strike">${atm_strike:,.0f}</span>)
+            </div>
+        </div>
+        <div class="action-grid">
+            <div id="banner-action-card" class="action-box" style="border-left: 4px solid {'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#22C55E' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
+                <div class="action-cmd-title">HÀNH ĐỘNG CẦN THỰC HIỆN NGAY:</div>
+                <div id="banner-action-cmd" class="action-cmd-val" style="color:{'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#4ADE80' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
+                    {active_sc.action_label}
+                </div>
+                <div id="banner-action-desc" style="font-size:11.5px; color:#94A3B8;">{active_sc.entry_desc}</div>
+            </div>
+            <div class="action-box">
+                <div class="action-cmd-title">HÀNH VI CỦA MARKET MAKER:</div>
+                <div id="banner-mm-state" style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">{active_sc.mm_state}</div>
+                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b id="banner-forecast">{active_sc.forecast}</b></div>
+            </div>
+            <div class="action-box">
+                <div class="action-cmd-title">THÔNG SỐ VÀO LỆNH (CME FUTURES):</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;">
+                    <div>Kích hoạt: <b id="banner-entry-trigger">{f'${active_sc.entry_trigger:,.2f}' if active_sc.entry_trigger > 0 else 'Chờ tín hiệu'}</b></div>
+                    <div>Khối lượng: <b id="banner-lot-size" style="color:#FACC15;">{f'~{active_sc.lot_size:.2f} Lot' if active_sc.lot_size > 0 else '0 Lot'}</b></div>
+                    <div>Cắt lỗ SL: <b id="banner-hard-sl" style="color:#F87171;">{f'${active_sc.hard_sl:,.2f}' if active_sc.hard_sl > 0 else 'N/A'}</b></div>
+                    <div>Chốt lời TP: <b id="banner-take-profit" style="color:#4ADE80;">{f'${active_sc.take_profit:,.2f}' if active_sc.take_profit > 0 else 'N/A'}</b></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- MA TRẬN 6 KỊCH BẢN THỜI GIAN THỰC (6-SCENARIO DYNAMIC MATRIX) -->
@@ -1433,7 +1765,8 @@ def run_pipeline(
 
     df_raw, meta = load_and_preprocess_options(input_csv, basis=basis, no_mt5=no_mt5)
     fig = build_plotly_figure(df_raw, meta)
-    html_content = generate_html_terminal(df_raw, meta, fig)
+    fig_smile = build_volatility_smile_figure(df_raw, meta)
+    html_content = generate_html_terminal(df_raw, meta, fig, fig_smile=fig_smile)
 
     saved_paths = []
     for out_str in output_files:
@@ -1452,7 +1785,7 @@ def run_pipeline(
             pass
 
     # Zero-Waste Memory Cleanup: Giai phong doi tuong lon khoi RAM
-    del df_raw, meta, fig, html_content
+    del df_raw, meta, fig, fig_smile, html_content
     gc.collect()
 
     return saved_paths
