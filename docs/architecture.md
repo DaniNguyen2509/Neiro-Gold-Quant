@@ -1,9 +1,9 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v2.2 — 20/10/2026 (Chuẩn hóa OTM Dealer Walls, M5 Orderflow Pulse & Anti-Cache Dashboard)  
+> **Phiên bản:** v2.3 — 23/10/2026 (Multi-Expiry GEX Superposition, Gamma-Weighted Wall Scoring & Pin/Trap Regime Classification)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
 > **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
-> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md) & [decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md](decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md)
+> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md) & [decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md)
 
 ---
 
@@ -16,6 +16,7 @@ Hệ thống **Neiro-Quant** được xây dựng không phải để đoán mò
    - Các bức tường quyền chọn: Call Wall, Put Wall, Absolute Gamma Strike, ATM Realtime Pivot, ±1.0σ & ±0.85σ Implied Bands.
    - Định vị 100% thuần theo Giá tương lai CME Gold Futures Realtime (`GC=F`), khóa chặt trục ATM theo bảng điện trực tiếp.
    - **Quy tắc khóa OTM Dealer Walls:** Call Wall bắt buộc là OTM Call ($strike \ge spot$), Put Wall bắt buộc là OTM Put ($strike \le spot$), triệt tiêu hoàn toàn rủi ro lấy nhầm Strike ITM làm sàn/trần.
+   - **Gamma-Weighted Wall Scoring (ADR-008):** Xếp hạng thành trì bằng $Power = OI \times \Gamma$ thay vì OI thô, phân loại rõ `[BOUNCE_WALL]` (Dealer Long Gamma pin/hỗ trợ) vs `[MAGNET_WALL]` (Dealer Short Gamma bẫy gia tốc xuyên thủng).
 2. **Giải mã trạng thái động và kích hoạt kịch bản tức thì (6-Scenario Realtime Engine):**
    - Đánh giá trực tiếp trong thời gian thực hành vi của Market Maker theo 6 kịch bản (KB-1 đến KB-6):
      * **KB-1 (Giằng co nén biên độ):** MM ghìm giá ăn phế -> ĐỨNG NGOÀI.
@@ -76,6 +77,7 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - Internal API Interceptor: Bắt gói JSON /proxies/core-api/v1/options/get.            │
 │  - Dynamic CME Rollover Engine: Tự động giải mã Front-Month Options theo CME Rule       │
 │    120102.E (resolve_front_month_cme_option), tự động rollover (OGX26 -> OGZ26...).     │
+│  - Multi-Expiry Resolver (ADR-008): Tự động quét cả Weekly (OG1..OG5) và Monthly.     │
 │  - Dynamic Expiration & DTE: Trích xuất expirationDate từ sàn, tính DTE chính xác.     │
 │  - Lưới Cron thích ứng 2 mùa: 07:15 VN (Chốt OI), London 2 nấc (12:30/13:30 & 14:30/15:30),│
 │    18:45 VN (Pre-US) & 19:45 đến 23:45 VN (Đón đầu phiên New York & London Fix).           │
@@ -89,11 +91,13 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │ [TẦNG 2: QUANT ENGINE & GREEKS CORE (CÔNG THỨC TOÁN HỌC)]                              │
 │  - black76.py: Mô hình Black-76 cho Options on Futures (Call, Put, d1, d2).            │
 │  - iv_solver.py: Giải ngược Implied Volatility (Newton-Raphson + Brent fallback).      │
+│  - loader.py (Multi-Expiry Superposition): aggregate_options_dataframes xếp chồng     │
+│    tuyến tính Greeks giữa Weekly & Monthly, triệt tiêu điểm mù OI thô.                 │
+│  - dealer.py: Gamma-Weighted Wall Scoring (Power = OI * Gamma), Wall Regime             │
+│    Classification ([BOUNCE_WALL] vs [MAGNET_WALL]), Zero Gamma Solver (_brentq),       │
+│    Wall Siege Ratio (compute_wall_siege_ratio), Dealer Net Delta Position.             │
 │  - Put-Call Parity Implied Spot: S_Implied = K_ATM + exp(r*T)*(C_ATM - P_ATM).         │
 │  - Liquid Strike Weighting: Lọc mốc ATM thực theo Open Interest và Volume thanh khoản. │
-│  - dealer.py: Zero Gamma Continuous Solver (_brentq Dekker-Brent), Wall Siege Ratio    │
-│    (compute_wall_siege_ratio), Dealer Net Delta Position (compute_net_delta_positions),│
-│    Call/Put Walls, Gamma Flip, Squeeze Triggers.                                       │
 │  - advanced_greeks.py: Net VEX ($M/1% IV - Vanna) & Net CHEX ($M/ngày - Charm).        │
 │  - expected_move.py: Biên độ 1-Sigma (Straddle / 0.7979) & Intraday Rule of 16.        │
 │  - institutional.py: 25Δ Risk Reversal (RR25), Butterfly (BF25), Volatility-Targeted   │
@@ -109,6 +113,9 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │    Triệt tiêu 100% hiện tượng sai lệch giá và báo động giả.                             │
 │  - 7 Thẻ KPI Thống Kê: Spot CME, Net GEX Regime, Sổ Sách Dealer (Net Delta / DEX),     │
 │    Zero Gamma Flip ($S*) & Wall Siege, Expected Move, Greeks Bậc 2, 25Δ Skew.          │
+│  - Gamma-Weighted Walls & Regimes: Plotly Panel 1 vẽ nhãn [BOUNCE PIN] / [MAGNET TRAP], │
+│    Visual Level Spine hiển thị Gamma Power & Siege Ratio, Tactical Table cấm Limit      │
+│    bắt dao rơi tại Magnet Wall.                                                        │
 │  - Plotly Panel 2: Trực quan hóa thanh Net Delta Bar (HĐ GC) và Hover Tooltip chi tiết │
 │    Call/Put/Net contracts từng Strike.                                                 │
 │  - Đường Zero Gamma Flip ($S*): Vẽ trực quan trên Panel 1, đánh dấu ranh giới đảo chiều.│

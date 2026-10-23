@@ -41,8 +41,10 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 
 ## 📚 TÀI LIỆU KIẾN TRÚC & QUYẾT ĐỊNH KỸ THUẬT
 
-- **Kiến trúc Hệ thống v2.1 (Toàn cảnh 6 tầng, Pure CME Futures & Realtime Scenario Engine):** [docs/architecture.md](docs/architecture.md)
+- **Kiến trúc Hệ thống v2.3 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Phân Tích GEX Đa Kỳ Hạn (Multi-Expiry) & Chấm Điểm Bức Tường Theo Gamma Power (ADR-008):** [docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md](docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md)
+- **Quyết định Giải Nghiệm Số Zero Gamma Flip & Đo Vận Tốc Công Thành Wall Siege Ratio (ADR-007):** [docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md](docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md)
 - **Quyết định Định vị Thuần CME Futures & Bộ Đánh Giá 6 Kịch Bản MM Realtime (ADR-006):** [docs/decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md](docs/decisions/ADR-006-pure-cme-futures-and-realtime-scenario-engine.md)
 - **Quyết định Nguồn Giá Kép Realtime (yfinance GC=F + LBMA Spot) & Dynamic Basis (ADR-005):** [docs/decisions/ADR-005-realtime-dual-price-feed-and-dynamic-basis.md](docs/decisions/ADR-005-realtime-dual-price-feed-and-dynamic-basis.md)
 - **Quyết định Tái Cấu Trúc Layout Chuẩn Market Maker & Chống Đè Chữ (ADR-004):** [docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md](docs/decisions/ADR-004-institutional-terminal-layout-and-anti-collision.md)

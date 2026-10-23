@@ -52,6 +52,9 @@ class Wall:
     rank: int  # 1 = primary wall
     siege_ratio: float = 0.0
     is_under_siege: bool = False
+    gamma_power: float = 0.0
+    regime: str = "NEUTRAL"  # "BOUNCE_WALL" | "MAGNET_WALL" | "NEUTRAL"
+    net_gex: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

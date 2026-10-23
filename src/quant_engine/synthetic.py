@@ -79,6 +79,74 @@ def resolve_front_month_cme_option(
     }
 
 
+def resolve_active_expirations(
+    now: Optional[Union[datetime.date, datetime.datetime]] = None,
+    underlying_futures: str = "GCZ26",
+    weekly_count: int = 2,
+) -> list[Dict[str, Any]]:
+    """Resolves active CME Gold Options expirations (Weekly + Monthly).
+
+    CME Gold Options structure:
+    - Weekly options (OG1..OG5) expire every Friday.
+    - Monthly option (OG) expires on the 4th business day prior to the end of the preceding month.
+
+    Returns:
+        List of dicts containing contract details, DTE, and Barchart URL for multi-expiry aggregation.
+    """
+    if now is None:
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+    elif isinstance(now, datetime.datetime):
+        now_dt = now if now.tzinfo is not None else now.replace(tzinfo=datetime.timezone.utc)
+    else:
+        now_dt = datetime.datetime.combine(now, datetime.time(0, 0), tzinfo=datetime.timezone.utc)
+
+    now_date = now_dt.date()
+    front_monthly = resolve_front_month_cme_option(now=now_dt, underlying_futures=underlying_futures)
+
+    results: list[Dict[str, Any]] = []
+
+    # 1. Upcoming Weekly Friday expirations
+    curr = now_date
+    fridays_found = 0
+    # COMEX Gold options expiration cutoff: 13:30 CT (18:30 UTC)
+    while fridays_found < weekly_count:
+        if curr.weekday() == 4:  # Friday
+            cutoff_dt = datetime.datetime.combine(curr, datetime.time(18, 30), tzinfo=datetime.timezone.utc)
+            if cutoff_dt >= now_dt:
+                day = curr.day
+                week_num = min(5, (day - 1) // 7 + 1)
+                month_code = CME_OPTION_MONTH_CODES[curr.month]
+                yr_code = str(curr.year)[-2:]
+                opt_sym = f"OG{week_num}{month_code}{yr_code}"
+                dte_val = compute_dynamic_dte(curr, now_dt)
+
+                results.append({
+                    "type": "WEEKLY",
+                    "name": f"Weekly {week_num} ({curr.strftime('%b %d')})",
+                    "option_symbol": opt_sym,
+                    "underlying": underlying_futures,
+                    "expiration_date": curr.isoformat(),
+                    "dte": dte_val,
+                    "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options/{opt_sym}?futuresOptionsView=merged",
+                })
+                fridays_found += 1
+        curr += datetime.timedelta(days=1)
+
+    # 2. Front-Month Monthly expiration
+    monthly_dte = compute_dynamic_dte(front_monthly["expiration_date"], now_dt)
+    results.append({
+        "type": "MONTHLY",
+        "name": f"Monthly ({front_monthly['option_symbol']})",
+        "option_symbol": front_monthly["option_symbol"],
+        "underlying": underlying_futures,
+        "expiration_date": front_monthly["expiration_date"],
+        "dte": monthly_dte,
+        "barchart_url": front_monthly["barchart_url"],
+    })
+
+    return results
+
+
 def compute_dynamic_dte(
     expiry: Optional[Union[str, datetime.date, datetime.datetime]] = None,
     now: Optional[datetime.datetime] = None,

@@ -208,15 +208,89 @@ def scrape_and_save(
     return str(out_file)
 
 
+def scrape_multi_expiry_and_save(
+    output_dir: str = "data",
+    underlying_futures: str = "GCZ26",
+    weekly_count: int = 1,
+    dry_run: bool = False,
+) -> list[str]:
+    """Scrape both nearest Weekly and Front-Month Monthly contracts and aggregate them into primary dataset."""
+    from src.quant_engine.synthetic import resolve_active_expirations
+    from src.quant_engine.loader import aggregate_options_dataframes
+
+    expirations = resolve_active_expirations(underlying_futures=underlying_futures, weekly_count=weekly_count)
+    logger.info("Targeting %d active CME expirations (Weekly + Monthly)", len(expirations))
+
+    saved_files = []
+    scraped_dfs = []
+    out_dir_path = Path(output_dir)
+    out_dir_path.mkdir(parents=True, exist_ok=True)
+
+    for exp in expirations:
+        sym = exp["option_symbol"]
+        url = exp["barchart_url"]
+        sub_csv = out_dir_path / f"options_prices_{underlying_futures}_{sym}.csv"
+
+        try:
+            logger.info("Scraping %s (%s) from %s", exp["name"], sym, url)
+            raw_json = asyncio.run(fetch_barchart_options_playwright(page_url=url))
+            df = parse_barchart_json(raw_json)
+            if df is not None and len(df) > 0:
+                df.attrs["expiration_date"] = exp["expiration_date"]
+                df.attrs["dte_days"] = exp["dte"]
+                df.attrs["option_symbol"] = sym
+                scraped_dfs.append(df)
+                if not dry_run:
+                    df.to_csv(sub_csv, index=False)
+                    saved_files.append(str(sub_csv))
+                    logger.info("Saved %s options chain with %d strikes to %s", sym, len(df), sub_csv)
+        except Exception as e:
+            logger.warning("Could not scrape %s (%s): %s", exp["name"], sym, e)
+            if sub_csv.exists():
+                try:
+                    df = pd.read_csv(sub_csv)
+                    df.attrs["expiration_date"] = exp["expiration_date"]
+                    df.attrs["dte_days"] = exp["dte"]
+                    df.attrs["option_symbol"] = sym
+                    scraped_dfs.append(df)
+                    logger.info("Loaded cached dataset for %s: %s", sym, sub_csv)
+                except Exception:
+                    pass
+
+    # Aggregate all scraped chains into the master options_prices_GCZ26.csv
+    if scraped_dfs:
+        logger.info("Superimposing %d options chains into master aggregated dataset...", len(scraped_dfs))
+        agg_df = aggregate_options_dataframes(scraped_dfs)
+        master_path = out_dir_path / f"options_prices_{underlying_futures}.csv"
+        if not dry_run and not agg_df.empty:
+            agg_df.to_csv(master_path, index=False)
+            saved_files.append(str(master_path))
+            logger.info("Master aggregated dataset saved to %s (%d strikes)", master_path, len(agg_df))
+
+    return saved_files
+
+
 def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Barchart Options Scraper")
     parser.add_argument("--url", default=DEFAULT_BARCHART_URL, help="Barchart Options Chain page URL")
     parser.add_argument("--output", default="data/options_prices_GCZ26.csv", help="Path to save output CSV")
     parser.add_argument("--dry-run", action="store_true", help="Test scraping without saving to file")
+    parser.add_argument("--multi-expiry", action="store_true", default=True, help="Scrape both Weekly and Monthly contracts")
+    parser.add_argument("--single-expiry", action="store_true", help="Scrape only single URL without multi-expiry")
+    parser.add_argument("--weekly-count", type=int, default=2, help="Number of weekly contracts to scrape")
     args = parser.parse_args()
 
     try:
-        scrape_and_save(output_path=args.output, page_url=args.url, dry_run=args.dry_run)
+        if args.single_expiry:
+            scrape_and_save(output_path=args.output, page_url=args.url, dry_run=args.dry_run)
+        else:
+            out_dir = str(Path(args.output).parent)
+            scrape_multi_expiry_and_save(
+                output_dir=out_dir,
+                underlying_futures="GCZ26",
+                weekly_count=args.weekly_count,
+                dry_run=args.dry_run,
+            )
     except Exception as e:
         logger.error("Scraper failed: %s", e)
         sys.exit(1)

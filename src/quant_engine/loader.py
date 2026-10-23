@@ -27,7 +27,13 @@ from typing import Optional, Union, Dict, Any, Tuple
 import numpy as np
 import pandas as pd
 
-from .dealer import compute_exact_gamma_flip, compute_wall_siege_ratio
+from .dealer import (
+    compute_exact_gamma_flip,
+    compute_wall_siege_ratio,
+    find_gamma_weighted_walls,
+    classify_wall_regime,
+    find_walls,
+)
 from .models import OptionsSnapshot, OptionsStrike, QuantLevels, Wall
 from .strategy import MarketSnapshot, OptionQuote, compute_implied_spot
 from .synthetic import compute_dynamic_dte
@@ -653,6 +659,180 @@ def _load_from_path(file_path: str, data_dir: Optional[str] = None) -> pd.DataFr
     return parse_dual_files(file_path, greeks_file if os.path.exists(greeks_file) else None)
 
 
+def aggregate_options_dataframes(
+    dfs: list[pd.DataFrame],
+    spot_price: Optional[float] = None,
+    r: float = 0.045,
+    default_iv: float = 0.16,
+) -> pd.DataFrame:
+    """Aggregates multiple options chains (e.g. Weekly + Monthly) across strikes.
+
+    Superimposes Dealer GEX and Gamma Power:
+        - Power_Call(K) = sum_i [ OI_Call,i(K) * Gamma_Call,i(K) ]
+        - Power_Put(K)  = sum_i [ OI_Put,i(K)  * Gamma_Put,i(K)  ]
+        - GEX_Call(K)   = sum_i [ GEX_Call,i(K) ]
+        - GEX_Put(K)    = sum_i [ GEX_Put,i(K) ]
+        - NetGEX(K)     = GEX_Call(K) + GEX_Put(K)
+
+    Preserves nearest-expiry market prices (callBid, callAsk, putBid, putAsk).
+    """
+    if not dfs:
+        return pd.DataFrame()
+
+    valid_dfs = []
+    for d in dfs:
+        if d is not None and not d.empty:
+            norm_d = normalize_options_df(d).copy()
+            if not norm_d.empty and "strike" in norm_d.columns:
+                valid_dfs.append(norm_d)
+
+    if not valid_dfs:
+        return pd.DataFrame()
+
+    if len(valid_dfs) == 1:
+        single_df = valid_dfs[0].copy()
+        if "callGammaPower" not in single_df.columns:
+            single_df["callGammaPower"] = single_df["callOpenInterest"] * single_df["callGamma"]
+        if "putGammaPower" not in single_df.columns:
+            single_df["putGammaPower"] = single_df["putOpenInterest"] * single_df["putGamma"]
+        return single_df
+
+    # Sort chains by DTE ascending so that index 0 is nearest to expiration
+    def get_dte(df_item: pd.DataFrame) -> float:
+        if "dte_days" in df_item.attrs:
+            return float(df_item.attrs["dte_days"])
+        exp_val = df_item.attrs.get("expiration_date")
+        if not exp_val and "expirationDate" in df_item.columns and not df_item["expirationDate"].dropna().empty:
+            exp_val = df_item["expirationDate"].dropna().iloc[0]
+        return compute_dynamic_dte(exp_val, default_dte=30.0)
+
+    valid_dfs.sort(key=get_dte)
+
+    spot = spot_price
+    if spot is None or spot <= 0:
+        atm_idx = (valid_dfs[0]["callMid"] - valid_dfs[0]["putMid"]).abs().idxmin()
+        spot = float(valid_dfs[0].loc[atm_idx, "strike"])
+
+    MULT = 100.0
+    scale = (spot ** 2) * 0.01 / 1e6
+
+    processed_dfs = []
+    for df_item in valid_dfs:
+        d_copy = df_item.copy()
+        dte = get_dte(d_copy)
+        t_years = max(float(dte) / 365.0, 1.0 / 365.0)
+        sigma = max(0.01, float(default_iv))
+        denom = sigma * math.sqrt(t_years)
+        half_sig2_t = 0.5 * (sigma ** 2) * t_years
+        df_disc = math.exp(-r * t_years)
+
+        strikes_arr = d_copy["strike"].values.astype(float)
+        d1 = (np.log(np.maximum(1e-4, spot / strikes_arr)) + half_sig2_t) / denom
+        pdf_d1 = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1 ** 2))
+        b76_gamma = (df_disc * pdf_d1) / np.maximum(1e-4, spot * denom)
+
+        # Fill gamma if missing / zero
+        d_copy["callGamma"] = np.where(d_copy["callGamma"] > 0, d_copy["callGamma"], b76_gamma)
+        d_copy["putGamma"] = np.where(d_copy["putGamma"] > 0, d_copy["putGamma"], b76_gamma)
+
+        d_copy["callGammaPower"] = d_copy["callOpenInterest"] * d_copy["callGamma"]
+        d_copy["putGammaPower"] = d_copy["putOpenInterest"] * d_copy["putGamma"]
+
+        d_copy["callGEX"] = d_copy["callGamma"] * d_copy["callOpenInterest"] * MULT * scale
+        d_copy["putGEX"] = - (d_copy["putGamma"] * d_copy["putOpenInterest"] * MULT * scale)
+        d_copy["netGEX"] = d_copy["callGEX"] + d_copy["putGEX"]
+
+        processed_dfs.append(d_copy)
+
+    # Base pricing from nearest expiration
+    nearest_df = processed_dfs[0].set_index("strike")
+    price_cols = [
+        "callBid", "callAsk", "callMid", "callLatest", "callIV",
+        "putBid", "putAsk", "putMid", "putLatest", "putIV"
+    ]
+
+    concat_all = pd.concat(processed_dfs, ignore_index=True)
+    agg_df = concat_all.groupby("strike", as_index=False).agg({
+        "callOpenInterest": "sum",
+        "putOpenInterest": "sum",
+        "callVolume": "sum",
+        "putVolume": "sum",
+        "callGammaPower": "sum",
+        "putGammaPower": "sum",
+        "callGEX": "sum",
+        "putGEX": "sum",
+        "netGEX": "sum",
+    })
+
+    # Superimposed effective Gamma
+    agg_df["callGamma"] = np.where(
+        agg_df["callOpenInterest"] > 0,
+        agg_df["callGammaPower"] / np.maximum(1, agg_df["callOpenInterest"]),
+        0.0,
+    )
+    agg_df["putGamma"] = np.where(
+        agg_df["putOpenInterest"] > 0,
+        agg_df["putGammaPower"] / np.maximum(1, agg_df["putOpenInterest"]),
+        0.0,
+    )
+
+    # Merge pricing columns from nearest chain
+    for col in price_cols:
+        if col in nearest_df.columns:
+            agg_df[col] = agg_df["strike"].map(nearest_df[col]).fillna(0.0)
+        else:
+            agg_df[col] = 0.0
+
+    agg_df = agg_df.sort_values("strike").reset_index(drop=True)
+    agg_df.attrs["is_aggregated"] = True
+    agg_df.attrs["aggregated_count"] = len(processed_dfs)
+    agg_df.attrs["expiration_date"] = valid_dfs[0].attrs.get("expiration_date", "MULTI-EXPIRY")
+    agg_df.attrs["dte_days"] = get_dte(valid_dfs[0])
+
+    return agg_df
+
+
+def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
+    """Discovers all available options chain files in data_dir and aggregates them."""
+    search_dir = data_dir or "data"
+    if not os.path.exists(search_dir):
+        return load_options_data()
+
+    pattern = os.path.join(search_dir, "options_prices*.csv")
+    matched_files = glob.glob(pattern)
+    # Exclude near_the_money slice if full file exists
+    matched_files = [f for f in matched_files if "near_the_money" not in os.path.basename(f).lower()]
+
+    if not matched_files:
+        return load_options_data(data_dir=data_dir)
+
+    # If individual sub-expiry files exist (e.g. options_prices_*_OG*.csv), aggregate ONLY the sub-expiry files
+    # to prevent double-counting against the master options_prices_GCZ26.csv
+    sub_expiry_files = [
+        f for f in matched_files
+        if os.path.basename(f).lower() not in ["options_prices_gcz26.csv", "options_prices.csv"]
+        and "_og" in os.path.basename(f).lower()
+    ]
+    files_to_load = sub_expiry_files if len(sub_expiry_files) >= 2 else matched_files
+
+    if len(files_to_load) == 1:
+        return _load_from_path(files_to_load[0], data_dir=search_dir)
+
+    dfs = []
+    for f in files_to_load:
+        try:
+            d = _load_from_path(f, data_dir=search_dir)
+            if not d.empty and len(d) > 0 and "strike" in d.columns:
+                dfs.append(d)
+        except Exception:
+            continue
+
+    if not dfs:
+        return load_options_data(data_dir=data_dir)
+
+    return aggregate_options_dataframes(dfs)
+
+
 # ==============================================================================
 # 4. QUANT MATRIX & REAL-TIME TACTICAL BOARD GENERATOR
 # ==============================================================================
@@ -736,25 +916,47 @@ def compute_tactical_matrix(
     df['putCHEX'] = - (charm_put_day * df['putOpenInterest'] * MULT * spot_price / 1e6)
     df['netCHEX'] = df['callCHEX'] + df['putCHEX']
 
-    # 3. Institutional Walls & Levels
-    call_wall_row = df.loc[df['callOpenInterest'].idxmax()]
-    put_wall_row = df.loc[df['putOpenInterest'].idxmax()]
-
-    call_wall = float(call_wall_row['strike'])
-    call_wall_oi = int(call_wall_row['callOpenInterest'])
-    put_wall = float(put_wall_row['strike'])
-    put_wall_oi = int(put_wall_row['putOpenInterest'])
+    # 3. Institutional Walls & Levels: Gamma-Weighted vs Raw OI
+    snap = to_options_snapshot(df)
+    call_walls_gamma, put_walls_gamma = find_gamma_weighted_walls(
+        df, top_n=2, spot_price=spot_price, r=r, dte_days=effective_dte, default_iv=sigma_atm
+    )
+    call_walls_oi, put_walls_oi = find_walls(snap, top_n=2, spot_price=spot_price)
 
     total_net_gex = float(df['netGEX'].sum())
     total_net_vex = float(df['netVEX'].sum())
     total_net_chex = float(df['netCHEX'].sum())
     regime = "LONG_GAMMA" if total_net_gex > 10.0 else ("SHORT_GAMMA" if total_net_gex < -10.0 else "NEUTRAL")
 
-    call_wall_siege = compute_wall_siege_ratio(int(call_wall_row['callVolume']), call_wall_oi)
-    put_wall_siege = compute_wall_siege_ratio(int(put_wall_row['putVolume']), put_wall_oi)
+    if call_walls_gamma:
+        call_wall = float(call_walls_gamma[0].strike)
+        call_wall_oi = int(call_walls_gamma[0].oi)
+        call_wall_siege = float(call_walls_gamma[0].siege_ratio)
+        call_wall_power = float(call_walls_gamma[0].gamma_power)
+        call_wall_regime = call_walls_gamma[0].regime
+    else:
+        call_wall_row = df.loc[df['callOpenInterest'].idxmax()]
+        call_wall = float(call_wall_row['strike'])
+        call_wall_oi = int(call_wall_row['callOpenInterest'])
+        call_wall_siege = compute_wall_siege_ratio(int(call_wall_row['callVolume']), call_wall_oi)
+        call_wall_power = 0.0
+        call_wall_regime = "NEUTRAL"
+
+    if put_walls_gamma:
+        put_wall = float(put_walls_gamma[0].strike)
+        put_wall_oi = int(put_walls_gamma[0].oi)
+        put_wall_siege = float(put_walls_gamma[0].siege_ratio)
+        put_wall_power = float(put_walls_gamma[0].gamma_power)
+        put_wall_regime = put_walls_gamma[0].regime
+    else:
+        put_wall_row = df.loc[df['putOpenInterest'].idxmax()]
+        put_wall = float(put_wall_row['strike'])
+        put_wall_oi = int(put_wall_row['putOpenInterest'])
+        put_wall_siege = compute_wall_siege_ratio(int(put_wall_row['putVolume']), put_wall_oi)
+        put_wall_power = 0.0
+        put_wall_regime = "NEUTRAL"
 
     # Gamma Flip: Solve exact continuous S* where aggregate net dealer GEX = 0
-    snap = to_options_snapshot(df)
     exact_gamma_flip = compute_exact_gamma_flip(
         snap, spot_price=spot_price, r=r, dte_days=effective_dte, default_iv=sigma_atm
     )
@@ -767,6 +969,17 @@ def compute_tactical_matrix(
     expected_move_1s = atm_straddle / 0.7979
 
     # 5. Build Structured Tactical Table (Bảng tác chiến định lượng theo thời gian thực)
+    put_wall_note = (
+        f"Put Wall {put_wall:.0f} là BẪY NAM CHÂM GIA TỐC (Negative GEX / Siege {put_wall_siege:.2f}) -> CẤM ĐẶT LIMIT ĐÓN ĐẦU, chờ đâm thủng quét gamma mới buy reversal"
+        if put_wall_regime == "MAGNET_WALL"
+        else f"Major Put Wall {put_wall_oi:,} OI (Vùng đệm tiền đáy - Pinning Bounce)"
+    )
+    call_wall_note = (
+        f"Call Wall {call_wall:.0f} là BẪY NAM CHÂM GIA TỐC (Short Gamma squeeze)"
+        if call_wall_regime == "MAGNET_WALL"
+        else f"Call Wall {call_wall_oi:,} OI (MM ép cản giá bán khống chế)"
+    )
+
     tactical_rows = [
         {
             'Chien Luoc': '1. BAN DINH (Fade Sell)',
@@ -774,7 +987,7 @@ def compute_tactical_matrix(
             'Entry': f"{call_wall - 1.00:.2f}",
             'Hard SL': f"{call_wall + 4.00:.2f} ($4.0)",
             'TP1 / TP2': f"{spot_price:.2f} / {atm_strike:.2f}",
-            'Ghi Chu': f"Call Wall {call_wall_oi:,} OI (MM ep can gia ban khong che)"
+            'Ghi Chu': call_wall_note
         },
         {
             'Chien Luoc': '2. MUA DAY (Rebound Buy)',
@@ -782,7 +995,7 @@ def compute_tactical_matrix(
             'Entry': f"{put_wall + 0.50:.2f}",
             'Hard SL': f"{put_wall - 4.00:.2f} ($4.0)",
             'TP1 / TP2': f"{spot_price:.2f} / {call_wall:.2f}",
-            'Ghi Chu': f"Major Put Wall {put_wall_oi:,} OI (Vung dem tien day)"
+            'Ghi Chu': put_wall_note
         },
         {
             'Chien Luoc': '3. MUA DUOI (Squeeze Break)',
@@ -811,9 +1024,13 @@ def compute_tactical_matrix(
         'call_wall': call_wall,
         'call_wall_oi': call_wall_oi,
         'call_wall_siege': call_wall_siege,
+        'call_wall_power': call_wall_power,
+        'call_wall_regime': call_wall_regime,
         'put_wall': put_wall,
         'put_wall_oi': put_wall_oi,
         'put_wall_siege': put_wall_siege,
+        'put_wall_power': put_wall_power,
+        'put_wall_regime': put_wall_regime,
         'total_net_gex': total_net_gex,
         'total_net_vex': total_net_vex,
         'total_net_chex': total_net_chex,

@@ -52,8 +52,13 @@ from src.quant_engine.scenario_engine import (
     ActionDirective,
     evaluate_market_scenarios,
 )
-from src.quant_engine.dealer import compute_exact_gamma_flip, compute_wall_siege_ratio
-from src.quant_engine.loader import to_options_snapshot
+from src.quant_engine.dealer import (
+    compute_exact_gamma_flip,
+    compute_wall_siege_ratio,
+    find_gamma_weighted_walls,
+    classify_wall_regime,
+)
+from src.quant_engine.loader import to_options_snapshot, load_multi_expiry_options
 
 
 def clean_val(v: Any, default: float = 0.0) -> float:
@@ -80,7 +85,16 @@ def load_and_preprocess_options(
     no_mt5: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
 
-    df_raw = pd.read_csv(csv_path)
+    p_path = Path(csv_path)
+    if p_path.exists():
+        data_parent = str(p_path.parent)
+        df_multi = load_multi_expiry_options(data_parent)
+        if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
+            df_raw = df_multi
+        else:
+            df_raw = pd.read_csv(csv_path)
+    else:
+        df_raw = pd.read_csv(csv_path)
 
     # Normalize column names
     col_clean = {c: c.strip() for c in df_raw.columns}
@@ -222,22 +236,45 @@ def load_and_preprocess_options(
         delta_tilt_label = "CÂN BẰNG (DELTA NEUTRAL)"
         delta_tilt_color = "#FACC15"
 
-    # 5. Structural Walls & Regime (OTM Dealer Boundary Walls)
-    df_calls_otm = df[df["strike"] >= spot_price]
-    if not df_calls_otm.empty and df_calls_otm["callOpenInterest"].max() > 0:
-        call_wall_row = df_calls_otm.loc[df_calls_otm["callOpenInterest"].idxmax()]
-    else:
-        call_wall_row = df.loc[df["callOpenInterest"].idxmax()]
-    call_wall = float(call_wall_row["strike"])
-    call_wall_oi = int(call_wall_row["callOpenInterest"])
+    # 5. Structural Walls & Regime: Gamma-Weighted vs Raw OI
+    call_walls_gamma, put_walls_gamma = find_gamma_weighted_walls(
+        df, top_n=2, spot_price=spot_price, r=r, dte_days=dte_days, default_iv=sigma_atm
+    )
+    raw_calls_otm = df[df["strike"] > spot_price]
+    if raw_calls_otm.empty or raw_calls_otm["callOpenInterest"].max() <= 0:
+        raw_calls_otm = df[df["strike"] >= spot_price]
+    raw_call_row = raw_calls_otm.loc[raw_calls_otm["callOpenInterest"].idxmax()] if not raw_calls_otm.empty and raw_calls_otm["callOpenInterest"].max() > 0 else df.loc[df["callOpenInterest"].idxmax()]
 
-    df_puts_otm = df[df["strike"] <= spot_price]
-    if not df_puts_otm.empty and df_puts_otm["putOpenInterest"].max() > 0:
-        put_wall_row = df_puts_otm.loc[df_puts_otm["putOpenInterest"].idxmax()]
+    raw_puts_otm = df[df["strike"] < spot_price]
+    if raw_puts_otm.empty or raw_puts_otm["putOpenInterest"].max() <= 0:
+        raw_puts_otm = df[df["strike"] <= spot_price]
+    raw_put_row = raw_puts_otm.loc[raw_puts_otm["putOpenInterest"].idxmax()] if not raw_puts_otm.empty and raw_puts_otm["putOpenInterest"].max() > 0 else df.loc[df["putOpenInterest"].idxmax()]
+    raw_call_wall_strike = float(raw_call_row["strike"])
+    raw_call_wall_oi = int(raw_call_row["callOpenInterest"])
+    raw_put_wall_strike = float(raw_put_row["strike"])
+    raw_put_wall_oi = int(raw_put_row["putOpenInterest"])
+
+    if call_walls_gamma:
+        call_wall = float(call_walls_gamma[0].strike)
+        call_wall_oi = int(call_walls_gamma[0].oi)
+        call_wall_power = float(call_walls_gamma[0].gamma_power)
+        call_wall_regime = call_walls_gamma[0].regime
     else:
-        put_wall_row = df.loc[df["putOpenInterest"].idxmax()]
-    put_wall = float(put_wall_row["strike"])
-    put_wall_oi = int(put_wall_row["putOpenInterest"])
+        call_wall = raw_call_wall_strike
+        call_wall_oi = raw_call_wall_oi
+        call_wall_power = 0.0
+        call_wall_regime = "NEUTRAL"
+
+    if put_walls_gamma:
+        put_wall = float(put_walls_gamma[0].strike)
+        put_wall_oi = int(put_walls_gamma[0].oi)
+        put_wall_power = float(put_walls_gamma[0].gamma_power)
+        put_wall_regime = put_walls_gamma[0].regime
+    else:
+        put_wall = raw_put_wall_strike
+        put_wall_oi = raw_put_wall_oi
+        put_wall_power = 0.0
+        put_wall_regime = "NEUTRAL"
 
     total_net_gex = float(df["netGEX"].sum())
     total_net_vex = float(df["netVEX"].sum())
@@ -272,8 +309,10 @@ def load_and_preprocess_options(
     # 7. Real-Time M5 Orderflow Tape & Volume Pulse
     m5_tape = fetch_live_cme_m5_tape(limit=8)
 
-    call_wall_vol = int(call_wall_row["callVolume"]) if "callVolume" in call_wall_row else 0
-    put_wall_vol = int(put_wall_row["putVolume"]) if "putVolume" in put_wall_row else 0
+    call_wall_matches = df.loc[df["strike"] == call_wall, "callVolume"]
+    put_wall_matches = df.loc[df["strike"] == put_wall, "putVolume"]
+    call_wall_vol = int(call_wall_matches.iloc[0]) if not call_wall_matches.empty else 0
+    put_wall_vol = int(put_wall_matches.iloc[0]) if not put_wall_matches.empty else 0
     call_wall_siege = compute_wall_siege_ratio(call_wall_vol, call_wall_oi)
     put_wall_siege = compute_wall_siege_ratio(put_wall_vol, put_wall_oi)
 
@@ -294,9 +333,17 @@ def load_and_preprocess_options(
         "call_wall": call_wall,
         "call_wall_oi": call_wall_oi,
         "call_wall_siege": call_wall_siege,
+        "call_wall_power": call_wall_power,
+        "call_wall_regime": call_wall_regime,
+        "raw_call_wall_strike": raw_call_wall_strike,
+        "raw_call_wall_oi": raw_call_wall_oi,
         "put_wall": put_wall,
         "put_wall_oi": put_wall_oi,
         "put_wall_siege": put_wall_siege,
+        "put_wall_power": put_wall_power,
+        "put_wall_regime": put_wall_regime,
+        "raw_put_wall_strike": raw_put_wall_strike,
+        "raw_put_wall_oi": raw_put_wall_oi,
         "total_net_gex": total_net_gex,
         "total_net_vex": total_net_vex,
         "total_net_chex": total_net_chex,
@@ -489,9 +536,14 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     y_min = float(df["strike"].min()) - 10.0
     y_max = float(df["strike"].max()) + 10.0
 
+    call_regime = meta.get("call_wall_regime", "NEUTRAL")
+    put_regime = meta.get("put_wall_regime", "NEUTRAL")
+    cw_tag = " [BOUNCE PIN]" if call_regime == "BOUNCE_WALL" else (" [MAGNET TRAP]" if call_regime == "MAGNET_WALL" else "")
+    pw_tag = " [BOUNCE PIN]" if put_regime == "BOUNCE_WALL" else (" [MAGNET TRAP]" if put_regime == "MAGNET_WALL" else "")
+
     levels = [
-        (call_wall, "#EF4444", "CALL WALL (TRẦN CHÍNH)", "top right", "dash"),
-        (put_wall, "#22C55E", "PUT WALL (SÀN CHÍNH)", "bottom right", "dash"),
+        (call_wall, "#EF4444", f"CALL WALL (${call_wall:.0f}{cw_tag})", "top right", "dash"),
+        (put_wall, "#22C55E", f"PUT WALL (${put_wall:.0f}{pw_tag})", "bottom right", "dash"),
         (strike_above, "#F87171", f"CẢN TRÊN (${strike_above:.0f})", "top right", "dot"),
         (strike_below, "#4ADE80", f"SÀN DƯỚI (${strike_below:.0f})", "bottom right", "dot"),
         (spot_price, "#FACC15", f"CME LIVE (${spot_price:.2f})", "top right", "solid"),
@@ -558,6 +610,24 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
     zero_gamma = meta.get("zero_gamma_flip")
     call_wall_siege = float(meta.get("call_wall_siege", 0.0))
     put_wall_siege = float(meta.get("put_wall_siege", 0.0))
+    call_wall_power = float(meta.get("call_wall_power", 0.0))
+    put_wall_power = float(meta.get("put_wall_power", 0.0))
+    call_wall_regime = str(meta.get("call_wall_regime", "NEUTRAL"))
+    put_wall_regime = str(meta.get("put_wall_regime", "NEUTRAL"))
+
+    call_badge_text = "BOUNCE PIN" if call_wall_regime == "BOUNCE_WALL" else ("BẪY NAM CHÂM" if call_wall_regime == "MAGNET_WALL" else "TRẦN MM")
+    put_badge_text = "BOUNCE PIN" if put_wall_regime == "BOUNCE_WALL" else ("BẪY NAM CHÂM" if put_wall_regime == "MAGNET_WALL" else "ĐÁY MM")
+
+    call_wall_tactical_note = (
+        f"Call Wall {call_wall:.0f} là BẪY NAM CHÂM GIA TỐC (Short Gamma Squeeze / Siege {call_wall_siege:.2f}x): Cấm short đón đầu nếu volume lớn!"
+        if call_wall_regime == "MAGNET_WALL"
+        else f"Call Wall {call_wall_oi:,} OI (Pwr: {call_wall_power:.2f} - Nóc nhà kiên cố cuối cùng của MM)"
+    )
+    put_wall_tactical_note = (
+        f"Put Wall {put_wall:.0f} là BẪY NAM CHÂM GIA TỐC (Negative GEX / Siege {put_wall_siege:.2f}x): CẤM ĐẶT LIMIT ĐÓN ĐẦU, chờ đâm thủng quét gamma mới buy reversal!"
+        if put_wall_regime == "MAGNET_WALL"
+        else f"Major Put Wall {put_wall_oi:,} OI (Pwr: {put_wall_power:.2f} - Đáy bê tông cốt thép của MM)"
+    )
 
     # Institutional metrics
     rr25 = float(meta.get("skew_rr25", 0.0))
@@ -918,9 +988,9 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
         </div>
         <div class="spine-track">
             <div class="spine-node">
-                <div class="spine-node-title" style="color:#22C55E;">PUT WALL (ĐÁY MM)</div>
+                <div class="spine-node-title" style="color:#22C55E;">PUT WALL ({put_badge_text})</div>
                 <div class="spine-node-price" style="color:#22C55E;">${put_wall:,.0f}</div>
-                <div style="font-size:10px; color:#64748B;">({put_wall_oi:,} OI | Siege: {put_wall_siege:.2f}x)</div>
+                <div style="font-size:10px; color:#64748B;">({put_wall_oi:,} OI | Pwr: {put_wall_power:.2f} | Siege: {put_wall_siege:.2f}x)</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
                 <div id="spine-dist-put" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
@@ -955,9 +1025,9 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
                 </div>
             </div>
             <div class="spine-node">
-                <div class="spine-node-title" style="color:#EF4444;">CALL WALL (TRẦN MM)</div>
+                <div class="spine-node-title" style="color:#EF4444;">CALL WALL ({call_badge_text})</div>
                 <div class="spine-node-price" style="color:#EF4444;">${call_wall:,.0f}</div>
-                <div style="font-size:10px; color:#64748B;">({call_wall_oi:,} OI | Siege: {call_wall_siege:.2f}x)</div>
+                <div style="font-size:10px; color:#64748B;">({call_wall_oi:,} OI | Pwr: {call_wall_power:.2f} | Siege: {call_wall_siege:.2f}x)</div>
             </div>
         </div>
     </div>
@@ -1123,22 +1193,22 @@ def generate_html_terminal(df: pd.DataFrame, meta: dict[str, Any], fig: go.Figur
             </thead>
             <tbody>
                 <tr>
-                    <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f})</td>
+                    <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f} - {call_badge_text})</td>
                     <td>{call_wall - 1.50:.2f} - {call_wall:.2f}</td>
                     <td>{entry_call_wall:.2f}</td>
                     <td style="color:#F87171;">{sl_call_wall:.2f} (${sl_dist_cw:.1f})</td>
                     <td style="color:#4ADE80;">{tp_call_wall:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_call_wall.recommended_lots:.2f} Lot</td>
-                    <td>Call Wall {call_wall_oi:,} OI (Nóc nhà kiên cố cuối cùng của MM)</td>
+                    <td>{call_wall_tactical_note}</td>
                 </tr>
                 <tr>
-                    <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f})</td>
+                    <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f} - {put_badge_text})</td>
                     <td>{put_wall:.2f} - {put_wall + 1.50:.2f}</td>
                     <td>{entry_put_wall:.2f}</td>
                     <td style="color:#F87171;">{sl_put_wall:.2f} (${sl_dist_pw:.1f})</td>
                     <td style="color:#4ADE80;">{tp_put_wall:.2f}</td>
                     <td style="color:#FACC15; font-weight:700;">~{size_put_wall.recommended_lots:.2f} Lot</td>
-                    <td>Major Put Wall {put_wall_oi:,} OI (Đáy bê tông cốt thép của MM)</td>
+                    <td>{put_wall_tactical_note}</td>
                 </tr>
             </tbody>
         </table>

@@ -87,7 +87,8 @@ Neiro-Quant/
 │   │   ├── ADR-004-institutional-terminal-layout-and-anti-collision.md
 │   │   ├── ADR-005-realtime-dual-price-feed-and-dynamic-basis.md
 │   │   ├── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
-│   │   └── ADR-007-zero-gamma-flip-and-wall-siege-velocity.md
+│   │   ├── ADR-007-zero-gamma-flip-and-wall-siege-velocity.md
+│   │   └── ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       ├── DEEPSEEK_MATH_AUDIT_REPORT.md
@@ -217,6 +218,16 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
     - **Hỗ trợ cờ `--no-mt5`:** Cho phép trader tắt quy đổi MT5 để xem 100% mức giá thuần CME Futures khi cần.
     - **Gắn nhãn nguồn tin cậy:** KPI Card hiển thị rõ nhãn `[LIVE]`, `[CALIBRATED CONTANGO]` hoặc `[MANUAL]` để trader luôn nắm rõ độ tin cậy của Basis.
 
+### Tier 5 (Multi-Expiry GEX Superposition & Gamma-Weighted Wall Scoring - ADR-008)
+- **Giải mã nghịch lý đâm thủng Strike OI lớn:** Giải quyết triệt để tình huống Strike 4,100 có >1,000 Put OI nhưng vẫn bị đâm thủng về 4,082 do:
+  1. Hợp đồng dài hạn (Monthly 30DTE) có $\Gamma \propto \frac{1}{\sqrt{T}}$ nhỏ gấp 5.5 lần so với ngắn hạn (Weekly 1DTE). Strike 4,085 (1DTE, 400 OI) có $\text{Power} = 4.66 > \text{Power}_{4100} = 3.60$.
+  2. Dealer ở vị thế Short Put $\Rightarrow$ Negative Gamma Trap. Khi giá sập qua 4,100, Dealer bị ép bán tháo -154.4 HĐ GC Futures (~$63.7M) để delta-hedge, biến mốc này thành Magnet Wall gia tốc đà giảm.
+- **Gamma-Weighted Wall Scoring:** $\text{Power}_k = \text{OI}_k \times \Gamma_k(S)$ kết hợp bộ lọc strictly OTM ($K > S$ cho Call, $K < S$ cho Put).
+- **Phân loại Wall Regime:**
+  - `[BOUNCE_WALL]` ($\text{NetGEX} \ge 0$): Dealer Long Gamma pin/hỗ trợ phản xạ dội ngược.
+  - `[MAGNET_WALL]` ($\text{NetGEX} < 0$): Dealer Short Put/Negative Gamma trap gia tốc xuyên phá $\Rightarrow$ **CẤM ĐẶT LIMIT CHẶN ĐẦU BẮT DAO RƠI!**
+- **Cơ chế Phân giải Đa kỳ hạn (Multi-Expiry Superposition):** `resolve_active_expirations()` tự động quét hợp đồng Weekly (OG1..OG5) và Monthly, gộp Greeks tuyến tính qua `aggregate_options_dataframes()`.
+
 ---
 
 ## Code Style
@@ -234,7 +245,7 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 
 | Level | Framework | Target | Coverage |
 |---|---|---|---|
-| Unit | pytest | quant_engine (synthetic, dealer, air_pocket, basis) | >= 90% |
+| Unit | pytest | quant_engine (synthetic, dealer, air_pocket, basis, multi_expiry) | >= 90% |
 | Integration | pytest | collector -> parser -> engine pipeline | >= 70% |
 | Manual | tools/manual_scrape.py | Barchart scraping end-to-end | Visual verify |
 
@@ -285,8 +296,10 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Cloud-Native Tactical Terminal xuất bản thành công lên GitHub Pages (`https://daninguyen2509.github.io/Neiro-Quant/`).
 - [x] Khai tử hoàn toàn Spot Gold & Hiệu chỉnh Basis: Loại bỏ 100% việc lấy giá vàng giao ngay (Spot XAU/USD từ Gold-API / Binance PAXG). Toàn bộ hệ thống neo chuẩn 100% theo giá hợp đồng tương lai vàng CME GCZ26 (COMEX GC=F), triệt tiêu hoàn toàn sai số hiệu chỉnh và báo động kịch bản giả.
 - [x] DeepSeek-R1 Adversarial Audit & Hardening (20/10/2026): Thẩm tra toàn diện mã nguồn src/ bằng DeepSeek-Reasoner (R1), vá triệt để 5 lỗi Critical (Invariant TP/SL HUD, OTM Wall filtering, giải ngược Black-76 Gamma loại bỏ hằng số fake 0.0037/0.0005, Expiry cutoff 18:30 UTC rollover và ưu tiên liquid strike cho ATM).
+- [x] Zero Gamma Flip Solver & Wall Siege Ratio (ADR-007): Giải nghiệm liên tục $S^*$ bằng Dekker-Brent `_brentq` thuần Python (<2ms), giám sát tỷ lệ công thành Intraday Wall Siege ($Volume / OI$) cảnh báo trước nguy cơ vỡ trận.
+- [x] Multi-Expiry GEX Superposition & Gamma-Weighted Wall Scoring (ADR-008): Tự động phân giải và xếp chồng tuyến tính Greeks giữa Weekly (OG1..OG5) và Monthly, phân loại chính xác `[BOUNCE_WALL]` vs `[MAGNET_WALL]`, xóa bỏ điểm mù OI thô.
 - [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~9.58MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 97/97 test cases passed 100%.
+- [x] Unit test coverage: 115/115 test cases passed 100%.
 
 ---
 
