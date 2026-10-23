@@ -109,10 +109,23 @@ def extract_rr_bf(
     idx_atm = (df["strike"] - atm_strike).abs().idxmin()
     c_iv_atm = df.loc[idx_atm, "callIV"]
     p_iv_atm = df.loc[idx_atm, "putIV"]
-    iv_atm = float((c_iv_atm + p_iv_atm) / 2.0) if (c_iv_atm > 0 and p_iv_atm > 0) else float(max(c_iv_atm, p_iv_atm, 0.15))
+    valid_all_iv = pd.concat([valid_calls["callIV"], valid_puts["putIV"]])
+    if c_iv_atm > 0.05 and p_iv_atm > 0.05:
+        iv_atm = float((c_iv_atm + p_iv_atm) / 2.0)
+    elif c_iv_atm > 0.05:
+        iv_atm = float(c_iv_atm)
+    elif p_iv_atm > 0.05:
+        iv_atm = float(p_iv_atm)
+    elif not valid_all_iv.empty:
+        # If specific strike lacks IV, estimate ATM IV at trough (below wing average)
+        avg_wings = 0.5 * (iv_c25 + iv_p25)
+        median_iv = float(valid_all_iv.median())
+        iv_atm = float(min(median_iv, max(0.10, avg_wings - 0.015)))
+    else:
+        iv_atm = 0.18
 
     rr25 = iv_c25 - iv_p25
-    bf25 = 0.5 * (iv_c25 + iv_p25) - iv_atm
+    bf25 = max(0.005, 0.5 * (iv_c25 + iv_p25) - iv_atm)
 
     # Classify regime
     if rr25 > tau:

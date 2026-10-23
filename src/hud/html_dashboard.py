@@ -169,8 +169,33 @@ def load_and_preprocess_options(
     # 2. Greeks via Black-76 & Volatility Model
     MULT = 100.0
     scale = (spot_price ** 2) * 0.01 / 1e6
-    atm_straddle = max(1.0, c_mid_atm + p_mid_atm)
-    sigma_atm = float(np.clip(atm_straddle / (0.7979 * spot_price * np.sqrt(T_years)), 0.01, 2.0))
+    # Calibrate ATM Implied Volatility:
+    # 1. Prefer real observed market IVs from COMEX if present in options chain
+    valid_c_iv = df["callIV"][(df["callIV"] > 0.05) & (df["callIV"] < 0.80)] if "callIV" in df.columns else pd.Series(dtype=float)
+    valid_p_iv = df["putIV"][(df["putIV"] > 0.05) & (df["putIV"] < 0.80)] if "putIV" in df.columns else pd.Series(dtype=float)
+    all_valid_iv = pd.concat([valid_c_iv, valid_p_iv])
+
+    c_iv_atm = float(df.loc[atm_idx, "callIV"]) if ("callIV" in df.columns and atm_idx in df.index) else 0.0
+    p_iv_atm = float(df.loc[atm_idx, "putIV"]) if ("putIV" in df.columns and atm_idx in df.index) else 0.0
+
+    if c_iv_atm > 0.05 and p_iv_atm > 0.05:
+        sigma_atm = float((c_iv_atm + p_iv_atm) / 2.0)
+    elif c_iv_atm > 0.05:
+        sigma_atm = float(c_iv_atm)
+    elif p_iv_atm > 0.05:
+        sigma_atm = float(p_iv_atm)
+    elif not all_valid_iv.empty:
+        sigma_atm = float(all_valid_iv.median())
+    else:
+        # Fallback: Time-value synthetic straddle (subtract intrinsic to prevent artificial inflation)
+        intrinsic_c = max(0.0, spot_price - atm_strike)
+        intrinsic_p = max(0.0, atm_strike - spot_price)
+        tv_c = max(1.0, c_mid_atm - intrinsic_c)
+        tv_p = max(1.0, p_mid_atm - intrinsic_p)
+        pure_straddle = tv_c + tv_p
+        sigma_atm = float(np.clip(pure_straddle / (0.7979 * spot_price * np.sqrt(T_years)), 0.08, 0.45))
+
+    atm_straddle = float(sigma_atm * 0.7979 * spot_price * np.sqrt(T_years))
     expected_move_1s = atm_straddle / 0.7979
     rule16_daily_move = (sigma_atm / 16.0) * spot_price
 
