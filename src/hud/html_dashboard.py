@@ -1791,9 +1791,12 @@ def generate_html_terminal(
 </div>
 <script>
     function refreshWithCacheBuster() {{
-        var base = window.location.pathname.split('?')[0];
-        // Dung location.replace de tranh tich luy history stack gay tran RAM trinh duyet
-        window.location.replace(base + '?t=' + Date.now());
+        if (window.location.protocol === "file:") {{
+            window.location.reload();
+        }} else {{
+            var clean = window.location.href.split('?')[0];
+            window.location.replace(clean + '?t=' + Date.now());
+        }}
     }}
     function clearHistoryAndCache() {{
         try {{
@@ -1805,20 +1808,11 @@ def generate_html_terminal(
             if (window.sessionStorage) sessionStorage.clear();
             if (window.localStorage) localStorage.clear();
         }} catch(e) {{}}
-        var base = window.location.pathname.split('?')[0];
-        window.location.replace(base + '?cleared=1');
-    }}
-    if (window.location.search.indexOf('cleared=1') !== -1) {{
-        var btn = document.querySelector("button[onclick='clearHistoryAndCache()']");
-        if (btn) {{
-            btn.innerText = "Đã dọn RAM!";
-            btn.style.borderColor = "#22C55E";
-            btn.style.color = "#4ADE80";
-            setTimeout(function() {{
-                btn.innerText = "Dọn RAM & Cache";
-                btn.style.borderColor = "rgba(239, 68, 68, 0.4)";
-                btn.style.color = "#F87171";
-            }}, 3000);
+        if (window.location.protocol === "file:") {{
+            window.location.reload();
+        }} else {{
+            var clean = window.location.href.split('?')[0];
+            window.location.replace(clean);
         }}
     }}
     function switchSmileView(mode) {{
