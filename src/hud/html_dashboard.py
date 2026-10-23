@@ -997,13 +997,70 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
     else:
         skew_short = "CÂN BẰNG"
 
+    # 1. Range bounds: Scalping Zoom ($4,000 - $4,050 focus) vs Full Macro Spectrum
+    scalp_k_min = float(min(spot_price, put_wall) - 25.0)
+    scalp_k_max = float(max(spot_price, atm_strike) + 35.0)
+    macro_k_min = float(k_min - 2.0)
+    macro_k_max = float(k_max + 2.0)
+
+    # Frame Y-axis IV range nicely for both views
+    mask_scalp = (k_grid >= scalp_k_min) & (k_grid <= scalp_k_max)
+    scalp_iv_vals = model_iv_grid[mask_scalp] if np.any(mask_scalp) else model_iv_grid
+    scalp_iv_min = float(max(5.0, np.min(scalp_iv_vals) - 1.5))
+    scalp_iv_max = float(min(50.0, np.max(scalp_iv_vals) + 2.5))
+
+    macro_iv_min = float(max(5.0, np.min(model_iv_grid) - 2.5))
+    macro_iv_max = float(min(60.0, np.max(model_iv_grid) + 3.0))
+
+    updatemenus = [
+        dict(
+            type="buttons",
+            direction="left",
+            showactive=True,
+            active=0,
+            x=0.01,
+            y=1.04,
+            xanchor="left",
+            yanchor="bottom",
+            bgcolor="#1E293B",
+            bordercolor="#475569",
+            borderwidth=1,
+            pad=dict(r=4, t=2, b=2, l=2),
+            font=dict(color="#F8FAFC", size=10.5, family="JetBrains Mono"),
+            buttons=[
+                dict(
+                    label="🔍 ZOOM SCALPING ($4,000 - $4,050)",
+                    method="relayout",
+                    args=[{
+                        "xaxis.range": [scalp_k_min, scalp_k_max],
+                        "yaxis.range": [scalp_iv_min, scalp_iv_max],
+                        "xaxis.autorange": False,
+                        "yaxis.autorange": False,
+                    }],
+                ),
+                dict(
+                    label="🌐 TOÀN CẢNH MACRO ($3,850 - $4,260)",
+                    method="relayout",
+                    args=[{
+                        "xaxis.range": [macro_k_min, macro_k_max],
+                        "yaxis.range": [macro_iv_min, macro_iv_max],
+                        "xaxis.autorange": False,
+                        "yaxis.autorange": False,
+                    }],
+                ),
+            ],
+        )
+    ]
+
+    zg_str = f"${zero_gamma:,.1f}" if zero_gamma else "N/A"
     fig.update_layout(
         title=dict(
             text=f"<b>CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW CURVE)</b><br>"
                  f"<span style='font-size:12px; color:#94A3B8; font-weight:normal;'>"
                  f"Mô hình Vi Cấu Trúc Malz (1997) SVI • ATM IV: <b>{sigma_atm*100:.2f}%</b> • "
                  f"25Δ Skew (RR25): <b style='color:{delta_tilt_color};'>{rr25*100:+.2f}v</b> ({skew_short}) • "
-                 f"Curvature (BF25): <b>{bf25*100:+.2f}v</b> • Hạn: {meta.get('expiration_date', 'OGX26')}</span>",
+                 f"Curvature (BF25): <b>{bf25*100:+.2f}v</b> • Hạn: {meta.get('expiration_date', 'OGX26')} • "
+                 f"<span style='color:#EF4444;'>Call Wall: ${call_wall:,.0f}</span> • <span style='color:#F59E0B;'>Zero Gamma: {zg_str}</span></span>",
             x=0.01,
             y=0.96,
             xanchor="left",
@@ -1013,12 +1070,12 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
         template="plotly_dark",
         paper_bgcolor="#0F172A",
         plot_bgcolor="#0A0F1D",
-        height=450,
-        margin=dict(l=65, r=40, t=75, b=45),
+        height=465,
+        margin=dict(l=65, r=40, t=85, b=45),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.04,
             xanchor="right",
             x=1.0,
             font=dict(size=11, family="JetBrains Mono"),
@@ -1031,19 +1088,22 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
             gridcolor="#1E293B",
             tickfont=dict(size=11, family="JetBrains Mono", color="#94A3B8"),
             tickformat="$,.0f",
-            range=[k_min - 2.0, k_max + 2.0],
+            range=[scalp_k_min, scalp_k_max],
         ),
         yaxis=dict(
             title=dict(text="Độ Biến Động Hàm Ý (Implied Volatility - IV %)", font=dict(size=12, color="#94A3B8")),
             gridcolor="#1E293B",
             tickfont=dict(size=11, family="JetBrains Mono", color="#94A3B8"),
             ticksuffix="%",
+            range=[scalp_iv_min, scalp_iv_max],
         ),
+        updatemenus=updatemenus,
         annotations=annotations,
         shapes=shapes,
     )
 
     return fig
+
 
 
 def generate_html_terminal(
@@ -1312,6 +1372,7 @@ def generate_html_terminal(
         full_html=False,
         include_plotlyjs="cdn",
         config={"responsive": True, "displayModeBar": True},
+        div_id="plotly-smile-chart",
     )
     plotly_div = fig.to_html(
         full_html=False,
@@ -1781,6 +1842,31 @@ def generate_html_terminal(
             }}, 3000);
         }}
     }}
+    // Tu dong luu va khoi phuc che do Zoom Scalping / Macro qua cac lan reload
+    try {{
+        var smileChart = document.getElementById("plotly-smile-chart");
+        if (smileChart) {{
+            var savedSmileView = localStorage.getItem("neiro_smile_view");
+            if (savedSmileView === "macro") {{
+                setTimeout(function() {{
+                    var btns = smileChart.querySelectorAll(".updatemenu-button");
+                    if (btns && btns.length > 1) {{
+                        btns[1].dispatchEvent(new MouseEvent("click", {{bubbles: true}}));
+                    }}
+                }}, 150);
+            }}
+            if (smileChart.on) {{
+                smileChart.on("plotly_relayout", function(ed) {{
+                    if (!ed) return;
+                    var x0 = ed["xaxis.range[0]"];
+                    if (x0 !== undefined) {{
+                        localStorage.setItem("neiro_smile_view", x0 <= 3900 ? "macro" : "scalp");
+                    }}
+                }});
+            }}
+        }}
+    }} catch(e) {{}}
+
     var countdown = 15;
     setInterval(function() {{
         countdown--;
