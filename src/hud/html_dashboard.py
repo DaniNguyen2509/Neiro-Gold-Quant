@@ -845,12 +845,27 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
         ),
     ]
 
+    # Dynamic anti-collision offsets for Call Wall and Zero Gamma annotations
+    cw_ax, cw_ay = -50, -55
+    zg_ax, zg_ay = 0, -40
+    if zero_gamma and (k_min <= zero_gamma <= k_max) and (k_min <= call_wall <= k_max):
+        diff_wall_zg = zero_gamma - call_wall
+        if abs(diff_wall_zg) < 140:
+            if diff_wall_zg >= 0:
+                # Call Wall is to the left of Zero Gamma (e.g. 4200 vs 4242)
+                cw_ax, cw_ay = -75, -65
+                zg_ax, zg_ay = 50, -35
+            else:
+                # Call Wall is to the right of Zero Gamma
+                cw_ax, cw_ay = 65, -65
+                zg_ax, zg_ay = -50, -35
+
     if k_min <= put_wall <= k_max:
         annotations.append(
             dict(
                 x=put_wall,
                 y=iv_pw,
-                text=f"<b>🛡️ HỐ ĐEN GIẢM TỐC</b><br>Put Wall ${put_wall:,.0f} (IV: {iv_pw:.1f}%)<br><span style='font-size:9.5px;color:#CBD5E1;'>MM bán đè Vol &bull; Điểm Limit Fade an toàn</span>",
+                text=f"<b>🛡️ HỐ ĐEN GIẢM TỐC</b><br>Put Wall ${put_wall:,.0f} (IV: {iv_pw:.1f}%)<br><span style='font-size:9.5px;color:#CBD5E1;'>MM bán đè Vol • Điểm Limit Fade an toàn</span>",
                 showarrow=True,
                 arrowhead=2,
                 arrowsize=1,
@@ -872,14 +887,14 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
             dict(
                 x=call_wall,
                 y=iv_cw,
-                text=f"<b>⚠️ BẪY THUỐC NỔ</b><br>Call Wall ${call_wall:,.0f} (IV: {iv_cw:.1f}%)<br><span style='font-size:9.5px;color:#CBD5E1;'>Mép vểnh Squeeze &bull; Bắt buộc cắt lỗ Hard SL</span>",
+                text=f"<b>⚠️ BẪY THUỐC NỔ</b><br>Call Wall ${call_wall:,.0f} (IV: {iv_cw:.1f}%)<br><span style='font-size:9.5px;color:#CBD5E1;'>Mép vểnh Squeeze • Bắt buộc cắt lỗ Hard SL</span>",
                 showarrow=True,
                 arrowhead=2,
                 arrowsize=1,
                 arrowwidth=1.5,
                 arrowcolor="#EF4444",
-                ax=40,
-                ay=-50,
+                ax=cw_ax,
+                ay=cw_ay,
                 font=dict(color="#F8FAFC", size=10, family="JetBrains Mono"),
                 bgcolor="#7F1D1D",
                 bordercolor="#EF4444",
@@ -901,8 +916,8 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
                 arrowsize=1,
                 arrowwidth=1.5,
                 arrowcolor="#F59E0B",
-                ax=0,
-                ay=-40,
+                ax=zg_ax,
+                ay=zg_ay,
                 font=dict(color="#000000", size=9.5, family="JetBrains Mono"),
                 bgcolor="#F59E0B",
                 bordercolor="#D97706",
@@ -974,13 +989,21 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
             )
         )
 
+    skew_badge_raw = str(meta.get("skew_regime", "BULLISH_CALL_SKEW"))
+    if "BULLISH" in skew_badge_raw or rr25 > 0.005:
+        skew_short = "BULLISH CALL SKEW"
+    elif "BEARISH" in skew_badge_raw or rr25 < -0.005:
+        skew_short = "DEFENSIVE PUT SKEW"
+    else:
+        skew_short = "CÂN BẰNG"
+
     fig.update_layout(
         title=dict(
             text=f"<b>CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW CURVE)</b><br>"
                  f"<span style='font-size:12px; color:#94A3B8; font-weight:normal;'>"
-                 f"Mô hình Vi Cấu Trúc Malz (1997) SVI &bull; ATM IV: <b>{sigma_atm*100:.2f}%</b> &bull; "
-                 f"25Δ Skew (RR25): <b style='color:{delta_tilt_color};'>{rr25*100:+.2f}v</b> ({skew_label}) &bull; "
-                 f"Curvature (BF25): <b>{bf25*100:+.2f}v</b> &bull; Hạn: {meta.get('expiration_date', 'OGX26')}</span>",
+                 f"Mô hình Vi Cấu Trúc Malz (1997) SVI • ATM IV: <b>{sigma_atm*100:.2f}%</b> • "
+                 f"25Δ Skew (RR25): <b style='color:{delta_tilt_color};'>{rr25*100:+.2f}v</b> ({skew_short}) • "
+                 f"Curvature (BF25): <b>{bf25*100:+.2f}v</b> • Hạn: {meta.get('expiration_date', 'OGX26')}</span>",
             x=0.01,
             y=0.96,
             xanchor="left",
