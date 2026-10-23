@@ -122,8 +122,11 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - Visual Level Spine: Thước đo vị trí giá tích hợp tỷ lệ Siege tại Call/Put Wall.     │
 │  - Institutional Pinning Radar: Cảnh báo tự động hiện tượng Neo giá (Pinning Box).     │
 │  - CTA Momentum Confluence Banner: Cảnh báo bứt phá đồng pha giữa Quỹ & Dealer.        │
-│  - Chế độ ATM Broad Tactical View: Tự động co giãn dải strikes bao trọn Walls & Flip.  │
-│  - Thuật toán chống đè chữ: Tách rời Legend, lệch tầng Vanna/Charm, đảo bờ nhãn Spot.  │
+│  - Chế độ Compact Tactical View: Giới hạn dải strikes tác chiến thực tế (từ 1 strike dưới Put Wall đến 1 strike trên Call Wall, tối đa 22 strikes quanh ATM), loại bỏ hoàn toàn vùng chết xa xôi giúp biểu đồ gọn gàng, thanh bar dày dặn và trực quan.│
+│  - Adaptive Bar Widths: Bề dày thanh bar tự động thích ứng theo bước giá (chiếm 72% khoảng trống), triệt tiêu hiện tượng thanh mỏng dính như sợi chỉ.│
+│  - Tickmode Array & Chống Đè Chữ: Trục Y chỉ hiển thị nhãn cho các strikes thực có trong dữ liệu (triệt tiêu 100% hiện tượng 120 nhãn đè nát chữ).│
+│  - Pinned Macro Badges: Ghim huy hiệu Zero Gamma Flip hoặc Walls ở mép trên/dưới khi nằm ngoài khung ngắm mà không làm méo mó dải chiến thuật.│
+│  - Quick Zoom Preset Buttons: 3 nút chuyển chế độ nhanh trên thanh công cụ Plotly: [🛡️ Thành Trì MM] (Mặc định), [🎯 Scalping Tinh Gọn (ATM ± $50)], [🌐 Toàn Cảnh (Macro Range)].│
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
 │  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │
 │  - Zero Laptop Dependency: Người dùng xem trực tiếp trên điện thoại ở bất kỳ đâu.      │

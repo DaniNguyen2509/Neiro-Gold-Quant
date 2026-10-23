@@ -383,22 +383,37 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     put_wall = meta["put_wall"]
 
     atm_idx = int((df_full["strike"] - atm_strike).abs().idxmin())
-    targets = [call_wall, put_wall, spot_price]
-    zg = meta.get("zero_gamma_flip")
-    if zg is not None and not np.isnan(zg):
-        if 0.85 * spot_price <= zg <= 1.15 * spot_price:
-            targets.append(zg)
 
-    min_idx = int((df_full["strike"] - min(targets)).abs().idxmin())
-    max_idx = int((df_full["strike"] - max(targets)).abs().idxmin())
+    # Focus on active tactical trading zone: Put Wall buffer to Call Wall buffer
+    put_wall_idx = int((df_full["strike"] - put_wall).abs().idxmin())
+    call_wall_idx = int((df_full["strike"] - call_wall).abs().idxmin())
 
-    half = 12
-    s_idx = max(0, min(atm_idx - half, min_idx - 1))
-    e_idx = min(len(df_full), max(atm_idx + half + 1, max_idx + 2))
+    # Bound lower index: 1 strike below Put Wall or at least 2 strikes below ATM
+    s_idx = max(0, min(put_wall_idx - 1, atm_idx - 2))
+
+    # Bound upper index: 1 strike above Call Wall or at least 2 strikes above ATM
+    e_idx = min(len(df_full), max(call_wall_idx + 2, atm_idx + 3))
+
+    # Safety clamp: if range exceeds 22 strikes, prioritize ATM +/- 10 strikes to keep chart compact & legible
+    max_strikes = 22
+    if (e_idx - s_idx) > max_strikes:
+        s_idx = max(0, atm_idx - 10)
+        e_idx = min(len(df_full), atm_idx + 11)
+
     df = df_full.iloc[s_idx:e_idx].copy().reset_index(drop=True)
 
     strikes = df["strike"].values
     step = float(np.diff(strikes).min()) if len(strikes) > 1 else 25.0
+
+    # Calculate adaptive bar widths based on local strike spacing
+    if len(strikes) > 1:
+        diffs = np.zeros_like(strikes)
+        diffs[0] = strikes[1] - strikes[0]
+        diffs[-1] = strikes[-1] - strikes[-2]
+        diffs[1:-1] = np.minimum(strikes[1:-1] - strikes[:-2], strikes[2:] - strikes[1:-1])
+        bar_widths = np.clip(diffs * 0.72, 3.5, 18.0)
+    else:
+        bar_widths = 10.0
 
     strikes_above = strikes[strikes > spot_price]
     strike_above = float(strikes_above[0]) if len(strikes_above) > 0 else call_wall
@@ -436,6 +451,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=df["netGEX"], orientation="h",
+            width=bar_widths,
             marker_color=colors_g, name="Net GEX ($M)",
             hovertemplate="Strike: $%{y}<br>Net GEX: $%{x:.2f}M<extra></extra>",
         ),
@@ -460,6 +476,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
         go.Bar(
             y=df["strike"],
             x=df["netDeltaContracts"],
+            width=bar_widths,
             orientation="h",
             marker=dict(color=net_delta_colors, opacity=0.45, line=dict(color=net_delta_colors, width=1)),
             name="Net Delta (HĐ GC)",
@@ -476,6 +493,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=-df["putVolume"], orientation="h",
+            width=bar_widths,
             marker_color="#F87171", opacity=0.75, name="Put Volume",
             hovertemplate="Strike: $%{y}<br>Put Vol: %{customdata:,}<extra></extra>",
             customdata=df["putVolume"],
@@ -485,6 +503,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=df["callVolume"], orientation="h",
+            width=bar_widths,
             marker_color="#4ADE80", opacity=0.75, name="Call Volume",
             hovertemplate="Strike: $%{y}<br>Call Vol: %{x:,}<extra></extra>",
         ),
@@ -517,6 +536,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=df["netVEX"], orientation="h",
+            width=bar_widths,
             marker_color="#38BDF8", opacity=0.8, name="Net VEX ($M)",
             hovertemplate="Strike: $%{y}<br>Net VEX: $%{x:.2f}M<extra></extra>",
         ),
@@ -525,6 +545,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=df["netCHEX"], orientation="h",
+            width=bar_widths,
             marker_color="#FACC15", opacity=0.8, name="Net CHEX ($M/ngày)",
             hovertemplate="Strike: $%{y}<br>Net CHEX: $%{x:.2f}M/ngày<extra></extra>",
         ),
@@ -570,23 +591,99 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
                 row=1, col=1,
             )
 
+    # Pin badges if key macro levels lie outside visible chart range
+    if zero_gamma is not None and zero_gamma > y_max:
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=0.01, y=0.98,
+            text=f"<b>▲ ZERO GAMMA FLIP: ${zero_gamma:.2f} (Macro Short Gamma ở trên)</b>",
+            showarrow=False,
+            font=dict(color="#F59E0B", size=10, family="JetBrains Mono"),
+            bgcolor="rgba(15, 23, 42, 0.90)",
+            bordercolor="#F59E0B", borderwidth=1, borderpad=4,
+            xanchor="left", yanchor="top",
+        )
+    if call_wall > y_max:
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=0.01, y=0.90,
+            text=f"<b>▲ CALL WALL: ${call_wall:.0f} (Nằm ngoài phạm vi trên)</b>",
+            showarrow=False,
+            font=dict(color="#EF4444", size=10, family="JetBrains Mono"),
+            bgcolor="rgba(15, 23, 42, 0.90)",
+            bordercolor="#EF4444", borderwidth=1, borderpad=4,
+            xanchor="left", yanchor="top",
+        )
+    if put_wall < y_min:
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=0.01, y=0.04,
+            text=f"<b>▼ PUT WALL: ${put_wall:.0f} (Nằm ngoài phạm vi dưới)</b>",
+            showarrow=False,
+            font=dict(color="#22C55E", size=10, family="JetBrains Mono"),
+            bgcolor="rgba(15, 23, 42, 0.90)",
+            bordercolor="#22C55E", borderwidth=1, borderpad=4,
+            xanchor="left", yanchor="bottom",
+        )
+
+    scalp_min = max(spot_price - 50.0, float(df_full["strike"].min()))
+    scalp_max = min(spot_price + 50.0, float(df_full["strike"].max()))
+
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#0F172A",
         plot_bgcolor="#0A0F1D",
-        height=750,
-        margin=dict(l=60, r=40, t=50, b=40),
+        height=620,
+        margin=dict(l=65, r=40, t=65, b=40),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.03,
+            y=1.02,
             xanchor="center",
             x=0.5,
             font=dict(size=11, family="JetBrains Mono"),
         ),
         barmode="relative",
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                x=0.5,
+                y=1.14,
+                xanchor="center",
+                yanchor="bottom",
+                bgcolor="#1E293B",
+                bordercolor="#334155",
+                borderwidth=1,
+                font=dict(size=11, family="JetBrains Mono", color="#F8FAFC"),
+                buttons=[
+                    dict(
+                        label="🛡️ Thành Trì MM (Mặc Định)",
+                        method="relayout",
+                        args=[{"yaxis.range": [y_min, y_max]}],
+                    ),
+                    dict(
+                        label="🎯 Scalping Tinh Gọn (ATM ± $50)",
+                        method="relayout",
+                        args=[{"yaxis.range": [scalp_min, scalp_max]}],
+                    ),
+                    dict(
+                        label="🌐 Toàn Cảnh (Macro Range)",
+                        method="relayout",
+                        args=[{"yaxis.range": [float(df_full["strike"].min()) - 10.0, float(df_full["strike"].max()) + 10.0]}],
+                    ),
+                ],
+            )
+        ],
     )
-    fig.update_yaxes(range=[y_min, y_max], gridcolor="#1E293B", dtick=step)
+    fig.update_yaxes(
+        range=[y_min, y_max],
+        gridcolor="#1E293B",
+        tickmode="array",
+        tickvals=df["strike"].tolist(),
+        ticktext=[f"${int(s)}" if s == int(s) else f"${s:.1f}" for s in df["strike"]],
+        tickfont=dict(size=11, family="JetBrains Mono", color="#94A3B8"),
+    )
     fig.update_xaxes(gridcolor="#1E293B")
     return fig
 
