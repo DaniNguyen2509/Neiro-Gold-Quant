@@ -1012,70 +1012,27 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
     macro_iv_min = float(max(5.0, np.min(model_iv_grid) - 2.5))
     macro_iv_max = float(min(60.0, np.max(model_iv_grid) + 3.0))
 
-    updatemenus = [
-        dict(
-            type="buttons",
-            direction="left",
-            showactive=True,
-            active=0,
-            x=0.01,
-            y=1.04,
-            xanchor="left",
-            yanchor="bottom",
-            bgcolor="#1E293B",
-            bordercolor="#475569",
-            borderwidth=1,
-            pad=dict(r=4, t=2, b=2, l=2),
-            font=dict(color="#F8FAFC", size=10.5, family="JetBrains Mono"),
-            buttons=[
-                dict(
-                    label="🔍 ZOOM SCALPING ($4,000 - $4,050)",
-                    method="relayout",
-                    args=[{
-                        "xaxis.range": [scalp_k_min, scalp_k_max],
-                        "yaxis.range": [scalp_iv_min, scalp_iv_max],
-                        "xaxis.autorange": False,
-                        "yaxis.autorange": False,
-                    }],
-                ),
-                dict(
-                    label="🌐 TOÀN CẢNH MACRO ($3,850 - $4,260)",
-                    method="relayout",
-                    args=[{
-                        "xaxis.range": [macro_k_min, macro_k_max],
-                        "yaxis.range": [macro_iv_min, macro_iv_max],
-                        "xaxis.autorange": False,
-                        "yaxis.autorange": False,
-                    }],
-                ),
-            ],
-        )
-    ]
+    # Store view parameters in meta for HTML Header & JS controls
+    meta["scalp_k_min"] = scalp_k_min
+    meta["scalp_k_max"] = scalp_k_max
+    meta["scalp_iv_min"] = scalp_iv_min
+    meta["scalp_iv_max"] = scalp_iv_max
+    meta["macro_k_min"] = macro_k_min
+    meta["macro_k_max"] = macro_k_max
+    meta["macro_iv_min"] = macro_iv_min
+    meta["macro_iv_max"] = macro_iv_max
+    meta["skew_short"] = skew_short
 
-    zg_str = f"${zero_gamma:,.1f}" if zero_gamma else "N/A"
     fig.update_layout(
-        title=dict(
-            text=f"<b>CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW CURVE)</b><br>"
-                 f"<span style='font-size:12px; color:#94A3B8; font-weight:normal;'>"
-                 f"Mô hình Vi Cấu Trúc Malz (1997) SVI • ATM IV: <b>{sigma_atm*100:.2f}%</b> • "
-                 f"25Δ Skew (RR25): <b style='color:{delta_tilt_color};'>{rr25*100:+.2f}v</b> ({skew_short}) • "
-                 f"Curvature (BF25): <b>{bf25*100:+.2f}v</b> • Hạn: {meta.get('expiration_date', 'OGX26')} • "
-                 f"<span style='color:#EF4444;'>Call Wall: ${call_wall:,.0f}</span> • <span style='color:#F59E0B;'>Zero Gamma: {zg_str}</span></span>",
-            x=0.01,
-            y=0.96,
-            xanchor="left",
-            yanchor="top",
-            font=dict(family="JetBrains Mono, Inter, sans-serif", size=15, color="#F8FAFC"),
-        ),
         template="plotly_dark",
         paper_bgcolor="#0F172A",
         plot_bgcolor="#0A0F1D",
-        height=465,
-        margin=dict(l=65, r=40, t=85, b=45),
+        height=410,
+        margin=dict(l=65, r=40, t=30, b=45),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.04,
+            y=1.02,
             xanchor="right",
             x=1.0,
             font=dict(size=11, family="JetBrains Mono"),
@@ -1097,7 +1054,6 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
             ticksuffix="%",
             range=[scalp_iv_min, scalp_iv_max],
         ),
-        updatemenus=updatemenus,
         annotations=annotations,
         shapes=shapes,
     )
@@ -1126,6 +1082,7 @@ def generate_html_terminal(
     total_chex = meta["total_net_chex"]
     expected_move = meta["expected_move_1s"]
     intraday_move = meta["rule16_daily_move"]
+    sigma_atm = float(meta.get("sigma_atm", 0.1724))
     call_wall = meta["call_wall"]
     call_wall_oi = meta["call_wall_oi"]
     put_wall = meta["put_wall"]
@@ -1474,7 +1431,29 @@ def generate_html_terminal(
     </div>
 
     <!-- KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW (PANEL LỚN HẲN MALZ 1997 SVI) -->
-    <div class="chart-box" style="margin-bottom: 16px;">
+    <div class="chart-box" style="margin-bottom: 16px; padding: 14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:6px; border-bottom:1px solid #1E293B; padding-bottom:10px;">
+            <div>
+                <div style="font-size:14.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.3px; font-family:'JetBrains Mono', monospace;">
+                    CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW)
+                </div>
+                <div style="font-size:11.5px; color:#94A3B8; margin-top:4px; font-family:'JetBrains Mono', monospace;">
+                    Mô hình Malz SVI • ATM IV: <b style="color:#FACC15;">{sigma_atm*100:.2f}%</b> • 
+                    25Δ Skew: <b style="color:{delta_tilt_color};">{rr25*100:+.2f}v</b> ({meta.get('skew_short', 'BULLISH CALL SKEW')}) • 
+                    Curvature: <b>{bf25*100:+.2f}v</b> • Hạn: <b>{meta.get('expiration_date', 'OGX26')}</b> | 
+                    <span style="color:#EF4444; font-weight:700;">Call Wall: ${call_wall:,.0f}</span> • 
+                    <span style="color:#F59E0B; font-weight:700;">Zero Gamma: {f'${zero_gamma:,.1f}' if zero_gamma else 'N/A'}</span>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button id="btn-smile-scalp" onclick="switchSmileView('scalp')" style="background:#2563EB; border:1px solid #38BDF8; color:#FFFFFF; border-radius:6px; padding:6px 12px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:'JetBrains Mono', monospace; box-shadow:0 0 10px rgba(37,99,235,0.4); transition:all 0.2s ease;">
+                    🔍 ZOOM SCALPING ($4,000 - $4,050)
+                </button>
+                <button id="btn-smile-macro" onclick="switchSmileView('macro')" style="background:rgba(30, 41, 59, 0.7); border:1px solid #475569; color:#94A3B8; border-radius:6px; padding:6px 12px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:'JetBrains Mono', monospace; transition:all 0.2s ease;">
+                    🌐 TOÀN CẢNH MACRO ($3,850 - $4,260)
+                </button>
+            </div>
+        </div>
         {smile_plotly_div}
     </div>
 
@@ -1842,28 +1821,60 @@ def generate_html_terminal(
             }}, 3000);
         }}
     }}
-    // Tu dong luu va khoi phuc che do Zoom Scalping / Macro qua cac lan reload
+    function switchSmileView(mode) {{
+        var chart = document.getElementById("plotly-smile-chart");
+        var btnScalp = document.getElementById("btn-smile-scalp");
+        var btnMacro = document.getElementById("btn-smile-macro");
+        if (!chart || !window.Plotly) return;
+
+        if (mode === "macro") {{
+            Plotly.relayout(chart, {{
+                "xaxis.range": [{meta.get('macro_k_min', 3815.0):.1f}, {meta.get('macro_k_max', 4260.0):.1f}],
+                "yaxis.range": [{meta.get('macro_iv_min', 13.0):.1f}, {meta.get('macro_iv_max', 33.0):.1f}],
+                "xaxis.autorange": false,
+                "yaxis.autorange": false
+            }});
+            if (btnMacro) {{
+                btnMacro.style.background = "#2563EB";
+                btnMacro.style.borderColor = "#38BDF8";
+                btnMacro.style.color = "#FFFFFF";
+                btnMacro.style.boxShadow = "0 0 10px rgba(37,99,235,0.4)";
+            }}
+            if (btnScalp) {{
+                btnScalp.style.background = "rgba(30, 41, 59, 0.7)";
+                btnScalp.style.borderColor = "#475569";
+                btnScalp.style.color = "#94A3B8";
+                btnScalp.style.boxShadow = "none";
+            }}
+            try {{ localStorage.setItem("neiro_smile_view", "macro"); }} catch(e) {{}}
+        }} else {{
+            Plotly.relayout(chart, {{
+                "xaxis.range": [{meta.get('scalp_k_min', 3975.0):.1f}, {meta.get('scalp_k_max', 4085.0):.1f}],
+                "yaxis.range": [{meta.get('scalp_iv_min', 14.5):.1f}, {meta.get('scalp_iv_max', 23.5):.1f}],
+                "xaxis.autorange": false,
+                "yaxis.autorange": false
+            }});
+            if (btnScalp) {{
+                btnScalp.style.background = "#2563EB";
+                btnScalp.style.borderColor = "#38BDF8";
+                btnScalp.style.color = "#FFFFFF";
+                btnScalp.style.boxShadow = "0 0 10px rgba(37,99,235,0.4)";
+            }}
+            if (btnMacro) {{
+                btnMacro.style.background = "rgba(30, 41, 59, 0.7)";
+                btnMacro.style.borderColor = "#475569";
+                btnMacro.style.color = "#94A3B8";
+                btnMacro.style.boxShadow = "none";
+            }}
+            try {{ localStorage.setItem("neiro_smile_view", "scalp"); }} catch(e) {{}}
+        }}
+    }}
+
+    // Khoi phuc che do xem khi mo hoac lam moi trang
     try {{
-        var smileChart = document.getElementById("plotly-smile-chart");
-        if (smileChart) {{
-            var savedSmileView = localStorage.getItem("neiro_smile_view");
-            if (savedSmileView === "macro") {{
-                setTimeout(function() {{
-                    var btns = smileChart.querySelectorAll(".updatemenu-button");
-                    if (btns && btns.length > 1) {{
-                        btns[1].dispatchEvent(new MouseEvent("click", {{bubbles: true}}));
-                    }}
-                }}, 150);
-            }}
-            if (smileChart.on) {{
-                smileChart.on("plotly_relayout", function(ed) {{
-                    if (!ed) return;
-                    var x0 = ed["xaxis.range[0]"];
-                    if (x0 !== undefined) {{
-                        localStorage.setItem("neiro_smile_view", x0 <= 3900 ? "macro" : "scalp");
-                    }}
-                }});
-            }}
+        var savedView = localStorage.getItem("neiro_smile_view") || "scalp";
+        if (savedView === "macro") {{
+            setTimeout(function() {{ switchSmileView("macro"); }}, 200);
         }}
     }} catch(e) {{}}
 
