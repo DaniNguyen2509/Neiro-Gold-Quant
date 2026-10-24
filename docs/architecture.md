@@ -3,7 +3,7 @@
 > **Phiên bản:** v2.3 — 23/10/2026 (Multi-Expiry GEX Superposition, Gamma-Weighted Wall Scoring & Pin/Trap Regime Classification)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
 > **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
-> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md) & [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
+> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md), [thuat_ngu_quant.md](thuat_ngu_quant.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md) & [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
 
 ---
 

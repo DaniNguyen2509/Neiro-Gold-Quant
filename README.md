@@ -48,8 +48,12 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 
 ---
 
-## 📚 TÀI LIỆU KIẾN TRÚC & QUYẾT ĐỊNH KỸ THUẬT
+## 📚 TÀI LIỆU KIẾN TRÚC & CẨM NANG THỰC CHIẾN
 
+- **Cẩm nang Tác chiến Thực chiến cho Trader (Trader Playbook):** [docs/TRADER_PLAYBOOK.md](docs/TRADER_PLAYBOOK.md) *(Đọc hiểu 7 KPI, bản đồ 6 kịch bản MM, SL/TP & Air Pocket)*
+- **Hướng dẫn Cài đặt & Sử dụng Bộ đôi Indicator MT5 & TradingView:** [docs/HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](docs/HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md) *(2TC-v10 Judas/Turtle Soup & Neiro-Liquidity-Map-v2)*
+- **Từ điển Thuật ngữ Quant Options & Vi cấu trúc Bỏ túi:** [docs/thuat_ngu_quant.md](docs/thuat_ngu_quant.md) *(Tra cứu nhanh Black-76, Greeks, GEX, DEX, Vanna, Charm, Parity)*
+- **Hỏi đáp Thường gặp & Hướng dẫn Xử lý Sự cố (FAQ & Troubleshooting):** [docs/FAQ_VA_XU_LY_SU_CO.md](docs/FAQ_VA_XU_LY_SU_CO.md) *(Quy đổi Contango Basis, sửa lỗi Python, RAM & Barchart)*
 - **Kiến trúc Hệ thống v2.3 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
 - **Quy chuẩn Đường cong Nụ cười Biến động (Volatility Smile & Skew Curve SVI) & 3 Bất biến Vi cấu trúc (ADR-009):** [docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md](docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
@@ -72,6 +76,10 @@ Neiro-Quant/
 ├── .github/workflows/
 │   └── daily_options_sync.yml   # Workflow cào Barchart, tính toán Greeks & xuất bản GitHub Pages
 ├── docs/
+│   ├── TRADER_PLAYBOOK.md       # Cẩm nang tác chiến thực chiến cho Trader (Playbook)
+│   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt & hợp lưu bộ đôi Indicator
+│   ├── thuat_ngu_quant.md       # Từ điển thuật ngữ Quant Options & Vi cấu trúc bỏ túi
+│   ├── FAQ_VA_XU_LY_SU_CO.md    # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
 │   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
 │   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
 │   ├── decisions/               # 9 bản Architecture Decision Records (ADR-001 đến ADR-009)
@@ -92,9 +100,9 @@ Neiro-Quant/
 │   │   ├── scenario_engine.py   # Ma trận 6 Kịch bản Hành vi Market Maker Realtime
 │   │   └── strategy.py          # Ma trận chiến lược Scalping & Swing
 │   ├── hud/                     # Giao diện Tactical Terminal
-│   │   └── html_dashboard.py    # Standalone Plotly Dark Mode Terminal, Volatility Smile SVI
-│   └── mt5_bridge/              # Cầu nối MetaTrader 5 (tùy chọn)
-│       └── connector.py         # Kết nối MT5 & tính Auto-Basis Sync
+│   │   ├── html_dashboard.py    # Standalone Plotly Dark Mode Terminal, Volatility Smile SVI
+│   │   └── chart_exporter.py    # Bộ xuất biểu đồ tĩnh 3-Panel Matplotlib PNG
+│   └── mt5_bridge/              # Thư mục giao tiếp MetaTrader 5 (tùy chọn)
 ├── data/
 │   └── options_prices_GCZ26.csv # Dữ liệu CME Options Chain tự động cập nhật
 ├── tests/                       # 119 Unit & Integration tests (100% pass)

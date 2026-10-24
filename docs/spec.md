@@ -31,7 +31,7 @@ Xây dựng hệ thống định lượng dòng tiền quyền chọn (Options F
 | Cloud Orchestration | GitHub Actions (Ubuntu) | Lưới Cron thích ứng 2 mùa (07:15 VN, London 2 nấc, New York) |
 | Tactical Dashboard | Plotly HTML (Dark Theme) | Giao diện Web Terminal tương tác độc lập (mobile-ready) |
 | Web Hosting | GitHub Pages | Host tĩnh `https://daninguyen2509.github.io/Neiro-Quant/` |
-| Real-time Feeds | yfinance (`GC=F`) & Gold-API / Binance PAXG | Dual-Feed CME Futures & LBMA Spot XAU/USD |
+| Real-time Feeds | yfinance (`GC=F`) Native COMEX | 100% Pure CME Gold Futures Engine (ADR-006) |
 | Broker Basis Bridge | MetaTrader 5 Python / MQL5 | Auto-Basis Sync Futures <-> Spot (tùy chọn) |
 
 ---
@@ -60,9 +60,9 @@ python -m src.hud.html_dashboard --clear-cache
 # Hoặc khởi chạy 1-Click nhanh chóng qua batch script Windows (Bộ điều khiển trung tâm 6-trong-1):
 .\Chay_Live_Terminal.bat
 # [1] Chạy Live Loop 15s | [2] Cào Options Chain | [3] Dọn Cache & RAM
-# [4] Snapshot 1 lần    | [5] Chạy 118 Unit Tests | [6] Thoát
+# [4] Snapshot 1 lần    | [5] Chạy 119 Unit Tests | [6] Thoát
 
-# Kiểm thử tự động (Unit Test & Math Verification - 118 Tests)
+# Kiểm thử tự động (Unit Test & Math Verification - 119 Tests)
 python -m pytest tests/ -v --tb=short
 
 # Kiểm tra quy chuẩn mã nguồn (Lint & Format)
@@ -80,6 +80,10 @@ Neiro-Quant/
 │   └── daily_options_sync.yml    # Workflow cào Barchart, tính Greeks & xuất bản GitHub Pages
 ├── .agents/skills/               # 24 bộ kỹ năng kỹ thuật chuẩn (Agent Skills)
 ├── docs/
+│   ├── TRADER_PLAYBOOK.md        # Cẩm nang tác chiến thực chiến cho Trader (Playbook)
+│   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt & hợp lưu bộ đôi Indicator
+│   ├── thuat_ngu_quant.md        # Từ điển thuật ngữ Quant Options & Vi cấu trúc bỏ túi
+│   ├── FAQ_VA_XU_LY_SU_CO.md     # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
 │   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
 │   ├── spec.md                   # Bản đặc tả kỹ thuật chi tiết
 │   ├── decisions/                # Architecture Decision Records (ADRs)
@@ -112,12 +116,12 @@ Neiro-Quant/
 │   │   ├── scenario_engine.py    # Ma trận 6 Kịch bản Hành vi Market Maker Realtime
 │   │   └── strategy.py           # Ma trận chiến lược Scalping & Swing
 │   ├── hud/                      # Giao diện Tactical Terminal
-│   │   └── html_dashboard.py     # Pure CME Terminal, Volatility Smile SVI, Action Banner
-│   └── mt5_bridge/               # Cầu nối MetaTrader 5 (tùy chọn)
-│       └── connector.py          # Kết nối MT5 & tính Auto-Basis Sync
+│   │   ├── html_dashboard.py     # Pure CME Terminal, Volatility Smile SVI, Action Banner
+│   │   └── chart_exporter.py     # Bộ xuất biểu đồ tĩnh 3-Panel Matplotlib PNG
+│   └── mt5_bridge/               # Thư mục giao tiếp MetaTrader 5 (tùy chọn)
 ├── data/
 │   └── options_prices_GCZ26.csv  # Chuỗi Options Chain mới nhất từ CME
-├── tests/                        # 118 Unit & Integration tests (100% pass)
+├── tests/                        # 119 Unit & Integration tests (100% pass)
 ├── Chay_Live_Terminal.bat        # Bảng điều khiển trung tâm 6-trong-1 tiện lợi
 ├── AGENTS.md / GEMINI.md         # Quy tắc cốt lõi & Quy trình kích hoạt Skill
 └── README.md                     # Hướng dẫn truy cập và tổng quan dự án
