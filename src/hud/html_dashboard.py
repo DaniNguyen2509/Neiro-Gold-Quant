@@ -79,6 +79,69 @@ def clean_val(v: Any, default: float = 0.0) -> float:
         return default
 
 
+def resolve_adaptive_tactical_strikes(
+    strikes: np.ndarray,
+    spot: float,
+    dte_days: float = 30.0,
+    call_wall: float = 0.0,
+    put_wall: float = 0.0,
+) -> tuple[float, float, float, float, float, bool]:
+    """Resolves immediate upper and lower resistance/support strikes with Adaptive Micro-Strike Guard.
+
+    When near expiration (DTE <= 10.0), COMEX Gold options deploy $5 fine strikes near ATM.
+    If the underlying data has a gap > $5.0 between spot and the next recorded strike,
+    this guard actively resolves the true micro-structure resistance/support (e.g. 4030 instead of jumping to 4050).
+    """
+    strikes_sorted = np.sort(strikes) if len(strikes) > 0 else np.array([spot])
+    strikes_above = strikes_sorted[strikes_sorted > spot]
+    raw_above = float(strikes_above[0]) if len(strikes_above) > 0 else (call_wall if call_wall > spot else spot + 25.0)
+    raw_next_above = float(strikes_above[1]) if len(strikes_above) > 1 else raw_above + 25.0
+
+    strikes_below = strikes_sorted[strikes_sorted <= spot]
+    raw_below = float(strikes_below[-1]) if len(strikes_below) > 0 else (put_wall if put_wall < spot else spot - 25.0)
+    raw_next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else raw_below - 25.0
+
+    raw_step = float(np.diff(strikes_sorted).min()) if len(strikes_sorted) > 1 else 25.0
+
+    is_micro_guarded = False
+    strike_above = raw_above
+    next_above = raw_next_above
+    strike_below = raw_below
+    next_below = raw_next_below
+    step = raw_step
+
+    # Adaptive Micro-Strike Guard for COMEX Gold (fine $5 increments within ATM +/- 50 zone near expiry)
+    if dte_days <= 10.0:
+        fine_step = 5.0
+        # Check upper fine strike
+        fine_above = float(math.ceil(spot / fine_step) * fine_step)
+        if fine_above <= spot:
+            fine_above += fine_step
+        if (raw_above - spot) > fine_step:
+            strike_above = fine_above
+            next_above = fine_above + fine_step if raw_above > fine_above + fine_step else raw_above
+            step = min(step, fine_step)
+            is_micro_guarded = True
+
+        # Check lower fine strike
+        fine_below = float(math.floor(spot / fine_step) * fine_step)
+        if fine_below >= spot:
+            fine_below -= fine_step
+        if (spot - raw_below) > fine_step:
+            strike_below = fine_below
+            next_below = fine_below - fine_step if raw_below < fine_below - fine_step else raw_below
+            step = min(step, fine_step)
+            is_micro_guarded = True
+
+        if is_micro_guarded:
+            if next_above > strike_above + step:
+                next_above = strike_above + step
+            if next_below < strike_below - step:
+                next_below = strike_below - step
+
+    return strike_above, next_above, strike_below, next_below, step, is_micro_guarded
+
+
 def load_and_preprocess_options(
     csv_path: str,
     basis: float | None = None,
@@ -86,7 +149,19 @@ def load_and_preprocess_options(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
 
     p_path = Path(csv_path)
+    file_age_hours = 0.0
+    is_data_stale = False
     if p_path.exists():
+        try:
+            mtime = p_path.stat().st_mtime
+            file_age_hours = (time.time() - mtime) / 3600.0
+            is_data_stale = (file_age_hours > 6.0)
+            if is_data_stale:
+                now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                print(f"[{now_str}] ⚠️ [CẢNH BÁO NGUY HIỂM] File Options CSV ({csv_path}) đã cũ {file_age_hours:.1f} giờ! Chuỗi options có thể chưa nạp các strike mới trong ngày.")
+        except Exception:
+            pass
+
         data_parent = str(p_path.parent)
         df_multi = load_multi_expiry_options(data_parent)
         if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
@@ -437,7 +512,15 @@ def load_and_preprocess_options(
         "delta_tilt_regime": delta_tilt_regime,
         "delta_tilt_label": delta_tilt_label,
         "delta_tilt_color": delta_tilt_color,
+        "file_age_hours": round(file_age_hours, 1),
+        "is_data_stale": is_data_stale,
     }
+    strike_above_res, _, strike_below_res, _, _, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
+        df["strike"].values, spot_price, dte_days=dte_days, call_wall=call_wall, put_wall=put_wall
+    )
+    meta["strike_above"] = strike_above_res
+    meta["strike_below"] = strike_below_res
+    meta["is_micro_guarded"] = is_micro_guarded_res
     return df, meta
 
 
@@ -480,13 +563,9 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     else:
         bar_widths = 10.0
 
-    strikes_above = strikes[strikes > spot_price]
-    strike_above = float(strikes_above[0]) if len(strikes_above) > 0 else call_wall
-    next_above = float(strikes_above[1]) if len(strikes_above) > 1 else strike_above + step
-
-    strikes_below = strikes[strikes <= spot_price]
-    strike_below = float(strikes_below[-1]) if len(strikes_below) > 0 else put_wall
-    next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else strike_below - step
+    strike_above, next_above, strike_below, next_below, step, is_micro_guarded = resolve_adaptive_tactical_strikes(
+        strikes, spot_price, dte_days=float(meta.get("dte_days", 8.0)), call_wall=call_wall, put_wall=put_wall
+    )
 
     if "callDelta" not in df.columns:
         df["callDelta"] = 0.50
@@ -1145,16 +1224,17 @@ def generate_html_terminal(
     delta_tilt_label = str(meta.get("delta_tilt_label", "CÂN BẰNG"))
     delta_tilt_color = str(meta.get("delta_tilt_color", "#FACC15"))
 
-    # Strikes and Geometry
+    # Strikes and Geometry with Adaptive Micro-Strike Guard
     strikes = df["strike"].values
-    step = float(np.diff(strikes).min()) if len(strikes) > 1 else 25.0
+    dte_days_val = float(meta.get("dte_days", 8.0))
+    strike_above, next_above, strike_below, next_below, step, is_micro_guarded = resolve_adaptive_tactical_strikes(
+        strikes, spot, dte_days=dte_days_val, call_wall=call_wall, put_wall=put_wall
+    )
     buffer_up = min(step * 0.10, 2.50)
     buffer_down = min(step * 0.10, 2.50)
     front_run_tp = 1.00
 
     # Exact Entry & SL Calculations
-    entry_squeeze = strike_above = float(strikes[strikes > spot][0]) if len(strikes[strikes > spot]) > 0 else call_wall
-    next_above = float(strikes[strikes > spot][1]) if len(strikes[strikes > spot]) > 1 else strike_above + step
     entry_squeeze = strike_above + buffer_up + 0.50
     sl_squeeze = strike_above - 1.50
     sl_dist_squeeze = round(entry_squeeze - sl_squeeze, 2)
@@ -1162,10 +1242,6 @@ def generate_html_terminal(
     entry_fade = strike_above - 1.00
     sl_fade = strike_above + buffer_up + 1.50
     sl_dist_fade = round(sl_fade - entry_fade, 2)
-
-    strikes_below = strikes[strikes <= spot]
-    strike_below = float(strikes_below[-1]) if len(strikes_below) > 0 else put_wall
-    next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else strike_below - step
 
     entry_rebound = strike_below + 1.00
     sl_rebound = strike_below - 4.00
@@ -1362,6 +1438,13 @@ def generate_html_terminal(
         config={"responsive": True, "displayModeBar": True},
     )
 
+    # Prepare Micro-Guard & Stale Data Badges
+    stale_badge_html = ""
+    if meta.get("is_data_stale", False):
+        stale_badge_html = f'<span class="badge" style="background:#7F1D1D; color:#FCA5A5; border:1px solid #EF4444; font-size:10px; padding:2px 7px; border-radius:4px; font-weight:700; margin-left:6px;">⚠️ OPTIONS DATA CŨ ({meta.get("file_age_hours", 0.0):.1f}h)</span>'
+
+    guard_tag = " (VI MÔ)" if is_micro_guarded else ""
+
     # Render complete HTML
     html = f"""<!DOCTYPE html>
 <html lang="vi">
@@ -1443,7 +1526,7 @@ def generate_html_terminal(
             <span class="badge badge-live">ZERO TOUCH AUTOMATION</span>
         </div>
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #D6D3D1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <div>Cập nhật: <b>{now_str} (Giờ VN)</b> | Hạn: <b>{meta.get('expiration_date', 'OGX26 (2026-10-27)')} ({float(meta.get('dte_days', 8.0)):.1f}d)</b></div>
+            <div>Cập nhật: <b>{now_str} (Giờ VN)</b> | Hạn: <b>{meta.get('expiration_date', 'OGX26 (2026-10-27)')} ({float(meta.get('dte_days', 8.0)):.1f}d)</b>{stale_badge_html}</div>
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất">
                 Làm mới
             </button>
@@ -1558,7 +1641,7 @@ def generate_html_terminal(
                 </div>
             </div>
             <div class="spine-node">
-                <div class="spine-node-title" style="color:#F87171;">CẢN TRÊN</div>
+                <div class="spine-node-title" style="color:#F87171;">CẢN TRÊN{guard_tag}</div>
                 <div class="spine-node-price" style="color:#F87171;">${strike_above:,.0f}</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">

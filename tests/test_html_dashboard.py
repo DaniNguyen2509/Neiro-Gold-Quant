@@ -11,6 +11,7 @@ from src.hud.html_dashboard import (
     load_and_preprocess_options,
     generate_html_terminal,
     run_pipeline,
+    resolve_adaptive_tactical_strikes,
 )
 from src.quant_engine.basis import clear_spot_cache, SpotQuote
 
@@ -411,4 +412,52 @@ def test_load_and_preprocess_options_disconnected_strikes_fallback(tmp_path):
         assert not df.empty
         # Recovered ATM strike must be close to spot (4000), NOT 2560
         assert abs(meta["atm_strike"] - 4000.0) <= 200.0
+
+
+def test_resolve_adaptive_tactical_strikes_fine_strike_guard():
+    """Verify Adaptive Micro-Strike Guard resolves 4030.0 when spot is 4027.5 on 1DTE."""
+    import numpy as np
+
+    # Case 1: Sparse strikes with $25 step, but spot is 4027.5 on 1DTE
+    sparse_strikes = np.array([3975.0, 4000.0, 4025.0, 4050.0, 4075.0])
+    spot = 4027.5
+    strike_above, next_above, strike_below, next_below, step, is_guarded = resolve_adaptive_tactical_strikes(
+        sparse_strikes, spot, dte_days=1.0, call_wall=4050.0, put_wall=4000.0
+    )
+
+    # Must resolve to 4030.0 (NOT 4050.0)
+    assert strike_above == 4030.0
+    assert next_above == 4035.0
+    assert strike_below == 4025.0
+    assert next_below == 4020.0
+    assert step == 5.0
+    assert is_guarded is True
+
+    # Case 2: Standard DTE (> 10.0 days), respects natural chain strikes
+    strike_above_far, _, _, _, _, is_guarded_far = resolve_adaptive_tactical_strikes(
+        sparse_strikes, spot, dte_days=30.0, call_wall=4050.0, put_wall=4000.0
+    )
+    assert strike_above_far == 4050.0
+    assert is_guarded_far is False
+
+
+def test_load_and_preprocess_options_stale_data_detection(tmp_path):
+    """Verify that file age and is_data_stale flag are recorded in meta."""
+    import os
+    import time
+
+    sample_csv = tmp_path / "sample_options.csv"
+    sample_csv.write_text("strike,callBid,callAsk,callMid,callOpenInterest,callVolume\n4000.0,10,12,11,100,20\n4025.0,5,7,6,200,30\n")
+
+    # Artificially age the file to 10 hours ago
+    past_time = time.time() - (10.0 * 3600.0)
+    os.utime(sample_csv, (past_time, past_time))
+
+    df, meta = load_and_preprocess_options(str(sample_csv))
+    assert meta["file_age_hours"] >= 9.9
+    assert meta["is_data_stale"] is True
+    assert "strike_above" in meta
+    assert "strike_below" in meta
+    assert "is_micro_guarded" in meta
+
 

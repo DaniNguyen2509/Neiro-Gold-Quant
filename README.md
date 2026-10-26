@@ -28,7 +28,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
   - `[2]` Cào dữ liệu CME Options Chain mới nhất (Multi-Expiry Scraper)
   - `[3]` Dọn sạch Cache & giải phóng bộ nhớ RAM
   - `[4]` Cập nhật Snapshot 1 lần
-  - `[5]` Chạy toàn bộ 120 Unit Tests tự động
+  - `[5]` Chạy toàn bộ 122 Unit Tests tự động
   - `[6]` Mở thư mục data để thả file
   - `[7]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
@@ -55,8 +55,9 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 - **Hướng dẫn Cài đặt & Sử dụng Bộ đôi Indicator MT5 & TradingView:** [docs/HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](docs/HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md) *(2TC-v10 Judas/Turtle Soup & Neiro-Liquidity-Map-v2)*
 - **Từ điển Thuật ngữ Quant Options & Vi cấu trúc Bỏ túi:** [docs/thuat_ngu_quant.md](docs/thuat_ngu_quant.md) *(Tra cứu nhanh Black-76, Greeks, GEX, DEX, Vanna, Charm, Parity)*
 - **Hỏi đáp Thường gặp & Hướng dẫn Xử lý Sự cố (FAQ & Troubleshooting):** [docs/FAQ_VA_XU_LY_SU_CO.md](docs/FAQ_VA_XU_LY_SU_CO.md) *(Quy đổi Contango Basis, sửa lỗi Python, RAM & Barchart)*
-- **Kiến trúc Hệ thống v2.3 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
+- **Kiến trúc Hệ thống v2.4 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Bảo Vệ Bước Giá Vi Mô $5 (Adaptive Micro-Strike Guard) & Phát Hiện Dữ Liệu Options Cũ (ADR-011):** [docs/decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md](docs/decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md)
 - **Quyết định Phòng Vệ Dữ Liệu Đa Tầng & Tự Động Phục Hồi (ADR-010):** [docs/decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md](docs/decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md)
 - **Quy chuẩn Đường cong Nụ cười Biến động (Volatility Smile & Skew Curve SVI) & 3 Bất biến Vi cấu trúc (ADR-009):** [docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md](docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
 - **Quyết định Phân Tích GEX Đa Kỳ Hạn (Multi-Expiry) & Chấm Điểm Bức Tường Theo Gamma Power (ADR-008):** [docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md](docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md)
@@ -82,9 +83,9 @@ Neiro-Quant/
 │   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt & hợp lưu bộ đôi Indicator
 │   ├── thuat_ngu_quant.md       # Từ điển thuật ngữ Quant Options & Vi cấu trúc bỏ túi
 │   ├── FAQ_VA_XU_LY_SU_CO.md    # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
-│   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
+│   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v2.4 (Single Source of Truth)
 │   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
-│   ├── decisions/               # 10 bản Architecture Decision Records (ADR-001 đến ADR-010)
+│   ├── decisions/               # 11 bản Architecture Decision Records (ADR-001 đến ADR-011)
 │   └── tailieudacta/            # Công thức toán học và tài liệu đặc tả vi mô
 ├── src/
 │   ├── collector/               # Playwright headless scraper & API interceptor

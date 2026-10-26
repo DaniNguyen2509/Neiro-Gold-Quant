@@ -60,9 +60,9 @@ python -m src.hud.html_dashboard --clear-cache
 # Hoặc khởi chạy 1-Click nhanh chóng qua batch script Windows (Bộ điều khiển trung tâm 6-trong-1):
 .\Chay_Live_Terminal.bat
 # [1] Chạy Live Loop 15s | [2] Cào Options Chain | [3] Dọn Cache & RAM
-# [4] Snapshot 1 lần    | [5] Chạy 119 Unit Tests | [6] Thoát
+# [4] Snapshot 1 lần    | [5] Chạy 122 Unit Tests | [6] Thoát
 
-# Kiểm thử tự động (Unit Test & Math Verification - 119 Tests)
+# Kiểm thử tự động (Unit Test & Math Verification - 122 Tests)
 python -m pytest tests/ -v --tb=short
 
 # Kiểm tra quy chuẩn mã nguồn (Lint & Format)
@@ -84,7 +84,7 @@ Neiro-Quant/
 │   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt & hợp lưu bộ đôi Indicator
 │   ├── thuat_ngu_quant.md        # Từ điển thuật ngữ Quant Options & Vi cấu trúc bỏ túi
 │   ├── FAQ_VA_XU_LY_SU_CO.md     # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
-│   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
+│   ├── architecture.md           # Tài liệu kiến trúc toàn cảnh v2.4 (Single Source of Truth)
 │   ├── spec.md                   # Bản đặc tả kỹ thuật chi tiết
 │   ├── decisions/                # Architecture Decision Records (ADRs)
 │   │   ├── ADR-001-cloud-native-tactical-terminal.md
@@ -95,7 +95,9 @@ Neiro-Quant/
 │   │   ├── ADR-006-pure-cme-futures-and-realtime-scenario-engine.md
 │   │   ├── ADR-007-zero-gamma-flip-and-wall-siege-velocity.md
 │   │   ├── ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md
-│   │   └── ADR-009-volatility-smile-and-skew-microstructure-invariants.md
+│   │   ├── ADR-009-volatility-smile-and-skew-microstructure-invariants.md
+│   │   ├── ADR-010-multi-tier-data-armor-and-self-healing-architecture.md
+│   │   └── ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       ├── DEEPSEEK_MATH_AUDIT_REPORT.md

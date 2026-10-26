@@ -1,9 +1,9 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v2.3 — 23/10/2026 (Multi-Expiry GEX Superposition, Gamma-Weighted Wall Scoring & Pin/Trap Regime Classification)  
+> **Phiên bản:** v2.4 — 26/10/2026 (Adaptive Micro-Strike Guard, Stale Options Detection, Auto-Sync Pipeline & Multi-Tier Data Armor)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
 > **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
-> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md), [thuat_ngu_quant.md](thuat_ngu_quant.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md) & [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
+> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md), [thuat_ngu_quant.md](thuat_ngu_quant.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md), [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md), [ADR-010 (Multi-Tier Data Armor)](decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md) & [ADR-011 (Adaptive Micro-Strike Guard & Stale Detection)](decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md)
 
 ---
 
@@ -126,6 +126,8 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - Adaptive Bar Widths: Bề dày thanh bar tự động thích ứng theo bước giá (chiếm 72% khoảng trống), triệt tiêu hiện tượng thanh mỏng dính như sợi chỉ.│
 │  - Tickmode Array & Chống Đè Chữ: Trục Y chỉ hiển thị nhãn cho các strikes thực có trong dữ liệu (triệt tiêu 100% hiện tượng 120 nhãn đè nát chữ).│
 │  - Pinned Macro Badges: Ghim huy hiệu Zero Gamma Flip hoặc Walls ở mép trên/dưới khi nằm ngoài khung ngắm mà không làm méo mó dải chiến thuật.│
+│  - Adaptive Micro-Strike Guard (ADR-011): Tự động phát hiện khoảng trống bước giá vi mô $5.0 (Fine Strike Gap) trong hợp đồng cận đáo hạn (DTE <= 10). Tự động kích hoạt cản trên vi mô Fine Strike Above ($4,030 thay vì $4,050 khi giá $4,027.5), đảm bảo kịch bản KB-3 Buy Squeeze kích hoạt chuẩn xác từng tick.│
+│  - Stale Options Data Detection & Header Warning Badge (ADR-011): Tự động tính toán tuổi file CSV (file_age_hours). Nếu > 6h, hiển thị cảnh báo đỏ trên UI Header và console.│
 │  - Quick Zoom Preset Buttons: 3 nút chuyển chế độ nhanh trên thanh công cụ Plotly: [🛡️ Thành Trì MM] (Mặc định), [🎯 Scalping Tinh Gọn (ATM ± $50)], [🌐 Toàn Cảnh (Macro Range)].│
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
 │  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │
@@ -352,3 +354,39 @@ Khi trader chạy Live Terminal trên máy local trong nhiều giờ (hoặc c�
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+## XI. KIẾN TRÚC BẢO VỆ BƯỚC GIÁ VI MÔ & TỰ ĐỘNG ĐỒNG BỘ CHUỖI OPTIONS (ADR-011)
+
+### 1. Bản chất Lệch pha Vi cấu trúc (Microstructure Temporal & Spatial Mismatch)
+1. **Lệch pha Thời gian (Temporal Mismatch):** Giá Futures COMEX (`GC=F`) nhảy realtime từng tick giây, trong khi chuỗi hợp đồng quyền chọn Options Chain (`data/options_prices_GCZ26.csv`) là dữ liệu tĩnh chốt theo ngày từ Clearing House. Nếu file CSV không được cập nhật mới trong ngày giao dịch, hệ thống sẽ tính toán các mốc cản dựa trên tập strike cũ.
+2. **Lệch pha Không gian (Spatial & Strike Grid Mismatch):** Trong các hợp đồng cận ngày đáo hạn ($\text{DTE} \le 10$ ngày, đặc biệt là 1DTE - 5DTE), sàn COMEX mở thêm các mức giá thực hiện bước giá hẹp **$5.0** (Fine Strikes) quanh vùng ATM ($\pm 50$ USD). Ví dụ: `4005, 4010, 4015, 4020, 4025, 4030, 4035, 4040, 4045, 4050`.  
+Nếu file dữ liệu cũ chỉ có bước giá chuẩn **$25.0**, khi giá chạy tới `4027.5`, thuật toán tìm strike trên sẽ nhảy vọt lên `4050.0`, hoàn toàn bỏ lọt chốt chặn nóng `4030.0`. Hệ quả là kịch bản `KB-3 (BUY BREAKOUT / GAMMA SQUEEZE)` bị trễ 20 giá, gây rủi ro bắt lệnh sai thời điểm cho trader.
+
+### 2. Thuật toán Adaptive Micro-Strike Guard (`resolve_adaptive_tactical_strikes`)
+Để giải quyết triệt để vấn đề này, hàm `resolve_adaptive_tactical_strikes()` trong `src/hud/html_dashboard.py` kích hoạt quy trình bảo vệ tự động:
+- **Điều kiện kích hoạt:** Hợp đồng cận hạn ($\text{DTE} \le 10.0$ ngày) và khoảng cách từ giá Spot đến strike kế tiếp trong file CSV $> 5.0$ USD (phát hiện Fine Strike Gap).
+- **Công thức giải Strike trên vi mô:**
+  $$\text{Fine Strike Above} = \lceil \text{spot} / 5.0 \rceil \times 5.0$$
+  *(Nếu $\text{Fine Strike Above} \le \text{spot}$, tự động cộng thêm $5.0$).*
+- **Kích hoạt Guard:**
+  - Thiết lập `strike_above = Fine Strike Above` (Ví dụ: `4,027.5` $\rightarrow$ `strike_above = 4,030.0`).
+  - Thiết lập bước giá tác chiến vi mô `step = 5.0`.
+  - Cân chỉnh biên độ tiếp giáp để tránh trùng lặp hoặc nhảy bậc:
+    $$\text{next\_above} = \min(\text{next\_above}, \text{strike\_above} + 5.0)$$
+    $$\text{next\_below} = \max(\text{next\_below}, \text{strike\_below} - 5.0)$$
+- **Gắn nhãn nhận diện:** Gắn cờ `is_micro_guarded = True`, hiển thị nhãn `(VI MÔ)` trên Visual Level Spine và bảng kịch bản tác chiến để trader nhận biết rõ ràng.
+- **Kích hoạt Kịch bản KB-3 Đúng Chuẩn:** Khi giá vượt $\text{strike\_above} + 1.5 = 4,031.5$, tín hiệu BUY SQUEEZE lập tức bùng nổ, không bị trễ đến $4,051.5$.
+
+### 3. Cơ chế Giám sát Tuổi Dữ liệu (Stale Data Detection)
+- Đo lường tuổi file CSV:
+  $$\text{File Age (Hours)} = \frac{\text{Current Time} - \text{mtime}}{3600}$$
+- Khi $\text{File Age} > 6.0$ giờ:
+  * Backend Python xuất cảnh báo đỏ nổi bật trên Console: `[CẢNH BÁO NGUY HIỂM] File Options CSV đã cũ X giờ!`.
+  * Dashboard Frontend tự động hiển thị Badge cảnh báo viền đỏ nhấp nháy trên Header:
+    `⚠️ OPTIONS DATA CŨ (X.Xh) - CẦN CÀO MỚI`.
+
+### 4. Cơ chế Tự Động Đồng Bộ Dữ Liệu Khi Khởi Chạy (Auto-Sync Scraper Pipeline)
+Trong `Chay_Live_Terminal.bat` (Mục `[1] CHAY LIVE TERMINAL`), hệ thống tích hợp đoạn script kiểm tra tuổi file tự động:
+- Nếu file `data/options_prices_GCZ26.csv` chưa tồn tại hoặc đã cũ hơn 6 giờ, batch script **tự động gọi Playwright Chromium cào 1 lần duy nhất** để lấy chuỗi Options mới nhất của ngày hôm nay trước khi bước vào vòng lặp 15s.
+- Toàn bộ quá trình hoàn toàn tự động (Zero-Touch), trader chỉ cần nhấp chọn `[1]` là hệ thống tự đảm bảo dữ liệu mới nhất.

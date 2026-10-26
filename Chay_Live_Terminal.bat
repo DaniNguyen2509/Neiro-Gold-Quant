@@ -36,6 +36,17 @@ goto MENU
 
 :RUN_LIVE
 cls
+echo [KIEM TRA DU LIEU] Dang kiem tra do tuoi cua Options Chain...
+powershell -Command "$f='data/options_prices_GCZ26.csv'; $needs_scrape = $true; if (Test-Path $f) { $h = ((Get-Date) - (Get-Item $f).LastWriteTime).TotalHours; if ($h -lt 6) { $needs_scrape = $false; Write-Host ('[XAC NHAN] Du lieu Options Chain moi cap nhat (' + [math]::Round($h*60, 0) + ' phut truoc). San sang!') -ForegroundColor Green; } else { Write-Host ('[PHAT HIEN DATA CU] Options Chain da cu ' + [math]::Round($h, 1) + ' gio (tu ngay ' + (Get-Item $f).LastWriteTime.ToString('dd/MM/yyyy HH:mm') + ').') -ForegroundColor Yellow; Write-Host '=> Tu dong kich hoat Scraper dong bo chuoi Options moi nhat hom nay...' -ForegroundColor Cyan; } } else { Write-Host '[PHAT HIEN] Chua co file data/options_prices_GCZ26.csv. Tu dong cao ban dau...' -ForegroundColor Yellow; }; if ($needs_scrape) { exit 1 } else { exit 0 }"
+if errorlevel 1 (
+    echo.
+    echo ===============================================================================
+    echo [AUTO-SYNC] Dang khoi chay Playwright Chromium cao chuoi Options Chain moi nhat...
+    echo ===============================================================================
+    python -m src.collector.scraper --output data/options_prices_GCZ26.csv
+    echo [AUTO-SYNC] Da dong bo chuoi Options hom nay thanh cong!
+    echo.
+)
 echo [KHOI TAO] Dang mo Dashboard tren trinh duyet...
 start "" "exports\index.html"
 echo [LIVE RUNNER] Dang kich hoat Live Runner (Chu ky: 15s)...
