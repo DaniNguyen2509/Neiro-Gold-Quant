@@ -145,6 +145,42 @@ def load_and_preprocess_options(
     if live_futures is not None and live_futures > 500.0:
         spot_price = live_futures
         futures_feed = "LIVE COMEX (GC=F)"
+
+        # Verify options strike coverage and non-empty valid chain against live spot price
+        min_s = float(df["strike"].min()) if not df.empty else 0.0
+        max_s = float(df["strike"].max()) if not df.empty else 0.0
+        total_oi = float(df["callOpenInterest"].sum() + df["putOpenInterest"].sum()) if not df.empty else 0.0
+        if df.empty or len(df) < 10 or total_oi <= 0 or max_s < (spot_price - 200.0) or min_s > (spot_price + 200.0):
+            p_cand = [
+                Path(csv_path).parent / "options_prices_GCZ26_near_the_money.csv",
+                Path("H:/My Drive/Neiro-Quant/data/options_prices_GCZ26.csv"),
+            ]
+            recovered = False
+            for fb_path in p_cand:
+                if fb_path.exists():
+                    try:
+                        fb_df = pd.read_csv(fb_path)
+                        if "strike" in fb_df.columns:
+                            fb_clean = fb_df[fb_df["strike"] > 0].sort_values("strike").reset_index(drop=True)
+                            fb_oi = float(fb_clean["callOpenInterest"].sum() + fb_clean["putOpenInterest"].sum()) if not fb_clean.empty else 0.0
+                            if not fb_clean.empty and len(fb_clean) >= 10 and fb_oi > 0 and float(fb_clean["strike"].max()) >= (spot_price - 200.0) and float(fb_clean["strike"].min()) <= (spot_price + 200.0):
+                                for col in [
+                                    "callMid", "callBid", "callAsk", "callLatest", "callVolume", "callOpenInterest", "callGamma", "callIV",
+                                    "putMid", "putBid", "putAsk", "putLatest", "putVolume", "putOpenInterest", "putGamma", "putIV"
+                                ]:
+                                    if col not in fb_clean.columns:
+                                        fb_clean[col] = 0.0
+                                    else:
+                                        fb_clean[col] = fb_clean[col].apply(clean_val)
+                                df = fb_clean
+                                recovered = True
+                                break
+                    except Exception:
+                        pass
+            if not recovered:
+                from src.quant_engine.loader import BENCHMARK_GCZ26_DATA
+                df = pd.DataFrame(BENCHMARK_GCZ26_DATA)
+
         # Dynamically lock ATM strike directly to the live futures price
         atm_idx = (df["strike"] - spot_price).abs().idxmin()
         atm_strike = float(df.loc[atm_idx, "strike"])

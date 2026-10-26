@@ -399,3 +399,16 @@ def test_load_and_preprocess_options_empty_csv_fallback(tmp_path):
     assert meta["spot_price"] > 0
     assert meta["call_wall"] > 0
     assert meta["put_wall"] > 0
+
+
+def test_load_and_preprocess_options_disconnected_strikes_fallback(tmp_path):
+    """Verify that disconnected strikes (e.g. max 2560 vs spot 4000) trigger fallback recovery."""
+    corrupt_csv = tmp_path / "corrupt_strikes.csv"
+    corrupt_csv.write_text("strike,callBid,callAsk,callMid,callOpenInterest,callVolume\n1080.0,0,0,0,0,0\n2560.0,0,0,0,0,0\n")
+
+    with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4000.0):
+        df, meta = load_and_preprocess_options(str(corrupt_csv))
+        assert not df.empty
+        # Recovered ATM strike must be close to spot (4000), NOT 2560
+        assert abs(meta["atm_strike"] - 4000.0) <= 200.0
+

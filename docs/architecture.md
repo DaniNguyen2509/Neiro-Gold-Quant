@@ -319,3 +319,36 @@ Khi trader chạy Live Terminal trên máy local trong nhiều giờ (hoặc c�
 - **Tự động dọn rác định kỳ:** Cứ mỗi 20 chu kỳ lặp (hoặc khi gọi `--clear-cache`), hệ thống tự động quét và xóa sạch mọi file tạm `.tmp`, `.bak`, `.log` trong `scratch/` và `logs/`.
 - **Khởi chạy tiện lợi 1-Click (`Chay_Live_Terminal.bat`):** Cung cấp bộ menu điều khiển trực quan bằng tiếng Việt: mở Live Terminal 15s/lần, dọn dẹp cache, cập nhật snapshot 1 lần hoặc thoát sạch sẽ không để lại tiến trình chạy ngầm.
 
+---
+
+## X. KIẾN TRÚC PHÒNG VỆ DỮ LIỆU ĐA TẦNG & TỰ ĐỘNG CHỮA LÀNH (MULTI-TIER DATA ARMOR & SELF-HEALING)
+
+Để triệt tiêu hoàn toàn sự cố gián đoạn hoặc sai lệch số liệu khi các trang cào dữ liệu bên ngoài (như Barchart) gặp lỗi, bảo trì hoặc bật tường lửa bot (Cloudflare / AWS WAF Challenge), Neiro-Quant áp dụng mô hình Phòng vệ 4 Lớp Độc lập (4-Layer Armor):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       4-LAYER ZERO-BREAK DATA ARMOR                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [LỚP 1: INGESTION GUARD]                                                    │
+│  - Kiểm định biên dải Strike: Bắt buộc len >= 10, min <= 3800, max >= 4200. │
+│  - Kiểm tra Total Open Interest > 0 (chống file rác 1 dòng, file trống).    │
+│  - Nếu không đạt chuẩn: Scraper HỦY THAO TÁC GHI ĐÈ, bảo tồn file gốc.      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [LỚP 2: RUNTIME SELF-HEALING FALLBACK]                                      │
+│  - Tại html_dashboard.py: Tự động so sánh dải strike với giá Spot thực tế. │
+│  - Nếu file bị lỗi/lệch > 200$: Tự động nạp Near-The-Money -> Nạp Google    │
+│    Drive Mirror -> Nạp Benchmark GCZ26 nội tại.                             │
+│  - Đảm bảo Terminal KHÔNG BAO GIỜ bị sập hay hiển thị cản âm.               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [LỚP 3: CI/CD AUTO-REVERT PIPELINE]                                         │
+│  - Trong daily_options_sync.yml: Chạy python test tính toàn vẹn sau khi cào.│
+│  - Nếu Barchart trả về WAF Challenge: Tự động `git checkout` khôi phục data,│
+│    tuyệt đối KHÔNG commit file hỏng lên kho mã nguồn.                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [LỚP 4: DUAL-LAYER SEPARATION]                                              │
+│  - Tầng 1: Giá CME Futures & Nến M5 chạy luồng REST độc lập (100% Realtime).│
+│  - Tầng 2: Open Interest CME là cấu trúc vị thế tĩnh (chốt 07:15 VN).       │
+│  - Đo lường áp lực nội phiên bằng Wall Siege Ratio (Volume / OI nền).       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+

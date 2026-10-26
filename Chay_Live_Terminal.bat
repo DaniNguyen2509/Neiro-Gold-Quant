@@ -15,20 +15,22 @@ echo   [2] CAO DU LIEU OPTIONS CHAIN CME MOI NHAT (Multi-Expiry Scraper)
 echo   [3] DON SACH CACHE & GIAI PHONG BO NHO (Clear Cache & Flush RAM)
 echo   [4] CAP NHAT SNAPSHOT 1 LAN (Generate 1-Shot Dashboard)
 echo   [5] KIEM THU HE THONG TOAN DIEN (Run Pytest Suite)
-echo   [6] THOAT
+echo   [6] MO THU MUC DATA DE THA FILE (Open Data Folder)
+echo   [7] THOAT
 echo.
 echo ===============================================================================
-set /p opt="Nhap lua chon cua ban [1-6]: "
+set /p opt="Nhap lua chon cua ban [1-7]: "
 
 if "%opt%"=="1" goto RUN_LIVE
 if "%opt%"=="2" goto RUN_SCRAPER
 if "%opt%"=="3" goto CLEAR_CACHE
 if "%opt%"=="4" goto RUN_ONCE
 if "%opt%"=="5" goto RUN_TESTS
-if "%opt%"=="6" goto EXIT_SCRIPT
+if "%opt%"=="6" goto OPEN_DATA
+if "%opt%"=="7" goto EXIT_SCRIPT
 
 echo.
-echo [LOI] Lua chon khong hop le. Vui long chon tu 1 den 6.
+echo [LOI] Lua chon khong hop le. Vui long chon tu 1 den 7.
 timeout /t 2 >nul
 goto MENU
 
@@ -77,12 +79,21 @@ goto MENU
 :RUN_TESTS
 cls
 echo ===============================================================================
-echo [KIEM THU] Dang chay toan bo 119 Unit & Math Verification Tests...
+echo [KIEM THU] Dang chay toan bo 120 Unit & Math Verification Tests...
 echo ===============================================================================
 echo.
 python -m pytest tests/ -v --tb=short
 echo.
 pause
+goto MENU
+
+:OPEN_DATA
+cls
+echo [THU MUC DATA] Dang mo thu muc data tren Windows Explorer...
+start "" "%~dp0data"
+echo.
+echo [HUONG DAN] Anh chi can keo file options_prices_GCZ26.csv vua tai tha vao day (ghi de).
+timeout /t 2 >nul
 goto MENU
 
 :EXIT_SCRIPT

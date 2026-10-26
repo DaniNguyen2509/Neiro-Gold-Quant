@@ -68,16 +68,23 @@ jobs:
             python -m src.collector.scraper --output data/options_prices_GCZ26.csv
           fi
 
-      - name: Verify Generated Options File
+      - name: Verify Generated Options File & Strike Coverage
         run: |
-          if [ -f data/options_prices_GCZ26.csv ]; then
-            echo "[SUCCESS] File data/options_prices_GCZ26.csv generated successfully!"
-            ls -lh data/options_prices_GCZ26.csv
-            head -n 5 data/options_prices_GCZ26.csv
-          else
-            echo "[ERROR] File data/options_prices_GCZ26.csv not found!"
-            exit 1
-          fi
+          python -c "
+          import pandas as pd, sys, subprocess
+          try:
+              df = pd.read_csv('data/options_prices_GCZ26.csv')
+              strikes = df['strike'].dropna()
+              assert len(strikes) >= 10, f'Strike count {len(strikes)} is below minimum 10'
+              assert strikes.min() <= 3800.0, f'Min strike {strikes.min()} does not cover lower band'
+              assert strikes.max() >= 4200.0, f'Max strike {strikes.max()} does not cover upper band'
+              total_oi = float(df['callOpenInterest'].sum() + df['putOpenInterest'].sum())
+              assert total_oi > 0, 'Total Open Interest is zero'
+              print(f'[VERIFIED] Data integrity passed: {len(strikes)} strikes ({strikes.min()} to {strikes.max()}), Total OI: {total_oi}')
+          except Exception as e:
+              print(f'[WARNING] Scraped file verification failed: {e}. Reverting data/options_prices_GCZ26.csv to repository valid state...')
+              subprocess.run(['git', 'checkout', 'data/options_prices_GCZ26.csv'], check=False)
+          "
 
       - name: Generate Plotly Tactical HTML Dashboard
         run: |

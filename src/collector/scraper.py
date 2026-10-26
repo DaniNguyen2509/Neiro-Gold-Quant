@@ -185,9 +185,11 @@ def scrape_and_save(
 
     if df is not None and len(df) > 0:
         max_strike = float(df["strike"].max())
-        if max_strike < 3500.0 and out_file.exists():
+        min_strike = float(df["strike"].min())
+        if (max_strike < 3500.0 or min_strike > 4500.0) and out_file.exists():
             logger.warning(
-                "Scraped strikes max=%.1f do not cover active gold market (> 3500). Preserving existing active dataset at %s",
+                "Scraped strikes [%.1f, %.1f] do not cover active gold market (3500-4500). Preserving existing active dataset at %s",
+                min_strike,
                 max_strike,
                 out_file,
             )
@@ -265,9 +267,19 @@ def scrape_multi_expiry_and_save(
         agg_df = aggregate_options_dataframes(scraped_dfs)
         master_path = out_dir_path / f"options_prices_{underlying_futures}.csv"
         if not dry_run and not agg_df.empty:
-            agg_df.to_csv(master_path, index=False)
-            saved_files.append(str(master_path))
-            logger.info("Master aggregated dataset saved to %s (%d strikes)", master_path, len(agg_df))
+            max_strike = float(agg_df["strike"].max())
+            min_strike = float(agg_df["strike"].min())
+            if (max_strike < 3500.0 or min_strike > 4500.0) and master_path.exists():
+                logger.warning(
+                    "Aggregated strikes [%.1f, %.1f] do not cover active gold market (3500-4500). Preserving existing active dataset at %s",
+                    min_strike,
+                    max_strike,
+                    master_path,
+                )
+            else:
+                agg_df.to_csv(master_path, index=False)
+                saved_files.append(str(master_path))
+                logger.info("Master aggregated dataset saved to %s (%d strikes)", master_path, len(agg_df))
 
     return saved_files
 
