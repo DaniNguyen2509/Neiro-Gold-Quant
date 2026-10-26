@@ -23,13 +23,14 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 ## 🚀 KHỞI CHẠY LIVE TERMINAL CỤC BỘ (1-CLICK LOCAL LIVE RUNNER)
 
 Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 15 giây/lần trực tiếp trên máy:
-- **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 6-trong-1:
+- **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 7-trong-1:
   - `[1]` Chạy Live Terminal Realtime (cập nhật 15s/lần + tự động dọn RAM)
   - `[2]` Cào dữ liệu CME Options Chain mới nhất (Multi-Expiry Scraper)
   - `[3]` Dọn sạch Cache & giải phóng bộ nhớ RAM
   - `[4]` Cập nhật Snapshot 1 lần
-  - `[5]` Chạy toàn bộ 119 Unit Tests tự động
-  - `[6]` Thoát
+  - `[5]` Chạy toàn bộ 120 Unit Tests tự động
+  - `[6]` Mở thư mục data để thả file
+  - `[7]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
   # Chạy Live Loop 15s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
@@ -56,6 +57,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 - **Hỏi đáp Thường gặp & Hướng dẫn Xử lý Sự cố (FAQ & Troubleshooting):** [docs/FAQ_VA_XU_LY_SU_CO.md](docs/FAQ_VA_XU_LY_SU_CO.md) *(Quy đổi Contango Basis, sửa lỗi Python, RAM & Barchart)*
 - **Kiến trúc Hệ thống v2.3 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Phòng Vệ Dữ Liệu Đa Tầng & Tự Động Phục Hồi (ADR-010):** [docs/decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md](docs/decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md)
 - **Quy chuẩn Đường cong Nụ cười Biến động (Volatility Smile & Skew Curve SVI) & 3 Bất biến Vi cấu trúc (ADR-009):** [docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md](docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
 - **Quyết định Phân Tích GEX Đa Kỳ Hạn (Multi-Expiry) & Chấm Điểm Bức Tường Theo Gamma Power (ADR-008):** [docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md](docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md)
 - **Quyết định Giải Nghiệm Số Zero Gamma Flip & Đo Vận Tốc Công Thành Wall Siege Ratio (ADR-007):** [docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md](docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md)
@@ -82,7 +84,7 @@ Neiro-Quant/
 │   ├── FAQ_VA_XU_LY_SU_CO.md    # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
 │   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v2.3 (Single Source of Truth)
 │   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
-│   ├── decisions/               # 9 bản Architecture Decision Records (ADR-001 đến ADR-009)
+│   ├── decisions/               # 10 bản Architecture Decision Records (ADR-001 đến ADR-010)
 │   └── tailieudacta/            # Công thức toán học và tài liệu đặc tả vi mô
 ├── src/
 │   ├── collector/               # Playwright headless scraper & API interceptor
