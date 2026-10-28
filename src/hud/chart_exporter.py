@@ -52,7 +52,8 @@ def export_quant_chart(
             exp_val = str(df.attrs["expiration_date"]).strip()
 
         if not exp_val:
-            exp_val = "2026-10-27"
+            from src.quant_engine.synthetic import resolve_front_month_cme_option
+            exp_val = resolve_front_month_cme_option().get("expiration_date", "2026-11-25")
         dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
         T_years = max(dte_days / 365.0, 1.0 / 365.0)
         atm_idx = (df['strike'] - k_atm).abs().idxmin()

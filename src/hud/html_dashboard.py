@@ -192,14 +192,23 @@ def load_and_preprocess_options(
         df_bench = load_options_data()
         df = df_bench[df_bench["strike"] > 0].sort_values("strike").reset_index(drop=True)
 
-    # Fallback fill for mid prices
+    # Fallback fill for mid prices (first Bid/Ask average, then Latest traded/settlement price)
     mask_c_mid = (df["callMid"] <= 0) & (df["callBid"] > 0) & (df["callAsk"] > 0)
     df.loc[mask_c_mid, "callMid"] = (df.loc[mask_c_mid, "callBid"] + df.loc[mask_c_mid, "callAsk"]) / 2.0
+    mask_c_latest = (df["callMid"] <= 0) & (df["callLatest"] > 0)
+    df.loc[mask_c_latest, "callMid"] = df.loc[mask_c_latest, "callLatest"]
 
     mask_p_mid = (df["putMid"] <= 0) & (df["putBid"] > 0) & (df["putAsk"] > 0)
     df.loc[mask_p_mid, "putMid"] = (df.loc[mask_p_mid, "putBid"] + df.loc[mask_p_mid, "putAsk"]) / 2.0
+    mask_p_latest = (df["putMid"] <= 0) & (df["putLatest"] > 0)
+    df.loc[mask_p_latest, "putMid"] = df.loc[mask_p_latest, "putLatest"]
 
-    # Expiry and DTE
+    # Expiry and DTE (Dynamically resolve front-month option if chain metadata is missing)
+    from src.quant_engine.synthetic import resolve_front_month_cme_option
+    front_opt = resolve_front_month_cme_option()
+    front_symbol = front_opt.get("option_symbol", "OGZ26")
+    default_expiry = front_opt.get("expiration_date", "2026-11-25")
+
     exp_val = ""
     if "expirationDate" in df.columns:
         s_exp = df["expirationDate"].dropna()
@@ -209,7 +218,7 @@ def load_and_preprocess_options(
         exp_val = str(df.attrs["expiration_date"]).strip()
 
     if not exp_val:
-        exp_val = "2026-10-27"
+        exp_val = default_expiry
 
     dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
     T_years = max(dte_days / 365.0, 1.0 / 365.0)
@@ -225,7 +234,7 @@ def load_and_preprocess_options(
         min_s = float(df["strike"].min()) if not df.empty else 0.0
         max_s = float(df["strike"].max()) if not df.empty else 0.0
         total_oi = float(df["callOpenInterest"].sum() + df["putOpenInterest"].sum()) if not df.empty else 0.0
-        if df.empty or len(df) < 10 or total_oi <= 0 or max_s < (spot_price - 200.0) or min_s > (spot_price + 200.0):
+        if df.empty or len(df) < 3 or total_oi <= 0 or max_s < (spot_price - 200.0) or min_s > (spot_price + 200.0):
             p_cand = [
                 Path(csv_path),
                 Path(csv_path).parent / "options_prices_GCZ26.csv",
@@ -240,7 +249,7 @@ def load_and_preprocess_options(
                         if "strike" in fb_df.columns:
                             fb_clean = fb_df[fb_df["strike"] > 0].sort_values("strike").reset_index(drop=True)
                             fb_oi = float(fb_clean["callOpenInterest"].sum() + fb_clean["putOpenInterest"].sum()) if not fb_clean.empty else 0.0
-                            if not fb_clean.empty and len(fb_clean) >= 10 and fb_oi > 0 and float(fb_clean["strike"].max()) >= (spot_price - 200.0) and float(fb_clean["strike"].min()) <= (spot_price + 200.0):
+                            if not fb_clean.empty and len(fb_clean) >= 3 and fb_oi > 0 and float(fb_clean["strike"].max()) >= (spot_price - 200.0) and float(fb_clean["strike"].min()) <= (spot_price + 200.0):
                                 for col in [
                                     "callMid", "callBid", "callAsk", "callLatest", "callVolume", "callOpenInterest", "callGamma", "callIV",
                                     "putMid", "putBid", "putAsk", "putLatest", "putVolume", "putOpenInterest", "putGamma", "putIV"
@@ -267,7 +276,7 @@ def load_and_preprocess_options(
             if not exp_val and hasattr(df, "attrs") and df.attrs.get("expiration_date"):
                 exp_val = str(df.attrs["expiration_date"]).strip()
             if not exp_val:
-                exp_val = "2026-11-25"
+                exp_val = default_expiry
             dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
             T_years = max(dte_days / 365.0, 1.0 / 365.0)
 
@@ -297,14 +306,21 @@ def load_and_preprocess_options(
         futures_feed = "ATM STRIKE SYNTHESIS"
 
     # 1.5 Self-healing Implied Volatilities (Pure-Python Black-76 Inversion)
-    # If options chain has missing or zeroed-out IVs, calibrate IVs directly from Mid prices
+    # If options chain has missing or zeroed-out IVs, calibrate IVs directly from Mid prices.
+    # We calibrate using the internal options chain Forward price via Put-Call parity at ATM:
+    # F_chain = K_atm + exp(r*T) * (C_atm - P_atm).
+    # This prevents artificial vertical divergence between Call IV and Put IV due to intraday spot moves.
     from src.quant_engine.dealer import solve_black76_iv
+    f_chain = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
+    if f_chain <= 0 or math.isnan(f_chain) or abs(f_chain - spot_price) > 60.0:
+        f_chain = spot_price
+
     needs_c_iv = (df["callIV"] <= 0.01) & (df["callMid"] > 0)
     needs_p_iv = (df["putIV"] <= 0.01) & (df["putMid"] > 0)
 
     if needs_c_iv.any():
         solved_c = [
-            solve_black76_iv(spot_price, row["strike"], T_years, row["callMid"], is_call=True, r=r)
+            solve_black76_iv(f_chain, row["strike"], T_years, row["callMid"], is_call=True, r=r)
             if row["callIV"] <= 0.01 and row["callMid"] > 0 else row["callIV"]
             for _, row in df.iterrows()
         ]
@@ -312,7 +328,7 @@ def load_and_preprocess_options(
 
     if needs_p_iv.any():
         solved_p = [
-            solve_black76_iv(spot_price, row["strike"], T_years, row["putMid"], is_call=False, r=r)
+            solve_black76_iv(f_chain, row["strike"], T_years, row["putMid"], is_call=False, r=r)
             if row["putIV"] <= 0.01 and row["putMid"] > 0 else row["putIV"]
             for _, row in df.iterrows()
         ]
@@ -532,7 +548,7 @@ def load_and_preprocess_options(
         "basis_source": basis_source,
         "no_mt5": no_mt5,
         "dte_days": dte_days,
-        "expiration_date": f"OGX26 ({exp_val})" if exp_val else "OGX26 (2026-10-27)",
+        "expiration_date": f"{front_symbol} ({exp_val})",
         "skew_rr25": skew_metrics.rr25,
         "skew_bf25": skew_metrics.bf25,
         "skew_regime": skew_metrics.regime.value,
@@ -549,6 +565,7 @@ def load_and_preprocess_options(
         "delta_tilt_regime": delta_tilt_regime,
         "delta_tilt_label": delta_tilt_label,
         "delta_tilt_color": delta_tilt_color,
+        "f_chain": f_chain,
         "file_age_hours": round(file_age_hours, 1),
         "is_data_stale": is_data_stale,
     }
@@ -848,6 +865,7 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
         - Zero Gamma Flip ($S^*)
     """
     spot_price = float(meta.get("spot_price", 4000.0))
+    f_chain = float(meta.get("f_chain", spot_price))
     atm_strike = float(meta.get("atm_strike", spot_price))
     sigma_atm = float(meta.get("sigma_atm", 0.20))
     if sigma_atm <= 0:
@@ -880,7 +898,7 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
     # 1. Theoretical Malz (1997) SVI Smile Curve
     k_grid = np.linspace(k_min, k_max, 150)
     denom = sigma_atm * math.sqrt(t_years)
-    d1_grid = (np.log(spot_price / k_grid) + 0.5 * (sigma_atm ** 2) * t_years) / denom
+    d1_grid = (np.log(f_chain / k_grid) + 0.5 * (sigma_atm ** 2) * t_years) / denom
     delta_grid = 0.5 * (1.0 + np.vectorize(math.erf)(d1_grid / math.sqrt(2.0)))
     delta_grid = np.clip(delta_grid, 0.01, 0.99)
     diff = delta_grid - 0.5
@@ -955,7 +973,7 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
 
     # Invariant helper for model IV at specific strike
     def get_model_iv(k_val: float) -> float:
-        d1_val = (math.log(spot_price / max(1.0, k_val)) + 0.5 * (sigma_atm ** 2) * t_years) / denom
+        d1_val = (math.log(f_chain / max(1.0, k_val)) + 0.5 * (sigma_atm ** 2) * t_years) / denom
         delta_val = 0.5 * (1.0 + math.erf(d1_val / math.sqrt(2.0)))
         delta_val = min(0.99, max(0.01, delta_val))
         diff_val = delta_val - 0.5
@@ -1563,14 +1581,14 @@ def generate_html_terminal(
             <span class="badge badge-live">ZERO TOUCH AUTOMATION</span>
         </div>
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #D6D3D1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <div>Cập nhật: <b>{now_str} (Giờ VN)</b> | Hạn: <b>{meta.get('expiration_date', 'OGX26 (2026-10-27)')} ({float(meta.get('dte_days', 8.0)):.1f}d)</b>{stale_badge_html}</div>
+            <div>Cập nhật: <b>{now_str} (Giờ VN)</b> | Hạn: <b>{meta.get('expiration_date', 'OGZ26 (2026-11-25)')} ({float(meta.get('dte_days', 8.0)):.1f}d)</b>{stale_badge_html}</div>
             <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất">
                 Làm mới
             </button>
             <button onclick="clearHistoryAndCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #F87171; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Xóa sạch cache, giải phóng bộ nhớ RAM trình duyệt và đặt lại lịch sử">
                 Dọn RAM & Cache
             </button>
-            <span style="font-size: 10.5px; color: #64748B;">(Tự nạp lại: <b id="timer-sec" style="color: #4ADE80;">15</b>s)</span>
+            <span style="font-size: 10.5px; color: #64748B;">(Tự nạp lại: <b id="timer-sec" style="color: #4ADE80;">60</b>s)</span>
             <span class="badge badge-gold">100% PURE CME FUTURES</span>
         </div>
     </div>
@@ -1951,7 +1969,7 @@ def generate_html_terminal(
         }}
     }}
 
-    var countdown = 15;
+    var countdown = 60;
     setInterval(function() {{
         countdown--;
         var el = document.getElementById("timer-sec");
@@ -2069,7 +2087,7 @@ def main():
     parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Optional)")
     parser.add_argument("--no-mt5", action="store_true", default=True, help="Disable MT5 Spot conversion and display pure CME Futures levels only (Default: True)")
     parser.add_argument("--with-mt5", dest="no_mt5", action="store_false", help="Enable MT5 Spot conversion column")
-    parser.add_argument("--loop", type=int, default=0, help="Continuous update interval in seconds (e.g. 15 for live). Default: 0 (run once)")
+    parser.add_argument("--loop", type=int, default=0, help="Continuous update interval in seconds (e.g. 60 for live 1-minute loop). Default: 0 (run once)")
     parser.add_argument("--clear-cache", action="store_true", help="Clear temporary cache files, garbage collection, and spot cache")
     args = parser.parse_args()
 

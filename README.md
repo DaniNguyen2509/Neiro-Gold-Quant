@@ -33,8 +33,8 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
   - `[7]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
-  # Chạy Live Loop 15s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
-  python -m src.hud.html_dashboard --loop 15
+  # Chạy Live Loop 60s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
+  python -m src.hud.html_dashboard --loop 60
 
   # Cào dữ liệu Options Chain đa kỳ hạn từ CME Barchart
   python -m src.collector.scraper --output data/options_prices_GCZ26.csv
@@ -45,7 +45,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 - **Kiến trúc chống tràn RAM (Zero-Leak):**
   - Trình duyệt dùng `location.replace` thay vì `location.href` để ngăn chặn tích lũy hàng nghìn snapshot DOM trong History Stack.
   - Trang bị nút `Dọn RAM & Cache` trực tiếp trên thanh tác chiến của Dashboard.
-  - Python engine thu hồi rác `gc.collect()` và xóa cache điểm giá sau mỗi vòng lặp 15s, giữ mức sử dụng RAM cố định ~90MB.
+  - Python engine thu hồi rác `gc.collect()` và xóa cache điểm giá sau mỗi vòng lặp 60s, giữ mức sử dụng RAM cố định ~90MB.
 
 ---
 

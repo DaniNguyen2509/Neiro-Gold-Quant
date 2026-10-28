@@ -51,15 +51,15 @@ python -m src.collector.scraper --output data/options_prices_GCZ26.csv
 # Sinh Plotly Tactical Web Terminal (Dark Mode - 1 lần)
 python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/index.html
 
-# Chạy Live Terminal liên tục (Cập nhật 15s/lần + Giám sát RAM + Tự giải phóng bộ nhớ)
-python -m src.hud.html_dashboard --loop 15
+# Chạy Live Terminal liên tục (Cập nhật 60s/lần [1 phút] + Giám sát RAM + Tự giải phóng bộ nhớ)
+python -m src.hud.html_dashboard --loop 60
 
 # Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM
 python -m src.hud.html_dashboard --clear-cache
 
 # Hoặc khởi chạy 1-Click nhanh chóng qua batch script Windows (Bộ điều khiển trung tâm 6-trong-1):
 .\Chay_Live_Terminal.bat
-# [1] Chạy Live Loop 15s | [2] Cào Options Chain | [3] Dọn Cache & RAM
+# [1] Chạy Live Loop 60s | [2] Cào Options Chain | [3] Dọn Cache & RAM
 # [4] Snapshot 1 lần    | [5] Chạy 122 Unit Tests | [6] Thoát
 
 # Kiểm thử tự động (Unit Test & Math Verification - 122 Tests)
