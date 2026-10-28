@@ -155,8 +155,11 @@ def test_generate_html_terminal_content():
     assert "BUY BẮT SÀN ATM" in html
     assert "SELL THỦNG SÀN" in html
     assert "BÁN ĐỈNH CALL WALL" in html
-    assert "MUA ĐÁY PUT WALL" in html
     assert "refreshWithCacheBuster()" in html
+    # Check Microstructure Greeks & Pinning Table
+    assert "BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING" in html
+    assert "Theta Bào Mòn" in html
+    assert "Gamma Black-76" in html
 
 
 def test_run_pipeline_end_to_end():

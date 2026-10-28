@@ -22,9 +22,9 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 ## 🚀 KHỞI CHẠY LIVE TERMINAL CỤC BỘ (1-CLICK LOCAL LIVE RUNNER)
 
-Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 15 giây/lần trực tiếp trên máy:
+Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 60 giây/lần trực tiếp trên máy:
 - **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 7-trong-1:
-  - `[1]` Chạy Live Terminal Realtime (cập nhật 15s/lần + tự động dọn RAM)
+  - `[1]` Chạy Live Terminal Realtime (cập nhật 60s/lần + tự động dọn RAM)
   - `[2]` Cào dữ liệu CME Options Chain mới nhất (Multi-Expiry Scraper)
   - `[3]` Dọn sạch Cache & giải phóng bộ nhớ RAM
   - `[4]` Cập nhật Snapshot 1 lần

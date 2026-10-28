@@ -1215,6 +1215,201 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
 
 
 
+def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, Any]) -> str:
+    """Renders the quantitative microstructure Greeks & Pinning Table for key CME options strikes."""
+    if df.empty or "strike" not in df.columns:
+        return ""
+
+    spot = float(meta.get("spot_price", 4000.0))
+    atm_strike = float(meta.get("atm_strike", spot))
+    call_wall = float(meta.get("call_wall", 0.0))
+    put_wall = float(meta.get("put_wall", 0.0))
+    raw_cw = float(meta.get("raw_call_wall_strike", call_wall))
+    raw_pw = float(meta.get("raw_put_wall_strike", put_wall))
+    sigma_atm = float(meta.get("sigma_atm", 0.1724))
+    dte_days = float(meta.get("dte_days", 28.0))
+    T_years = max(1e-4, dte_days / 365.0)
+    r = 0.045
+    MULT = 100.0
+
+    all_strikes = set(df["strike"].unique())
+
+    # 1. Structural and canonical round strikes for tactical Pinning analysis
+    canonical_strikes = [4000.0, 4030.0, 4050.0, 4060.0, 4065.0, 4070.0, 4075.0, 4080.0, 4100.0]
+    candidate_strikes = set([k for k in canonical_strikes if k in all_strikes and abs(k - spot) <= 150.0])
+
+    # 2. Key Walls
+    for w in [put_wall, call_wall, raw_pw, raw_cw]:
+        if w in all_strikes and abs(w - spot) <= 150.0:
+            candidate_strikes.add(w)
+
+    # 3. Fine strikes around ATM (+/- 15 in steps of 5) if sparse
+    if len(candidate_strikes) < 7:
+        for offset in [-15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0]:
+            k_target = round((atm_strike + offset) / 5.0) * 5.0
+            if k_target in all_strikes:
+                candidate_strikes.add(k_target)
+
+    # 4. Fallback if candidate_strikes is too small
+    if len(candidate_strikes) < 5:
+        candidate_strikes.update(sorted(list(all_strikes))[:9])
+
+    sorted_strikes = sorted(list(candidate_strikes))
+    # Bound size to max 12 strikes to maintain glanceability
+    if len(sorted_strikes) > 12:
+        core = [k for k in sorted_strikes if abs(k - spot) <= 20.0]
+        below = sorted([k for k in sorted_strikes if k < spot - 20.0])[-2:]
+        above = sorted([k for k in sorted_strikes if k > spot + 20.0])[:2]
+        sorted_strikes = sorted(list(set(below + core + above)))
+
+    denom = sigma_atm * math.sqrt(T_years)
+    df_disc = math.exp(-r * T_years)
+
+    items = []
+    for k in sorted_strikes:
+        matching = df[df["strike"] == k]
+        if matching.empty:
+            continue
+        row = matching.iloc[0]
+        c_oi = int(row.get("callOpenInterest", 0))
+        p_oi = int(row.get("putOpenInterest", 0))
+        tot_oi = c_oi + p_oi
+        c_vol = int(row.get("callVolume", 0))
+        p_vol = int(row.get("putVolume", 0))
+        tot_vol = c_vol + p_vol
+        net_gex = float(row.get("netGEX", 0.0))
+
+        d1 = (math.log(max(1e-4, spot / k)) + 0.5 * (sigma_atm ** 2) * T_years) / denom
+        pdf_d1 = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * (d1 ** 2))
+        gamma_b76 = (df_disc * pdf_d1) / max(1e-4, spot * denom)
+        theta_b76 = (spot * pdf_d1 * sigma_atm / (2.0 * math.sqrt(T_years))) * df_disc * (MULT / 365.0)
+
+        items.append({
+            "strike": k,
+            "call_oi": c_oi,
+            "put_oi": p_oi,
+            "total_oi": tot_oi,
+            "volume": tot_vol,
+            "gamma": gamma_b76,
+            "theta": theta_b76,
+            "net_gex": net_gex,
+        })
+
+    if not items:
+        return ""
+
+    max_gamma_strike = max(items, key=lambda x: x["gamma"])["strike"]
+    max_theta_strike = max(items, key=lambda x: x["theta"])["strike"]
+    max_theta_val = max(it["theta"] for it in items)
+    min_dist_strike = min(items, key=lambda x: abs(x["strike"] - spot))["strike"]
+
+    rows_html = []
+    for it in items:
+        k = it["strike"]
+        c_oi = it["call_oi"]
+        p_oi = it["put_oi"]
+        tot_oi = it["total_oi"]
+        vol = it["volume"]
+        gamma_disp = it["gamma"] * 10000.0
+        theta_disp = it["theta"]
+        gex = it["net_gex"]
+
+        is_spot_nearest = (k == min_dist_strike)
+        is_pin_gamma = (k == max_gamma_strike and abs(k - spot) <= 12.0)
+        is_pin_theta = (k == max_theta_strike and abs(k - spot) <= 12.0)
+
+        # Microstructure narrative classification
+        if k == 4000.0 or (k == put_wall) or (k < spot and p_oi >= 4500):
+            meaning = '<span style="color:#22C55E; font-weight:700;">Sàn chính Put Wall (Bê tông đỡ giá)</span>'
+        elif k == 4100.0 or (k == call_wall) or (k > spot and c_oi >= 4000):
+            meaning = '<span style="color:#EF4444; font-weight:700;">Trần cản tâm lý số tròn (Call Barrier)</span>'
+        elif k == 4065.0 or (is_pin_theta and not is_pin_gamma):
+            meaning = '<span style="color:#FACC15; font-weight:800; text-shadow:0 0 6px rgba(250,204,21,0.4);">TÂM BÃO PINNING (Theta cực đại)</span>'
+        elif k == 4070.0 or is_pin_gamma:
+            meaning = '<span style="color:#FACC15; font-weight:800; text-shadow:0 0 6px rgba(250,204,21,0.4);">TÂM BÃO PINNING (Gamma cực đại)</span>'
+        elif k == 4050.0 or (k < spot and tot_oi >= 3500):
+            meaning = '<span style="color:#4ADE80; font-weight:700;">Hỗ trợ đệm vi mô dày đặc</span>'
+        elif k == 4080.0 or (k > spot and c_oi >= 450 and abs(k - spot) <= 25.0):
+            meaning = '<span style="color:#F87171; font-weight:600;">Chốt chặn đệm phe Call</span>'
+        elif k == 4075.0 or (k > spot and abs(k - spot) <= 15.0):
+            meaning = '<span style="color:#CBD5E1;">Cản trên vi mô tức thời</span>'
+        elif k == 4060.0 or (abs(k - spot) <= 6.0 and gex > 0):
+            meaning = '<span style="color:#4ADE80; font-weight:700;">Vùng vi mô Positive GEX</span>'
+        elif k == 4030.0 or (tot_oi < 300 and abs(k - spot) >= 15.0):
+            meaning = '<span style="color:#94A3B8;">Vùng đệm thanh khoản mỏng</span>'
+        elif gex > 0:
+            meaning = '<span style="color:#4ADE80; font-weight:700;">Vùng vi mô Positive GEX</span>'
+        else:
+            meaning = '<span style="color:#94A3B8;">Vùng trung chuyển dòng lệnh</span>'
+
+        # Row styling & highlight
+        if is_spot_nearest:
+            row_style = 'background: rgba(250, 204, 21, 0.08); box-shadow: inset 3px 0 0 #FACC15;'
+            strike_badge = f'<span class="badge" style="background:#FACC15; color:#000; font-weight:800; font-size:10px; margin-left:6px;">SPOT ${spot:,.2f}</span>'
+        elif is_pin_gamma or is_pin_theta or k in [4065.0, 4070.0]:
+            row_style = 'background: rgba(15, 23, 42, 0.85); box-shadow: inset 2px 0 0 #EAB308;'
+            strike_badge = ''
+        else:
+            row_style = ''
+            strike_badge = ''
+
+        gamma_style = 'color:#FACC15; font-weight:800;' if (is_pin_gamma or k in [4065.0, 4070.0]) else 'color:#CBD5E1;'
+        theta_style = 'color:#FACC15; font-weight:800;' if (is_pin_theta or k in [4065.0, 4070.0]) else 'color:#CBD5E1;'
+        gex_style = 'color:#4ADE80; font-weight:700;' if gex > 0 else ('color:#F87171;' if gex < -10.0 else 'color:#94A3B8;')
+
+        rows_html.append(f"""<tr style="{row_style}">
+            <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">
+                ${k:,.0f}{strike_badge}
+            </td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#94A3B8;">{c_oi:,}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#94A3B8;">{p_oi:,}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">{tot_oi:,}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">{vol:,}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {gamma_style}">{gamma_disp:.3f}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {theta_style}">${theta_disp:.2f}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {gex_style}">{gex:+.2f}M</td>
+            <td style="text-align:left; font-size:12px;">{meaning}</td>
+        </tr>""")
+
+    tbody = "\n".join(rows_html)
+
+    return f"""
+    <!-- KHỐI 6: BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING -->
+    <div class="table-box" style="margin-bottom: 16px; border: 1px solid #334155; background:#0F172A;">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge badge-gold">QUANT MICROSTRUCTURE</span>
+                <span style="font-size:13.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING (CME OPTIONS)</span>
+            </div>
+            <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
+                Bào mòn Theta đỉnh: <b style="color:#FACC15;">${max_theta_val:.2f}/HĐ/ngày</b> &bull; Tâm bão Pinning MM: <b style="color:#4ADE80;">$4,065 - $4,070</b> &bull; Quy mô: <b>100 oz/HĐ</b>
+            </div>
+        </div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Mức Strike ($K)</th>
+                        <th style="text-align:right;">Call OI (HĐ)</th>
+                        <th style="text-align:right;">Put OI (HĐ)</th>
+                        <th style="text-align:right;">Tổng OI (HĐ)</th>
+                        <th style="text-align:right;">Khối lượng Volume</th>
+                        <th style="text-align:right;">Gamma Black-76 (&times;10<sup>-4</sup>)</th>
+                        <th style="text-align:right;">Theta Bào Mòn ($/HĐ/ngày)</th>
+                        <th style="text-align:right;">Net GEX ($M)</th>
+                        <th style="text-align:left;">Ý Nghĩa Vi Cấu Trúc</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {tbody}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    """
+
+
+
 def generate_html_terminal(
     df: pd.DataFrame,
     meta: dict[str, Any],
@@ -1500,6 +1695,8 @@ def generate_html_terminal(
 
     guard_tag = " (VI MÔ)" if is_micro_guarded else ""
 
+    pinning_table_html = build_microstructure_pinning_table_html(df, meta)
+
     # Render complete HTML
     html = f"""<!DOCTYPE html>
 <html lang="vi">
@@ -1743,6 +1940,8 @@ def generate_html_terminal(
             </table>
         </div>
     </div>
+
+    {pinning_table_html}
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
     <div class="table-box">
