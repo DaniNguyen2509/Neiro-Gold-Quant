@@ -76,13 +76,14 @@ def extract_rr_bf(
     valid_puts = df[(df["putIV"] > 0.01) & (df["putDelta"] < 0.0)]
 
     if len(valid_calls) < 2 or len(valid_puts) < 2:
-        # Fallback to ATM estimate if chain is sparse
+        # Fallback to ATM estimate if chain is sparse, preserve standard institutional smile curvature
         median_iv = float(df["callIV"][df["callIV"] > 0].median()) if (df["callIV"] > 0).any() else 0.18
+        baseline_bf25 = max(0.015, round(median_iv * 0.08, 4))
         return SkewMetrics(
             rr25=0.0,
-            bf25=0.0,
-            iv_call_25d=median_iv,
-            iv_put_25d=median_iv,
+            bf25=baseline_bf25,
+            iv_call_25d=median_iv + baseline_bf25,
+            iv_put_25d=median_iv + baseline_bf25,
             iv_atm=median_iv,
             regime=SkewRegime.NEUTRAL_SKEW,
             label_vi="CÂN BẰNG (NEUTRAL SKEW)",

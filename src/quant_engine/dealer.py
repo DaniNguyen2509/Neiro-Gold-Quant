@@ -70,6 +70,54 @@ def _brentq(f, a: float, b: float, xtol: float = 0.01, maxiter: int = 100) -> fl
     return b
 
 
+def solve_black76_iv(
+    F: float,
+    K: float,
+    T: float,
+    price: float,
+    is_call: bool,
+    r: float = 0.045,
+    default_iv: float = 0.20,
+) -> float:
+    """Solves Black-76 implied volatility using Dekker-Brent root finder (_brentq).
+
+    Guarantees pure-Python execution, zero external scipy dependency,
+    and returns realistic calibrated volatility [0.03, 1.50].
+    """
+    if price <= 0.0 or F <= 0.0 or K <= 0.0 or T <= 0.0:
+        return default_iv
+
+    df_disc = math.exp(-r * T)
+    sqrt_t = math.sqrt(T)
+
+    # Intrinsic value lower bound check
+    intrinsic = max(0.0, (F - K) if is_call else (K - F)) * df_disc
+    if price <= intrinsic:
+        return default_iv
+
+    def b76_price(sigma: float) -> float:
+        denom = max(1e-5, sigma * sqrt_t)
+        d1 = (math.log(F / K) + 0.5 * (sigma ** 2) * T) / denom
+        d2 = d1 - denom
+        cdf_d1 = 0.5 * (1.0 + math.erf(d1 / math.sqrt(2.0)))
+        cdf_d2 = 0.5 * (1.0 + math.erf(d2 / math.sqrt(2.0)))
+        if is_call:
+            return df_disc * (F * cdf_d1 - K * cdf_d2)
+        else:
+            return df_disc * (K * (1.0 - cdf_d2) - F * (1.0 - cdf_d1))
+
+    try:
+        f_low = b76_price(0.02) - price
+        f_high = b76_price(2.00) - price
+        if f_low * f_high <= 0:
+            sol = float(_brentq(lambda s: b76_price(s) - price, 0.02, 2.00, xtol=0.001))
+            return float(np.clip(sol, 0.03, 1.50))
+    except Exception:
+        pass
+
+    return default_iv
+
+
 def compute_wall_siege_ratio(volume: int, oi: int) -> float:
     """Compute Wall Siege / Turnover Ratio = Volume / max(1, OI)."""
     if oi <= 0:

@@ -239,7 +239,15 @@ def scrape_multi_expiry_and_save(
             logger.info("Scraping %s (%s) from %s", exp["name"], sym, url)
             raw_json = asyncio.run(fetch_barchart_options_playwright(page_url=url))
             df = parse_barchart_json(raw_json)
-            if df is not None and len(df) > 0:
+            if df is not None and len(df) > 0 and "strike" in df.columns:
+                min_k = float(df["strike"].min())
+                max_k = float(df["strike"].max())
+                if max_k < 3000.0 or min_k > 5000.0:
+                    logger.warning(
+                        "Scraped strikes [%.1f, %.1f] for %s (%s) do not match active Gold market (3000-5000). Discarding corrupt data.",
+                        min_k, max_k, exp["name"], sym
+                    )
+                    continue
                 df.attrs["expiration_date"] = exp["expiration_date"]
                 df.attrs["dte_days"] = exp["dte"]
                 df.attrs["option_symbol"] = sym
@@ -253,11 +261,18 @@ def scrape_multi_expiry_and_save(
             if sub_csv.exists():
                 try:
                     df = pd.read_csv(sub_csv)
-                    df.attrs["expiration_date"] = exp["expiration_date"]
-                    df.attrs["dte_days"] = exp["dte"]
-                    df.attrs["option_symbol"] = sym
-                    scraped_dfs.append(df)
-                    logger.info("Loaded cached dataset for %s: %s", sym, sub_csv)
+                    if (
+                        df is not None
+                        and not df.empty
+                        and "strike" in df.columns
+                        and float(df["strike"].max()) >= 3000.0
+                        and float(df["strike"].min()) <= 5000.0
+                    ):
+                        df.attrs["expiration_date"] = exp["expiration_date"]
+                        df.attrs["dte_days"] = exp["dte"]
+                        df.attrs["option_symbol"] = sym
+                        scraped_dfs.append(df)
+                        logger.info("Loaded cached dataset for %s: %s", sym, sub_csv)
                 except Exception:
                     pass
 

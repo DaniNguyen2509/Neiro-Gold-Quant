@@ -806,14 +806,37 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
     if not matched_files:
         return load_options_data(data_dir=data_dir)
 
-    # If individual sub-expiry files exist (e.g. options_prices_*_OG*.csv), aggregate ONLY the sub-expiry files
+    def _is_valid_gold_chain(df_cand: pd.DataFrame) -> bool:
+        if df_cand is None or df_cand.empty or len(df_cand) < 5 or "strike" not in df_cand.columns:
+            return False
+        k_min = float(df_cand["strike"].min())
+        k_max = float(df_cand["strike"].max())
+        return k_max >= 3000.0 and k_min <= 5000.0
+
+    # If individual sub-expiry files exist (e.g. options_prices_*_OG*.csv), aggregate ONLY valid sub-expiry files
     # to prevent double-counting against the master options_prices_GCZ26.csv
-    sub_expiry_files = [
-        f for f in matched_files
-        if os.path.basename(f).lower() not in ["options_prices_gcz26.csv", "options_prices.csv"]
-        and "_og" in os.path.basename(f).lower()
-    ]
-    files_to_load = sub_expiry_files if len(sub_expiry_files) >= 2 else matched_files
+    valid_sub_files = []
+    for f in matched_files:
+        fname = os.path.basename(f).lower()
+        if fname not in ["options_prices_gcz26.csv", "options_prices.csv"] and "_og" in fname:
+            try:
+                d_check = _load_from_path(f, data_dir=search_dir)
+                if _is_valid_gold_chain(d_check):
+                    valid_sub_files.append(f)
+            except Exception:
+                pass
+
+    if len(valid_sub_files) >= 2:
+        files_to_load = valid_sub_files
+    else:
+        files_to_load = []
+        for f in matched_files:
+            try:
+                d_check = _load_from_path(f, data_dir=search_dir)
+                if _is_valid_gold_chain(d_check):
+                    files_to_load.append(f)
+            except Exception:
+                pass
 
     if len(files_to_load) == 1:
         return _load_from_path(files_to_load[0], data_dir=search_dir)
@@ -822,7 +845,7 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
     for f in files_to_load:
         try:
             d = _load_from_path(f, data_dir=search_dir)
-            if not d.empty and len(d) > 0 and "strike" in d.columns:
+            if _is_valid_gold_chain(d):
                 dfs.append(d)
         except Exception:
             continue

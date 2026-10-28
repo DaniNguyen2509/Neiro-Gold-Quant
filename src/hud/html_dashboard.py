@@ -227,6 +227,8 @@ def load_and_preprocess_options(
         total_oi = float(df["callOpenInterest"].sum() + df["putOpenInterest"].sum()) if not df.empty else 0.0
         if df.empty or len(df) < 10 or total_oi <= 0 or max_s < (spot_price - 200.0) or min_s > (spot_price + 200.0):
             p_cand = [
+                Path(csv_path),
+                Path(csv_path).parent / "options_prices_GCZ26.csv",
                 Path(csv_path).parent / "options_prices_GCZ26_near_the_money.csv",
                 Path("H:/My Drive/Neiro-Quant/data/options_prices_GCZ26.csv"),
             ]
@@ -256,6 +258,19 @@ def load_and_preprocess_options(
                 from src.quant_engine.loader import BENCHMARK_GCZ26_DATA
                 df = pd.DataFrame(BENCHMARK_GCZ26_DATA)
 
+            # Recompute expiry metadata for recovered chain to avoid retaining contaminated metadata
+            exp_val = ""
+            if "expirationDate" in df.columns:
+                s_exp = df["expirationDate"].dropna()
+                if not s_exp.empty:
+                    exp_val = str(s_exp.iloc[0]).strip()
+            if not exp_val and hasattr(df, "attrs") and df.attrs.get("expiration_date"):
+                exp_val = str(df.attrs["expiration_date"]).strip()
+            if not exp_val:
+                exp_val = "2026-11-25"
+            dte_days = compute_dynamic_dte(exp_val, default_dte=8.0)
+            T_years = max(dte_days / 365.0, 1.0 / 365.0)
+
         # Dynamically lock ATM strike directly to the live futures price
         atm_idx = (df["strike"] - spot_price).abs().idxmin()
         atm_strike = float(df.loc[atm_idx, "strike"])
@@ -280,6 +295,28 @@ def load_and_preprocess_options(
         if spot_price <= 0 or math.isnan(spot_price):
             spot_price = atm_strike
         futures_feed = "ATM STRIKE SYNTHESIS"
+
+    # 1.5 Self-healing Implied Volatilities (Pure-Python Black-76 Inversion)
+    # If options chain has missing or zeroed-out IVs, calibrate IVs directly from Mid prices
+    from src.quant_engine.dealer import solve_black76_iv
+    needs_c_iv = (df["callIV"] <= 0.01) & (df["callMid"] > 0)
+    needs_p_iv = (df["putIV"] <= 0.01) & (df["putMid"] > 0)
+
+    if needs_c_iv.any():
+        solved_c = [
+            solve_black76_iv(spot_price, row["strike"], T_years, row["callMid"], is_call=True, r=r)
+            if row["callIV"] <= 0.01 and row["callMid"] > 0 else row["callIV"]
+            for _, row in df.iterrows()
+        ]
+        df["callIV"] = solved_c
+
+    if needs_p_iv.any():
+        solved_p = [
+            solve_black76_iv(spot_price, row["strike"], T_years, row["putMid"], is_call=False, r=r)
+            if row["putIV"] <= 0.01 and row["putMid"] > 0 else row["putIV"]
+            for _, row in df.iterrows()
+        ]
+        df["putIV"] = solved_p
 
     # 2. Greeks via Black-76 & Volatility Model
     MULT = 100.0

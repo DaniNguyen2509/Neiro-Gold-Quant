@@ -461,3 +461,55 @@ def test_load_and_preprocess_options_stale_data_detection(tmp_path):
     assert "is_micro_guarded" in meta
 
 
+def test_multi_expiry_ignores_corrupt_sub_files(tmp_path):
+    """Verify that load_multi_expiry_options discards corrupt sub-expiry files (e.g. strikes 500-1000)."""
+    from src.quant_engine.loader import load_multi_expiry_options
+
+    # Create valid master chain
+    master_csv = tmp_path / "options_prices_GCZ26.csv"
+    master_csv.write_text(
+        "strike,callBid,callAsk,callMid,callOpenInterest,callVolume,callGamma,callIV,putBid,putAsk,putMid,putOpenInterest,putVolume,putGamma,putIV\n"
+        "4000.0,10,12,11,100,20,0.003,0.18,5,7,6,150,30,0.003,0.18\n"
+        "4025.0,8,10,9,120,25,0.003,0.18,7,9,8,140,25,0.003,0.18\n"
+        "4050.0,6,8,7,140,30,0.003,0.18,9,11,10,120,20,0.003,0.18\n"
+        "4075.0,4,6,5,160,35,0.003,0.18,11,13,12,100,15,0.003,0.18\n"
+        "4100.0,2,4,3,180,40,0.003,0.18,13,15,14,80,10,0.003,0.18\n"
+    )
+
+    # Create corrupt sub-expiry file with strikes 500-1000
+    corrupt_sub = tmp_path / "options_prices_GCZ26_OG1X26.csv"
+    corrupt_sub.write_text(
+        "strike,callBid,callAsk,callMid,callOpenInterest,callVolume,callGamma,callIV,putBid,putAsk,putMid,putOpenInterest,putVolume,putGamma,putIV,expirationDate\n"
+        "500.0,100,105,102.5,10,0,0.001,0.20,0,0,0,0,0,0,0,2027-03-19\n"
+        "525.0,90,95,92.5,10,0,0.001,0.20,0,0,0,0,0,0,0,2027-03-19\n"
+        "550.0,80,85,82.5,10,0,0.001,0.20,0,0,0,0,0,0,0,2027-03-19\n"
+    )
+
+    df_loaded = load_multi_expiry_options(str(tmp_path))
+    assert not df_loaded.empty
+    # Must contain gold strikes (4000-4100), NOT corrupt strikes (500-550)
+    assert float(df_loaded["strike"].min()) >= 3000.0
+
+
+def test_zero_iv_chain_self_healing_black76(tmp_path):
+    """Verify that options chains with 0.0 IVs are self-healed via Black-76 so skew curve is not flat."""
+    sample_csv = tmp_path / "options_prices_zero_iv.csv"
+    strikes = [3950.0 + i * 25.0 for i in range(10)]
+    rows = ["strike,callBid,callAsk,callMid,callOpenInterest,callVolume,callGamma,callIV,putBid,putAsk,putMid,putOpenInterest,putVolume,putGamma,putIV,expirationDate"]
+    for i, s in enumerate(strikes):
+        c_mid = max(5.0, 100.0 - i * 10.0)
+        p_mid = max(5.0, 10.0 + i * 10.0)
+        rows.append(f"{s},{c_mid-1},{c_mid+1},{c_mid},200,20,0.003,0.0,{p_mid-1},{p_mid+1},{p_mid},200,20,0.003,0.0,2026-11-25")
+    sample_csv.write_text("\n".join(rows))
+
+    df, meta = load_and_preprocess_options(str(sample_csv))
+    # ATM IV must be calibrated (> 8% lower clamp)
+    assert meta["sigma_atm"] > 0.08
+    # Butterfly curvature must be active (>= 0.005)
+    assert meta["skew_bf25"] >= 0.005
+    # Call/Put IVs in df must be self-healed from mid prices
+    assert (df["callIV"] > 0.03).all()
+    assert (df["putIV"] > 0.03).all()
+
+
+

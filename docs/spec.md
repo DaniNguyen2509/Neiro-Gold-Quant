@@ -314,9 +314,9 @@ Doc truc tiep so lenh quyen chon thong qua cap Bid/Ask va Open Interest (OI) de 
 - [x] Zero Gamma Flip Solver & Wall Siege Ratio (ADR-007): Giải nghiệm liên tục $S^*$ bằng Dekker-Brent `_brentq` thuần Python (<2ms), giám sát tỷ lệ công thành Intraday Wall Siege ($Volume / OI$) cảnh báo trước nguy cơ vỡ trận.
 - [x] Multi-Expiry GEX Superposition & Gamma-Weighted Wall Scoring (ADR-008): Tự động phân giải và xếp chồng tuyến tính Greeks giữa Weekly (OG1..OG5) và Monthly, phân loại chính xác `[BOUNCE_WALL]` vs `[MAGNET_WALL]`, xóa bỏ điểm mù OI thô.
 - [x] Volatility Smile & Skew Microstructure Invariants (ADR-009): Khóa 3 bất biến tác chiến vi cấu trúc (Tâm bão Pinning ATM, Hố đen giảm tốc Skew Dip và Bẫy thuốc nổ mép vểnh), tham số hóa Malz SVI (RR25 & BF25) kết nối chặt chẽ với Vanna & Charm. Thiết lập Panel độc lập toàn màn hình hiển thị trực quan Nụ cười biến động lên đầu trang Dashboard, sắp xếp thứ tự chart-first tối ưu trải nghiệm đọc lệnh trước kịch bản tác chiến.
-- [x] Strike Coverage Invariant & Auto-Recovery: Khóa chặt phạm vi strike hợp lệ [3500, 4500] cho CME Gold Futures Options, ngăn chặn scraper ghi đè tập dữ liệu bị cắt cụt do bot challenge (AWS WAF/Cloudflare) và tự động kích hoạt cơ chế fallback phục hồi chuỗi strike hợp lệ khi giá spot lệch quá $200 so với biên data.
+- [x] Volatility Smile & Skew Self-Healing & Sub-Expiry Armor (28/10/2026): Khóa chặn phạm vi strike vàng [3000, 5000] cho toàn bộ sub-expiry options files, ngăn ngừa triệt để dữ liệu rác từ Barchart redirect làm lệch DTE/Expiry. Tự động giải ngược Black-76 Implied Volatility thuần Python (`solve_black76_iv` qua Dekker-Brent `_brentq`) từ giá Mid khi dữ liệu cào khuyết IV, bảo vệ đường cong Malz SVI và 25Δ Skew luôn cong mềm mại, không bao giờ bị đứng hoặc phẳng lì ở 8.00%.
 - [x] 100% Zero-Waste: Dung lượng repo luôn < 15MB (hiện tại ~10.5MB), 0 MB rác trên laptop cá nhân.
-- [x] Unit test coverage: 120/120 test cases passed 100%.
+- [x] Unit test coverage: 13/13 dashboard test cases & 120+ test cases toàn repo passed 100%.
 
 ---
 

@@ -1,6 +1,6 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v2.4 — 26/10/2026 (Adaptive Micro-Strike Guard, Stale Options Detection, Auto-Sync Pipeline & Multi-Tier Data Armor)  
+> **Phiên bản:** v2.5 — 28/10/2026 (Volatility Smile & Skew Self-Healing Architecture, Black-76 Inversion & Sub-Expiry Armor)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
 > **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
 > **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md), [thuat_ngu_quant.md](thuat_ngu_quant.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md), [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md), [ADR-010 (Multi-Tier Data Armor)](decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md) & [ADR-011 (Adaptive Micro-Strike Guard & Stale Detection)](decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md)
