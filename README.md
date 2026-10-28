@@ -57,6 +57,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 - **Hỏi đáp Thường gặp & Hướng dẫn Xử lý Sự cố (FAQ & Troubleshooting):** [docs/FAQ_VA_XU_LY_SU_CO.md](docs/FAQ_VA_XU_LY_SU_CO.md) *(Quy đổi Contango Basis, sửa lỗi Python, RAM & Barchart)*
 - **Kiến trúc Hệ thống v2.4 (Toàn cảnh 6 tầng, Multi-Expiry GEX Superposition & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Định Tuyến URL Barchart & Đánh Chặn API Nội Bộ Quotes/Get (ADR-012):** [docs/decisions/ADR-012-barchart-routing-and-quotes-api-interception.md](docs/decisions/ADR-012-barchart-routing-and-quotes-api-interception.md)
 - **Quyết định Bảo Vệ Bước Giá Vi Mô $5 (Adaptive Micro-Strike Guard) & Phát Hiện Dữ Liệu Options Cũ (ADR-011):** [docs/decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md](docs/decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md)
 - **Quyết định Phòng Vệ Dữ Liệu Đa Tầng & Tự Động Phục Hồi (ADR-010):** [docs/decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md](docs/decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md)
 - **Quy chuẩn Đường cong Nụ cười Biến động (Volatility Smile & Skew Curve SVI) & 3 Bất biến Vi cấu trúc (ADR-009):** [docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md](docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)

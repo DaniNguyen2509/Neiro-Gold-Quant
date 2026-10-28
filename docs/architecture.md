@@ -74,10 +74,11 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 1: CLOUD COLLECTOR & AUTOMATION PIPELINE]                                        │
 │  - Playwright Headless Chromium: Tự động chạy trên Ubuntu GitHub Actions.              │
-│  - Internal API Interceptor: Bắt gói JSON /proxies/core-api/v1/options/get.            │
+│  - Internal API Interceptor: Bắt gói JSON /proxies/core-api/v1/quotes/get & options/get│
+│    (ADR-012), trích xuất mượt mà định dạng dictionary phân tách Call/Put.             │
 │  - Dynamic CME Rollover Engine: Tự động giải mã Front-Month Options theo CME Rule       │
 │    120102.E (resolve_front_month_cme_option), tự động rollover (OGX26 -> OGZ26...).     │
-│  - Multi-Expiry Resolver (ADR-008): Tự động quét cả Weekly (OG1..OG5) và Monthly.     │
+│  - Multi-Expiry Resolver (ADR-008 & ADR-012): Quét cả Weekly (IG1..IG5) và Monthly.    │
 │  - Dynamic Expiration & DTE: Trích xuất expirationDate từ sàn, tính DTE chính xác.     │
 │  - Lưới Cron thích ứng 2 mùa: 07:15 VN (Chốt OI), London 2 nấc (12:30/13:30 & 14:30/15:30),│
 │    18:45 VN (Pre-US) & 19:45 đến 23:45 VN (Đón đầu phiên New York & London Fix).           │
@@ -390,3 +391,17 @@ Nếu file dữ liệu cũ chỉ có bước giá chuẩn **$25.0**, khi giá ch
 Trong `Chay_Live_Terminal.bat` (Mục `[1] CHAY LIVE TERMINAL`), hệ thống tích hợp đoạn script kiểm tra tuổi file tự động:
 - Nếu file `data/options_prices_GCZ26.csv` chưa tồn tại hoặc đã cũ hơn 6 giờ, batch script **tự động gọi Playwright Chromium cào 1 lần duy nhất** để lấy chuỗi Options mới nhất của ngày hôm nay trước khi bước vào vòng lặp 15s.
 - Toàn bộ quá trình hoàn toàn tự động (Zero-Touch), trader chỉ cần nhấp chọn `[1]` là hệ thống tự đảm bảo dữ liệu mới nhất.
+
+---
+
+## XII. ĐỊNH TUYẾN URL BARCHART & ĐÁNH CHẶN API NỘI BỘ QUOTES/GET (ADR-012)
+
+### 1. Chuẩn Hóa Định Tuyến URL Options Trên Barchart
+- **Monthly Options:** Barchart sử dụng cấu trúc đường dẫn `/futures/quotes/{underlying}/options` hoặc `/options/dec-26` thay vì mã hợp đồng thanh toán bù trừ CME `OGZ26` (vốn bị Barchart báo hết hạn).
+- **Friday Weekly Options:** Barchart quy ước các hợp đồng tuần thứ Sáu với mã tiền tố `IG` (ví dụ `IG1X26`, `IG5V26`) thay vì `OG` của CME.
+
+### 2. Đánh Chặn & Phân Tách Dữ Liệu Dictionary
+- Bắt trực tiếp endpoint: `/proxies/core-api/v1/quotes/get?symbol={underlying}&list=futures.options...`.
+- Tự động bóc tách cấu trúc dictionary `{"data": {"Call": [...], "Put": [...]}}` với hơn 1,790 bản ghi tùy chọn ($1,350 - $10,000 USD).
+- Scraper polling liên tục mỗi 500ms (tối đa 12s) để chộp ngay gói tin ngầm từ browser context và đóng trình duyệt lập tức, tối ưu tốc độ thu thập xuống còn 10-14 giây.
+

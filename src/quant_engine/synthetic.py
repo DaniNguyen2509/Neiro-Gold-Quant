@@ -58,7 +58,8 @@ def resolve_front_month_cme_option(
             month_code = CME_OPTION_MONTH_CODES[target_m]
             yr_code = str(target_y)[-2:]
             opt_symbol = f"OG{month_code}{yr_code}"
-            url = f"https://www.barchart.com/futures/quotes/{underlying_futures}/options/{opt_symbol}?futuresOptionsView=merged"
+            # Barchart serves front-month monthly options under /options?futuresOptionsView=merged
+            url = f"https://www.barchart.com/futures/quotes/{underlying_futures}/options?futuresOptionsView=merged"
             return {
                 "option_symbol": opt_symbol,
                 "underlying": underlying_futures,
@@ -75,7 +76,7 @@ def resolve_front_month_cme_option(
         "expiration_date": "2026-10-27",
         "contract_month": 11,
         "contract_year": 2026,
-        "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options/OGX26?futuresOptionsView=merged",
+        "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options?futuresOptionsView=merged",
     }
 
 
@@ -87,7 +88,7 @@ def resolve_active_expirations(
     """Resolves active CME Gold Options expirations (Weekly + Monthly).
 
     CME Gold Options structure:
-    - Weekly options (OG1..OG5) expire every Friday.
+    - Weekly options (OG1..OG5) expire every Friday. On Barchart, they are listed as IG1..IG5.
     - Monthly option (OG) expires on the 4th business day prior to the end of the preceding month.
 
     Returns:
@@ -118,6 +119,8 @@ def resolve_active_expirations(
                 month_code = CME_OPTION_MONTH_CODES[curr.month]
                 yr_code = str(curr.year)[-2:]
                 opt_sym = f"OG{week_num}{month_code}{yr_code}"
+                # Barchart uses IG prefix for Friday Weekly options
+                barchart_sym = f"IG{week_num}{month_code}{yr_code}"
                 dte_val = compute_dynamic_dte(curr, now_dt)
 
                 results.append({
@@ -127,7 +130,7 @@ def resolve_active_expirations(
                     "underlying": underlying_futures,
                     "expiration_date": curr.isoformat(),
                     "dte": dte_val,
-                    "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options/{opt_sym}?futuresOptionsView=merged",
+                    "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options/{barchart_sym}?futuresOptionsView=merged",
                 })
                 fridays_found += 1
         curr += datetime.timedelta(days=1)

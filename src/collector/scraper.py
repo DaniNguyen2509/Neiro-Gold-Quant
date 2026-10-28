@@ -28,11 +28,33 @@ def get_dynamic_barchart_url() -> str:
         resolved = resolve_front_month_cme_option()
         return resolved["barchart_url"]
     except Exception:
-        return "https://www.barchart.com/futures/quotes/GCZ26/options/OGX26?futuresOptionsView=merged"
+        return "https://www.barchart.com/futures/quotes/GCZ26/options?futuresOptionsView=merged"
 
 
 DEFAULT_BARCHART_URL = get_dynamic_barchart_url()
-ALL_FIELDS = "strikePrice,optionType,openPrice,highPrice,lowPrice,lastPrice,priceChange,bidPrice,askPrice,volume,openInterest,premium,tradeTime,expirationDate,volatility,delta,gamma,theta,vega"
+ALL_FIELDS = "strike,strikePrice,optionType,openPrice,highPrice,lowPrice,lastPrice,priceChange,bidPrice,askPrice,volume,openInterest,premium,tradeTime,expirationDate,volatility,delta,gamma,theta,vega"
+
+
+def _extract_records(data_cand: Any) -> list[dict[str, Any]]:
+    """Helper to extract option records whether response is list, dict, or Call/Put partitioned."""
+    if isinstance(data_cand, list):
+        return data_cand
+    if isinstance(data_cand, dict):
+        d = data_cand.get("data") or data_cand.get("results") or data_cand
+        if isinstance(d, list):
+            return d
+        if isinstance(d, dict):
+            recs = []
+            for k in ("Call", "Put", "calls", "puts"):
+                if k in d and isinstance(d[k], list):
+                    recs.extend(d[k])
+            if recs:
+                return recs
+            for v in d.values():
+                if isinstance(v, list):
+                    recs.extend(v)
+            return recs
+    return []
 
 
 async def fetch_barchart_options_playwright(
@@ -70,9 +92,9 @@ async def fetch_barchart_options_playwright(
 
         captured_data: list[dict[str, Any]] = []
 
-        # Listen to any background network responses for options API
+        # Listen to background network responses for options / quotes API
         async def handle_response(response):
-            if "proxies/core-api" in response.url or ("options" in response.url and "get" in response.url):
+            if "proxies/core-api" in response.url or ("options" in response.url and "get" in response.url) or "quotes/get" in response.url:
                 try:
                     if response.ok and "json" in response.headers.get("content-type", ""):
                         body = await response.json()
@@ -87,22 +109,22 @@ async def fetch_barchart_options_playwright(
         logger.info("Navigating to: %s", page_url)
         try:
             await page.goto(page_url, timeout=timeout_ms, wait_until="domcontentloaded")
-            await asyncio.sleep(4.0)
         except Exception as e:
             logger.warning("Page navigation notice (proceeding to evaluate): %s", e)
-            await asyncio.sleep(3.0)
 
-        # Check if we already intercepted a valid API response
-        for data in captured_data:
-            records = data.get("data") if isinstance(data, dict) else data
-            if isinstance(records, list) and len(records) > 0:
-                first_rec = records[0].get("raw", records[0]) if isinstance(records[0], dict) else {}
-                if first_rec.get("strikePrice") is not None or first_rec.get("strike") is not None:
-                    await browser.close()
-                    logger.info("Using intercepted response with %d records", len(records))
-                    return data
+        # Poll up to 12s for background interception
+        for _ in range(24):
+            for data in captured_data:
+                records = _extract_records(data)
+                if records:
+                    first_rec = records[0].get("raw", records[0]) if isinstance(records[0], dict) else {}
+                    if first_rec.get("strikePrice") is not None or first_rec.get("strike") is not None:
+                        await browser.close()
+                        logger.info("Using intercepted response with %d records", len(records))
+                        return data
+            await asyncio.sleep(0.5)
 
-        # Execute direct API call in browser context (using active XSRF token)
+        # Fallback: Execute direct API call in browser context (using active XSRF token)
         logger.info("Evaluating internal API fetch in browser context...")
         js_code = f"""
         async () => {{
@@ -112,8 +134,8 @@ async def fetch_barchart_options_playwright(
             }}
             let xsrf = getCookie('XSRF-TOKEN');
             let perf = performance.getEntriesByType('resource').map(e => e.name);
-            let apiUrls = perf.filter(u => u.includes('proxies/core-api') || (u.includes('options') && u.includes('get')));
-            let targetUrl = apiUrls.length > 0 ? apiUrls[apiUrls.length - 1] : '/proxies/core-api/v1/options/get';
+            let apiUrls = perf.filter(u => u.includes('proxies/core-api') && (u.includes('quotes/get') || u.includes('options')));
+            let targetUrl = apiUrls.length > 0 ? apiUrls[apiUrls.length - 1] : '/proxies/core-api/v1/quotes/get?symbol=GCZ26&list=futures.options&groupBy=optionType&orderBy=strike&orderDir=asc';
             
             if (targetUrl.includes('fields=')) {{
                 targetUrl = targetUrl.replace(/fields=[^&]+/, 'fields=' + encodeURIComponent('{ALL_FIELDS}'));

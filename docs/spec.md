@@ -27,7 +27,7 @@ Xây dựng hệ thống định lượng dòng tiền quyền chọn (Options F
 | Layer | Technology | Role |
 |---|---|---|
 | Quant Engine | Python 3.12 / 3.14 | Mô hình Black-76, IV Solver, GEX/VEX/CHEX Core |
-| Options Scraper | Playwright Headless Chromium | Bắt gói API JSON `/proxies/core-api/v1/options/get` |
+| Options Scraper | Playwright Headless Chromium | Bắt gói API JSON `/proxies/core-api/v1/quotes/get` & `options/get` (ADR-012) |
 | Cloud Orchestration | GitHub Actions (Ubuntu) | Lưới Cron thích ứng 2 mùa (07:15 VN, London 2 nấc, New York) |
 | Tactical Dashboard | Plotly HTML (Dark Theme) | Giao diện Web Terminal tương tác độc lập (mobile-ready) |
 | Web Hosting | GitHub Pages | Host tĩnh `https://daninguyen2509.github.io/Neiro-Quant/` |
@@ -97,14 +97,15 @@ Neiro-Quant/
 │   │   ├── ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md
 │   │   ├── ADR-009-volatility-smile-and-skew-microstructure-invariants.md
 │   │   ├── ADR-010-multi-tier-data-armor-and-self-healing-architecture.md
-│   │   └── ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md
+│   │   ├── ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md
+│   │   └── ADR-012-barchart-routing-and-quotes-api-interception.md
 │   └── tailieudacta/             # Công thức toán học, báo cáo kiểm toán Math/Audit
 │       ├── CÔNG THỨC CẦN TÍNH TOÁN.md
 │       ├── DEEPSEEK_MATH_AUDIT_REPORT.md
 │       └── DEEPSEEK_SRC_FULL_AUDIT_REPORT.md
 ├── src/
 │   ├── collector/                # Thu thập dữ liệu Options Chain
-│   │   ├── scraper.py            # Playwright API Sniffer (/proxies/core-api/v1/options/get)
+│   │   ├── scraper.py            # Playwright API Sniffer (/proxies/core-api/v1/quotes/get & options/get)
 │   │   └── parser.py             # Chuẩn hóa OptionsSnapshot
 │   ├── quant_engine/             # Lõi tính toán định lượng
 │   │   ├── models.py             # Dataclasses & kiểu dữ liệu

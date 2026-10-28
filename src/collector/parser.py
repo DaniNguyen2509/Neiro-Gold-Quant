@@ -113,6 +113,13 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
     if not all_strikes:
         raise ValueError("No valid strike prices found in records")
 
+    if not found_expiry:
+        try:
+            from src.quant_engine.synthetic import resolve_front_month_cme_option
+            found_expiry = resolve_front_month_cme_option()["expiration_date"]
+        except Exception:
+            pass
+
     sorted_strikes = sorted(all_strikes)
     rows: list[dict[str, Any]] = []
 
