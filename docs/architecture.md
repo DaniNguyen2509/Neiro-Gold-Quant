@@ -1,9 +1,9 @@
 # Neiro-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v2.5 — 28/10/2026 (Volatility Smile & Skew Self-Healing Architecture, Black-76 Inversion & Sub-Expiry Armor)  
+> **Phiên bản:** v2.6 — 28/10/2026 (Quantitative Microstructure Greeks & Pinning Table, Synthetic Forward IV Calibration & 60s Terminal)  
 > **Project:** Neiro-Quant (Hệ thống Định lượng Options Flow, GEX, DEX, Vanna, Charm & Market Microstructure)  
 > **Tài sản mục tiêu:** Vàng CME Futures (`GCZ26` / `GC=F`) & COMEX Gold Options.  
-> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md), [thuat_ngu_quant.md](thuat_ngu_quant.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md), [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md), [ADR-010 (Multi-Tier Data Armor)](decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md) & [ADR-011 (Adaptive Micro-Strike Guard & Stale Detection)](decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md)
+> **Tài liệu chuẩn đối chiếu:** [spec.md](spec.md), [TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md](HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md), [thuat_ngu_quant.md](thuat_ngu_quant.md), [ADR-007 (Zero Gamma)](decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md), [ADR-008 (Multi-Expiry GEX)](decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md), [ADR-009 (Volatility Smile SVI)](decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md), [ADR-010 (Multi-Tier Data Armor)](decisions/ADR-010-multi-tier-data-armor-and-self-healing-architecture.md), [ADR-011 (Adaptive Micro-Strike Guard & Stale Detection)](decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md), [ADR-013 (Forward IV Calibration)](decisions/ADR-013-options-chain-synthetic-forward-iv-calibration.md) & [ADR-014 (Microstructure Greeks & Pinning Table)](decisions/ADR-014-quantitative-microstructure-greeks-and-pinning-table.md)
 
 ---
 
@@ -130,6 +130,9 @@ Nếu trader chỉ nhìn vào các đường hỗ trợ kháng cự vẽ tay mà
 │  - Adaptive Micro-Strike Guard (ADR-011): Tự động phát hiện khoảng trống bước giá vi mô $5.0 (Fine Strike Gap) trong hợp đồng cận đáo hạn (DTE <= 10). Tự động kích hoạt cản trên vi mô Fine Strike Above ($4,030 thay vì $4,050 khi giá $4,027.5), đảm bảo kịch bản KB-3 Buy Squeeze kích hoạt chuẩn xác từng tick.│
 │  - Stale Options Data Detection & Header Warning Badge (ADR-011): Tự động tính toán tuổi file CSV (file_age_hours). Nếu > 6h, hiển thị cảnh báo đỏ trên UI Header và console.│
 │  - Quick Zoom Preset Buttons: 3 nút chuyển chế độ nhanh trên thanh công cụ Plotly: [🛡️ Thành Trì MM] (Mặc định), [🎯 Scalping Tinh Gọn (ATM ± $50)], [🌐 Toàn Cảnh (Macro Range)].│
+│  - Bảng Định Lượng Vi Cấu Trúc Greeks & Tâm Bão Pinning (ADR-014): Trích xuất chi tiết 9 mức Strike chiến lược quanh ATM và Walls, định lượng chính xác Black-76 Gamma (x10^-4), Theta bào mòn theo ngày ($/HĐ/ngày), Net GEX ($M) và phân loại vi cấu trúc tự động (Tâm bão Pinning, Sàn Put Wall, Cản trên, Đệm thanh khoản), giải mã toán học vùng nén giá biên độ hẹp của Market Maker.│
+│  - Hiệu chỉnh Black-76 IV qua Forward Tương lai Nội suy (ADR-013): Triệt tiêu hoàn toàn độ lệch giả tạo Call/Put IV bằng F_chain via Put-Call Parity, khóa đường cong Malz SVI mượt mà hoàn hảo.│
+│  - Chu kỳ Cập nhật Tác chiến 60 Giây (60s Refresh Loop): Tự động đếm ngược 60s, ngăn ngừa hiện tượng nghẽn mạng và xung đột luồng nến M5.│
 │  - GitHub Pages Hosting: Xuất bản tự động ra https://daninguyen2509.github.io/Neiro-Quant/ │
 │  - Artifacts Storage: Lưu trữ bản build 7 ngày trên GitHub Actions.                    │
 │  - Zero Laptop Dependency: Người dùng xem trực tiếp trên điện thoại ở bất kỳ đâu.      │
@@ -404,4 +407,33 @@ Trong `Chay_Live_Terminal.bat` (Mục `[1] CHAY LIVE TERMINAL`), hệ thống t�
 - Bắt trực tiếp endpoint: `/proxies/core-api/v1/quotes/get?symbol={underlying}&list=futures.options...`.
 - Tự động bóc tách cấu trúc dictionary `{"data": {"Call": [...], "Put": [...]}}` với hơn 1,790 bản ghi tùy chọn ($1,350 - $10,000 USD).
 - Scraper polling liên tục mỗi 500ms (tối đa 12s) để chộp ngay gói tin ngầm từ browser context và đóng trình duyệt lập tức, tối ưu tốc độ thu thập xuống còn 10-14 giây.
+
+---
+
+## XIII. HIỆU CHỈNH BLACK-76 IV QUA FORWARD TƯƠNG LAI NỘI SUY (ADR-013)
+
+### 1. Vấn Đề Phân Kỳ Giả Tạo Giữa Call IV và Put IV
+- Khi giải ngược Implied Volatility bằng mô hình Black-76: Nếu dùng giá Live Spot Futures biến động trong ngày thay vì Forward chuẩn tại thời điểm chốt sổ Options Chain, đẳng thức Put-Call Parity:
+  $$C - P = e^{-rT}(F - K)$$
+  sẽ bị phá vỡ. Giá trị chênh lệch $(F - K)$ bị lệch khiến Call IV bị ép xuống thấp và Put IV bị đẩy lên cao, tạo ra khoảng cách phân kỳ nhân tạo hơn 300 bps (3.0 vol points) trên biểu đồ Volatility Smile.
+
+### 2. Giải Pháp $F_{\text{chain}}$ Nội Suy
+- Tự động giải mã mức giá Forward ngầm định tại trục ATM từ cặp quyền chọn thanh khoản nhất:
+  $$F_{\text{chain}} = K_{\text{ATM}} + e^{rT}(C_{\text{ATM}} - P_{\text{ATM}})$$
+- Sử dụng $F_{\text{chain}}$ làm tham số Forward chuẩn cho hàm giải nghiệm `solve_black76_iv()`. Kết quả: Độ lệch giữa Call IV và Put IV sụp đổ từ 300 bps xuống dưới 0.08 vol points (<0.08%), các điểm Call và Put trùng khớp tuyệt đối lên đường cong Malz (1997) SVI.
+
+---
+
+## XIV. BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING (ADR-014)
+
+### 1. Mục Đích & Vị Trí Tác Chiến
+- Bổ sung Khối 6 chuyên dụng ngay dưới Băng giá M5 Orderflow Pulse, cung cấp thấu thị chi tiết từng Strike trọng yếu (Put Wall, đệm thanh khoản, vùng vi mô quanh ATM, Call Barrier).
+
+### 2. Công Thức & Nhận Diện Động
+- **Gamma Black-76:** $\Gamma = \frac{e^{-rT} \phi(d_1)}{F \sigma \sqrt{T}} \times 10^4$.
+- **Theta Bào Mòn Hàng Ngày (100 oz CME COMEX):**
+  $$\Theta_{\text{daily}} = \left( \frac{F \cdot \phi(d_1) \cdot \sigma}{2\sqrt{T}} \cdot e^{-rT} \right) \times \frac{100}{365}$$
+- **Tâm Bão Pinning:** Tự động phát hiện Strike có $\Gamma$ cực đại và $\Theta$ cực đại (tại $4,065–$4,070 với $\Theta \approx \$158.03$/ngày), đánh dấu nhãn `TÂM BÃO PINNING` màu vàng kim.
+- **Spot Highlight:** Tự động gắn badge `SPOT $4,061.10` nổi bật tại hàng Strike sát giá thị trường nhất.
+
 
