@@ -43,6 +43,62 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     regime_color = "#4ADE80" if total_gex >= 0 else "#F87171"
     regime_text = "POSITIVE GAMMA (LONG MM)" if total_gex >= 0 else "NEGATIVE GAMMA (SHORT MM)"
 
+    # Identify Peak Vanna & Peak Charm strikes
+    vanna_peak_strike = float(meta.get("vanna_peak_strike") or 0.0)
+    vanna_peak_val = float(meta.get("vanna_peak_val") or 0.0)
+    charm_peak_strike = float(meta.get("charm_peak_strike") or 0.0)
+    charm_peak_val = float(meta.get("charm_peak_val") or 0.0)
+
+    if (vanna_peak_strike == 0.0 or charm_peak_strike == 0.0) and not df.empty:
+        if "netVEX" in df.columns:
+            vex_s = df["netVEX"].abs()
+            if not vex_s.empty and vex_s.max() > 0:
+                v_idx = vex_s.idxmax()
+                vanna_peak_strike = float(df.loc[v_idx, "strike"])
+                vanna_peak_val = float(df.loc[v_idx, "netVEX"])
+        if "netCHEX" in df.columns:
+            chex_s = df["netCHEX"].abs()
+            if not chex_s.empty and chex_s.max() > 0:
+                ch_idx = chex_s.idxmax()
+                charm_peak_strike = float(df.loc[ch_idx, "strike"])
+                charm_peak_val = float(df.loc[ch_idx, "netCHEX"])
+
+    # Build ladder rows for dedicated right-side Vanna & Charm sidebar
+    ladder_rows = []
+    ladder_df = df[(df["strike"] >= spot - 180.0) & (df["strike"] <= spot + 180.0)].sort_values("strike", ascending=False)
+    if len(ladder_df) < 10:
+        ladder_df = df.sort_values("strike", ascending=False)
+
+    for _, r in ladder_df.iterrows():
+        k_val = float(r["strike"])
+        vex_val = float(r.get("netVEX", 0.0) or 0.0)
+        chex_val = float(r.get("netCHEX", 0.0) or 0.0)
+        is_top_v = (abs(k_val - vanna_peak_strike) < 1.0)
+        is_top_ch = (abs(k_val - charm_peak_strike) < 1.0)
+        is_spot_k = (abs(k_val - spot) <= 2.5)
+
+        prefix_tag = ""
+        row_extra = ""
+        if is_top_v:
+            prefix_tag = "⚡ "
+            row_extra = "background: rgba(251, 146, 60, 0.22); font-weight:800;"
+        elif is_top_ch:
+            prefix_tag = "⏳ "
+            row_extra = "background: rgba(192, 132, 252, 0.22); font-weight:800;"
+        elif is_spot_k:
+            prefix_tag = "👉 "
+            row_extra = "background: rgba(56, 189, 248, 0.18);"
+
+        ladder_rows.append(f'''
+        <tr style="{row_extra}">
+            <td style="font-weight:700; color:{'#FB923C' if is_top_v else ('#C084FC' if is_top_ch else '#F8FAFC')}; white-space:nowrap;">
+                {prefix_tag}${k_val:,.0f}
+            </td>
+            <td style="color:#FB923C; text-align:right;">{vex_val:+.1f}M</td>
+            <td style="color:#C084FC; text-align:right;">{chex_val:+.1f}M</td>
+        </tr>''')
+    ladder_rows_html = "".join(ladder_rows)
+
     # 1. CSS styling for Fullscreen TradingView Cockpit
     neiro_css = """
     .neiro-tf-btn {
@@ -60,6 +116,68 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); padding: 6px 14px; margin-bottom: 8px;
         font-family: 'JetBrains Mono', monospace; font-size: 10px;
         display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 16px;
+    }
+    .neiro-greeks-sidebar {
+        width: 230px;
+        height: 100%;
+        background: #090E17;
+        border-left: 1px solid #1E293B;
+        display: flex;
+        flex-direction: column;
+        z-index: 20;
+        flex-shrink: 0;
+        padding: 8px;
+        box-sizing: border-box;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .greeks-sidebar-header {
+        border-bottom: 1px solid #1E293B;
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+    .greeks-peak-card {
+        border-radius: 6px;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+    }
+    .greeks-peak-card.peak-vanna {
+        border: 1px solid #FB923C;
+        background: rgba(251, 146, 60, 0.12);
+        box-shadow: inset 0 0 8px rgba(251, 146, 60, 0.18);
+    }
+    .greeks-peak-card.peak-charm {
+        border: 1px solid #C084FC;
+        background: rgba(192, 132, 252, 0.12);
+        box-shadow: inset 0 0 8px rgba(192, 132, 252, 0.18);
+    }
+    .greeks-ladder-table-container {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #1E293B;
+        border-radius: 4px;
+        background: #060911;
+    }
+    .greeks-ladder-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10.5px;
+    }
+    .greeks-ladder-table th {
+        position: sticky;
+        top: 0;
+        background: #0F172A;
+        color: #94A3B8;
+        padding: 4px 6px;
+        font-size: 9.5px;
+        border-bottom: 1px solid #1E293B;
+        z-index: 5;
+    }
+    .greeks-ladder-table td {
+        padding: 4px 6px;
+        border-bottom: 1px solid #111827;
+    }
+    .greeks-ladder-table tr:hover td {
+        background: #1E293B;
     }
     .hud-col { display: flex; flex-direction: column; gap: 2px; }
     .hud-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 10.5px; }
@@ -120,8 +238,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <div class="hud-row"><span class="hud-lbl">VOLUME / OI:</span> <b style="color:#F1F5F9;">{total_vol:,} / {total_oi:,} HĐ</b> <span style="color:#64748B;">(HĐTL)</span></div>
         </div>
         <div class="hud-col">
-            <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#22D3EE;">${total_vex:+.1f}M</b> <span style="color:#64748B;">(+1% IV)</span></div>
-            <div class="hud-row"><span class="hud-lbl">CHARM (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/d</b> <span style="color:#64748B;">(Decay)</span></div>
+            <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#FB923C;">${total_vex:+.1f}M</b> <span style="color:#94A3B8; font-size:10px;">(Đỉnh: <b style="color:#FB923C;">${vanna_peak_strike:,.0f}</b> {vanna_peak_val:+.1f}M)</span></div>
+            <div class="hud-row"><span class="hud-lbl">CHARM (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/d</b> <span style="color:#94A3B8; font-size:10px;">(Đỉnh: <b style="color:#C084FC;">${charm_peak_strike:,.0f}</b> {charm_peak_val:+.1f}M)</span></div>
         </div>
         <div class="hud-col">
             <div class="hud-row"><span class="hud-lbl">ZERO GAMMA:</span> <b style="color:#FACC15;">${zero_gamma:,.1f}</b> <span style="color:#64748B;">(Flip)</span></div>
@@ -132,9 +250,65 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <div class="hud-row"><span class="hud-lbl">GAMMA WATERFALL ↓:</span> <b style="color:#F87171;">&lt;${strike_below:,.0f} → TP ${next_below:,.0f}</b></div>
         </div>
     </div>
-    <div id="neiro-view-container" style="display:block; width:100%; height:700px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:14px; overflow:hidden;">
-        <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
-        <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
+    <div id="neiro-view-container" style="display:flex; width:100%; height:700px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:14px; overflow:hidden;">
+        <div style="flex:1; height:100%; position:relative; min-width:0;">
+            <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
+            <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
+        </div>
+        <!-- CỘT RIÊNG NGAY BÊN PHẢI CỘT GIÁ: DEDICATED VANNA & CHARM GREEKS LADDER -->
+        <div id="neiro-greeks-sidebar" class="neiro-greeks-sidebar">
+            <div class="greeks-sidebar-header">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-weight:800; font-size:11px; color:#F8FAFC; letter-spacing:0.4px;">⚡ VANNA &amp; ⏳ CHARM</span>
+                    <span class="badge" style="background:#1E293B; color:#94A3B8; font-size:9px; padding:1px 5px; border-radius:3px;">GREEKS BẬC 2</span>
+                </div>
+                <div style="font-size:9.5px; color:#64748B; margin-top:2px;">Cột hồ sơ độ nhạy theo từng Strike</div>
+            </div>
+
+            <!-- Thẻ Đỉnh Vanna -->
+            <div class="greeks-peak-card peak-vanna">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#FB923C; font-weight:800; font-size:10.5px;">⚡ ĐỈNH VANNA</span>
+                    <span style="color:#FDBA74; font-weight:800; font-size:12px;">${vanna_peak_strike:,.0f}</span>
+                </div>
+                <div style="font-size:10px; color:#FED7AA; margin-top:2px; font-weight:600;">
+                    Net VEX: <b style="color:#FB923C;">{vanna_peak_val:+.2f}M</b> / 1% IV
+                </div>
+                <div style="font-size:9px; color:#94A3B8; margin-top:2px; line-height:1.25;">
+                    Lực đẩy V-Rebound khi IV hạ • Áp lực xả khi IV tăng
+                </div>
+            </div>
+
+            <!-- Thẻ Đỉnh Charm -->
+            <div class="greeks-peak-card peak-charm">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#C084FC; font-weight:800; font-size:10.5px;">⏳ ĐỈNH CHARM</span>
+                    <span style="color:#E9D5FF; font-weight:800; font-size:12px;">${charm_peak_strike:,.0f}</span>
+                </div>
+                <div style="font-size:10px; color:#E9D5FF; margin-top:2px; font-weight:600;">
+                    Net CHEX: <b style="color:#C084FC;">{charm_peak_val:+.2f}M</b> / ngày
+                </div>
+                <div style="font-size:9px; color:#94A3B8; margin-top:2px; line-height:1.25;">
+                    Nam châm ghìm giá đêm • Dealer tự động mua bù Delta
+                </div>
+            </div>
+
+            <!-- Bảng Ladder từng Strike (Scrollable) -->
+            <div class="greeks-ladder-table-container">
+                <table class="greeks-ladder-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Strike</th>
+                            <th style="text-align:right; color:#FB923C;">VEX</th>
+                            <th style="text-align:right; color:#C084FC;">CHEX</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {ladder_rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     """
 
@@ -189,6 +363,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "strike_below": strike_below,
         "next_below": next_below,
         "zero_gamma_flip": zero_gamma,
+        "vanna_peak_strike": vanna_peak_strike,
+        "vanna_peak_val": vanna_peak_val,
+        "charm_peak_strike": charm_peak_strike,
+        "charm_peak_val": charm_peak_val,
         "dte_days": dte_days,
         "multiplier": 100.0,
         "air_pockets": air_pockets,
@@ -461,6 +639,28 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             title: 'GC=F LIVE',
         }});
 
+        // PriceLine markers on Right Price Scale for Peak Vanna & Peak Charm
+        if (window.INITIAL_META.vanna_peak_strike) {{
+            candleSeries.createPriceLine({{
+                price: window.INITIAL_META.vanna_peak_strike,
+                color: '#FB923C',
+                lineWidth: 1.5,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true,
+                title: '⚡ ĐỈNH VANNA',
+            }});
+        }}
+        if (window.INITIAL_META.charm_peak_strike) {{
+            candleSeries.createPriceLine({{
+                price: window.INITIAL_META.charm_peak_strike,
+                color: '#C084FC',
+                lineWidth: 1.5,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true,
+                title: '⏳ ĐỈNH CHARM',
+            }});
+        }}
+
         const handleResize = () => {{
             if (!container || !neiroChart) return;
             const newW = container.clientWidth;
@@ -595,11 +795,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         // 3. Draw Key Structural Boundary Lines
         const keyLevels = [
-            {{ p: m.call_wall,       c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
-            {{ p: m.put_wall,        c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
-            {{ p: m.strike_above,    c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
-            {{ p: m.strike_below,    c: '#F87171', d: [2, 3], txt: 'GAMMA WATERFALL ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
-            {{ p: m.zero_gamma_flip, c: '#FACC15', d: [4, 4], txt: 'ZERO GAMMA FLIP (S*) $' + Math.round(m.zero_gamma_flip) + ' · MỐC ĐẢO CHIỀU TÂM LÝ' }},
+            {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
+            {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
+            {{ p: m.vanna_peak_strike,  c: '#FB923C', d: [4, 4], txt: '⚡ ĐỈNH VANNA $' + Math.round(m.vanna_peak_strike) + ' (' + ((m.vanna_peak_val || 0) >= 0 ? '+' : '') + (m.vanna_peak_val || 0).toFixed(1) + 'M) · LỰC ĐẨY V-REBOUND / NHẠY CẢM IV' }},
+            {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: '⏳ ĐỈNH CHARM $' + Math.round(m.charm_peak_strike) + ' (' + ((m.charm_peak_val || 0) >= 0 ? '+' : '') + (m.charm_peak_val || 0).toFixed(1) + 'M/d) · NAM CHÂM GHÌM GIÁ ĐÊM / DELTA DECAY' }},
+            {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
+            {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA WATERFALL ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
+            {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], txt: 'ZERO GAMMA FLIP (S*) $' + Math.round(m.zero_gamma_flip) + ' · MỐC ĐẢO CHIỀU TÂM LÝ' }},
         ];
 
         keyLevels.forEach(L => {{

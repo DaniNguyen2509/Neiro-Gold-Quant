@@ -56,3 +56,4 @@
 - **Kiểm thử tự động:**
   - 137/137 tests passed (100%) trong 29.09s.
   - Dung lượng kho mã nguồn: 11.89 MB (đạt chuẩn Zero-Waste `< 15 MB`).
+

@@ -199,3 +199,19 @@ on:
    - 8 cột tiêu chuẩn chuẩn hóa theo Neiro-NQ-Quant: `GC Strike`, `Net GEX ($M)`, `Call OI`, `Put OI`, `Call Vol`, `Put Vol`, `Net VEX ($M)`, `Net CHEX ($M/d)`.
    - Tổng hợp vị thế đa kỳ hạn, tự động làm nổi bật Spot realtime, Call Wall, Put Wall và Zero Gamma Flip.
 
+
+
+## VII. CỘT HỒ SƠ RIÊNG BIỆT CHO ĐỈNH VANNA & ĐỈNH CHARM CẠNH CỘT GIÁ (ADR-020)
+
+1. **Khắc phục điểm mù Greeks bậc 2:**
+   - Trên đồ thị TradingView chuẩn, các mốc cực trị Đỉnh Vanna (VEX Peak) và Đỉnh Charm (CHEX Peak) khó quan sát trực tiếp nếu chỉ hiển thị dạng bảng dưới đáy.
+   - Kiến trúc giải pháp: Tích hợp cột hồ sơ chuyên dụng (#neiro-greeks-sidebar, width: 230px) ngay bên phải thước đo giá (
+ightPriceScale) của TradingView.
+
+2. **Cơ chế hiển thị đa tầng:**
+   - **Thẻ tiêu điểm phát sáng (Neon Cards):**
+     - ⚡ ĐỈNH VANNA ,XXX (Màu cam #FB923C): Mức strike có $|VEX|$ cực đại, đo độ nhạy của Delta theo IV (lực đẩy V-Rebound hoặc xả Waterfall khi IV co giãn).
+     - ⏳ ĐỈNH CHARM ,XXX (Màu tím #C084FC): Mức strike có $|CHEX|$ cực đại, đo tốc độ bào mòn Delta theo thời gian (nam châm ghìm giá qua đêm / delta decay).
+   - **Bảng Ladder cuộn dọc:** Liệt kê toàn bộ các Strike tác chiến quanh Spot với giá trị VEX và CHEX chi tiết.
+   - **Trục giá trực tiếp (Price Scale Lines):** Gọi candleSeries.createPriceLine() gắn badge nhãn giá màu cam ⚡ ĐỈNH VANNA và màu tím ⏳ ĐỈNH CHARM ngay trên thước đo giá của TradingView.
+   - **Canvas Overlay:** Kẻ đường nét đứt ngang xuyên suốt đồ thị nến M1 cho cả 2 mốc cực trị.
