@@ -56,3 +56,4 @@ Mốc Zero Gamma Flip ($S^*$) được tìm nghiệm trên hàm liên tục tổ
   - Tính toán Greeks đa kỳ hạn chuẩn xác theo lý thuyết định giá Black-76 cho Options on Futures.
   - Duy trì chuẩn Zero-Waste: Toàn bộ repository sạch sẽ, kích thước chỉ ~11.8 MB (< 15MB).
 - **Tuân thủ Kiểm thử:** 133/133 Unit Tests vượt qua 100%.
+
