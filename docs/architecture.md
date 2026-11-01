@@ -84,7 +84,7 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 │  └──────────────────────────────────────────────┴────────────────────────────────────────┘ │
 │  - Header KPI Bar: Spot CME, Net GEX Regime, Net Delta Tilt, Zero Gamma Flip, Expected Move│
 │  - Client-Side Black-76 Engine (Pure JS): Tái tính toán Greeks theo từng tick giá.         │
-│  - Xuất bản tự động lên GitHub Pages (https://daninguyen2509.github.io/Neiro-Quant/).      │
+│  - Xuất bản tự động lên GitHub Pages (https://daninguyen2509.github.io/Neiro-Gold-Quant/).      │
 └────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                              │
                                              ▼

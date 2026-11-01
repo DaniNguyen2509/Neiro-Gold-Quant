@@ -19,7 +19,7 @@
 ### Q2: Tôi không bật máy tính, chỉ xem điện thoại thì Terminal có tự cập nhật không?
 * **Trả lời:**  
   * **CÓ, 100% TỰ ĐỘNG.** Hệ thống Neiro-Quant vận hành theo kiến trúc Cloud-Native (Serverless) trên máy chủ GitHub Actions.
-  * Lưới Cron tự động kích hoạt cào dữ liệu, tính toán Greeks và cập nhật website [https://daninguyen2509.github.io/Neiro-Quant/](https://daninguyen2509.github.io/Neiro-Quant/) theo các mốc:
+  * Lưới Cron tự động kích hoạt cào dữ liệu, tính toán Greeks và cập nhật website [https://daninguyen2509.github.io/Neiro-Gold-Quant/](https://daninguyen2509.github.io/Neiro-Gold-Quant/) theo các mốc:
     - **07:15 VN:** Chốt số liệu Open Interest chính thức từ CME Clearing.
     - **11:00 VN:** Cập nhật phiên Á & chuẩn bị bước đệm phiên Âu.
     - **12:30 & 14:30 VN (hoặc 13:30 & 15:30 VN theo mùa):** 2 nấc phiên London.

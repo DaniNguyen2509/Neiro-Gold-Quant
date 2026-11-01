@@ -3,7 +3,7 @@
 > **Phiên bản:** v1.0 — 24/10/2026  
 > **Dành cho:** Nhà giao dịch Vàng Phái sinh (CME Gold Futures `GCZ26` / `GC=F`) & Vàng Giao ngay (XAUUSD Spot).  
 > **Tài liệu nền tảng:** [docs/architecture.md](architecture.md), [docs/spec.md](spec.md) & [docs/decisions/](decisions/).  
-> **URL Tactical Web Terminal:** [https://daninguyen2509.github.io/Neiro-Quant/](https://daninguyen2509.github.io/Neiro-Quant/)
+> **URL Tactical Web Terminal:** [https://daninguyen2509.github.io/Neiro-Gold-Quant/](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
 
 ---
 

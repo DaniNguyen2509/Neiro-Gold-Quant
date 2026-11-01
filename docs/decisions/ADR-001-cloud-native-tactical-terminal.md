@@ -38,7 +38,7 @@ Chuyển đổi toàn diện hệ thống sang mô hình **100% Serverless Cloud
    - Áp dụng thuật toán chống va chạm nhãn (Label Anti-Collision): Tách rời Legend (y=1.07), phân tầng độ cao cho Vanna/Charm trùng strike, đảo biên nhãn Spot.
 
 4. **Static Hosting qua GitHub Pages & Artifacts:**
-   - Tự động xuất bản `exports/index.html` lên `https://daninguyen2509.github.io/Neiro-Quant/`.
+   - Tự động xuất bản `exports/index.html` lên `https://daninguyen2509.github.io/Neiro-Gold-Quant/`.
    - Lưu trữ bản backup dữ liệu CSV và HTML 7 ngày qua GitHub Actions Artifacts.
 
 ## Alternatives Considered
