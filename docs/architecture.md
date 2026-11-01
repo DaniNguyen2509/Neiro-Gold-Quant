@@ -184,3 +184,18 @@ on:
 1. Mọi file tạm, cache Playwright và artifact kiểm thử phải tự động giải phóng ngay sau mỗi lần thực thi (`--clear-cache`).
 2. Dung lượng toàn bộ repo Neiro-Gold-Quant luôn được bảo toàn dưới ngưỡng nghiêm ngặt **15 MB**.
 3. Thuật toán tối ưu bộ nhớ: `gc.collect()`, đóng kết nối browser, xóa cache tick `clear_spot_cache()` mỗi 20 chu kỳ.
+
+---
+
+## VI. BẢNG ĐỊNH LƯỢNG MICROSTRUCTURE MATRIX 8 CỘT & OTM VOLATILITY SMILE (ADR-019)
+
+1. **Chuẩn hóa OTM Volatility Smile:**
+   - Khi Call IV và Put IV giải ngược trùng nhau do Put-Call parity, hệ thống tự động tách biệt biểu diễn theo chuẩn tổ chức quốc tế (CME QuikStrike & Bloomberg):
+     - Vùng Strike $\le$ Spot: Biểu diễn Put IV thực tế (OTM Puts).
+     - Vùng Strike $\ge$ Spot: Biểu diễn Call IV thực tế (OTM Calls).
+   - Loại bỏ hoàn toàn lỗi hiển thị chồng đè các điểm dữ liệu.
+
+2. **Ma trận Vi Cấu Trúc Microstructure Matrix 8 Cột Đa Kỳ Hạn:**
+   - 8 cột tiêu chuẩn chuẩn hóa theo Neiro-NQ-Quant: `GC Strike`, `Net GEX ($M)`, `Call OI`, `Put OI`, `Call Vol`, `Put Vol`, `Net VEX ($M)`, `Net CHEX ($M/d)`.
+   - Tổng hợp vị thế đa kỳ hạn, tự động làm nổi bật Spot realtime, Call Wall, Put Wall và Zero Gamma Flip.
+
