@@ -1,6 +1,6 @@
 # 🪙 Neiro-Gold-Quant — Market Microstructure & Dual-View Tactical Combat Terminal
 
-[![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
+[![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Quant/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Gold-Quant/actions)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12%20%7C%203.14-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Unit Tests](https://img.shields.io/badge/Tests-133%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
@@ -12,7 +12,7 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 ## ⚡ TRUY CẬP WEB TERMINAL ĐA CHẾ ĐỘ DUAL-VIEW TRÊN ĐIỆN THOẠI & MÁY TÍNH
 
-- **URL Dashboard Trực Tuyến:** [https://daninguyen2509.github.io/Neiro-Gold-Quant/](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
+- **URL Dashboard Trực Tuyến:** [https://daninguyen2509.github.io/Neiro-Quant/](https://daninguyen2509.github.io/Neiro-Quant/)
 - **Hệ Thống Dual-View Tác Chiến 2-trong-1:**
   - **Tab 1: NEIRO ORDERFLOW FOOTPRINT:** Canvas HTML5 60 FPS, mô phỏng sổ lệnh thang giá dọc DOM, Delta Footprint cụm nến 1M/5M, Tick-by-Tick tape, Multiplier = $100.0/oz cho GC ($10.0/oz cho MGC).
   - **Tab 2: 3-PANEL QUANT LADDER & PLAYBOOK:** Plotly Dark HUD trực quan (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Nụ cười biến động Malz SVI, Ma trận 6 Kịch bản Realtime và Bảng chiến lược Scalping/Swing).

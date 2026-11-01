@@ -88,7 +88,7 @@ jobs:
 
       - name: Generate Plotly Tactical HTML Dashboard
         run: |
-          python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html --no-mt5
+          python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html index.html --no-mt5
           ls -lh exports/
 
       - name: Upload Tactical Dashboard Artifacts
@@ -112,5 +112,5 @@ jobs:
         run: |
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/options_prices_GCZ26.csv
-          git diff --staged --quiet || (git commit -m "chore(data): auto-sync CME Gold GCZ26 options chain [skip ci]" && git push)
+          git add data/options_prices_GCZ26.csv index.html
+          git diff --staged --quiet || (git commit -m "chore(data): auto-sync CME Gold GCZ26 options chain and index.html [skip ci]" && git push)
