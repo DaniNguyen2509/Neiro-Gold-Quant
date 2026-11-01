@@ -366,7 +366,7 @@ def test_volatility_smile_figure_and_layout_ordering():
     assert "TÂM BÃO PINNING" in annot_texts
     assert "HỐ ĐEN GIẢM TỐC" in annot_texts
     assert "BẪY THUỐC NỔ" in annot_texts
-    assert "SPOT" in annot_texts
+    assert "CME GC" in annot_texts
 
     # 2. Test HTML layout sequence
     html = generate_html_terminal(df_sample, meta, fig_micro, fig_smile=fig_smile)

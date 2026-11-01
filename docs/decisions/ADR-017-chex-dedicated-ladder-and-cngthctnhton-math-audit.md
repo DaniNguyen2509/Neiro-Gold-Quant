@@ -58,3 +58,4 @@ Qua đối chiếu chi tiết từng phương trình đạo hàm:
 - Người dùng có thể nhìn thấy ngay lập tức biểu đồ CHEX riêng biệt ở Panel 4 (không bị che khuất).
 - Toán học mô hình Black-76 và Greeks khớp 100% với tài liệu đặc tả `CNGTHCTNHTON.html`.
 - Toàn bộ 137 unit tests vượt qua, đảm bảo không có rủi ro hồi quy logic.
+

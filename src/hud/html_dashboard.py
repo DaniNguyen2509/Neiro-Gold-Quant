@@ -866,7 +866,7 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
         - 🎯 Tâm Bão Pinning (ATM Strike - minimum IV sweet spot / theta decay)
         - 🛡️ Hố Đen Giảm Tốc (Put Wall - structural skew dip / safe fade limit)
         - ⚠️ Bẫy Thuốc Nổ (Call Wall - wing skew explosion / hard SL boundary)
-        - ⚡ Giá Realtime CME Gold Futures (Spot price)
+        - ⚡ Giá Realtime CME Gold Futures (GC=F)
         - Zero Gamma Flip ($S^*)
     """
     spot_price = float(meta.get("spot_price", 4000.0))
@@ -1009,16 +1009,16 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
             borderpad=4,
             opacity=0.95,
         ),
-        # Live Spot Annotation
+        # Live CME Futures Annotation
         dict(
             x=spot_price,
             y=1.02,
             yref="paper",
-            text=f"<b>⚡ SPOT: ${spot_price:,.2f}</b>",
+            text=f"<b>⚡ CME GC: ${spot_price:,.2f}</b>",
             showarrow=False,
-            font=dict(color="#FACC15", size=10.5, family="JetBrains Mono"),
+            font=dict(color="#38BDF8", size=10.5, family="JetBrains Mono"),
             bgcolor="rgba(15, 23, 42, 0.90)",
-            bordercolor="#FACC15",
+            bordercolor="#38BDF8",
             borderwidth=1,
             borderpad=3,
         ),
@@ -1107,7 +1107,7 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
         )
 
     shapes = [
-        # Spot Price Line
+        # CME Futures Price Line
         dict(
             type="line",
             x0=spot_price,
@@ -1115,7 +1115,7 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
             y0=0,
             y1=1,
             yref="paper",
-            line=dict(color="#FACC15", width=2, dash="dash"),
+            line=dict(color="#38BDF8", width=2, dash="dash"),
         ),
         # ATM Strike Line
         dict(
@@ -1349,8 +1349,8 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
 
         # Row styling & highlight
         if is_spot_nearest:
-            row_style = 'background: rgba(250, 204, 21, 0.08); box-shadow: inset 3px 0 0 #FACC15;'
-            strike_badge = f'<span class="badge" style="background:#FACC15; color:#000; font-weight:800; font-size:10px; margin-left:6px;">SPOT ${spot:,.2f}</span>'
+            row_style = 'background: rgba(56, 189, 248, 0.08); box-shadow: inset 3px 0 0 #38BDF8;'
+            strike_badge = f'<span class="badge" style="background:#38BDF8; color:#000; font-weight:800; font-size:10px; margin-left:6px;">CME GC ${spot:,.2f}</span>'
         elif is_pin_gamma or is_pin_theta or k in [4065.0, 4070.0]:
             row_style = 'background: rgba(15, 23, 42, 0.85); box-shadow: inset 2px 0 0 #EAB308;'
             strike_badge = ''

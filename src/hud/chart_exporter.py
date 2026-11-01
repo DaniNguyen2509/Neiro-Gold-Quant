@@ -183,7 +183,7 @@ def export_quant_chart(
                  color='#B45309', fontsize=7.2, fontweight='bold', va='center',
                  bbox=dict(boxstyle='round,pad=0.2', facecolor='#FEF3C7', edgecolor='#F59E0B', alpha=0.92, linewidth=0.8), zorder=4)
 
-    # 4. CÁC MỐC CHIẾN THUẬT LƯỚT SÓNG TRONG NGÀY (100% TỰ ĐỘNG THEO GIÁ SPOT & GEX)
+    # 4. CÁC MỐC CHIẾN THUẬT LƯỚT SÓNG TRONG NGÀY (100% TỰ ĐỘNG THEO GIÁ CME FUTURES & GEX)
     strikes_above = strikes[strikes > futures_price]
     strike_above = float(strikes_above[0]) if len(strikes_above) > 0 else call_wall
     next_above = float(strikes_above[1]) if len(strikes_above) > 1 else strike_above + step
@@ -192,7 +192,7 @@ def export_quant_chart(
     strike_below = float(strikes_below[-1]) if len(strikes_below) > 0 else put_wall
     next_below = float(strikes_below[-2]) if len(strikes_below) > 1 else strike_below - step
 
-    # Mốc Cửa Ải Kháng Cự Tiền Tuyến (Strike ngay trên Spot)
+    # Mốc Cửa Ải Kháng Cự Tiền Tuyến (Strike ngay trên CME Futures)
     if strikes.min() <= strike_above <= strikes.max() and strike_above != call_wall:
         ax1.axhline(strike_above, color='#2E7D32', linewidth=1.1, linestyle=':')
         gex_above_matches = plot_df.loc[plot_df['strike'] == strike_above, 'netGEX'].values
@@ -201,7 +201,7 @@ def export_quant_chart(
                  color='#1B5E20', fontsize=7.2, fontweight='bold', va='center', ha='left',
                  bbox=dict(boxstyle='round,pad=0.2', facecolor='#E8F5E9', edgecolor='#2E7D32', alpha=0.9, linewidth=0.8))
 
-    # Mốc Sàn Đỡ ATM (Strike ngay dưới Spot)
+    # Mốc Sàn Đỡ ATM (Strike ngay dưới CME Futures)
     if strikes.min() <= strike_below <= strikes.max() and strike_below != put_wall:
         ax1.axhline(strike_below, color='#1565C0', linewidth=1.1, linestyle=':')
         gex_below_matches = plot_df.loc[plot_df['strike'] == strike_below, 'netGEX'].values
@@ -210,7 +210,7 @@ def export_quant_chart(
                  color='#0D47A1', fontsize=7.2, fontweight='bold', va='center', ha='right',
                  bbox=dict(boxstyle='round,pad=0.2', facecolor='#E3F2FD', edgecolor='#1565C0', alpha=0.9, linewidth=0.8))
 
-    # Mốc Trạm Nghỉ Kế Tiếp (Strike nấc 2 dưới Spot)
+    # Mốc Trạm Nghỉ Kế Tiếp (Strike nấc 2 dưới CME Futures)
     if strikes.min() <= next_below <= strikes.max() and next_below != put_wall:
         ax1.axhline(next_below, color='#C62828', linewidth=1.1, linestyle=':')
         gex_next_below_matches = plot_df.loc[plot_df['strike'] == next_below, 'netGEX'].values
