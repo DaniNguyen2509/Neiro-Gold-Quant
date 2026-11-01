@@ -754,8 +754,11 @@ def aggregate_options_dataframes(
         d_copy["putVEX"] = - (vanna * d_copy["putOpenInterest"] * MULT * spot * 0.01 / 1e6)
         d_copy["netVEX"] = d_copy["callVEX"] + d_copy["putVEX"]
 
-        charm_call = - df_disc * (pdf_d1 * (r / denom - d2 / (2.0 * t_years)) - r * cdf_d1)
-        charm_put = charm_call - r * df_disc
+        # Black-76 Charm: Rate of delta decay per calendar day (CNGTHCTNHTON.html)
+        # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
+        # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * cdf(-d1)] / 365
+        charm_call = df_disc * (pdf_d1 * (d2 / (2.0 * t_years)) - r * cdf_d1)
+        charm_put = df_disc * (pdf_d1 * (d2 / (2.0 * t_years)) + r * cdf_neg_d1)
         d_copy["callCHEX"] = (charm_call / 365.0) * d_copy["callOpenInterest"] * MULT * spot / 1e6
         d_copy["putCHEX"] = - ((charm_put / 365.0) * d_copy["putOpenInterest"] * MULT * spot / 1e6)
         d_copy["netCHEX"] = d_copy["callCHEX"] + d_copy["putCHEX"]
@@ -764,9 +767,11 @@ def aggregate_options_dataframes(
         d_copy["totalVega"] = (d_copy["callOpenInterest"] + d_copy["putOpenInterest"]) * MULT * vega * 0.01 / 1e6
 
         theta_common = - (spot * df_disc * pdf_d1 * sigma) / (2.0 * math.sqrt(t_years))
-        theta_call = (theta_common - r * df_disc * (spot * cdf_d1 - strikes_arr * cdf_d2)) / 365.0
-        theta_put = (theta_common + r * df_disc * (strikes_arr * cdf_neg_d2 - spot * cdf_neg_d1)) / 365.0
-        d_copy["totalTheta"] = (d_copy["callOpenInterest"] * theta_call + d_copy["putOpenInterest"] * theta_put) * MULT / 1e6
+        call_price = df_disc * (spot * cdf_d1 - strikes_arr * cdf_d2)
+        put_price = df_disc * (strikes_arr * cdf_neg_d2 - spot * cdf_neg_d1)
+        theta_call = (theta_common + r * call_price) / 365.0
+        theta_put = (theta_common + r * put_price) / 365.0
+        d_copy["totalTheta"] = (d_copy["callOpenInterest"] * np.abs(theta_call) + d_copy["putOpenInterest"] * np.abs(theta_put)) * MULT / 1e6
 
         processed_dfs.append(d_copy)
 
@@ -959,9 +964,11 @@ def compute_tactical_matrix(
     # Vanna = -df * n(d1) * (d2 / sigma)
     vanna = - df_discount * pdf_d1 * (d2 / sigma_atm)
 
-    # Charm_call = -df * [ n(d1) * (r / denom - d2 / (2T)) - r * N(d1) ]
-    charm_call = - df_discount * (pdf_d1 * (r / denom - d2 / (2.0 * T_years)) - r * cdf_d1)
-    charm_put = charm_call - r * df_discount
+    # Charm (Black-76 rate of delta decay per calendar day, CNGTHCTNHTON.html)
+    # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
+    # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * (1 - cdf(d1))] / 365
+    charm_call = df_discount * (pdf_d1 * (d2 / (2.0 * T_years)) - r * cdf_d1)
+    charm_put = df_discount * (pdf_d1 * (d2 / (2.0 * T_years)) + r * (1.0 - cdf_d1))
 
     charm_call_day = charm_call / 365.0
     charm_put_day = charm_put / 365.0

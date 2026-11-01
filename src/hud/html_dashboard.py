@@ -382,8 +382,11 @@ def load_and_preprocess_options(
     df["netGEX"] = df["callGEX"] + df["putGEX"]
 
     vanna = - df_disc * pdf_d1 * (d2 / sigma_atm)
-    charm_call = - df_disc * (pdf_d1 * (r / denom - d2 / (2.0 * T_years)) - r * cdf_d1)
-    charm_put = charm_call - r * df_disc
+    # Charm (Rate of delta decay per calendar day, Black-76, CNGTHCTNHTON.html)
+    # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
+    # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * (1 - cdf(d1))] / 365
+    charm_call = df_disc * (pdf_d1 * (d2 / (2.0 * T_years)) - r * cdf_d1)
+    charm_put = df_disc * (pdf_d1 * (d2 / (2.0 * T_years)) + r * (1.0 - cdf_d1))
 
     df["callVEX"] = vanna * df["callOpenInterest"] * MULT * spot_price * 0.01 / 1e6
     df["putVEX"] = - (vanna * df["putOpenInterest"] * MULT * spot_price * 0.01 / 1e6)
@@ -629,15 +632,16 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
         df["netDeltaContracts"] = np.round(df["callDeltaContracts"] + df["putDeltaContracts"], 1)
 
     fig = make_subplots(
-        rows=1, cols=3,
+        rows=1, cols=4,
         shared_yaxes=True,
-        horizontal_spacing=0.035,
+        horizontal_spacing=0.025,
         subplot_titles=(
-            "<b>Panel 1: Net GEX ($M) & Mốc Chiến Thuật (SL/TP)</b>",
-            "<b>Panel 2: Volume, OI & Sổ Sách Net Delta (HĐ)</b>",
-            "<b>Panel 3: Greeks Bậc 2 (Vanna & Charm)</b>",
+            "<b>Panel 1: Net GEX ($M)</b>",
+            "<b>Panel 2: Volume, OI & Net Delta (HĐ)</b>",
+            "<b>Panel 3: Net VEX ($M/1% IV) · Vanna</b>",
+            "<b>Panel 4: Net CHEX ($M/ngày) · Charm Decay</b>",
         ),
-        column_widths=[0.36, 0.36, 0.28],
+        column_widths=[0.27, 0.27, 0.23, 0.23],
     )
 
     # Panel 1: Net GEX
@@ -726,26 +730,31 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     )
     fig.add_vline(x=0, line_dash="solid", line_color="#475569", row=1, col=2)
 
-    # Panel 3: Vanna & Charm
+    # Panel 3: Net VEX (Vanna Exposure Flow)
+    colors_v = ["#38BDF8" if x >= 0 else "#818CF8" for x in df["netVEX"]]
     fig.add_trace(
         go.Bar(
             y=df["strike"], x=df["netVEX"], orientation="h",
             width=bar_widths,
-            marker_color="#38BDF8", opacity=0.8, name="Net VEX ($M)",
-            hovertemplate="Strike: $%{y}<br>Net VEX: $%{x:.2f}M<extra></extra>",
-        ),
-        row=1, col=3,
-    )
-    fig.add_trace(
-        go.Bar(
-            y=df["strike"], x=df["netCHEX"], orientation="h",
-            width=bar_widths,
-            marker_color="#FACC15", opacity=0.8, name="Net CHEX ($M/ngày)",
-            hovertemplate="Strike: $%{y}<br>Net CHEX: $%{x:.2f}M/ngày<extra></extra>",
+            marker_color=colors_v, opacity=0.85, name="Net VEX ($M/1% IV)",
+            hovertemplate="Strike: $%{y}<br>Net VEX: %{x:+.2f}M USD<extra></extra>",
         ),
         row=1, col=3,
     )
     fig.add_vline(x=0, line_dash="solid", line_color="#475569", row=1, col=3)
+
+    # Panel 4: Dedicated Net CHEX (Charm Exposure Delta Decay Flow per 24h)
+    colors_c = ["#FACC15" if x >= 0 else "#C084FC" for x in df["netCHEX"]]
+    fig.add_trace(
+        go.Bar(
+            y=df["strike"], x=df["netCHEX"], orientation="h",
+            width=bar_widths,
+            marker_color=colors_c, opacity=0.88, name="Net CHEX ($M/ngày)",
+            hovertemplate="<b>Strike: $%{y}</b><br>Net CHEX: %{x:+.2f}M USD/ngày<br><i>(Dòng tiền phân rã Delta 24h)</i><extra></extra>",
+        ),
+        row=1, col=4,
+    )
+    fig.add_vline(x=0, line_dash="solid", line_color="#475569", row=1, col=4)
 
     # Horizontal Level Annotations across panels
     y_min = float(df["strike"].min()) - 10.0
@@ -769,7 +778,7 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
 
     for lvl, color, label, pos, dash in levels:
         if y_min <= lvl <= y_max:
-            for c in [1, 2, 3]:
+            for c in [1, 2, 3, 4]:
                 fig.add_hline(
                     y=lvl, line_color=color, line_width=1.8 if "LIVE" in label else 1.2,
                     line_dash=dash, row=1, col=c,

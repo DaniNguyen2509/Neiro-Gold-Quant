@@ -71,8 +71,8 @@ def export_quant_chart(
         df_disc = np.exp(-0.045 * T_years)
         
         vanna = - df_disc * pdf_d1 * (d2 / sigma_atm)
-        charm_call = - df_disc * (pdf_d1 * (0.045 / denom - d2 / (2.0 * T_years)) - 0.045 * cdf_d1)
-        charm_put = charm_call - 0.045 * df_disc
+        charm_call = df_disc * (pdf_d1 * (d2 / (2.0 * T_years)) - 0.045 * cdf_d1)
+        charm_put = df_disc * (pdf_d1 * (d2 / (2.0 * T_years)) + 0.045 * (1.0 - cdf_d1))
         
         df['callVEX'] = vanna * df['callOpenInterest'] * MULT * futures_price * 0.01 / 1e6
         df['putVEX'] = - (vanna * df['putOpenInterest'] * MULT * futures_price * 0.01 / 1e6)

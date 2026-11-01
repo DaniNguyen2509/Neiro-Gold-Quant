@@ -448,7 +448,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }}
         }});
 
-        // 2. Draw Net GEX & Greeks Profile Bars per Strike (Thang đo vi mô bậc 1 & 2)
+        // 2. Draw Net GEX & Greeks Profile Bars per Strike (Thang đo vi mô bậc 1 & 2: GEX, VEX, CHEX)
         const optionsData = window.INITIAL_OPTIONS || [];
         optionsData.forEach(opt => {{
             const k = opt.strike;
@@ -459,25 +459,36 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 const chex = opt.netCHEX || 0;
                 const isPos = gex >= 0;
                 const barLen = Math.min(130, Math.abs(gex) * 3.5);
+                const chexLen = Math.min(65, Math.abs(chex) * 4.0);
 
-                // Bar ngang đại diện cho trọng lượng Net GEX
+                // Bar ngang đại diện cho trọng lượng Net GEX (Xanh lá / Đỏ)
                 if (barLen > 2) {{
                     ctx.fillStyle = isPos ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)';
-                    ctx.fillRect(rightX - barLen, y - 4, barLen, 8);
+                    ctx.fillRect(rightX - barLen, y - 5, barLen, 6);
                     ctx.fillStyle = isPos ? '#4ADE80' : '#F87171';
-                    ctx.fillRect(rightX - 2, y - 4, 2, 8);
+                    ctx.fillRect(rightX - 2, y - 5, 2, 6);
                 }}
 
-                // Hiển thị nhãn Greeks trực tiếp cạnh từng Strike chính
-                if (Math.abs(gex) >= 2.5 || Math.abs(vex) >= 1.5) {{
+                // Bar ngang đại diện cho dòng phân rã Charm Net CHEX (Vàng / Tím - Delta Decay/24h)
+                if (chexLen > 2) {{
+                    const isChexPos = chex >= 0;
+                    ctx.fillStyle = isChexPos ? 'rgba(250, 204, 21, 0.40)' : 'rgba(192, 132, 252, 0.40)';
+                    ctx.fillRect(rightX - chexLen, y + 2, chexLen, 4);
+                    ctx.fillStyle = isChexPos ? '#FACC15' : '#C084FC';
+                    ctx.fillRect(rightX - 2, y + 2, 2, 4);
+                }}
+
+                // Hiển thị nhãn Greeks trực tiếp cạnh từng Strike chính (GEX, VEX, CHEX đầy đủ)
+                if (Math.abs(gex) >= 2.5 || Math.abs(vex) >= 1.5 || Math.abs(chex) >= 0.5) {{
                     ctx.font = '8.5px "JetBrains Mono", monospace';
                     ctx.textAlign = 'right';
-                    const txt = '$' + Math.round(k) + ' · GEX ' + (gex >= 0 ? '+' : '') + gex.toFixed(1) + 'M | VEX ' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M';
+                    const maxBar = Math.max(barLen, chexLen);
+                    const txt = '$' + Math.round(k) + ' · GEX ' + (gex >= 0 ? '+' : '') + gex.toFixed(1) + 'M | VEX ' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M | CHEX ' + (chex >= 0 ? '+' : '') + chex.toFixed(1) + 'M/d';
                     const tw = ctx.measureText(txt).width;
-                    ctx.fillStyle = 'rgba(6, 8, 14, 0.85)';
-                    ctx.fillRect(rightX - barLen - tw - 10, y - 7, tw + 6, 12);
+                    ctx.fillStyle = 'rgba(6, 8, 14, 0.88)';
+                    ctx.fillRect(rightX - maxBar - tw - 12, y - 7, tw + 8, 14);
                     ctx.fillStyle = isPos ? '#86EFAC' : '#FCA5A5';
-                    ctx.fillText(txt, rightX - barLen - 7, y + 2);
+                    ctx.fillText(txt, rightX - maxBar - 8, y + 3);
                 }}
             }}
         }});

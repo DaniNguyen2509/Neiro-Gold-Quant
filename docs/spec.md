@@ -30,10 +30,15 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
 4. **All-in-One Orderflow Terminal Canvas 60 FPS (Nhìn 1 Biểu Đồ Thấu Suốt Toàn Bộ):**
    - **Tab 1: ALL-IN-ONE ORDERFLOW FOOTPRINT CANVAS:** Tích hợp trực tiếp trên Canvas 60 FPS:
      * Air Pocket Vacuum Zones (`⚠️ AIR POCKET VACUUM [$min - $max]`) cảnh báo khoảng trống thanh khoản rỗng.
-     * Net GEX Profile Bars & nhãn VEX hiển thị song hành cạnh từng Strike trên thước đo giá.
+     * Net GEX Profile Bars (Xanh lá / Đỏ) & Net CHEX Profile Bars (Vàng / Tím) kèm nhãn hiển thị đầy đủ GEX, VEX, CHEX cạnh từng Strike trên thước đo giá.
      * Key Structural Boundary Lines (Call Wall, Put Wall kèm Siege Ratio, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers).
      * Floating HUD & Băng giá M5 Orderflow Tape.
-   - **Tab 2: 3-PANEL QUANT LADDER & MICROSTRUCTURE MATRIX:** Plotly Dark HUD trực quan (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Bảng cấu trúc vi mô Strike Pinning Matrix, Bảng tác chiến Scalping lướt sóng trong ngày).
+   - **Tab 2: 4-PANEL QUANT LADDER & MICROSTRUCTURE MATRIX:** Plotly Dark HUD trực quan gồm 4 Panel độc lập:
+     * **Panel 1: Net GEX ($M)** & Mốc Chiến Thuật (SL/TP)
+     * **Panel 2: Volume, OI & Sổ Sách Net Delta (HĐ)** (Dòng lệnh & Vị thế thực tế)
+     * **Panel 3: Net VEX ($M/1% IV)** · Áp lực biến động Vanna Flow
+     * **Panel 4: Net CHEX ($M/ngày)** · Dòng tiền tự động phân rã Delta Charm 24h
+     * Bảng định lượng vi cấu trúc Greeks & Tâm bão Pinning, Bảng chiến lược lướt sóng trong ngày.
    - Đã loại bỏ hoàn toàn các khối rườm rà: PHẦN 2 Structural Swing Walls, Action Banner KB-2, Ma trận 6 Kịch bản.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.

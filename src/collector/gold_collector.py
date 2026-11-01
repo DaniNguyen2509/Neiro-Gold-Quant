@@ -89,19 +89,21 @@ def black76_greeks_single(
     d2 = d1 - sigma * sqrt_t
     df = math.exp(-r * t)
     pdf_d1 = normal_pdf(d1)
+    common_theta = -df * (f * pdf_d1 * sigma / (2.0 * sqrt_t))
 
     if is_call:
         price = df * (f * normal_cdf(d1) - k * normal_cdf(d2))
         delta = df * normal_cdf(d1)
-        charm = df * (r * normal_cdf(d1) + pdf_d1 * d2 / (2.0 * t))
+        charm = df * (pdf_d1 * (d2 / (2.0 * t)) - r * normal_cdf(d1))
+        theta = common_theta + r * price
     else:
         price = df * (k * normal_cdf(-d2) - f * normal_cdf(-d1))
         delta = -df * normal_cdf(-d1)
-        charm = df * (-r * normal_cdf(-d1) + pdf_d1 * d2 / (2.0 * t))
+        charm = df * (pdf_d1 * (d2 / (2.0 * t)) + r * normal_cdf(-d1))
+        theta = common_theta + r * price
 
     gamma = df * pdf_d1 / (f * sigma * sqrt_t)
     vega = df * f * sqrt_t * pdf_d1
-    theta = -df * (f * pdf_d1 * sigma / (2.0 * sqrt_t))
     vanna = -df * pdf_d1 * (d2 / sigma)
 
     return {
