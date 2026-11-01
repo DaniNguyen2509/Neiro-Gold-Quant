@@ -373,8 +373,15 @@ def load_and_preprocess_options(
 
     # Black-76 Gamma: e^(-rT) * n(d1) / (F * sigma * sqrt(T))
     gamma_b76 = (df_disc * pdf_d1) / np.maximum(1e-4, spot_price * denom)
-    gamma_c = np.where(df["callGamma"] > 0, df["callGamma"], gamma_b76)
-    gamma_p = np.where(df["putGamma"] > 0, df["putGamma"], gamma_b76)
+    raw_unphysical = (df["callGamma"].nunique() <= 3) or bool(((df["strike"] > (spot_price + 800.0)) & (df["callGamma"] > 0.001)).any())
+    if raw_unphysical:
+        gamma_c = gamma_b76
+        gamma_p = gamma_b76
+    else:
+        gamma_c = np.where(df["callGamma"] > 0, df["callGamma"], gamma_b76)
+        gamma_p = np.where(df["putGamma"] > 0, df["putGamma"], gamma_b76)
+    df["callGamma"] = gamma_c
+    df["putGamma"] = gamma_p
 
     # 3. GEX Calculation ($M / 1% move)
     df["callGEX"] = gamma_c * df["callOpenInterest"] * MULT * scale
