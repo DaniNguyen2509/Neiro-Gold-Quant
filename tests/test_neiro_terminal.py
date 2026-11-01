@@ -41,14 +41,16 @@ def test_render_neiro_orderflow_component():
     assert "neiro_container_html" in comp
     assert "neiro_js_script" in comp
 
-    # Verify key elements in HTML components
-    assert "NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL" in comp["nav_topbar_html"]
-    assert "$100.0/oz" in comp["nav_topbar_html"]
+    # Verify key elements in HTML components (standardized with Neiro-NQ-Quant)
+    assert "NEIRO ORDERFLOW" in comp["nav_topbar_html"]
+    assert "SPOT CME:" in comp["nav_topbar_html"]
+    assert "M1 INTRADAY" in comp["nav_topbar_html"]
 
     assert "neiro-view-container" in comp["neiro_container_html"]
     assert "neiro-tv-chart" in comp["neiro_container_html"]
     assert "neiro-canvas" in comp["neiro_container_html"]
-    assert "GAMMA SQUEEZE ↑" in comp["neiro_container_html"]
+    assert "GAMMA SQUEEZE" in comp["neiro_container_html"]
+    assert "neiro-floating-hud" in comp["neiro_container_html"]
 
     assert "switchTerminalView" in comp["neiro_js_script"]
     assert "initNeiroGoldChart" in comp["neiro_js_script"]

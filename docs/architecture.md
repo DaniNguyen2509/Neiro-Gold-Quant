@@ -1,9 +1,9 @@
 # Neiro-Gold-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v3.2 — TradingView Fullscreen Zero-Tabs & Realtime Tick Terminal  
+> **Phiên bản:** v3.3 — Chuẩn Hóa 1:1 Cockpit Neiro-NQ-Quant & 4 Cột Profile Greeks Trên Canvas  
 > **Dự án:** Neiro-Gold-Quant (Hệ thống Định lượng Vi mô Dòng tiền Market Maker & All-in-One Orderflow Terminal cho 100% Pure COMEX Gold Futures `GC` / `MGC`)  
 > **Vận hành:** Cloud-Native Zero-Touch Automation (GitHub Actions + GitHub Pages, thuần Python, Zero-Waste < 15MB)  
-> **Tài liệu chuẩn đối chiếu:** [docs/spec.md](spec.md), [config/settings.toml](../config/settings.toml), [docs/TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [ADR-018](decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md).
+> **Tài liệu chuẩn đối chiếu:** [docs/spec.md](spec.md), [config/settings.toml](../config/settings.toml), [docs/TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [ADR-018](decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md), [ADR-020](decisions/ADR-020-dedicated-vanna-and-charm-ladder-column.md).
 
 ---
 
@@ -29,10 +29,11 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
    - Áp lực tấn công thành trì trong ngày được đo lường bằng tỷ lệ tốc độ dòng tiền:
      $$\text{Wall Siege Ratio} = \frac{\text{Volume}}{\max(\text{Baseline OI}, 1)}$$
      Khi $\text{Siege Ratio} \ge 0.25$, hệ thống phát cảnh báo nguy cơ vỡ trận phòng thủ.
-4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Toàn Bộ Trên 1 Màn Hình Duy Nhất):**
+4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Chuẩn hóa 1:1 Neiro-NQ-Quant):**
    - **Mặc định Timeframe M1:** Lấy 250 nến 1 phút liên tục gần nhất của COMEX Gold Futures `GC=F`, phản ánh từng biến động vi cấu trúc.
-   - **TradingView Full-bleed Canvas 60 FPS:** Khung chart mở rộng 100% màn hình (700px/880px), topbar chuyên nghiệp với nhãn live badge và multiplier $100.0/oz.
-   - **Zero Tabs & Unified Matrix:** Loại bỏ tabs phân mảnh. Canvas Orderflow và Unified Greeks Matrix (kết hợp GEX, VEX, CHEX, Delta, OI, Volume) cùng 4-Panel Plotly hiển thị liền mạch trên một màn hình duy nhất.
+   - **TradingView Full-bleed Canvas 60 FPS:** Khung chart mở rộng 100% màn hình, topbar chuyên nghiệp với nhãn live badge và multiplier $100.0/oz.
+   - **Floating Tactical HUD Card:** Góc trên bên trái hiển thị NET GEX, GAMMA SQUEEZE ↑/↓, VANNA, CHARM, THETA, 1-SIGMA.
+   - **4 Cột Greeks Profile Cố Định Theo Trục Giá Nến:** GEX | VEX | CHEX | THETA trên Canvas 60 FPS bám sát `candleSeries.priceToCoordinate(k)`.
    - **Realtime Tick Engine:** Tự động đẩy giá nến M1 và đường giá live `livePriceLine` từng tick mà không cần reload trang (Zero Page Reload), triệt tiêu hiện tượng nhấp nháy chớp trắng.
 5. **Vận hành Tự động Đám mây (Zero-Touch Cloud-Native Automation):**
    - Chạy 100% không người lái trên GitHub Actions theo Lưới Cron Đa Tầng Pre-Session Radar, xuất bản trực tiếp lên GitHub Pages. Không cần cài đặt phần mềm nặng, không phụ thuộc laptop, repo < 15MB.
@@ -72,12 +73,14 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
                                              │
                                              ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 3: TRADINGVIEW FULLSCREEN REALTIME TERMINAL (ZERO-TABS SINGLE PAGE)]                 │
+│ [TẦNG 3: TRADINGVIEW FULLSCREEN REALTIME TERMINAL (CHUẨN HÓA 1:1 NEIRO-NQ-QUANT)]          │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────┐ │
 │  │ KHỐI 1: TRADINGVIEW FULLSCREEN CANVAS 60 FPS (LIGHTWEIGHT CHARTS 4.2)                 │ │
 │  │  - Mặc định M1 nến 1 phút liên tục CME GC=F, Topbar Live Badge, Multiplier $100.0/oz  │ │
-│  │  - Air Pocket Vacuum Zones, Net GEX/CHEX Profile Bars, Wall Lines, Realtime Tick Line  │ │
-│  │  - Realtime Tick Engine (Zero Reload): cập nhật giá từng tick trực tiếp qua DOM       │ │
+│  │  - Floating Tactical HUD Card góc trên bên trái (GEX, SQZ, VEX, CHEX, TEX, 1-σ)       │ │
+│  │  - 4 Cột Profile Greeks trên Canvas: GEX | VEX | CHEX | THETA bám chặt trục giá nến   │ │
+│  │  - Pinned Edge Indicators: ▲ CALL WALL trên đỉnh, ▼ PUT WALL dưới đáy                 │ │
+│  │  - Air Pocket Vacuum Zones, Realtime Tick Line, Subbar Live Greeks Radar              │ │
 │  ├───────────────────────────────────────────────────────────────────────────────────────┤ │
 │  │ KHỐI 2: UNIFIED GREEKS & ORDERFLOW PINNING MATRIX (FULL-BLEED 100% WIDTH)             │ │
 │  │  - Hợp nhất toàn bộ: Net GEX ($M), Net VEX ($M/1%), Net CHEX ($M/d), Net Delta, OI, Vol│ │
@@ -199,15 +202,20 @@ on:
    - 8 cột tiêu chuẩn chuẩn hóa theo Neiro-NQ-Quant: `GC Strike`, `Net GEX ($M)`, `Call OI`, `Put OI`, `Call Vol`, `Put Vol`, `Net VEX ($M)`, `Net CHEX ($M/d)`.
    - Tổng hợp vị thế đa kỳ hạn, tự động làm nổi bật Spot realtime, Call Wall, Put Wall và Zero Gamma Flip.
 
+---
 
-
-## VII. CỐ ĐỊNH HỒ SƠ ĐỈNH VANNA (XANH DƯƠNG) & ĐỈNH CHARM (VÀNG) THEO TRỤC GIÁ BIỂU ĐỒ (ADR-020)
+## VII. CHUẨN HÓA 1:1 GIAO DIỆN COCKPIT VỚI NEIRO-NQ-QUANT & 4 CỘT PROFILE GREEKS (ADR-020)
 
 1. **Khắc phục điểm mù và lệch trục giá (Zero Vertical Desynchronization):**
-   - Loại bỏ các bảng HTML độc lập ngoài chart để tránh hiện tượng lệch giá khi co giãn nến. Biểu đồ TradingView và Canvas chiếm trọn 100% diện tích màn hình.
-   - Sử dụng hàm \candleSeries.priceToCoordinate(k)\ tính tọa độ Y của từng mức giá trực tiếp trên Canvas 60 FPS, đảm bảo thanh bar profile Vanna và Charm luôn bám chặt và cố định theo mức giá của nến M1.
+   - Loại bỏ triệt để các bảng HTML độc lập ngoài chart để tránh hiện tượng lệch giá khi co giãn nến. Biểu đồ TradingView và Canvas chiếm trọn 100% diện tích màn hình.
+   - Sử dụng hàm `candleSeries.priceToCoordinate(k)` tính tọa độ Y của từng mức giá trực tiếp trên Canvas 60 FPS, đảm bảo 4 cột profile Greeks (`GEX | VEX | CHEX | THETA`) luôn bám chặt và cố định theo mức giá của nến M1.
 
-2. **Quy chuẩn màu sắc & Nhận diện vi cấu trúc:**
-   - **Vanna (Net VEX - Màu Xanh Dương \#38BDF8\):** Đo lường độ nhạy của Delta theo IV. Điểm cực trị Đỉnh Vanna được làm nổi bật với badge phát sáng xanh dương trên canvas và PriceLine trên thước đo giá.
-   - **Charm (Net CHEX - Màu Vàng \#FACC15\):** Đo lường tốc độ bào mòn Delta theo thời gian (nam châm ghìm giá đêm). Điểm cực trị Đỉnh Charm được làm nổi bật với badge phát sáng vàng trên canvas và PriceLine trên thước đo giá.
-   - **Đồng bộ toàn diện:** Trục giá, Top HUD và Canvas Overlay đều áp dụng đồng nhất chuẩn màu Xanh Dương (Vanna) và Vàng (Charm).
+2. **Cấu trúc Cockpit Chuẩn Neiro-NQ-Quant:**
+   - **Floating Quant HUD Card:** Đặt tại góc trên bên trái biểu đồ nến, hiển thị `NET GEX`, `GAMMA SQUEEZE ↑/↓`, `VANNA (VEX)`, `CHARM (CHEX)`, `THETA (TEX)`, `1-SIGMA`.
+   - **Topbar & Subbar Realtime Greeks Radar:** Topbar hiển thị trạng thái `M1 INTRADAY` và các chỉ số tài chính vi cấu trúc; Subbar hiển thị live Black-76 Greeks tick-by-tick (Delta, Gamma, Vega, Theta, Vanna, Charm, Zero Gamma).
+   - **4 Cột Profile Greeks Trên Canvas (colW = 60px):** Đặt bên phải sát thước đo giá, tỏa đều 2 phía từ trục tâm, với mã màu chuẩn hóa:
+     * GEX: Xanh lá (`#22C55E`) / Đỏ (`#EF4444`).
+     * VEX: Xanh Cyan (`#22D3EE` / `#0E7490`).
+     * CHEX: Tím (`#C084FC` / `#7E22CE`).
+     * THETA: Cam (`#FDBA74` / `#EA580C`).
+   - **Pinned Edge Indicators:** Ghim cảnh báo `▲ CALL WALL` khi nằm vượt lên trên khung hình, `▼ PUT WALL` khi nằm tụt xuống dưới đáy khung hình.
