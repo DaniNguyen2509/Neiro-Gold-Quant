@@ -1,9 +1,9 @@
 # Neiro-Gold-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v3.1 — All-in-One Tactical Terminal & Multi-Expiry Greeks Term Structure  
+> **Phiên bản:** v3.2 — TradingView Fullscreen Zero-Tabs & Realtime Tick Terminal  
 > **Dự án:** Neiro-Gold-Quant (Hệ thống Định lượng Vi mô Dòng tiền Market Maker & All-in-One Orderflow Terminal cho 100% Pure COMEX Gold Futures `GC` / `MGC`)  
 > **Vận hành:** Cloud-Native Zero-Touch Automation (GitHub Actions + GitHub Pages, thuần Python, Zero-Waste < 15MB)  
-> **Tài liệu chuẩn đối chiếu:** [docs/spec.md](spec.md), [config/settings.toml](../config/settings.toml), [docs/TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [ADR-016](decisions/ADR-016-all-in-one-tactical-terminal-and-multi-expiry-greeks.md).
+> **Tài liệu chuẩn đối chiếu:** [docs/spec.md](spec.md), [config/settings.toml](../config/settings.toml), [docs/TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [ADR-018](decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md).
 
 ---
 
@@ -29,9 +29,11 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
    - Áp lực tấn công thành trì trong ngày được đo lường bằng tỷ lệ tốc độ dòng tiền:
      $$\text{Wall Siege Ratio} = \frac{\text{Volume}}{\max(\text{Baseline OI}, 1)}$$
      Khi $\text{Siege Ratio} \ge 0.25$, hệ thống phát cảnh báo nguy cơ vỡ trận phòng thủ.
-4. **Terminal Tác chiến Đa Chế Độ Dual-View (Single-Page HUD):**
-   - **Tab 1: NEIRO ORDERFLOW FOOTPRINT:** Canvas HTML5 60 FPS mô phỏng sổ lệnh thang giá dọc, Bid/Ask Footprint Delta, Micro-candles Brownian-bridge / Globex 1m-5m, Multiplier = 100.0 cho GC ($10.0 cho MGC), Tick-by-Tick tape.
-   - **Tab 2: 3-PANEL QUANT LADDER & PLAYBOOK:** Plotly Dark HUD tương tác cao (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Intraday Scalping Strategy, Structural Swing Walls, Strike Microstructure Matrix, Anti-collision layout).
+4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Toàn Bộ Trên 1 Màn Hình Duy Nhất):**
+   - **Mặc định Timeframe M1:** Lấy 250 nến 1 phút liên tục gần nhất của COMEX Gold Futures `GC=F`, phản ánh từng biến động vi cấu trúc.
+   - **TradingView Full-bleed Canvas 60 FPS:** Khung chart mở rộng 100% màn hình (700px/880px), topbar chuyên nghiệp với nhãn live badge và multiplier $100.0/oz.
+   - **Zero Tabs & Unified Matrix:** Loại bỏ tabs phân mảnh. Canvas Orderflow và Unified Greeks Matrix (kết hợp GEX, VEX, CHEX, Delta, OI, Volume) cùng 4-Panel Plotly hiển thị liền mạch trên một màn hình duy nhất.
+   - **Realtime Tick Engine:** Tự động đẩy giá nến M1 và đường giá live `livePriceLine` từng tick mà không cần reload trang (Zero Page Reload), triệt tiêu hiện tượng nhấp nháy chớp trắng.
 5. **Vận hành Tự động Đám mây (Zero-Touch Cloud-Native Automation):**
    - Chạy 100% không người lái trên GitHub Actions theo Lưới Cron Đa Tầng Pre-Session Radar, xuất bản trực tiếp lên GitHub Pages. Không cần cài đặt phần mềm nặng, không phụ thuộc laptop, repo < 15MB.
 
@@ -70,18 +72,20 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
                                              │
                                              ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 3: ALL-IN-ONE ORDERFLOW TERMINAL (CANVAS 60 FPS FRONTEND HUD)]                       │
-│  ┌──────────────────────────────────────────────┬────────────────────────────────────────┐ │
-│  │ TAB 1: NEIRO ALL-IN-ONE ORDERFLOW FOOTPRINT  │ TAB 2: 3-PANEL QUANT LADDER & MATRIX   │ │
-│  ├──────────────────────────────────────────────┼────────────────────────────────────────┤ │
-│  │ - HTML5 Canvas 60 FPS Orderflow Layer        │ - Panel 1: Net GEX Profile & Walls     │ │
-│  │ - Thang giá dọc DOM / Bid-Ask Ladder         │ - Panel 2: OI Concentration & Delta    │ │
-│  │ - Footprint Delta Bar Cluster & 1m/5m Candle │ - Panel 3: Vanna & Charm Flow          │ │
-│  │ - Air Pocket Vacuum Zones trên Canvas        │ - Bảng Cấu Trúc Vi Mô Strike Matrix   │ │
-│  │ - Net GEX Bars & Greeks Profile per Strike   │ - Bảng Tác Chiến Scalping Trong Ngày   │ │
-│  │ - Key Structural Walls & Wall Siege Ratio    │ - Từ Điển Bỏ Túi Giải Thích 1 Dòng     │ │
-│  │ - Multiplier = 100.0 (GC) / 10.0 (MGC)       │ - Thuật toán Chống Đè Chữ              │ │
-│  └──────────────────────────────────────────────┴────────────────────────────────────────┘ │
+│ [TẦNG 3: TRADINGVIEW FULLSCREEN REALTIME TERMINAL (ZERO-TABS SINGLE PAGE)]                 │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐ │
+│  │ KHỐI 1: TRADINGVIEW FULLSCREEN CANVAS 60 FPS (LIGHTWEIGHT CHARTS 4.2)                 │ │
+│  │  - Mặc định M1 nến 1 phút liên tục CME GC=F, Topbar Live Badge, Multiplier $100.0/oz  │ │
+│  │  - Air Pocket Vacuum Zones, Net GEX/CHEX Profile Bars, Wall Lines, Realtime Tick Line  │ │
+│  │  - Realtime Tick Engine (Zero Reload): cập nhật giá từng tick trực tiếp qua DOM       │ │
+│  ├───────────────────────────────────────────────────────────────────────────────────────┤ │
+│  │ KHỐI 2: UNIFIED GREEKS & ORDERFLOW PINNING MATRIX (FULL-BLEED 100% WIDTH)             │ │
+│  │  - Hợp nhất toàn bộ: Net GEX ($M), Net VEX ($M/1%), Net CHEX ($M/d), Net Delta, OI, Vol│ │
+│  ├───────────────────────────────────────────────────────────────────────────────────────┤ │
+│  │ KHỐI 3: PLOTLY 4-PANEL QUANT LADDER (HIỂN THỊ SONG SONG LIỀN MẠCH)                    │ │
+│  │  - Panel 1: Net GEX ($M) & Mốc Chiến Thuật | Panel 2: Volume, OI & Sổ Sách Net Delta   │ │
+│  │  - Panel 3: Net VEX ($M/1% IV) Flow         | Panel 4: Net CHEX ($M/ngày) Delta Decay │ │
+│  └───────────────────────────────────────────────────────────────────────────────────────┘ │
 │  - Header KPI Bar: Spot CME, Net GEX Regime, Net Delta Tilt, Zero Gamma Flip, Expected Move│
 │  - Multi-Expiry Term Structure: Xếp chồng tuyến tính Greeks ∑ NetGEX_e, ∑ NetVEX_e        │
 │  - Xuất bản tự động lên GitHub Pages (https://daninguyen2509.github.io/Neiro-Gold-Quant/).      │

@@ -1282,7 +1282,15 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
         c_vol = int(row.get("callVolume", 0))
         p_vol = int(row.get("putVolume", 0))
         tot_vol = c_vol + p_vol
+        c_delta = float(row.get("callDelta", 0.0))
+        p_delta = float(row.get("putDelta", 0.0))
+        net_delta = float(row.get("netDeltaContracts", 0.0) or (c_oi * c_delta + p_oi * p_delta))
+        c_delta = float(row.get("callDelta", 0.0))
+        p_delta = float(row.get("putDelta", 0.0))
+        net_delta = float(row.get("netDeltaContracts", 0.0) or (c_oi * c_delta + p_oi * p_delta))
         net_gex = float(row.get("netGEX", 0.0))
+        net_vex = float(row.get("netVEX", 0.0))
+        net_chex = float(row.get("netCHEX", 0.0))
 
         d1 = (math.log(max(1e-4, spot / k)) + 0.5 * (sigma_atm ** 2) * T_years) / denom
         pdf_d1 = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * (d1 ** 2))
@@ -1294,10 +1302,15 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
             "call_oi": c_oi,
             "put_oi": p_oi,
             "total_oi": tot_oi,
+            "call_vol": c_vol,
+            "put_vol": p_vol,
             "volume": tot_vol,
+            "net_delta": net_delta,
             "gamma": gamma_b76,
             "theta": theta_b76,
             "net_gex": net_gex,
+            "net_vex": net_vex,
+            "net_chex": net_chex,
         })
 
     if not items:
@@ -1361,18 +1374,27 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
         gamma_style = 'color:#FACC15; font-weight:800;' if (is_pin_gamma or k in [4065.0, 4070.0]) else 'color:#CBD5E1;'
         theta_style = 'color:#FACC15; font-weight:800;' if (is_pin_theta or k in [4065.0, 4070.0]) else 'color:#CBD5E1;'
         gex_style = 'color:#4ADE80; font-weight:700;' if gex > 0 else ('color:#F87171;' if gex < -10.0 else 'color:#94A3B8;')
+        vex = it.get("net_vex", 0.0)
+        chex = it.get("net_chex", 0.0)
+        delta_val = it.get("net_delta", 0.0)
+        c_vol = it.get("call_vol", 0)
+        p_vol = it.get("put_vol", 0)
+        delta_style = 'color:#38BDF8; font-weight:700;' if delta_val >= 0 else 'color:#FB923C; font-weight:700;'
+        vex_style = 'color:#38BDF8;' if abs(vex) > 1.0 else 'color:#94A3B8;'
+        chex_style = 'color:#FACC15;' if chex > 0 else ('color:#C084FC;' if chex < -0.5 else 'color:#94A3B8;')
 
         rows_html.append(f"""<tr style="{row_style}">
             <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">
                 ${k:,.0f}{strike_badge}
             </td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#94A3B8;">{c_oi:,}</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#94A3B8;">{p_oi:,}</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">{tot_oi:,}</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">{vol:,}</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {gex_style}">{gex:+.2f}M</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {delta_style}">{delta_val:+,.0f} HĐ</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; color:#38BDF8;">{vol:,} <span style="font-size:10px; color:#64748B;">(C:{c_vol:,}/P:{p_vol:,})</span></td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; font-weight:700; color:#F8FAFC;">{tot_oi:,} <span style="font-size:10px; color:#64748B;">(C:{c_oi:,}/P:{p_oi:,})</span></td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {vex_style}">{vex:+.2f}M</td>
+            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {chex_style}">{chex:+.2f}M/d</td>
             <td style="text-align:right; font-family:'JetBrains Mono', monospace; {gamma_style}">{gamma_disp:.3f}</td>
             <td style="text-align:right; font-family:'JetBrains Mono', monospace; {theta_style}">${theta_disp:.2f}</td>
-            <td style="text-align:right; font-family:'JetBrains Mono', monospace; {gex_style}">{gex:+.2f}M</td>
             <td style="text-align:left; font-size:12px;">{meaning}</td>
         </tr>""")
 
@@ -1395,13 +1417,14 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
                 <thead>
                     <tr>
                         <th style="text-align:left;">Mức Strike ($K)</th>
-                        <th style="text-align:right;">Call OI (HĐ)</th>
-                        <th style="text-align:right;">Put OI (HĐ)</th>
-                        <th style="text-align:right;">Tổng OI (HĐ)</th>
-                        <th style="text-align:right;">Khối lượng Volume</th>
+                        <th style="text-align:right;">Net GEX ($M)</th>
+                        <th style="text-align:right;">Net Delta (HĐ GC)</th>
+                        <th style="text-align:right;">Khối Lượng Volume</th>
+                        <th style="text-align:right;">Open Interest (Call / Put)</th>
+                        <th style="text-align:right;">Net VEX ($M)</th>
+                        <th style="text-align:right;">Net CHEX ($M/d)</th>
                         <th style="text-align:right;">Gamma Black-76 (&times;10<sup>-4</sup>)</th>
                         <th style="text-align:right;">Theta Bào Mòn ($/HĐ/ngày)</th>
-                        <th style="text-align:right;">Net GEX ($M)</th>
                         <th style="text-align:left;">Ý Nghĩa Vi Cấu Trúc</th>
                     </tr>
                 </thead>
@@ -1662,7 +1685,7 @@ def generate_html_terminal(
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ background-color: var(--bg-base); color: var(--text-primary); font-family: 'Inter', sans-serif; padding: 14px; font-size: 13.5px; line-height: 1.5; }}
-        .container {{ max-width: 1440px; margin: 0 auto; }}
+        .container {{ width: 100%; max-width: 100%; margin: 0 auto; padding: 8px 14px; }}
         
         .header {{ display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #1C1917 0%, #292524 100%); border: 1px solid #44403C; border-radius: 10px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }}
         .brand {{ display: flex; align-items: center; gap: 10px; }}
@@ -1719,25 +1742,8 @@ def generate_html_terminal(
 <div class="container">
     {neiro_comp['nav_topbar_html']}
     {neiro_comp['neiro_container_html']}
-    <div id="plotly-view-container" style="display:none;">
-    <div class="header">
-        <div class="brand">
-            <div class="brand-title">NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</div>
-            <span class="badge badge-gold">100% PURE CME FUTURES</span>
-            <span class="badge badge-live">ZERO TOUCH AUTOMATION</span>
-        </div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #D6D3D1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <div>Cập nhật: <b>{now_str} (Giờ VN)</b> | Hạn: <b>{meta.get('expiration_date', 'OGZ26 (2026-11-25)')} ({float(meta.get('dte_days', 8.0)):.1f}d)</b>{stale_badge_html}</div>
-            <button onclick="refreshWithCacheBuster()" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #FACC15; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Tải lại số liệu mới nhất">
-                Làm mới
-            </button>
-            <button onclick="clearHistoryAndCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #F87171; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Xóa sạch cache, giải phóng bộ nhớ RAM trình duyệt và đặt lại lịch sử">
-                Dọn RAM & Cache
-            </button>
-            <span style="font-size: 10.5px; color: #64748B;">(Tự nạp lại: <b id="timer-sec" style="color: #4ADE80;">60</b>s)</span>
-            <span class="badge badge-gold">100% PURE CME FUTURES</span>
-        </div>
-    </div>
+
+    {pinning_table_html}
 
     <!-- KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW (PANEL LỚN HẲN MALZ 1997 SVI) -->
     <div class="chart-box" style="margin-bottom: 16px; padding: 14px 16px;">
@@ -1756,10 +1762,7 @@ def generate_html_terminal(
         {smile_plotly_div}
     </div>
 
-    <!-- KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX, VOLUME/OI, GREEKS BẬC 2 (MẶC ĐỊNH TINH GỌN) -->
-    <div class="chart-box" style="margin-bottom: 16px;">
-        {plotly_div}
-    </div>
+    <!-- KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX, VOLUME/OI, GREEKS BẬC 2 (ĐÃ TÍCH HỢP TRỰC TIẾP VÀO UNIFIED GREEKS & ORDERFLOW MATRIX & CANVAS TERMINAL TAB 1) -->
 
     <!-- KHỐI 3: KPI THỐNG KÊ TOÀN CẢNH CME GOLD FUTURES (7 THẺ TOÀN CẢNH) -->
     <div class="kpi-grid">
@@ -1889,8 +1892,6 @@ def generate_html_terminal(
             </table>
         </div>
     </div>
-
-    {pinning_table_html}
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
     <div class="table-box">
@@ -2035,17 +2036,7 @@ def generate_html_terminal(
         }}
     }}
 
-    var countdown = 60;
-    setInterval(function() {{
-        countdown--;
-        var el = document.getElementById("timer-sec");
-        if (el) {{
-            el.innerText = countdown;
-        }}
-        if (countdown <= 0) {{
-            refreshWithCacheBuster();
-        }}
-    }}, 1000);
+    // Realtime tick streaming active - automatic full-page reload timer removed
 </script>
 </body>
 </html>

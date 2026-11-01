@@ -232,6 +232,8 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
             'latest_price': float
     """
     chart_urls = [
+        "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=5d",
+        "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=5d",
         "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d",
         "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d",
     ]
@@ -353,7 +355,7 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                                     "close": rc["close"],
                                     "volume": rc["volume"],
                                 }
-                                for rc in raw_candles[-150:]
+                                for rc in raw_candles[-250:]
                             ]
 
                             return {

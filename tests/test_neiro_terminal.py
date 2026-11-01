@@ -42,7 +42,7 @@ def test_render_neiro_orderflow_component():
     assert "neiro_js_script" in comp
 
     # Verify key elements in HTML components
-    assert "TAB 1: NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL" in comp["nav_topbar_html"]
+    assert "NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL" in comp["nav_topbar_html"]
     assert "$100.0/oz" in comp["nav_topbar_html"]
 
     assert "neiro-view-container" in comp["neiro_container_html"]

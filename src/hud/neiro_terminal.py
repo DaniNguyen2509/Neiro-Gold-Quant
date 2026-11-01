@@ -36,73 +36,88 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     gvz_iv = float(meta.get("gvz_iv", 18.5))
     air_pockets = meta.get("air_pockets", [])
 
+    total_net_delta = float(meta.get("total_net_delta_contracts", 0.0) or (df["netDeltaContracts"].sum() if "netDeltaContracts" in df.columns else 0.0))
+    total_vol = int(df["callVolume"].sum() + df["putVolume"].sum()) if ("callVolume" in df.columns and "putVolume" in df.columns) else 0
+    total_oi = int(df["callOpenInterest"].sum() + df["putOpenInterest"].sum()) if ("callOpenInterest" in df.columns and "putOpenInterest" in df.columns) else 0
+
     regime_color = "#4ADE80" if total_gex >= 0 else "#F87171"
     regime_text = "POSITIVE GAMMA (LONG MM)" if total_gex >= 0 else "NEGATIVE GAMMA (SHORT MM)"
 
-    # 1. CSS styling
+    # 1. CSS styling for Fullscreen TradingView Cockpit
     neiro_css = """
-    .neiro-tab-btn {
-        background: #1E293B; border: 1px solid #334155; color: #94A3B8;
-        padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 11.5px;
-        cursor: pointer; font-family: 'JetBrains Mono', monospace; transition: all 0.2s ease;
-    }
-    .neiro-tab-btn:hover { background: #334155; color: #F8FAFC; }
-    .neiro-tab-btn.active {
-        background: #0284C7; border-color: #38BDF8; color: #FFFFFF;
-        box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
-    }
     .neiro-tf-btn {
         background: #0F172A; border: 1px solid #1E293B; color: #94A3B8;
-        padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;
-        font-family: 'JetBrains Mono', monospace; font-weight: 600;
+        padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+        font-family: 'JetBrains Mono', monospace; font-weight: 600; transition: all 0.15s ease;
     }
-    .neiro-tf-btn.active { background: #38BDF8; color: #000000; font-weight: 700; }
+    .neiro-tf-btn:hover { background: #1E293B; color: #F8FAFC; }
+    .neiro-tf-btn.active {
+        background: #0284C7; border-color: #38BDF8; color: #FFFFFF; font-weight: 700;
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    }
     .neiro-top-hud {
         background: rgba(8, 11, 18, 0.95); border: 1px solid #1E293B; border-radius: 6px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); padding: 5px 12px; margin-bottom: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); padding: 6px 14px; margin-bottom: 8px;
         font-family: 'JetBrains Mono', monospace; font-size: 10px;
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 3px 16px;
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 16px;
     }
     .hud-col { display: flex; flex-direction: column; gap: 2px; }
     .hud-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 10.5px; }
     .hud-lbl { color: #94A3B8; font-weight: 600; font-size: 10px; }
+    .live-dot {
+        display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+        background-color: #22C55E; box-shadow: 0 0 8px #22C55E;
+        animation: pulse-dot 1.5s infinite; margin-right: 4px;
+    }
+    @keyframes pulse-dot {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+        70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
     """
 
-    # 2. Navigation Topbar HTML (Pure CME Futures Focus)
+    # 2. Navigation Topbar HTML (TradingView Fullscreen Standard)
     nav_topbar_html = f"""
-    <div style="background:#161A22; border:1px solid #232A37; display:flex; align-items:center; justify-content:space-between; padding:0 10px; height:38px; font-family:'JetBrains Mono',monospace; font-size:11px; margin-bottom:8px; border-radius:6px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-            <span style="width:3px; height:18px; background:#0284C7; border-radius:2px;"></span>
-            <button id="tab-neiro" class="neiro-tab-btn active" onclick="switchTerminalView('neiro')">
-                📊 TAB 1: NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL
-            </button>
-            <button id="tab-plotly" class="neiro-tab-btn" onclick="switchTerminalView('plotly')">
-                📈 TAB 2: QUANT PROFILE LADDER
-            </button>
-            <span style="color:#475569; margin:0 2px;">|</span>
-            <div style="display:flex; gap:3px;">
-                <button class="neiro-tf-btn" onclick="setTimeframe('1m')">1M</button>
-                <button class="neiro-tf-btn active" onclick="setTimeframe('5m')">5M</button>
+    <div style="background:#161A22; border:1px solid #232A37; display:flex; align-items:center; justify-content:space-between; padding:0 12px; height:42px; font-family:'JetBrains Mono',monospace; font-size:11px; margin-bottom:8px; border-radius:6px; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:3px; height:20px; background:#0284C7; border-radius:2px;"></span>
+            <span style="font-weight:800; font-size:12px; letter-spacing:0.5px; background:linear-gradient(90deg, #FDE047 0%, #EAB308 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+                NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL
+            </span>
+            <span style="color:#475569; margin:0 4px;">|</span>
+            <div style="display:flex; gap:4px;">
+                <button class="neiro-tf-btn active" onclick="setTimeframe('1m')">1M</button>
+                <button class="neiro-tf-btn" onclick="setTimeframe('5m')">5M</button>
                 <button class="neiro-tf-btn" onclick="setTimeframe('15m')">15M</button>
                 <button class="neiro-tf-btn" onclick="setTimeframe('1h')">1H</button>
-                <button class="neiro-tf-btn" id="btn-chart-expand" onclick="toggleChartHeight()" title="Thu nhỏ / Mở rộng (540px / 720px)" style="color:#38BDF8; font-weight:700;">↕ 540p</button>
+                <button class="neiro-tf-btn" id="btn-chart-expand" onclick="toggleChartHeight()" title="Thu nhỏ / Mở rộng chiều cao biểu đồ" style="color:#38BDF8; font-weight:700;">↕ Fullscreen</button>
             </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:#94A3B8; font-size:10.5px;">HỆ SỐ NHÂN: <b style="color:#FACC15;">$100.0/oz</b> (GC)</span>
-            <span style="color:#94A3B8; font-size:10.5px;">| CME FUTURES: <b style="color:#38BDF8; font-size:12px;" id="top-live-spot">${spot:,.2f}</b></span>
+            <span style="color:#94A3B8; font-size:10px; background:rgba(30,41,59,0.7); padding:2px 7px; border-radius:4px; border:1px solid #334155;">
+                PROFILE: <b style="color:#4ADE80;">■ GEX</b> <b style="color:#38BDF8;">■ DEX</b> <b style="color:#FACC15;">■ CHEX</b> <b style="color:#C084FC;">■ VEX</b>
+            </span>
+            <span style="color:#94A3B8; font-size:10.5px;">HỆ SỐ: <b style="color:#FACC15;">$100.0/oz</b></span>
+            <span style="color:#94A3B8; font-size:10.5px;">| SPOT: <b style="color:#38BDF8; font-size:13px;" id="top-live-spot">${spot:,.2f}</b></span>
+            <button onclick="clearHistoryAndCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #F87171; border-radius: 4px; padding: 2px 7px; font-size: 10px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: 600;" title="Xóa sạch cache, giải phóng bộ nhớ RAM trình duyệt">
+                Dọn RAM & Cache
+            </button>
             <span class="badge badge-gold" style="font-size:9.5px; padding:2px 6px;">GVZ: {gvz_iv:.1f}%</span>
-            <span class="badge badge-live" style="font-size:9.5px; padding:2px 6px;">100% PURE CME GC=F</span>
+            <span class="badge badge-live" style="font-size:9.5px; padding:2px 6px; display:inline-flex; align-items:center;"><span class="live-dot"></span>LIVE CME GC=F</span>
         </div>
     </div>
     """
 
-    # 3. Tab 1 Container HTML with Top Quant HUD (unobstructed chart)
+    # 3. Top Quant HUD & Fullscreen TradingView Chart Container
     neiro_container_html = f"""
     <div id="neiro-top-hud" class="neiro-top-hud">
         <div class="hud-col">
             <div class="hud-row"><span class="hud-lbl">COMEX GC:</span> <b style="color:#38BDF8;">${spot:,.2f}</b> <span style="color:#64748B;">(ATM ${atm_strike:,.0f})</span></div>
             <div class="hud-row"><span class="hud-lbl">GEX REGIME:</span> <b style="color:{regime_color};" id="hud-gex-regime">{regime_text} (${total_gex:+.0f}M)</b></div>
+        </div>
+        <div class="hud-col">
+            <div class="hud-row"><span class="hud-lbl">NET DELTA (DEX):</span> <b style="color:{'#38BDF8' if total_net_delta >= 0 else '#FB923C'};">{total_net_delta:+,.0f} HĐ</b> <span style="color:#64748B;">(Sổ MM)</span></div>
+            <div class="hud-row"><span class="hud-lbl">VOLUME / OI:</span> <b style="color:#F1F5F9;">{total_vol:,} / {total_oi:,} HĐ</b> <span style="color:#64748B;">(HĐTL)</span></div>
         </div>
         <div class="hud-col">
             <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#22D3EE;">${total_vex:+.1f}M</b> <span style="color:#64748B;">(+1% IV)</span></div>
@@ -117,7 +132,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <div class="hud-row"><span class="hud-lbl">GAMMA WATERFALL ↓:</span> <b style="color:#F87171;">&lt;${strike_below:,.0f} → TP ${next_below:,.0f}</b></div>
         </div>
     </div>
-    <div id="neiro-view-container" style="display:block; width:100%; height:540px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:12px; overflow:hidden;">
+    <div id="neiro-view-container" style="display:block; width:100%; height:700px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:14px; overflow:hidden;">
         <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
         <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
     </div>
@@ -127,19 +142,27 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     js_options_data = []
     for _, r in df.sort_values("strike").iterrows():
         try:
+            c_oi_val = int(r.get("callOpenInterest", 0) or 0)
+            p_oi_val = int(r.get("putOpenInterest", 0) or 0)
+            c_vol_val = int(r.get("callVolume", 0) or 0)
+            p_vol_val = int(r.get("putVolume", 0) or 0)
+            c_delta_val = float(r.get("callDelta", 0.0) or 0.0)
+            p_delta_val = float(r.get("putDelta", 0.0) or 0.0)
+            net_delta_val = float(r.get("netDeltaContracts", 0.0) or (c_oi_val * c_delta_val + p_oi_val * p_delta_val))
             js_options_data.append({
                 "strike": float(r["strike"]),
-                "c_oi": int(r.get("callOpenInterest", 0) or 0),
-                "p_oi": int(r.get("putOpenInterest", 0) or 0),
-                "c_vol": int(r.get("callVolume", 0) or 0),
-                "p_vol": int(r.get("putVolume", 0) or 0),
+                "c_oi": c_oi_val,
+                "p_oi": p_oi_val,
+                "c_vol": c_vol_val,
+                "p_vol": p_vol_val,
                 "c_iv": float(r.get("callIV", 0.18) or 0.18),
                 "p_iv": float(r.get("putIV", 0.18) or 0.18),
-                "c_delta": float(r.get("callDelta", 0.0) or 0.0),
-                "p_delta": float(r.get("putDelta", 0.0) or 0.0),
+                "c_delta": c_delta_val,
+                "p_delta": p_delta_val,
                 "c_gamma": float(r.get("callGamma", 0.0) or 0.0),
                 "p_gamma": float(r.get("putGamma", 0.0) or 0.0),
                 "netGEX": float(r.get("netGEX", 0.0) or 0.0),
+                "netDelta": net_delta_val,
                 "netVEX": float(r.get("netVEX", 0.0) or 0.0),
                 "netCHEX": float(r.get("netCHEX", 0.0) or 0.0),
             })
@@ -175,7 +198,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     chart_candles = m5_tape.get("chart_candles") or []
     json_candles_str = json.dumps(chart_candles)
 
-    # 5. JavaScript Orderflow & Dual-View Engine (All-in-One Rendering)
+    # 5. JavaScript Orderflow & Realtime Tick Engine (Default M1, Fullscreen, Zero Reload)
     neiro_js_script = f"""
     <script>
     window.INITIAL_OPTIONS = {json_options_str};
@@ -186,37 +209,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     let candleSeries = null;
     let livePriceLine = null;
     let currentGoldPrice = window.INITIAL_META.spot;
-    let currentTf = '5m';
-    let currentPeriodSec = 300;
+    let currentTf = '1m';
+    let currentPeriodSec = 60;
+    let tickEngineTimer = null;
 
     function switchTerminalView(view) {{
-        const neiroView = document.getElementById('neiro-view-container');
-        const neiroHud = document.getElementById('neiro-top-hud');
-        const plotlyView = document.getElementById('plotly-view-container');
-        const tabNeiro = document.getElementById('tab-neiro');
-        const tabPlotly = document.getElementById('tab-plotly');
-        if (!neiroView || !plotlyView) return;
-
-        if (view === 'plotly') {{
-            neiroView.style.display = 'none';
-            if (neiroHud) neiroHud.style.display = 'none';
-            plotlyView.style.display = 'block';
-            if (tabPlotly) {{ tabPlotly.classList.add('active'); }}
-            if (tabNeiro) {{ tabNeiro.classList.remove('active'); }}
-            window.dispatchEvent(new Event('resize'));
-        }} else {{
-            plotlyView.style.display = 'none';
-            neiroView.style.display = 'block';
-            if (neiroHud) neiroHud.style.display = 'grid';
-            if (tabNeiro) {{ tabNeiro.classList.add('active'); }}
-            if (tabPlotly) {{ tabPlotly.classList.remove('active'); }}
-            window.dispatchEvent(new Event('resize'));
-            if (!neiroChart) {{
-                setTimeout(initNeiroGoldChart, 50);
-            }} else {{
-                setTimeout(drawNeiroOverlay, 50);
-            }}
-        }}
+        // Backward-compatible stub: All indicators are unified on one screen (Zero Tabs)
+        window.dispatchEvent(new Event('resize'));
     }}
 
     function setTimeframe(tf) {{
@@ -225,7 +224,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const activeBtn = Array.from(document.querySelectorAll('.neiro-tf-btn')).find(b => b.innerText.trim().toLowerCase() === tf.toLowerCase());
         if (activeBtn) activeBtn.classList.add('active');
 
-        let period = 300;
+        let period = 60;
         if (tf === '1m') period = 60;
         else if (tf === '5m') period = 300;
         else if (tf === '15m') period = 900;
@@ -241,13 +240,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const vc = document.getElementById('neiro-view-container');
         const btn = document.getElementById('btn-chart-expand');
         if (!vc) return;
-        const isDefault = vc.style.height === '540px' || !vc.style.height;
+        const isDefault = vc.style.height === '700px' || !vc.style.height;
         if (isDefault) {{
-            vc.style.height = '720px';
-            if (btn) btn.innerText = '↕ 720p';
+            vc.style.height = '880px';
+            if (btn) btn.innerText = '↕ 700p';
         }} else {{
-            vc.style.height = '540px';
-            if (btn) btn.innerText = '↕ 540p';
+            vc.style.height = '700px';
+            if (btn) btn.innerText = '↕ Fullscreen';
         }}
         const container = document.getElementById('neiro-tv-chart');
         const canvas = document.getElementById('neiro-canvas');
@@ -265,7 +264,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
     function resampleBars(candles, targetPeriodSec) {{
         if (!candles || candles.length === 0) return [];
-        if (targetPeriodSec <= 300) {{
+        if (targetPeriodSec <= 60) {{
             return candles.map(c => ({{
                 time: c.time,
                 open: c.open,
@@ -300,22 +299,22 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return resampled;
     }}
 
-    function generateRealisticGoldCandles(currentP, numBars = 60, periodSec = 60) {{
+    function generateRealisticGoldCandles(currentP, numBars = 120, periodSec = 60) {{
         const bars = [];
         const nowSec = Math.floor(Date.now() / 1000);
         const startSec = nowSec - (numBars * periodSec);
 
-        // Gold Intraday Volatility (~$1.50 - $2.50 per M5)
-        const vol = 1.8 * Math.sqrt(periodSec / 300.0);
+        // Gold Intraday Volatility scaled to timeframe (~$0.80 - $1.40 per M1)
+        const vol = 1.2 * Math.sqrt(periodSec / 60.0);
         const increments = [];
         let sum = 0;
         for (let i = 0; i < numBars; i++) {{
-            const r = (Math.random() - 0.49) * 2.0 * vol;
+            const r = (Math.random() - 0.495) * 2.0 * vol;
             increments.push(r);
             sum += r;
         }}
 
-        const targetDrift = (Math.random() - 0.5) * 8.0;
+        const targetDrift = (Math.random() - 0.5) * 6.0;
         const startP = currentP - targetDrift;
         const correction = (targetDrift - sum) / numBars;
         let p = startP;
@@ -325,8 +324,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             const change = increments[i] + correction;
             const open = Math.round(p * 10) / 10;
             const close = Math.round((p + change) * 10) / 10;
-            const high = Math.round((Math.max(open, close) + Math.random() * vol * 0.7 + 0.5) * 10) / 10;
-            const low = Math.round((Math.min(open, close) - Math.random() * vol * 0.7 - 0.5) * 10) / 10;
+            const high = Math.round((Math.max(open, close) + Math.random() * vol * 0.6 + 0.3) * 10) / 10;
+            const low = Math.round((Math.min(open, close) - Math.random() * vol * 0.6 - 0.3) * 10) / 10;
             p = close;
             const barTime = t - (t % periodSec);
             bars.push({{ time: barTime, open, high, low, close }});
@@ -338,13 +337,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return bars;
     }}
 
-    function buildHistoricalGoldBars(periodSec = 300) {{
+    function buildHistoricalGoldBars(periodSec = 60) {{
         if (!candleSeries) return;
         let bars = [];
         if (window.INITIAL_CANDLES && window.INITIAL_CANDLES.length > 0) {{
             bars = resampleBars(window.INITIAL_CANDLES, periodSec);
         }} else {{
-            bars = generateRealisticGoldCandles(currentGoldPrice, 60, periodSec);
+            bars = generateRealisticGoldCandles(currentGoldPrice, 120, periodSec);
         }}
 
         if (bars && bars.length > 0) {{
@@ -352,12 +351,56 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             const totalBars = bars.length;
             if (neiroChart) {{
                 neiroChart.timeScale().setVisibleLogicalRange({{
-                    from: Math.max(0, totalBars - 36),
-                    to: totalBars + 6,
+                    from: Math.max(0, totalBars - 60),
+                    to: totalBars + 8,
                 }});
             }}
         }}
-        setTimeout(drawNeiroOverlay, 80);
+        setTimeout(drawNeiroOverlay, 60);
+    }}
+
+    function applyLiveTick(newPrice) {{
+        if (!newPrice || isNaN(newPrice) || !candleSeries) return;
+        currentGoldPrice = Math.round(newPrice * 100) / 100;
+
+        if (livePriceLine) {{
+            livePriceLine.applyOptions({{ price: currentGoldPrice }});
+        }}
+
+        const topSpotEl = document.getElementById('top-live-spot');
+        if (topSpotEl) topSpotEl.innerText = '$' + currentGoldPrice.toLocaleString('en-US', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+
+        const spinePriceEl = document.getElementById('spine-current-price');
+        if (spinePriceEl) spinePriceEl.innerText = '$' + currentGoldPrice.toLocaleString('en-US', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+
+        const kpiPriceEl = document.getElementById('kpi-cme-price');
+        if (kpiPriceEl) kpiPriceEl.innerText = '$' + currentGoldPrice.toLocaleString('en-US', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+
+        // Update active M1 candle dynamically
+        const nowSec = Math.floor(Date.now() / 1000);
+        const barTime = nowSec - (nowSec % currentPeriodSec);
+        candleSeries.update({{
+            time: barTime,
+            open: currentGoldPrice,
+            high: currentGoldPrice,
+            low: currentGoldPrice,
+            close: currentGoldPrice,
+        }});
+    }}
+
+    window.onLiveTick = function(data) {{
+        if (data && data.price) {{
+            applyLiveTick(data.price);
+        }}
+    }};
+
+    function startRealtimeTickEngine() {{
+        if (tickEngineTimer) {{
+            clearInterval(tickEngineTimer);
+            tickEngineTimer = null;
+        }}
+        // Khong chay setInterval random gia lap de triet tieu hoan toan hien tuong giat lag / rung man hinh
+        // San sang tiep nhan luong live tick that tu he thong qua cong window.onLiveTick(data)
     }}
 
     function initNeiroGoldChart() {{
@@ -367,7 +410,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         neiroChart = LightweightCharts.createChart(container, {{
             width: container.clientWidth,
-            height: container.clientHeight || 540,
+            height: container.clientHeight || 700,
             layout: {{
                 background: {{ type: 'solid', color: '#000000' }},
                 textColor: '#94A3B8',
@@ -385,15 +428,15 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }},
             rightPriceScale: {{
                 borderColor: '#1E293B',
-                scaleMargins: {{ top: 0.12, bottom: 0.12 }},
+                scaleMargins: {{ top: 0.10, bottom: 0.10 }},
             }},
             timeScale: {{
                 borderColor: '#1E293B',
                 timeVisible: true,
                 secondsVisible: false,
-                barSpacing: 22,
-                minBarSpacing: 10,
-                rightOffset: 14,
+                barSpacing: 18,
+                minBarSpacing: 6,
+                rightOffset: 12,
             }},
         }});
 
@@ -421,7 +464,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const handleResize = () => {{
             if (!container || !neiroChart) return;
             const newW = container.clientWidth;
-            const newH = container.clientHeight || 540;
+            const newH = container.clientHeight || 700;
             neiroChart.applyOptions({{ width: newW, height: newH }});
             if (canvas) {{
                 canvas.width = newW;
@@ -435,6 +478,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         neiroChart.timeScale().subscribeVisibleLogicalRangeChange(() => drawNeiroOverlay());
 
         handleResize();
+        startRealtimeTickEngine();
     }}
 
     function drawNeiroOverlay() {{
@@ -448,7 +492,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const m = window.INITIAL_META;
         const rightX = w - 75;
 
-        // 1. Draw Air Pocket Vacuum Zones (Tô màu chân không thanh khoản trực tiếp)
+        // 1. Draw Air Pocket Vacuum Zones
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
             const pFrom = parseFloat(ap.from || 0);
@@ -477,7 +521,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }}
         }});
 
-        // 2. Draw Net GEX & Greeks Profile Bars per Strike (Thang đo vi mô bậc 1 & 2: GEX, VEX, CHEX)
+        // 2. Draw Multi-Metric Profile per Strike (GEX, DEX, CHEX, Vol/OI)
         const optionsData = window.INITIAL_OPTIONS || [];
         optionsData.forEach(opt => {{
             const k = opt.strike;
@@ -486,43 +530,70 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 const gex = opt.netGEX || 0;
                 const vex = opt.netVEX || 0;
                 const chex = opt.netCHEX || 0;
-                const isPos = gex >= 0;
-                const barLen = Math.min(130, Math.abs(gex) * 3.5);
-                const chexLen = Math.min(65, Math.abs(chex) * 4.0);
+                const delta = opt.netDelta || 0;
+                const cVol = opt.c_vol || 0;
+                const pVol = opt.p_vol || 0;
+                const totVol = cVol + pVol;
+                const cOi = opt.c_oi || 0;
+                const pOi = opt.p_oi || 0;
+                const totOi = cOi + pOi;
 
-                // Bar ngang đại diện cho trọng lượng Net GEX (Xanh lá / Đỏ)
+                const isPos = gex >= 0;
+                const barLen = Math.min(100, Math.abs(gex) * 2.8);
+                const deltaLen = Math.min(75, Math.abs(delta) * 0.030);
+                const chexLen = Math.min(50, Math.abs(chex) * 3.0);
+
+                // 2a. Net GEX Bar (Top bar)
                 if (barLen > 2) {{
-                    ctx.fillStyle = isPos ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)';
-                    ctx.fillRect(rightX - barLen, y - 5, barLen, 6);
+                    ctx.fillStyle = isPos ? 'rgba(34, 197, 94, 0.40)' : 'rgba(239, 68, 68, 0.40)';
+                    ctx.fillRect(rightX - barLen, y - 6, barLen, 4);
                     ctx.fillStyle = isPos ? '#4ADE80' : '#F87171';
-                    ctx.fillRect(rightX - 2, y - 5, 2, 6);
+                    ctx.fillRect(rightX - 2, y - 6, 2, 4);
                 }}
 
-                // Bar ngang đại diện cho dòng phân rã Charm Net CHEX (Vàng / Tím - Delta Decay/24h)
+                // 2b. Net Delta Bar (Middle bar)
+                if (deltaLen > 2) {{
+                    const isDeltaPos = delta >= 0;
+                    ctx.fillStyle = isDeltaPos ? 'rgba(56, 189, 248, 0.40)' : 'rgba(251, 146, 60, 0.40)';
+                    ctx.fillRect(rightX - deltaLen, y - 1, deltaLen, 3);
+                    ctx.fillStyle = isDeltaPos ? '#38BDF8' : '#FB923C';
+                    ctx.fillRect(rightX - 2, y - 1, 2, 3);
+                }}
+
+                // 2c. Net CHEX Bar (Bottom bar)
                 if (chexLen > 2) {{
                     const isChexPos = chex >= 0;
                     ctx.fillStyle = isChexPos ? 'rgba(250, 204, 21, 0.40)' : 'rgba(192, 132, 252, 0.40)';
-                    ctx.fillRect(rightX - chexLen, y + 2, chexLen, 4);
+                    ctx.fillRect(rightX - chexLen, y + 3, chexLen, 3);
                     ctx.fillStyle = isChexPos ? '#FACC15' : '#C084FC';
-                    ctx.fillRect(rightX - 2, y + 2, 2, 4);
+                    ctx.fillRect(rightX - 2, y + 3, 2, 3);
                 }}
 
-                // Hiển thị nhãn Greeks trực tiếp cạnh từng Strike chính (GEX, VEX, CHEX đầy đủ)
-                if (Math.abs(gex) >= 2.5 || Math.abs(vex) >= 1.5 || Math.abs(chex) >= 0.5) {{
-                    ctx.font = '8.5px "JetBrains Mono", monospace';
+                // 2d. Detailed Multi-Metric Label for significant strikes
+                if (Math.abs(gex) >= 2.0 || Math.abs(delta) >= 250 || Math.abs(vex) >= 1.0 || totVol >= 150) {{
+                    ctx.font = '8px "JetBrains Mono", monospace';
                     ctx.textAlign = 'right';
-                    const maxBar = Math.max(barLen, chexLen);
-                    const txt = '$' + Math.round(k) + ' · GEX ' + (gex >= 0 ? '+' : '') + gex.toFixed(1) + 'M | VEX ' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M | CHEX ' + (chex >= 0 ? '+' : '') + chex.toFixed(1) + 'M/d';
+                    const maxBar = Math.max(barLen, deltaLen, chexLen, 20);
+                    const txt = '$' + Math.round(k) +
+                        ' · GEX ' + (gex >= 0 ? '+' : '') + gex.toFixed(1) + 'M' +
+                        ' | DEX ' + (delta >= 0 ? '+' : '') + Math.round(delta) + ' HĐ' +
+                        ' | VEX ' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M' +
+                        ' | CHEX ' + (chex >= 0 ? '+' : '') + chex.toFixed(1) + 'M/d' +
+                        ' | Vol ' + totVol.toLocaleString() + ' (C:' + cVol.toLocaleString() + '/P:' + pVol.toLocaleString() + ')' +
+                        ' | OI ' + totOi.toLocaleString();
                     const tw = ctx.measureText(txt).width;
-                    ctx.fillStyle = 'rgba(6, 8, 14, 0.88)';
-                    ctx.fillRect(rightX - maxBar - tw - 12, y - 7, tw + 8, 14);
+                    ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
+                    ctx.fillRect(rightX - maxBar - tw - 12, y - 8, tw + 8, 16);
+                    ctx.strokeStyle = isPos ? 'rgba(74, 222, 128, 0.35)' : 'rgba(248, 113, 113, 0.35)';
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeRect(rightX - maxBar - tw - 12, y - 8, tw + 8, 16);
                     ctx.fillStyle = isPos ? '#86EFAC' : '#FCA5A5';
                     ctx.fillText(txt, rightX - maxBar - 8, y + 3);
                 }}
             }}
         }});
 
-        // 3. Draw Key Structural Boundary Lines (Thành trì định lượng)
+        // 3. Draw Key Structural Boundary Lines
         const keyLevels = [
             {{ p: m.call_wall,       c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.put_wall,        c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
@@ -558,12 +629,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }});
     }}
 
-    // Auto-init on load if Tab 1 active
+    // Auto-init on load
     window.addEventListener('DOMContentLoaded', () => {{
-        const neiroView = document.getElementById('neiro-view-container');
-        if (neiroView && neiroView.style.display !== 'none') {{
-            setTimeout(initNeiroGoldChart, 100);
-        }}
+        setTimeout(initNeiroGoldChart, 80);
     }});
     </script>
     """

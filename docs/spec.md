@@ -1,9 +1,9 @@
-# Spec: Neiro-Gold-Quant — Quantitative Gold Options Trading System & Dual-View Terminal
+# Spec: Neiro-Gold-Quant — Quantitative Gold Options Trading System & TradingView Fullscreen Realtime Terminal
 
 > **Bản đặc tả kỹ thuật chi tiết (System Specification)**  
 > **Tài sản mục tiêu:** COMEX Gold Futures (`GC` / `MGC`), Spot `XAUUSD` / `GOLD` (London OTC) & SPDR Gold Shares (`GLD`) Options Proxy.  
 > **Kiến trúc:** Cloud-Native Zero-Touch Automation (GitHub Actions + GitHub Pages, thuần Python, Zero-Waste < 15MB).  
-> **Tài liệu tham chiếu:** [docs/architecture.md](architecture.md), [docs/gold-options-architecture.md](file:///c:/Users/Daniel/Documents/My-Projects/Neiro-NQ-Quant/docs/gold-options-architecture.md), [config/settings.toml](../config/settings.toml).
+> **Tài liệu tham chiếu:** [docs/architecture.md](architecture.md), [docs/decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md](decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md), [config/settings.toml](../config/settings.toml).
 
 ---
 
@@ -27,19 +27,14 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
    - Vàng mang đặc tính **Call Skew** (phe mua Call OTM phòng hộ lạm phát & địa chính trị đẩy IV Call lên cao), kích hoạt các đợt bùng nổ **Gamma Squeeze** phía trần kháng cự khi vượt qua $Trigger_{Up} = CallWall + Call_{mid}(CallWall)$.
    - Bất biến Zero Gamma Flip ($S^*$) bắt buộc giải nghiệm liên tục bằng Dekker-Brent `_brentq` trên hàm tổng đa kỳ hạn.
    - Đo lường áp lực công thành Intraday Wall Siege Velocity Ratio: $\text{Wall Siege Ratio} = \text{Volume} / \text{Baseline OI}$.
-4. **All-in-One Orderflow Terminal Canvas 60 FPS (Nhìn 1 Biểu Đồ Thấu Suốt Toàn Bộ):**
-   - **Tab 1: ALL-IN-ONE ORDERFLOW FOOTPRINT CANVAS:** Tích hợp trực tiếp trên Canvas 60 FPS:
-     * Air Pocket Vacuum Zones (`⚠️ AIR POCKET VACUUM [$min - $max]`) cảnh báo khoảng trống thanh khoản rỗng.
-     * Net GEX Profile Bars (Xanh lá / Đỏ) & Net CHEX Profile Bars (Vàng / Tím) kèm nhãn hiển thị đầy đủ GEX, VEX, CHEX cạnh từng Strike trên thước đo giá.
-     * Key Structural Boundary Lines (Call Wall, Put Wall kèm Siege Ratio, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers).
-     * Floating HUD & Băng giá M5 Orderflow Tape.
-   - **Tab 2: 4-PANEL QUANT LADDER & MICROSTRUCTURE MATRIX:** Plotly Dark HUD trực quan gồm 4 Panel độc lập:
-     * **Panel 1: Net GEX ($M)** & Mốc Chiến Thuật (SL/TP)
-     * **Panel 2: Volume, OI & Sổ Sách Net Delta (HĐ)** (Dòng lệnh & Vị thế thực tế)
-     * **Panel 3: Net VEX ($M/1% IV)** · Áp lực biến động Vanna Flow
-     * **Panel 4: Net CHEX ($M/ngày)** · Dòng tiền tự động phân rã Delta Charm 24h
-     * Bảng định lượng vi cấu trúc Greeks & Tâm bão Pinning, Bảng chiến lược lướt sóng trong ngày.
-   - Đã loại bỏ hoàn toàn các khối rườm rà: PHẦN 2 Structural Swing Walls, Action Banner KB-2, Ma trận 6 Kịch bản.
+4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Nhìn 1 Màn Hình Thấu Suốt Toàn Bộ Giá Tick & Greeks):**
+   - **Mặc định Timeframe M1:** Hệ thống ưu tiên truy vấn 250 nến 1 phút liên tục gần nhất (~4 giờ giao dịch) từ COMEX Gold Futures `GC=F`, nút `1M` kích hoạt mặc định.
+   - **Fullscreen TradingView Canvas (Full-bleed 100%):** Bố cục giao diện mở rộng tràn toàn bộ chiều ngang và chiều dọc (700px mặc định, tùy chọn ↕ Fullscreen 880px), thanh Topbar chuẩn TradingView với badge `● LIVE CME GC=F` nhấp nháy và hệ số nhân `$100.0/oz`.
+   - **Giao diện Không Tab (Zero Tabs):** Loại bỏ toàn bộ các nút tab chuyển màn hình. Toàn bộ thông tin hiển thị liền mạch trên 1 trang cuộn duy nhất:
+     * Khối 1: Canvas Lightweight Charts 60 FPS tích hợp Air Pocket Vacuum Zones, Net GEX/CHEX Profile Bars, Wall Lines, Floating HUD, Live Price Line.
+     * Khối 2: Unified Greeks & Orderflow Matrix (tích hợp đầy đủ Net GEX, Net VEX, Net CHEX, Net Delta, OI, Volume, Pinning Pressure).
+     * Khối 3: Plotly 4-Panel Quant Ladder (GEX, Volume/OI, VEX, CHEX) hiển thị song song ngay phía dưới.
+   - **Realtime Tick Engine (Zero Reload):** Gỡ bỏ hoàn toàn nút "Làm mới" thủ công và bộ đếm ngược 60s tự reload trang. Giá từng tick được cập nhật mượt mà qua cơ chế `window.onLiveTick(data)` và `candleSeries.update(...)`, không giật lag, không chớp trắng màn hình, bảo toàn nguyên vẹn tọa độ zoom/pan của trader.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.
    - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.
@@ -91,13 +86,13 @@ python -m src.collector.scraper --output data/options_prices_GCZ26.csv
 # 3. Sinh Terminal Tác chiến Dual-View (Snapshot 1 lần)
 python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/index.html
 
-# 4. Chạy Live Terminal liên tục (vòng lặp 60s tự giải phóng RAM)
-python -m src.hud.html_dashboard --loop 60
+# 4. Chạy Live Terminal liên tục (vòng lặp 15s tự giải phóng RAM)
+python -m src.hud.html_dashboard --loop 15
 
 # 5. Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM (< 15MB)
 python -m src.hud.html_dashboard --clear-cache
 
-# 6. Kiểm thử tự động (Unit Test & Math Verification - 124 Tests)
+# 6. Kiểm thử tự động (Unit Test & Math Verification - 137 Tests)
 python -m pytest tests/ -v --tb=short
 
 # 7. Kiểm tra chuẩn mã nguồn
@@ -160,6 +155,6 @@ Neiro-Gold-Quant/
 - [x] Lõi toán Black-76 giải tích bậc 1 & bậc 2 chính xác, bộ giải ngược IV lai (Newton-Raphson + Dekker-Brent `_brentq`), loại bỏ triệt để NaN.
 - [x] Bất biến Zero Gamma Flip ($S^*$) giải liên tục bằng Dekker-Brent `_brentq` thuần Python, đo lường Wall Siege Ratio ($Volume / OI$).
 - [x] Hoàn thiện tài liệu kiến trúc và đặc tả chuyên biệt cho Vàng (`docs/spec.md` & `docs/architecture.md`).
-- [x] Bộ kiểm thử 133 unit test chạy sạch sẽ 100% không lỗi.
-- [x] Triển khai Terminal Tác chiến Đa Chế Độ Dual-View: Tab 1 NEIRO Orderflow Footprint (HTML5 Canvas 60 FPS) kết hợp Tab 2 Plotly Dark HUD 3-Panel Quant Ladder.
+- [x] Bộ kiểm thử 137 unit test chạy sạch sẽ 100% không lỗi.
+- [x] Triển khai TradingView Fullscreen Zero-Tabs Realtime Terminal: Mặc định nến M1, layout tràn màn hình 100%, tích hợp Realtime Tick Engine không reload trang, Unified Greeks Matrix (GEX, VEX, CHEX, Net Delta) và Plotly 4-Panel trên cùng 1 màn hình.
 - [x] Đảm bảo nghiêm ngặt Zero-Waste Mandate (< 15MB repo footprint, 0 MB rác).

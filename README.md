@@ -3,7 +3,7 @@
 [![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Gold-Quant/actions)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12%20%7C%203.14-blue?style=for-the-badge&logo=python)](https://www.python.org/)
-[![Unit Tests](https://img.shields.io/badge/Tests-133%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
+[![Unit Tests](https://img.shields.io/badge/Tests-137%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Zero-Waste](https://img.shields.io/badge/Zero--Waste-%3C%2015MB-green?style=for-the-badge)](docs/spec.md)
 
 Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX), Greeks bậc 2 (Vanna, Charm), Cấu trúc Kỳ hạn Đa tầng (Multi-Expiry Term Structure) & Market Microstructure vận hành **tự động 100% trên Cloud (Serverless Zero-Touch Automation)** cho **COMEX Gold Futures (`GC` / `MGC`) và ETF `GLD` Options Proxy**.
@@ -32,17 +32,17 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 60 giây/lần trực tiếp trên máy:
 - **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 7-trong-1:
-  - `[1]` Chạy Live Terminal Realtime (cập nhật 60s/lần + tự động dọn RAM)
+  - `[1]` Chạy Live Terminal Realtime (cập nhật 15s/lần + tự động dọn RAM)
   - `[2]` Cào dữ liệu CME Options Chain mới nhất (Multi-Expiry Scraper)
   - `[3]` Dọn sạch Cache & giải phóng bộ nhớ RAM
   - `[4]` Cập nhật Snapshot 1 lần
-  - `[5]` Chạy toàn bộ 133 Unit Tests tự động
+  - `[5]` Chạy toàn bộ 137 Unit Tests tự động
   - `[6]` Mở thư mục data để thả file
   - `[7]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
-  # Chạy Live Loop 60s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
-  python -m src.hud.html_dashboard --loop 60
+  # Chạy Live Loop 15s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
+  python -m src.hud.html_dashboard --loop 15
 
   # Cào dữ liệu Options Chain đa kỳ hạn từ CME Barchart
   python -m src.collector.scraper --output data/options_prices_GCZ26.csv
@@ -61,6 +61,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 - **Cẩm nang Tác chiến Thực chiến cho Trader (Trader Playbook):** [docs/TRADER_PLAYBOOK.md](docs/TRADER_PLAYBOOK.md) *(Đọc hiểu 7 KPI, bản đồ 6 kịch bản MM, SL/TP & Air Pocket)*
 - **Kiến trúc Hệ thống v3.0 (Toàn cảnh 6 tầng, Dual-View Terminal & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Giao diện Fullscreen TradingView, Mặc Định Nến M1, Zero Tabs & Realtime Tick Engine (ADR-018):** [docs/decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md](docs/decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md)
 - **Quyết định Định lượng Quyền chọn Vàng, Mô hình Cost of Carry, Call Skew & Terminal Dual-View (ADR-015):** [docs/decisions/ADR-015-gold-options-cost-of-carry-call-skew-and-dual-view-terminal.md](docs/decisions/ADR-015-gold-options-cost-of-carry-call-skew-and-dual-view-terminal.md)
 - **Quyết định Định Lượng Vi Cấu Trúc Greeks & Tâm Bão Pinning (ADR-014):** [docs/decisions/ADR-014-quantitative-microstructure-greeks-and-pinning-table.md](docs/decisions/ADR-014-quantitative-microstructure-greeks-and-pinning-table.md)
 - **Quyết định Hiệu Chỉnh Black-76 IV Qua Forward Nội Suy (ADR-013):** [docs/decisions/ADR-013-options-chain-synthetic-forward-iv-calibration.md](docs/decisions/ADR-013-options-chain-synthetic-forward-iv-calibration.md)

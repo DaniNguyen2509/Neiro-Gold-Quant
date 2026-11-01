@@ -57,7 +57,9 @@ anti_collision = true
 dual_view_enabled = true           # Enable Dual-View Tab System
 neiro_footprint_enabled = true     # Tab 1: NEIRO Orderflow Footprint (HTML5 Canvas 60 FPS)
 quant_ladder_enabled = true        # Tab 2: 3-Panel Quant Ladder & Playbook
-default_active_tab = "neiro"       # Default landing tab: "neiro" or "quant"
+default_active_tab = "neiro"
+default_timeframe = "1m"
+tradingview_fullscreen = true       # Default landing tab: "neiro" or "quant"
 
 [cloud]
 zero_waste = true                  # Strict < 15MB local machine footprint

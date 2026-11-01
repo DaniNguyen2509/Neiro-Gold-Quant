@@ -50,11 +50,11 @@ if errorlevel 1 (
 echo [KHOI TAO] Don dep cac tien trinh cu va mo Dashboard tren trinh duyet...
 powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*html_dashboard*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 start "" "exports\index.html"
-echo [LIVE RUNNER] Dang kich hoat Live Runner (Chu ky: 60s / 1 phut)...
+echo [LIVE RUNNER] Dang kich hoat Live Runner (Chu ky: 15s / Realtime)...
 echo [RAM MONITOR] Bo nho duoc thu hoi lien tuc bang gc.collect(). Khong tran RAM.
 echo [THONG BAO] Nhan Ctrl+C de dung terminal bat cu luc nao.
 echo.
-python -m src.hud.html_dashboard --loop 60
+python -m src.hud.html_dashboard --loop 15
 pause
 goto MENU
 
