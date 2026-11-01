@@ -15,4 +15,4 @@ select = ["E", "F", "W", "I", "N", "UP"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --basetemp=C:/Users/Daniel/AppData/Local/Temp/pytest_gold_temp"

@@ -432,3 +432,61 @@ def test_fetch_live_cme_m5_tape_pinbar_bear_and_tick_filter():
         assert churn_candle["signal_class"] == "spike-neutral"
 
 
+def test_compute_gold_cost_of_carry():
+    from src.quant_engine.basis import compute_gold_cost_of_carry
+
+    # S0 = 2700, dte = 30 days, r = 0.045, u = 0.002, y = 0.015
+    # net carry = 0.045 + 0.002 - 0.015 = 0.032 (3.2%/year)
+    # T = 30 / 365 = 0.08219
+    # F0 = 2700 * exp(0.032 * 0.08219) ~ 2700 * 1.002633 ~ 2707.11
+    f0 = compute_gold_cost_of_carry(2700.0, dte_days=30.0, risk_free_rate=0.045, storage_cost=0.002, lease_rate=0.015)
+    assert f0 == pytest.approx(2707.11, abs=0.5)
+
+    # Edge cases
+    assert compute_gold_cost_of_carry(0.0) == 0.0
+    assert compute_gold_cost_of_carry(-100.0) == 0.0
+
+
+def test_analyze_efp_spread():
+    from src.quant_engine.basis import analyze_efp_spread
+
+    # Case 1: Premium / Bullish NY Buying (Futures > Theoretical by > 3.0 USD)
+    res_prem = analyze_efp_spread(
+        futures_price=2720.0,
+        spot_price=2700.0,
+        dte_days=30.0,
+        risk_free_rate=0.045,
+        storage_cost=0.002,
+        lease_rate=0.015,
+    )
+    assert res_prem["status"] == "PREMIUM"
+    assert "MUA ĐUỔI" in res_prem["label"]
+    assert res_prem["delta_f"] > 3.0
+
+    # Case 2: Discount / Producer Hedging (Futures < Theoretical by > 3.0 USD)
+    res_disc = analyze_efp_spread(
+        futures_price=2695.0,
+        spot_price=2700.0,
+        dte_days=30.0,
+        risk_free_rate=0.045,
+        storage_cost=0.002,
+        lease_rate=0.015,
+    )
+    assert res_disc["status"] == "DISCOUNT"
+    assert "BÁN XẢ" in res_disc["label"]
+    assert res_disc["delta_f"] < -3.0
+
+    # Case 3: Fair Value Equilibrium (|delta_f| <= 3.0 USD)
+    res_fair = analyze_efp_spread(
+        futures_price=2708.0,
+        spot_price=2700.0,
+        dte_days=30.0,
+        risk_free_rate=0.045,
+        storage_cost=0.002,
+        lease_rate=0.015,
+    )
+    assert res_fair["status"] == "FAIR_VALUE"
+    assert "CÂN BẰNG" in res_fair["label"]
+
+
+

@@ -6,3 +6,4 @@ apscheduler>=3.10.0
 rich>=13.0.0
 pandas>=2.0.0
 plotly>=5.18.0
+yfinance>=0.2.35

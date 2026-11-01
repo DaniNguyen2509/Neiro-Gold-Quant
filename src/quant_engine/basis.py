@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 import time
 import urllib.error
@@ -536,3 +537,80 @@ def convert_levels_to_spot(levels: QuantLevels, basis: float) -> dict[str, float
         )
 
     return result
+
+
+def compute_gold_cost_of_carry(
+    spot_price: float,
+    dte_days: float = 30.0,
+    risk_free_rate: float = 0.045,
+    storage_cost: float = 0.002,
+    lease_rate: float = 0.015,
+) -> float:
+    """Computes theoretical COMEX Gold Futures price using Cost of Carry model.
+
+    Formula:
+        F_{0, theoretical} = S_0 * exp((r + u - y) * T)
+    Where:
+        S_0: Spot price (XAUUSD)
+        r: Risk-free rate (SOFR / 3M Treasury yield, e.g. 4.5%)
+        u: Physical vault storage & insurance cost at COMEX (~0.2%/year)
+        y: Gold Lease Rate between bullion banks (~1.5%/year)
+        T: Time to expiration in years (dte_days / 365.0)
+    """
+    if spot_price <= 0.0:
+        return 0.0
+    t = max(0.0035, dte_days / 365.0)
+    net_carry = risk_free_rate + storage_cost - lease_rate
+    return round(spot_price * math.exp(net_carry * t), 2)
+
+
+def analyze_efp_spread(
+    futures_price: float,
+    spot_price: float,
+    dte_days: float = 30.0,
+    risk_free_rate: float = 0.045,
+    storage_cost: float = 0.002,
+    lease_rate: float = 0.015,
+    threshold: float = 3.0,
+) -> dict[str, Any]:
+    """Analyzes Exchange for Physical (EFP) basis spread between London OTC Spot and NY COMEX.
+
+    Returns:
+        dict containing:
+            'f0_theoretical': float
+            'delta_f': float (futures - theoretical)
+            'status': str ('PREMIUM', 'DISCOUNT', 'FAIR_VALUE')
+            'label': str (Vietnamese descriptive label)
+            'color': str (HEX color code)
+            'efp_arbitrage_signal': str
+    """
+    f0_theo = compute_gold_cost_of_carry(
+        spot_price, dte_days, risk_free_rate, storage_cost, lease_rate
+    )
+    delta_f = round(futures_price - f0_theo, 2)
+
+    if delta_f > threshold:
+        status = "PREMIUM"
+        label = "PREMIUM &bull; MUA ĐUỔI COMEX"
+        color = "#4ADE80"
+        arb_signal = "EFP BUY SPOT / SELL FUTURES (Lực mua New York áp đảo, kéo Spot tăng)"
+    elif delta_f < -threshold:
+        status = "DISCOUNT"
+        label = "DISCOUNT &bull; BÁN XẢ COMEX"
+        color = "#F87171"
+        arb_signal = "EFP SELL SPOT / BUY FUTURES (Áp lực mỏ vàng phòng hộ xả hàng)"
+    else:
+        status = "FAIR_VALUE"
+        label = "FAIR VALUE &bull; CÂN BẰNG"
+        color = "#FACC15"
+        arb_signal = "MARKET IN EQUILIBRIUM (Cung cầu vật chất và phái sinh cân bằng)"
+
+    return {
+        "f0_theoretical": f0_theo,
+        "delta_f": delta_f,
+        "status": status,
+        "label": label,
+        "color": color,
+        "efp_arbitrage_signal": arb_signal,
+    }
+

@@ -1,28 +1,73 @@
-﻿# Neiro-Quant Runtime Configuration
+# Neiro-Gold-Quant System Configuration
+# COMEX Gold Futures (GC / MGC), Spot XAUUSD & SPDR Gold Trust (GLD) Options
+# Architecture: Cloud-Native Zero-Touch Automation (< 15MB Footprint)
+
+[symbol]
+primary = "GC"
+futures_symbol = "GC=F"
+micro_symbol = "MGC"
+continuous_symbol = "GC1!"
+spot_symbol = "XAUUSD"
+alt_spot_symbol = "GOLD"
+proxy_symbol = "GLD"
+alt_proxy_symbol = "IAU"
+volatility_index = "^GVZ"          # CBOE Gold Volatility Index
+multiplier = 100.0                 # 100 troy oz per COMEX standard contract
+micro_multiplier = 10.0            # 10 troy oz per COMEX micro contract
+default_step = 10.0                # Common strike interval ($10-$25)
+fine_step = 5.0                    # ATM micro-strike interval for near-dated expirations
+default_basis_ratio = 10.8         # GC ≈ 10.8 * GLD (e.g. GC=2,700 -> GLD=250)
+primary_cycles = ["G", "J", "M", "Q", "Z"]  # Feb, Apr, Jun, Aug, Dec
+
+[cost_of_carry]
+# Theoretical Forward: F0 = S0 * exp((r + u - y) * T)
+risk_free_rate = 0.045             # r: US SOFR / 3M Treasury Yield (~4.5%)
+storage_cost = 0.002               # u: COMEX physical storage & insurance (~0.2%/year)
+lease_rate = 0.015                 # y: Bullion Bank Gold Lease Rate (~1.5%/year)
+efp_arbitrage_enabled = true       # Exchange for Physical spread monitor
 
 [collector]
+barchart_symbol = "GCZ26"
+underlying_symbol = "GLD"
+futures_symbol = "GC=F"
+options_code_prefix = "OG"         # CME Monthly Gold Options
+weekly_code_prefix = "IG"          # CME Weekly Gold Options (Barchart)
+target_dte_mode = "NEAR"           # "0DTE", "NEAR" (1-5 days), "MONTHLY"
+near_strikes_count = 35            # Number of strikes around ATM
 interval_minutes = 10
-barchart_symbol = GCZ25
 timeout_seconds = 30
-
-[mt5]
-forward_symbol = XAUUSD-F
-spot_symbol = XAUUSDc
-spot_broker = Exness
-forward_broker = Pepperstone
+cache_ttl_seconds = 5.0
 
 [engine]
-sigma_factor = 0.85
-air_pocket_threshold = 0.35
-wall_volume_confirm = true
+sigma_band_factor = 1.0            # Standard deviation expected move
+tactical_sigma_factor = 0.85       # Institutional trading range factor
+air_pocket_threshold = 0.35        # Liquidity vacuum threshold (OI < 35% of moving average)
+wall_volume_confirm = true         # Require volume confirmation for major walls
+siege_ratio_threshold = 0.25       # Wall Siege Ratio (Volume / Baseline OI >= 0.25)
+skew_mode = "call_skew"            # Gold exhibits Call Skew (hedging inflation & geopolitical shocks)
+zero_gamma_solver = "brentq"       # Pure Python Dekker-Brent numerical solver
 
 [hud]
-refresh_seconds = 5
+theme = "dark"
+refresh_seconds = 60
 show_futures = true
 show_spot = true
+show_air_pockets = true
+anti_collision = true
+dual_view_enabled = true           # Enable Dual-View Tab System
+neiro_footprint_enabled = true     # Tab 1: NEIRO Orderflow Footprint (HTML5 Canvas 60 FPS)
+quant_ladder_enabled = true        # Tab 2: 3-Panel Quant Ladder & Playbook
+default_active_tab = "neiro"       # Default landing tab: "neiro" or "quant"
+
+[cloud]
+zero_waste = true                  # Strict < 15MB local machine footprint
+max_footprint_mb = 15.0
+cloud_provider = "github_actions"
+web_hosting = "github_pages"
+multi_tier_radar = true            # 3-tier pre-session cron execution
 
 [logging]
-level = INFO
-file = logs/neiro-quant.log
-max_bytes = 10485760
+level = "INFO"
+file = "logs/neiro-gold-quant.log"
+max_bytes = 10485760               # 10 MB
 backup_count = 3

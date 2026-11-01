@@ -118,7 +118,7 @@ Hệ thống **Neiro-Quant** sinh ra để phát hiện trước **nguy cơ bị
                      ▼                                           ▼
 ┌─────────────────────────────────────────┐ ┌────────────────────────────────────────────┐
 │ [TẦNG 6A: WEB COCKPIT DASHBOARD]        │ │ [TẦNG 6B: MT5 / TRADINGVIEW OVERLAY]       │
-│  - Localhost:8080 (Dark Theme ATAS)     │ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5  │
+│  - Localhost:8080 (Dark Theme NEIRO)    │ │  - MT5 Indicator: Neiro-Quant-Overlay.mq5  │
 │  - Radar Matrix: Giám sát trạng thái    │ │    đọc levels_cache.json vẽ trực tiếp hộp   │
 │    từng level theo thời gian thực       │ │    vùng cản & Air Pocket lên nến MT5.       │
 │  - GEX Profile Bar Chart từng Strike    │ │  - TradingView Pine Script Indicator       │

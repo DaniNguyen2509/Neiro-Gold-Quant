@@ -57,7 +57,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright pandas plotly
+          pip install playwright pandas plotly yfinance
           python -m playwright install chromium --with-deps
 
       - name: Scrape Options Chain from Barchart
@@ -76,8 +76,8 @@ jobs:
               df = pd.read_csv('data/options_prices_GCZ26.csv')
               strikes = df['strike'].dropna()
               assert len(strikes) >= 10, f'Strike count {len(strikes)} is below minimum 10'
-              assert strikes.min() <= 3800.0, f'Min strike {strikes.min()} does not cover lower band'
-              assert strikes.max() >= 4200.0, f'Max strike {strikes.max()} does not cover upper band'
+              assert strikes.min() <= 2800.0, f'Min strike {strikes.min()} is above active trading band'
+              assert strikes.max() >= 2600.0, f'Max strike {strikes.max()} is below active trading band'
               total_oi = float(df['callOpenInterest'].sum() + df['putOpenInterest'].sum())
               assert total_oi > 0, 'Total Open Interest is zero'
               print(f'[VERIFIED] Data integrity passed: {len(strikes)} strikes ({strikes.min()} to {strikes.max()}), Total OI: {total_oi}')

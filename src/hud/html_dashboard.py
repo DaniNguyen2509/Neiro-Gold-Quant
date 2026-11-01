@@ -59,6 +59,7 @@ from src.quant_engine.dealer import (
     classify_wall_regime,
 )
 from src.quant_engine.loader import to_options_snapshot, load_multi_expiry_options
+from src.hud.neiro_terminal import render_neiro_orderflow_component
 
 
 def clean_val(v: Any, default: float = 0.0) -> float:
@@ -1696,6 +1697,7 @@ def generate_html_terminal(
     guard_tag = " (VI MÔ)" if is_micro_guarded else ""
 
     pinning_table_html = build_microstructure_pinning_table_html(df, meta)
+    neiro_comp = render_neiro_orderflow_component(meta, df)
 
     # Render complete HTML
     html = f"""<!DOCTYPE html>
@@ -1708,7 +1710,9 @@ def generate_html_terminal(
     <meta http-equiv="Expires" content="0">
     <title>NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
+{neiro_comp['neiro_css']}
         :root {{
             --bg-base: #070B12; --bg-card: #0F172A; --border-color: #1E293B;
             --text-primary: #F8FAFC; --text-secondary: #94A3B8; --text-muted: #64748B;
@@ -1771,6 +1775,9 @@ def generate_html_terminal(
 </head>
 <body>
 <div class="container">
+    {neiro_comp['nav_topbar_html']}
+    {neiro_comp['neiro_container_html']}
+    <div id="plotly-view-container" style="display:none;">
     <div class="header">
         <div class="brand">
             <div class="brand-title">NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</div>
@@ -2140,7 +2147,9 @@ def generate_html_terminal(
     <div class="footer">
         NEIRO-QUANT HEDGE FUND QUANTITATIVE SYSTEM &bull; 100% PURE CME GOLD FUTURES &bull; ZERO TOUCH CLOUD AUTOMATION
     </div>
+    </div>
 </div>
+{neiro_comp['neiro_js_script']}
 <script>
     function refreshWithCacheBuster() {{
         if (window.location.protocol === "file:") {{
