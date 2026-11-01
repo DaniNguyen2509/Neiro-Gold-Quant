@@ -58,40 +58,41 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     }
     .neiro-tf-btn.active { background: #38BDF8; color: #000000; font-weight: 700; }
     .neiro-top-hud {
-        background: rgba(8, 11, 18, 0.96); border: 1px solid #1E293B; border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); padding: 10px 18px; margin-bottom: 12px;
-        font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 6px 24px;
+        background: rgba(8, 11, 18, 0.95); border: 1px solid #1E293B; border-radius: 6px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); padding: 5px 12px; margin-bottom: 8px;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 3px 16px;
     }
-    .hud-col { display: flex; flex-direction: column; gap: 4px; }
-    .hud-row { display: flex; align-items: center; gap: 8px; }
-    .hud-lbl { color: #94A3B8; font-weight: 600; min-width: 155px; }
+    .hud-col { display: flex; flex-direction: column; gap: 2px; }
+    .hud-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 10.5px; }
+    .hud-lbl { color: #94A3B8; font-weight: 600; font-size: 10px; }
     """
 
     # 2. Navigation Topbar HTML (Pure CME Futures Focus)
     nav_topbar_html = f"""
-    <div style="background:#161A22; border:1px solid #232A37; display:flex; align-items:center; justify-content:space-between; padding:0 12px; height:46px; font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:14px; border-radius:8px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-            <span style="width:4px; height:22px; background:#0284C7; border-radius:2px;"></span>
+    <div style="background:#161A22; border:1px solid #232A37; display:flex; align-items:center; justify-content:space-between; padding:0 10px; height:38px; font-family:'JetBrains Mono',monospace; font-size:11px; margin-bottom:8px; border-radius:6px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+            <span style="width:3px; height:18px; background:#0284C7; border-radius:2px;"></span>
             <button id="tab-neiro" class="neiro-tab-btn active" onclick="switchTerminalView('neiro')">
                 📊 TAB 1: NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL
             </button>
             <button id="tab-plotly" class="neiro-tab-btn" onclick="switchTerminalView('plotly')">
                 📈 TAB 2: QUANT PROFILE LADDER
             </button>
-            <span style="color:#475569; margin:0 4px;">|</span>
-            <div style="display:flex; gap:4px;">
+            <span style="color:#475569; margin:0 2px;">|</span>
+            <div style="display:flex; gap:3px;">
                 <button class="neiro-tf-btn" onclick="setTimeframe('1m')">1M</button>
                 <button class="neiro-tf-btn active" onclick="setTimeframe('5m')">5M</button>
                 <button class="neiro-tf-btn" onclick="setTimeframe('15m')">15M</button>
                 <button class="neiro-tf-btn" onclick="setTimeframe('1h')">1H</button>
+                <button class="neiro-tf-btn" id="btn-chart-expand" onclick="toggleChartHeight()" title="Thu nhỏ / Mở rộng (540px / 720px)" style="color:#38BDF8; font-weight:700;">↕ 540p</button>
             </div>
         </div>
-        <div style="display:flex; align-items:center; gap:12px;">
-            <span style="color:#94A3B8; font-size:11px;">HỆ SỐ NHÂN: <b style="color:#FACC15;">$100.0/oz</b> (GC)</span>
-            <span style="color:#94A3B8; font-size:11px;">| CME FUTURES: <b style="color:#38BDF8; font-size:13px;" id="top-live-spot">${spot:,.2f}</b></span>
-            <span class="badge badge-gold">GVZ: {gvz_iv:.1f}%</span>
-            <span class="badge badge-live">100% PURE CME GC=F</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#94A3B8; font-size:10.5px;">HỆ SỐ NHÂN: <b style="color:#FACC15;">$100.0/oz</b> (GC)</span>
+            <span style="color:#94A3B8; font-size:10.5px;">| CME FUTURES: <b style="color:#38BDF8; font-size:12px;" id="top-live-spot">${spot:,.2f}</b></span>
+            <span class="badge badge-gold" style="font-size:9.5px; padding:2px 6px;">GVZ: {gvz_iv:.1f}%</span>
+            <span class="badge badge-live" style="font-size:9.5px; padding:2px 6px;">100% PURE CME GC=F</span>
         </div>
     </div>
     """
@@ -100,21 +101,23 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     neiro_container_html = f"""
     <div id="neiro-top-hud" class="neiro-top-hud">
         <div class="hud-col">
-            <div class="hud-row"><span class="hud-lbl">COMEX GC FUTURES:</span> <b style="color:#38BDF8; font-size:13px;">${spot:,.2f}</b> <span style="color:#64748B;">(Trục ATM: ${atm_strike:,.0f})</span></div>
-            <div class="hud-row"><span class="hud-lbl">MARKET GEX REGIME:</span> <b style="color:{regime_color};" id="hud-gex-regime">{regime_text} (${total_gex:+.1f}M)</b></div>
-            <div class="hud-row"><span class="hud-lbl">VANNA EXPOSURE (VEX):</span> <b style="color:#22D3EE;">${total_vex:+.1f}M</b> <span style="color:#64748B;">(Vol Shift +1%)</span></div>
-            <div class="hud-row"><span class="hud-lbl">CHARM EXPOSURE (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/ngày</b> <span style="color:#64748B;">(Delta Decay/24h)</span></div>
-            <div class="hud-row"><span class="hud-lbl">ZERO GAMMA FLIP (S*):</span> <b style="color:#FACC15;">${zero_gamma:,.1f}</b> <span style="color:#64748B;">(Mốc Đảo Pha Xu Hướng)</span></div>
+            <div class="hud-row"><span class="hud-lbl">COMEX GC:</span> <b style="color:#38BDF8;">${spot:,.2f}</b> <span style="color:#64748B;">(ATM ${atm_strike:,.0f})</span></div>
+            <div class="hud-row"><span class="hud-lbl">GEX REGIME:</span> <b style="color:{regime_color};" id="hud-gex-regime">{regime_text} (${total_gex:+.0f}M)</b></div>
         </div>
         <div class="hud-col">
-            <div class="hud-row"><span class="hud-lbl">1-SIGMA EXPECTED MOVE:</span> <b style="color:#FACC15;">±${expected_move:,.1f}</b> <span style="color:#94A3B8;">(Rule 16 trong ngày: ±${intraday_move:,.1f})</span></div>
-            <div class="hud-row"><span class="hud-lbl">CALL WALL (TRẦN CỨNG):</span> <b style="color:#EF4444;">${call_wall:,.0f}</b> <span style="color:#64748B;">({call_wall_oi:,} OI · Siege: {call_wall_siege:.2f}x)</span></div>
-            <div class="hud-row"><span class="hud-lbl">PUT WALL (SÀN ĐỠ):</span> <b style="color:#22C55E;">${put_wall:,.0f}</b> <span style="color:#64748B;">({put_wall_oi:,} OI · Siege: {put_wall_siege:.2f}x)</span></div>
-            <div class="hud-row"><span class="hud-lbl">GAMMA SQUEEZE ↑:</span> <b style="color:#4ADE80;">&gt; ${strike_above:,.1f} → TP ${next_above:,.1f}</b></div>
-            <div class="hud-row"><span class="hud-lbl">GAMMA WATERFALL ↓:</span> <b style="color:#F87171;">&lt; ${strike_below:,.1f} → TP ${next_below:,.1f}</b></div>
+            <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#22D3EE;">${total_vex:+.1f}M</b> <span style="color:#64748B;">(+1% IV)</span></div>
+            <div class="hud-row"><span class="hud-lbl">CHARM (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/d</b> <span style="color:#64748B;">(Decay)</span></div>
+        </div>
+        <div class="hud-col">
+            <div class="hud-row"><span class="hud-lbl">ZERO GAMMA:</span> <b style="color:#FACC15;">${zero_gamma:,.1f}</b> <span style="color:#64748B;">(Flip)</span></div>
+            <div class="hud-row"><span class="hud-lbl">WALLS:</span> <span><b style="color:#EF4444;">C: ${call_wall:,.0f}</b> <span style="color:#64748B;">({call_wall_siege:.2f}x)</span> | <b style="color:#22C55E;">P: ${put_wall:,.0f}</b> <span style="color:#64748B;">({put_wall_siege:.2f}x)</span></span></div>
+        </div>
+        <div class="hud-col">
+            <div class="hud-row"><span class="hud-lbl">GAMMA SQUEEZE ↑:</span> <b style="color:#4ADE80;">&gt;${strike_above:,.0f} → TP ${next_above:,.0f}</b></div>
+            <div class="hud-row"><span class="hud-lbl">GAMMA WATERFALL ↓:</span> <b style="color:#F87171;">&lt;${strike_below:,.0f} → TP ${next_below:,.0f}</b></div>
         </div>
     </div>
-    <div id="neiro-view-container" style="display:block; width:100%; height:820px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:10px; margin-bottom:16px; overflow:hidden;">
+    <div id="neiro-view-container" style="display:block; width:100%; height:540px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:12px; overflow:hidden;">
         <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
         <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
     </div>
@@ -234,6 +237,32 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
     }}
 
+    function toggleChartHeight() {{
+        const vc = document.getElementById('neiro-view-container');
+        const btn = document.getElementById('btn-chart-expand');
+        if (!vc) return;
+        const isDefault = vc.style.height === '540px' || !vc.style.height;
+        if (isDefault) {{
+            vc.style.height = '720px';
+            if (btn) btn.innerText = '↕ 720p';
+        }} else {{
+            vc.style.height = '540px';
+            if (btn) btn.innerText = '↕ 540p';
+        }}
+        const container = document.getElementById('neiro-tv-chart');
+        const canvas = document.getElementById('neiro-canvas');
+        if (container && neiroChart) {{
+            const newW = container.clientWidth;
+            const newH = container.clientHeight;
+            neiroChart.applyOptions({{ width: newW, height: newH }});
+            if (canvas) {{
+                canvas.width = newW;
+                canvas.height = newH;
+            }}
+            drawNeiroOverlay();
+        }}
+    }}
+
     function resampleBars(candles, targetPeriodSec) {{
         if (!candles || candles.length === 0) return [];
         if (targetPeriodSec <= 300) {{
@@ -338,7 +367,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         neiroChart = LightweightCharts.createChart(container, {{
             width: container.clientWidth,
-            height: container.clientHeight || 840,
+            height: container.clientHeight || 540,
             layout: {{
                 background: {{ type: 'solid', color: '#000000' }},
                 textColor: '#94A3B8',
@@ -392,7 +421,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const handleResize = () => {{
             if (!container || !neiroChart) return;
             const newW = container.clientWidth;
-            const newH = container.clientHeight || 840;
+            const newH = container.clientHeight || 540;
             neiroChart.applyOptions({{ width: newW, height: newH }});
             if (canvas) {{
                 canvas.width = newW;
