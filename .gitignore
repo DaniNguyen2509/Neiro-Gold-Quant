@@ -72,6 +72,7 @@ desktop.ini
 
 # --- Generated Visualizations & Reports ---
 reports/
+exports/
 quant_truevision_map.*
 *.html
 !index.html

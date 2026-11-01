@@ -1,9 +1,9 @@
 # Neiro-Gold-Quant — TÀI LIỆU KIẾN TRÚC HỆ THỐNG ĐỊNH LƯỢNG (QUANT ARCHITECTURE)
 
-> **Phiên bản:** v3.0 — Kiến trúc Terminal Tác chiến Đa Chế Độ Dual-View (NEIRO Footprint & 3-Panel Quant Ladder)  
-> **Dự án:** Neiro-Gold-Quant (Hệ thống Định lượng Vi mô Dòng tiền Market Maker & Terminal Tác chiến cho COMEX Gold Futures `GC` / `MGC` & Spot `XAUUSD`)  
+> **Phiên bản:** v3.1 — All-in-One Tactical Terminal & Multi-Expiry Greeks Term Structure  
+> **Dự án:** Neiro-Gold-Quant (Hệ thống Định lượng Vi mô Dòng tiền Market Maker & All-in-One Orderflow Terminal cho 100% Pure COMEX Gold Futures `GC` / `MGC`)  
 > **Vận hành:** Cloud-Native Zero-Touch Automation (GitHub Actions + GitHub Pages, thuần Python, Zero-Waste < 15MB)  
-> **Tài liệu chuẩn đối chiếu:** [docs/spec.md](spec.md), [config/settings.toml](../config/settings.toml), [docs/TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md).
+> **Tài liệu chuẩn đối chiếu:** [docs/spec.md](spec.md), [config/settings.toml](../config/settings.toml), [docs/TRADER_PLAYBOOK.md](TRADER_PLAYBOOK.md), [ADR-016](decisions/ADR-016-all-in-one-tactical-terminal-and-multi-expiry-greeks.md).
 
 ---
 
@@ -70,20 +70,20 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
                                              │
                                              ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [TẦNG 3: TERMINAL TÁC CHIẾN ĐA CHẾ ĐỘ DUAL-VIEW (FRONTEND HUD)]                            │
+│ [TẦNG 3: ALL-IN-ONE ORDERFLOW TERMINAL (CANVAS 60 FPS FRONTEND HUD)]                       │
 │  ┌──────────────────────────────────────────────┬────────────────────────────────────────┐ │
-│  │ TAB 1: NEIRO ORDERFLOW FOOTPRINT             │ TAB 2: 3-PANEL QUANT LADDER & PLAYBOOK │ │
+│  │ TAB 1: NEIRO ALL-IN-ONE ORDERFLOW FOOTPRINT  │ TAB 2: 3-PANEL QUANT LADDER & MATRIX   │ │
 │  ├──────────────────────────────────────────────┼────────────────────────────────────────┤ │
 │  │ - HTML5 Canvas 60 FPS Orderflow Layer        │ - Panel 1: Net GEX Profile & Walls     │ │
 │  │ - Thang giá dọc DOM / Bid-Ask Ladder         │ - Panel 2: OI Concentration & Delta    │ │
-│  │ - Footprint Delta Bar Cluster                │ - Panel 3: Vanna & Charm Flow          │ │
-│  │ - Micro-candles 1m/5m Brownian Bridge        │ - Ma trận 6 Kịch bản Realtime          │ │
-│  │ - Greeks Overlay Profile per Strike          │ - Bảng Scalping & Swing Playbook       │ │
-│  │ - Tick-by-Tick Simulated Tape                │ - Strike Microstructure Matrix         │ │
+│  │ - Footprint Delta Bar Cluster & 1m/5m Candle │ - Panel 3: Vanna & Charm Flow          │ │
+│  │ - Air Pocket Vacuum Zones trên Canvas        │ - Bảng Cấu Trúc Vi Mô Strike Matrix   │ │
+│  │ - Net GEX Bars & Greeks Profile per Strike   │ - Bảng Tác Chiến Scalping Trong Ngày   │ │
+│  │ - Key Structural Walls & Wall Siege Ratio    │ - Từ Điển Bỏ Túi Giải Thích 1 Dòng     │ │
 │  │ - Multiplier = 100.0 (GC) / 10.0 (MGC)       │ - Thuật toán Chống Đè Chữ              │ │
 │  └──────────────────────────────────────────────┴────────────────────────────────────────┘ │
 │  - Header KPI Bar: Spot CME, Net GEX Regime, Net Delta Tilt, Zero Gamma Flip, Expected Move│
-│  - Client-Side Black-76 Engine (Pure JS): Tái tính toán Greeks theo từng tick giá.         │
+│  - Multi-Expiry Term Structure: Xếp chồng tuyến tính Greeks ∑ NetGEX_e, ∑ NetVEX_e        │
 │  - Xuất bản tự động lên GitHub Pages (https://daninguyen2509.github.io/Neiro-Gold-Quant/).      │
 └────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                              │
@@ -101,7 +101,7 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 5: TACTICAL PLAYBOOK & RISK MATRICES]                                                │
 │  - Intraday Scalping Strategy (biên độ 15-25 USD): Entry, Hard SL, TP, Lots.              │
-│  - Structural Swing Strategy (biên độ 50-120 USD): Vị thế theo Major Walls.                │
+│  - 100% Pure CME Futures Positioning: Khử bỏ toàn bộ Spot/Binance và kịch bản suy đoán.  │
 │  - CTA 20-Day Momentum Confluence: Hợp lưu bứt phá đà tăng/giảm giữa Quỹ và Dealer.       │
 └────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

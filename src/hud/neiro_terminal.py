@@ -1,9 +1,9 @@
 """src/hud/neiro_terminal.py
 
-High-Fidelity NEIRO Orderflow Footprint Terminal Component for Gold (GC / MGC).
-Renders Tab 1: HTML5 Canvas 60 FPS Orderflow Layer, Lightweight Charts Candlesticks,
-Dynamic Greeks Profile Overlay, and Client-Side Black-76 Engine for COMEX Gold.
-Multiplier = 100.0 (GC) / 10.0 (MGC). Zero-Waste Compliant (< 15MB).
+High-Fidelity All-in-One NEIRO Orderflow Footprint Terminal Component for COMEX Gold (GC / MGC).
+Renders 100% Pure CME Futures Tactical Chart: HTML5 Canvas 60 FPS Orderflow Layer,
+Candlesticks, Dynamic Greeks Profile per Strike (Net GEX, VEX, CHEX), Air Pocket Vacuum Bands,
+and Key Institutional Boundary Lines. Multiplier = 100.0 (GC) / 10.0 (MGC). Zero-Waste Compliant (< 15MB).
 """
 from __future__ import annotations
 
@@ -13,13 +13,15 @@ import pandas as pd
 
 
 def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> dict[str, str]:
-    """Generates HTML, CSS, and JS artifacts for Tab 1 NEIRO Orderflow Footprint."""
+    """Generates HTML, CSS, and JS artifacts for All-in-One NEIRO Orderflow Terminal."""
     spot = float(meta.get("spot_price", 2700.0))
     atm_strike = float(meta.get("atm_strike", spot))
     call_wall = float(meta.get("call_wall", spot + 40.0))
     put_wall = float(meta.get("put_wall", spot - 40.0))
     call_wall_oi = int(meta.get("call_wall_oi", 0))
     put_wall_oi = int(meta.get("put_wall_oi", 0))
+    call_wall_siege = float(meta.get("call_wall_siege", 0.0))
+    put_wall_siege = float(meta.get("put_wall_siege", 0.0))
     total_gex = float(meta.get("total_net_gex", 0.0))
     total_vex = float(meta.get("total_net_vex", 0.0))
     total_chex = float(meta.get("total_net_chex", 0.0))
@@ -32,9 +34,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     zero_gamma = float(meta.get("zero_gamma_flip", spot))
     dte_days = float(meta.get("dte_days", 8.0))
     gvz_iv = float(meta.get("gvz_iv", 18.5))
+    air_pockets = meta.get("air_pockets", [])
 
     regime_color = "#4ADE80" if total_gex >= 0 else "#F87171"
-    regime_text = "POSITIVE GAMMA" if total_gex >= 0 else "NEGATIVE GAMMA"
+    regime_text = "POSITIVE GAMMA (LONG MM)" if total_gex >= 0 else "NEGATIVE GAMMA (SHORT MM)"
 
     # 1. CSS styling
     neiro_css = """
@@ -56,25 +59,25 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     .neiro-tf-btn.active { background: #38BDF8; color: #000000; font-weight: 700; }
     .neiro-floating-hud {
         position: absolute; top: 12px; left: 14px; z-index: 20;
-        background: rgba(8, 11, 18, 0.92); border: 1px solid #1E293B; border-radius: 6px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7); padding: 8px 14px;
+        background: rgba(8, 11, 18, 0.94); border: 1px solid #1E293B; border-radius: 8px;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.8); padding: 10px 16px;
         font-family: 'JetBrains Mono', monospace; font-size: 11px; pointer-events: none;
     }
-    .hud-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .hud-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3.5px; }
     .hud-row:last-child { margin-bottom: 0; }
-    .hud-lbl { color: #94A3B8; font-weight: 600; min-width: 125px; }
+    .hud-lbl { color: #94A3B8; font-weight: 600; min-width: 145px; }
     """
 
-    # 2. Navigation Topbar HTML
+    # 2. Navigation Topbar HTML (Pure CME Futures Focus)
     nav_topbar_html = f"""
-    <div style="background:#161A22; border:1px solid #232A37; display:flex; align-items:center; justify-content:space-between; padding:0 12px; height:44px; font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:14px; border-radius:8px;">
+    <div style="background:#161A22; border:1px solid #232A37; display:flex; align-items:center; justify-content:space-between; padding:0 12px; height:46px; font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:14px; border-radius:8px;">
         <div style="display:flex; align-items:center; gap:8px;">
-            <span style="width:4px; height:20px; background:#0284C7; border-radius:2px;"></span>
+            <span style="width:4px; height:22px; background:#0284C7; border-radius:2px;"></span>
             <button id="tab-neiro" class="neiro-tab-btn active" onclick="switchTerminalView('neiro')">
-                📊 TAB 1: NEIRO ORDERFLOW FOOTPRINT
+                📊 TAB 1: NEIRO ALL-IN-ONE ORDERFLOW & GREEKS TERMINAL
             </button>
             <button id="tab-plotly" class="neiro-tab-btn" onclick="switchTerminalView('plotly')">
-                📈 TAB 2: 3-PANEL QUANT LADDER & PLAYBOOK
+                📈 TAB 2: QUANT PROFILE LADDER
             </button>
             <span style="color:#475569; margin:0 4px;">|</span>
             <div style="display:flex; gap:4px;">
@@ -84,25 +87,29 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 <button class="neiro-tf-btn" onclick="setTimeframe('1h')">1H</button>
             </div>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:12px;">
             <span style="color:#94A3B8; font-size:11px;">HỆ SỐ NHÂN: <b style="color:#FACC15;">$100.0/oz</b> (GC)</span>
-            <span style="color:#94A3B8; font-size:11px;">| SPOT CME: <b style="color:#38BDF8;" id="top-live-spot">${spot:,.2f}</b></span>
+            <span style="color:#94A3B8; font-size:11px;">| CME FUTURES: <b style="color:#38BDF8; font-size:13px;" id="top-live-spot">${spot:,.2f}</b></span>
             <span class="badge badge-gold">GVZ: {gvz_iv:.1f}%</span>
-            <span class="badge badge-live">COMEX GC=F</span>
+            <span class="badge badge-live">100% PURE CME GC=F</span>
         </div>
     </div>
     """
 
-    # 3. Tab 1 Container HTML
+    # 3. Tab 1 Container HTML with Floating All-in-One HUD
     neiro_container_html = f"""
-    <div id="neiro-view-container" style="display:block; width:100%; height:820px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:10px; margin-bottom:16px; overflow:hidden;">
+    <div id="neiro-view-container" style="display:block; width:100%; height:840px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:10px; margin-bottom:16px; overflow:hidden;">
         <div class="neiro-floating-hud">
-            <div class="hud-row"><span class="hud-lbl">GEX REGIME:</span> <b style="color:{regime_color};" id="hud-gex-regime">{regime_text} (${total_gex:+.1f}M)</b></div>
+            <div class="hud-row"><span class="hud-lbl">COMEX GC FUTURES:</span> <b style="color:#38BDF8; font-size:13px;">${spot:,.2f}</b> <span style="color:#64748B;">(Trục ATM: ${atm_strike:,.0f})</span></div>
+            <div class="hud-row"><span class="hud-lbl">MARKET GEX REGIME:</span> <b style="color:{regime_color};" id="hud-gex-regime">{regime_text} (${total_gex:+.1f}M)</b></div>
+            <div class="hud-row"><span class="hud-lbl">VANNA EXPOSURE (VEX):</span> <b style="color:#22D3EE;">${total_vex:+.1f}M</b> <span style="color:#64748B;">(Vol Shift +1%)</span></div>
+            <div class="hud-row"><span class="hud-lbl">CHARM EXPOSURE (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/ngày</b> <span style="color:#64748B;">(Delta Decay/24h)</span></div>
+            <div class="hud-row"><span class="hud-lbl">ZERO GAMMA FLIP (S*):</span> <b style="color:#FACC15;">${zero_gamma:,.1f}</b> <span style="color:#64748B;">(Mốc Đảo Pha Xu Hướng)</span></div>
+            <div class="hud-row"><span class="hud-lbl">1-SIGMA EXPECTED MOVE:</span> <b style="color:#FACC15;">±${expected_move:,.1f}</b> <span style="color:#94A3B8;">(Rule 16 trong ngày: ±${intraday_move:,.1f})</span></div>
+            <div class="hud-row"><span class="hud-lbl">CALL WALL (TRẦN CỨNG):</span> <b style="color:#EF4444;">${call_wall:,.0f}</b> <span style="color:#64748B;">({call_wall_oi:,} OI · Siege: {call_wall_siege:.2f}x)</span></div>
+            <div class="hud-row"><span class="hud-lbl">PUT WALL (SÀN ĐỠ):</span> <b style="color:#22C55E;">${put_wall:,.0f}</b> <span style="color:#64748B;">({put_wall_oi:,} OI · Siege: {put_wall_siege:.2f}x)</span></div>
             <div class="hud-row"><span class="hud-lbl">GAMMA SQUEEZE ↑:</span> <b style="color:#4ADE80;">&gt; ${strike_above:,.1f} → TP ${next_above:,.1f}</b></div>
             <div class="hud-row"><span class="hud-lbl">GAMMA WATERFALL ↓:</span> <b style="color:#F87171;">&lt; ${strike_below:,.1f} → TP ${next_below:,.1f}</b></div>
-            <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#22D3EE;">${total_vex:+.1f}M</b></div>
-            <div class="hud-row"><span class="hud-lbl">CHARM (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/d</b></div>
-            <div class="hud-row"><span class="hud-lbl">1-SIGMA MOVE:</span> <b style="color:#FACC15;">±${expected_move:,.1f} (Rule 16: ±${intraday_move:,.1f})</b></div>
         </div>
         <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
         <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
@@ -138,8 +145,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "atm_strike": atm_strike,
         "call_wall": call_wall,
         "call_wall_oi": call_wall_oi,
+        "call_wall_siege": call_wall_siege,
         "put_wall": put_wall,
         "put_wall_oi": put_wall_oi,
+        "put_wall_siege": put_wall_siege,
         "total_net_gex": total_gex,
         "total_net_vex": total_vex,
         "total_net_chex": total_chex,
@@ -152,9 +161,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "zero_gamma_flip": zero_gamma,
         "dte_days": dte_days,
         "multiplier": 100.0,
+        "air_pockets": air_pockets,
     })
 
-    # 5. JavaScript Orderflow & Dual-View Engine
+    # 5. JavaScript Orderflow & Dual-View Engine (All-in-One Rendering)
     neiro_js_script = f"""
     <script>
     window.INITIAL_OPTIONS = {json_options_str};
@@ -270,7 +280,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         neiroChart = LightweightCharts.createChart(container, {{
             width: container.clientWidth,
-            height: container.clientHeight || 820,
+            height: container.clientHeight || 840,
             layout: {{
                 background: {{ type: 'solid', color: '#000000' }},
                 textColor: '#94A3B8',
@@ -296,7 +306,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 secondsVisible: false,
                 barSpacing: 22,
                 minBarSpacing: 10,
-                rightOffset: 12,
+                rightOffset: 14,
             }},
         }});
 
@@ -318,13 +328,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
             axisLabelVisible: true,
-            title: 'F0 LIVE',
+            title: 'GC=F LIVE',
         }});
 
         const handleResize = () => {{
             if (!container || !neiroChart) return;
             const newW = container.clientWidth;
-            const newH = container.clientHeight || 820;
+            const newH = container.clientHeight || 840;
             neiroChart.applyOptions({{ width: newW, height: newH }});
             if (canvas) {{
                 canvas.width = newW;
@@ -349,14 +359,78 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         ctx.clearRect(0, 0, w, h);
 
         const m = window.INITIAL_META;
-        const rightX = w - 70;
+        const rightX = w - 75;
 
+        // 1. Draw Air Pocket Vacuum Zones (Tô màu chân không thanh khoản trực tiếp)
+        const airPockets = m.air_pockets || [];
+        airPockets.forEach(ap => {{
+            const pFrom = parseFloat(ap.from || 0);
+            const pTo = parseFloat(ap.to || 0);
+            if (!pFrom || !pTo) return;
+            const y1 = candleSeries.priceToCoordinate(Math.max(pFrom, pTo));
+            const y2 = candleSeries.priceToCoordinate(Math.min(pFrom, pTo));
+            if (y1 !== null && y2 !== null) {{
+                const topY = Math.min(y1, y2);
+                const botY = Math.max(y1, y2);
+                const bandH = Math.max(12, botY - topY);
+                if (topY <= h && botY >= 0) {{
+                    ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+                    ctx.fillRect(0, topY, rightX, bandH);
+                    ctx.strokeStyle = '#F59E0B';
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(0, topY, rightX, bandH);
+                    ctx.setLineDash([]);
+
+                    ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#FACC15';
+                    ctx.fillText('⚠️ AIR POCKET VACUUM [$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + '] · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)', 20, topY + 13);
+                }}
+            }}
+        }});
+
+        // 2. Draw Net GEX & Greeks Profile Bars per Strike (Thang đo vi mô bậc 1 & 2)
+        const optionsData = window.INITIAL_OPTIONS || [];
+        optionsData.forEach(opt => {{
+            const k = opt.strike;
+            const y = candleSeries.priceToCoordinate(k);
+            if (y !== null && y >= 15 && y <= h - 15) {{
+                const gex = opt.netGEX || 0;
+                const vex = opt.netVEX || 0;
+                const chex = opt.netCHEX || 0;
+                const isPos = gex >= 0;
+                const barLen = Math.min(130, Math.abs(gex) * 3.5);
+
+                // Bar ngang đại diện cho trọng lượng Net GEX
+                if (barLen > 2) {{
+                    ctx.fillStyle = isPos ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+                    ctx.fillRect(rightX - barLen, y - 4, barLen, 8);
+                    ctx.fillStyle = isPos ? '#4ADE80' : '#F87171';
+                    ctx.fillRect(rightX - 2, y - 4, 2, 8);
+                }}
+
+                // Hiển thị nhãn Greeks trực tiếp cạnh từng Strike chính
+                if (Math.abs(gex) >= 2.5 || Math.abs(vex) >= 1.5) {{
+                    ctx.font = '8.5px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'right';
+                    const txt = '$' + Math.round(k) + ' · GEX ' + (gex >= 0 ? '+' : '') + gex.toFixed(1) + 'M | VEX ' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M';
+                    const tw = ctx.measureText(txt).width;
+                    ctx.fillStyle = 'rgba(6, 8, 14, 0.85)';
+                    ctx.fillRect(rightX - barLen - tw - 10, y - 7, tw + 6, 12);
+                    ctx.fillStyle = isPos ? '#86EFAC' : '#FCA5A5';
+                    ctx.fillText(txt, rightX - barLen - 7, y + 2);
+                }}
+            }}
+        }});
+
+        // 3. Draw Key Structural Boundary Lines (Thành trì định lượng)
         const keyLevels = [
-            {{ p: m.call_wall,       c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() }},
-            {{ p: m.put_wall,        c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() }},
+            {{ p: m.call_wall,       c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
+            {{ p: m.put_wall,        c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.strike_above,    c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
             {{ p: m.strike_below,    c: '#F87171', d: [2, 3], txt: 'GAMMA WATERFALL ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
-            {{ p: m.zero_gamma_flip, c: '#FACC15', d: [4, 4], txt: 'ZERO GAMMA FLIP (S*) $' + Math.round(m.zero_gamma_flip) }},
+            {{ p: m.zero_gamma_flip, c: '#FACC15', d: [4, 4], txt: 'ZERO GAMMA FLIP (S*) $' + Math.round(m.zero_gamma_flip) + ' · MỐC ĐẢO CHIỀU TÂM LÝ' }},
         ];
 
         keyLevels.forEach(L => {{
@@ -375,13 +449,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 ctx.font = 'bold 10px "JetBrains Mono", monospace';
                 ctx.textAlign = 'right';
                 const tw = ctx.measureText(L.txt).width;
-                ctx.fillStyle = 'rgba(6, 8, 14, 0.88)';
-                ctx.fillRect(rightX - tw - 12, y - 14, tw + 10, 13);
+                ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
+                ctx.fillRect(rightX - tw - 12, y - 14, tw + 10, 14);
                 ctx.strokeStyle = L.c;
                 ctx.lineWidth = 1;
-                ctx.strokeRect(rightX - tw - 12, y - 14, tw + 10, 13);
+                ctx.strokeRect(rightX - tw - 12, y - 14, tw + 10, 14);
                 ctx.fillStyle = L.c;
-                ctx.fillText(L.txt, rightX - 7, y - 4);
+                ctx.fillText(L.txt, rightX - 7, y - 3);
             }}
         }});
     }}
@@ -406,4 +480,3 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "atas_container_html": neiro_container_html,
         "atas_js_script": neiro_js_script,
     }
-

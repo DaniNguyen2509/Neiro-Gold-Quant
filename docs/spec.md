@@ -15,19 +15,26 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
    - Tự động bắt gói Options Chain CME Gold (GCZ26 / OG) từ Barchart qua Playwright Headless Chromium + Internal API Sniffer (`/proxies/core-api/v1/quotes/get` & `options/get`).
    - Tích hợp bộ thu thập Proxy ETF Vàng thanh khoản cao `GLD` (SPDR Gold Shares) qua `yfinance` với tỷ lệ ánh xạ chuẩn $\text{Basis Ratio} = \text{Spot}_{GC} / \text{Spot}_{GLD} \approx 10.8$.
    - Tự động nhận diện và tính toán chu kỳ đáo hạn 5 tháng chẵn chuẩn CME Rule 120102.E (`resolve_front_month_cme_option`): **G (T2), J (T4), M (T6), Q (T8), Z (T12)**. Tự động rollover khi đến hạn.
-2. **Lõi Toán Định Lượng Black-76 Toàn Diện:**
-   - Bộ Greeks giải tích bậc 1 & bậc 2 chuẩn xác: Delta ($\Delta$), Gamma ($\Gamma$), Vega ($\nu$), Vanna ($VEX$), Charm ($CHEX = -\partial \Delta / \partial T$).
+2. **Lõi Toán Định Lượng Black-76 & Cấu Trúc Kỳ Hạn Đa Tầng (Multi-Expiry Term Structure):**
+   - Bộ Greeks giải tích bậc 1 & bậc 2 chuẩn xác: Delta ($\Delta$), Gamma ($\Gamma$), Vega ($\nu$), Vanna ($VEX$), Charm ($CHEX = -\partial \Delta / \partial T$), Theta ($\Theta$).
+   - Hợp đồng Vàng gồm nhiều kỳ hạn (Monthly G, J, M, Q, Z và Weekly OG1..OG5) với DTE ($T_e$) và $\sigma_e$ khác nhau. Tổng Greeks tại từng Strike $K$ được tính theo nguyên lý xếp chồng tuyến tính (Linear Superposition):
+     $$\text{NetGEX}(K) = \sum_e \text{NetGEX}_e(K), \quad \text{NetVEX}(K) = \sum_e \text{NetVEX}_e(K), \quad \text{NetCHEX}(K) = \sum_e \text{NetCHEX}_e(K)$$
    - Thuật toán giải ngược IV lai (Newton-Raphson + Dekker-Brent `_brentq` thuần Python).
    - Put-Call Parity Synthetic Pivot: $S_{\text{Implied}} = K_{\text{ATM}} + e^{rT}(C_{\text{ATM}} - P_{\text{ATM}})$.
    - Dynamic DTE theo múi giờ New York, xử lý `clean_num()` / `clean_val()` khử bỏ triệt để NaN và giá trị rác.
-   - Mô hình Cost of Carry cho Vàng: $F_{0, \text{lý thuyết}} = S_0 \times e^{(r + u - y)T}$ với chi phí lưu kho/bảo hiểm $u \approx 0.2\%$ và Gold Lease Rate $y \approx 1.5\%$, giải mã cơ chế EFP giữa London OTC và New York COMEX.
+   - Nguồn dữ liệu thời gian thực 100% là CME Gold Futures (`GC=F`) từ Yahoo Finance, hủy bỏ cào giá Spot thứ ba (Binance PAXG, Gold-API) để loại bỏ sai lệch cơ sở và suy đoán không kiểm chứng.
 3. **Đặc Thù Vi Cấu Trúc Vàng (Gold Call Skew & Gamma Squeeze):**
    - Vàng mang đặc tính **Call Skew** (phe mua Call OTM phòng hộ lạm phát & địa chính trị đẩy IV Call lên cao), kích hoạt các đợt bùng nổ **Gamma Squeeze** phía trần kháng cự khi vượt qua $Trigger_{Up} = CallWall + Call_{mid}(CallWall)$.
-   - Bất biến Zero Gamma Flip ($S^*$) bắt buộc giải nghiệm liên tục bằng Dekker-Brent `_brentq`.
+   - Bất biến Zero Gamma Flip ($S^*$) bắt buộc giải nghiệm liên tục bằng Dekker-Brent `_brentq` trên hàm tổng đa kỳ hạn.
    - Đo lường áp lực công thành Intraday Wall Siege Velocity Ratio: $\text{Wall Siege Ratio} = \text{Volume} / \text{Baseline OI}$.
-4. **Terminal Tác Chiến Đa Chế Độ Dual-View (Single-Page HUD):**
-   - **Tab 1: NEIRO ORDERFLOW FOOTPRINT:** Canvas HTML5 60 FPS (sổ lệnh thang giá dọc, Bid/Ask Footprint Delta, Micro-candles Brownian-bridge / CME Globex 1m-5m, Tick-by-Tick tape, Multiplier = 100.0 cho GC và 10.0 cho MGC).
-   - **Tab 2: 3-PANEL QUANT LADDER & PLAYBOOK:** Plotly Dark HUD (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Intraday Scalping Strategy, Structural Swing Walls, Strike Microstructure Matrix, Anti-collision layout).
+4. **All-in-One Orderflow Terminal Canvas 60 FPS (Nhìn 1 Biểu Đồ Thấu Suốt Toàn Bộ):**
+   - **Tab 1: ALL-IN-ONE ORDERFLOW FOOTPRINT CANVAS:** Tích hợp trực tiếp trên Canvas 60 FPS:
+     * Air Pocket Vacuum Zones (`⚠️ AIR POCKET VACUUM [$min - $max]`) cảnh báo khoảng trống thanh khoản rỗng.
+     * Net GEX Profile Bars & nhãn VEX hiển thị song hành cạnh từng Strike trên thước đo giá.
+     * Key Structural Boundary Lines (Call Wall, Put Wall kèm Siege Ratio, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers).
+     * Floating HUD & Băng giá M5 Orderflow Tape.
+   - **Tab 2: 3-PANEL QUANT LADDER & MICROSTRUCTURE MATRIX:** Plotly Dark HUD trực quan (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Bảng cấu trúc vi mô Strike Pinning Matrix, Bảng tác chiến Scalping lướt sóng trong ngày).
+   - Đã loại bỏ hoàn toàn các khối rườm rà: PHẦN 2 Structural Swing Walls, Action Banner KB-2, Ma trận 6 Kịch bản.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.
    - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.

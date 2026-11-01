@@ -129,67 +129,19 @@ def fetch_live_spot_gold_price(
     timeout: float = _HTTP_TIMEOUT_S,
     retries: int = _HTTP_RETRIES,
 ) -> Optional[SpotQuote]:
-    """Fetches real-time physical XAU/USD spot price with TTL caching & fallback.
-
-    Sources:
-    1. Gold-API (LBMA-blended spot XAU/USD)
-    2. Binance PAXG/USDT (Physical crypto-backed proxy fallback)
+    """Pure CME Futures invariant: External spot scraping (Binance PAXG, Gold-API) is decommissioned.
+    Neiro-Gold-Quant operates 100% strictly on CME Gold Futures (GC=F).
+    Returns cached quote if explicitly injected/cached, otherwise None.
     """
     global _cached_quote, _last_fetch_mono
 
-    # Check cache under thread-lock
+    # Check cache under thread-lock if a quote was previously cached (e.g. for testing)
     with _cache_lock:
         now_mono = time.monotonic()
         if _cached_quote is not None and (now_mono - _last_fetch_mono) < _CACHE_TTL_S:
             return _cached_quote
 
-    sources = [
-        ("https://api.gold-api.com/price/XAU", "price", "Gold-API"),
-        ("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", "price", "Binance-PAXG"),
-    ]
-
-    for url, key, source_name in sources:
-        for attempt in range(retries):
-            try:
-                req = urllib.request.Request(
-                    url,
-                    headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
-                        "Accept": "application/json",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
-                    status = getattr(resp, "status", getattr(resp, "code", 200))
-                    if status != 200:
-                        logger.warning("HTTP status %s from %s", status, source_name)
-                        continue
-
-                    raw_data = resp.read().decode("utf-8")
-                    data = json.loads(raw_data)
-                    p_val = data.get(key)
-                    if p_val is None:
-                        continue
-
-                    price = float(p_val)
-                    if price > 500.0:  # Valid gold price range
-                        quote = SpotQuote(
-                            price=price,
-                            source=source_name,
-                            fetched_at=datetime.now(timezone.utc),
-                        )
-                        with _cache_lock:
-                            _cached_quote = quote
-                            _last_fetch_mono = time.monotonic()
-                        return quote
-
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError) as e:
-                logger.debug("Fetch attempt %d failed for %s: %s", attempt + 1, source_name, e)
-                if attempt < retries - 1:
-                    time.sleep(_HTTP_BACKOFF_S * (2 ** attempt))
-            except Exception as e:
-                logger.warning("Unexpected error fetching spot from %s: %s", source_name, e)
-                break
-
+    # By design, no external scraping to third-party spot APIs (Binance PAXG, Gold-API)
     return None
 
 

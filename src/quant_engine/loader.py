@@ -742,6 +742,32 @@ def aggregate_options_dataframes(
         d_copy["putGEX"] = - (d_copy["putGamma"] * d_copy["putOpenInterest"] * MULT * scale)
         d_copy["netGEX"] = d_copy["callGEX"] + d_copy["putGEX"]
 
+        # Multi-Expiry Greeks: Vanna (VEX), Charm (CHEX), Vega & Theta
+        d2 = d1 - denom
+        cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
+        cdf_d2 = 0.5 * (1.0 + np.vectorize(math.erf)(d2 / np.sqrt(2.0)))
+        cdf_neg_d1 = 1.0 - cdf_d1
+        cdf_neg_d2 = 1.0 - cdf_d2
+
+        vanna = - df_disc * pdf_d1 * (d2 / sigma)
+        d_copy["callVEX"] = vanna * d_copy["callOpenInterest"] * MULT * spot * 0.01 / 1e6
+        d_copy["putVEX"] = - (vanna * d_copy["putOpenInterest"] * MULT * spot * 0.01 / 1e6)
+        d_copy["netVEX"] = d_copy["callVEX"] + d_copy["putVEX"]
+
+        charm_call = - df_disc * (pdf_d1 * (r / denom - d2 / (2.0 * t_years)) - r * cdf_d1)
+        charm_put = charm_call - r * df_disc
+        d_copy["callCHEX"] = (charm_call / 365.0) * d_copy["callOpenInterest"] * MULT * spot / 1e6
+        d_copy["putCHEX"] = - ((charm_put / 365.0) * d_copy["putOpenInterest"] * MULT * spot / 1e6)
+        d_copy["netCHEX"] = d_copy["callCHEX"] + d_copy["putCHEX"]
+
+        vega = spot * df_disc * math.sqrt(t_years) * pdf_d1
+        d_copy["totalVega"] = (d_copy["callOpenInterest"] + d_copy["putOpenInterest"]) * MULT * vega * 0.01 / 1e6
+
+        theta_common = - (spot * df_disc * pdf_d1 * sigma) / (2.0 * math.sqrt(t_years))
+        theta_call = (theta_common - r * df_disc * (spot * cdf_d1 - strikes_arr * cdf_d2)) / 365.0
+        theta_put = (theta_common + r * df_disc * (strikes_arr * cdf_neg_d2 - spot * cdf_neg_d1)) / 365.0
+        d_copy["totalTheta"] = (d_copy["callOpenInterest"] * theta_call + d_copy["putOpenInterest"] * theta_put) * MULT / 1e6
+
         processed_dfs.append(d_copy)
 
     # Base pricing from nearest expiration
@@ -762,6 +788,14 @@ def aggregate_options_dataframes(
         "callGEX": "sum",
         "putGEX": "sum",
         "netGEX": "sum",
+        "callVEX": "sum",
+        "putVEX": "sum",
+        "netVEX": "sum",
+        "callCHEX": "sum",
+        "putCHEX": "sum",
+        "netCHEX": "sum",
+        "totalVega": "sum",
+        "totalTheta": "sum",
     })
 
     # Superimposed effective Gamma

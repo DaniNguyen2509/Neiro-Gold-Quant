@@ -1,21 +1,26 @@
-# 🪙 Neiro-Gold-Quant — Market Microstructure & Dual-View Tactical Combat Terminal
+# 🪙 Neiro-Gold-Quant — Market Microstructure & All-in-One Orderflow Terminal
 
-[![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Quant/)
+[![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Gold-Quant/actions)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12%20%7C%203.14-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Unit Tests](https://img.shields.io/badge/Tests-133%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Zero-Waste](https://img.shields.io/badge/Zero--Waste-%3C%2015MB-green?style=for-the-badge)](docs/spec.md)
 
-Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX), Greeks bậc 2 (Vanna, Charm), Expected Move & Market Microstructure vận hành **tự động 100% trên Cloud (Serverless Zero-Touch Automation)** cho **COMEX Gold Futures (`GC` / `MGC`), Spot `XAUUSD` và ETF `GLD` Options Proxy**.
+Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX), Greeks bậc 2 (Vanna, Charm), Cấu trúc Kỳ hạn Đa tầng (Multi-Expiry Term Structure) & Market Microstructure vận hành **tự động 100% trên Cloud (Serverless Zero-Touch Automation)** cho **COMEX Gold Futures (`GC` / `MGC`) và ETF `GLD` Options Proxy**.
 
 ---
 
-## ⚡ TRUY CẬP WEB TERMINAL ĐA CHẾ ĐỘ DUAL-VIEW TRÊN ĐIỆN THOẠI & MÁY TÍNH
+## ⚡ TRUY CẬP ALL-IN-ONE ORDERFLOW TERMINAL TRÊN ĐIỆN THOẠI & MÁY TÍNH
 
-- **URL Dashboard Trực Tuyến:** [https://daninguyen2509.github.io/Neiro-Quant/](https://daninguyen2509.github.io/Neiro-Quant/)
-- **Hệ Thống Dual-View Tác Chiến 2-trong-1:**
-  - **Tab 1: NEIRO ORDERFLOW FOOTPRINT:** Canvas HTML5 60 FPS, mô phỏng sổ lệnh thang giá dọc DOM, Delta Footprint cụm nến 1M/5M, Tick-by-Tick tape, Multiplier = $100.0/oz cho GC ($10.0/oz cho MGC).
-  - **Tab 2: 3-PANEL QUANT LADDER & PLAYBOOK:** Plotly Dark HUD trực quan (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Nụ cười biến động Malz SVI, Ma trận 6 Kịch bản Realtime và Bảng chiến lược Scalping/Swing).
+- **URL Dashboard Trực Tuyến:** [https://daninguyen2509.github.io/Neiro-Gold-Quant/](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
+- **Hệ Thống All-in-One Orderflow Terminal (Nhìn 1 Biểu Đồ Thấu Suốt Toàn Bộ):**
+  - **Tab 1: NEIRO ALL-IN-ONE ORDERFLOW CANVAS:** Canvas HTML5 60 FPS tích hợp trực tiếp:
+    * Air Pocket Vacuum Zones (`⚠️ AIR POCKET VACUUM [$min - $max]`) phát hiện khoảng trống thanh khoản.
+    * Net GEX Profile Bars & nhãn VEX hiển thị song hành cạnh từng Strike trên thước đo giá.
+    * Key Structural Boundary Lines (Call Wall, Put Wall kèm Wall Siege Ratio, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers).
+    * Sổ lệnh thang giá dọc DOM, Delta Footprint cụm nến 1M/5M, Tick-by-Tick tape (Multiplier = $100.0/oz cho GC, $10.0/oz cho MGC).
+  - **Tab 2: 3-PANEL QUANT LADDER & MICROSTRUCTURE MATRIX:** Plotly Dark HUD trực quan (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Bảng cấu trúc vi mô Strike Pinning Matrix, Bảng tác chiến Scalping lướt sóng trong ngày).
+  - Đã loại bỏ hoàn toàn các khối kịch bản suy đoán (PHẦN 2 Structural Swing Walls, Action Banner KB-2, Ma trận 6 Kịch bản) để tối ưu độ tập trung cho trader.
 - **Lịch chạy tự động (Lưới Cron Pre-Session Radar thích ứng 2 mùa):**
   - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt số liệu Open Interest (OI) chính thức ngày mới từ CME Clearing.
   - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.

@@ -47,11 +47,6 @@ from src.quant_engine.level_state import (
     find_next_major_wall,
     detect_strike_air_pockets,
 )
-from src.quant_engine.scenario_engine import (
-    AlertLevel,
-    ActionDirective,
-    evaluate_market_scenarios,
-)
 from src.quant_engine.dealer import (
     compute_exact_gamma_flip,
     compute_wall_siege_ratio,
@@ -1527,79 +1522,17 @@ def generate_html_terminal(
     up_pockets = detect_strike_air_pockets(df, strike_above, major_up_wall, threshold_ratio=0.40)
     has_up_air_pocket = len(up_pockets) > 0 or (abs(major_up_wall - strike_above) > step * 1.5)
 
-    # Run Scenario Engine
-    scenario_res = evaluate_market_scenarios(
-        spot_price=spot,
-        atm_strike=atm_strike,
-        strike_above=strike_above,
-        strike_below=strike_below,
-        call_wall=call_wall,
-        call_wall_oi=call_wall_oi,
-        put_wall=put_wall,
-        put_wall_oi=put_wall_oi,
-        regime=regime,
-        total_gex=total_gex,
-        total_chex=total_chex,
-        has_up_air_pocket=has_up_air_pocket,
-        has_down_air_pocket=has_down_air_pocket,
-        major_up_wall=major_up_wall,
-        major_down_wall=major_down_wall,
-        recommended_lots=size_squeeze.recommended_lots,
-        zero_gamma=zero_gamma,
-        call_wall_siege=call_wall_siege,
-        put_wall_siege=put_wall_siege,
-    )
-    active_sc = scenario_res.active_scenario
-
-    # Scenario cards HTML
-    scenario_cards_html = []
-    for sc in scenario_res.all_scenarios:
-        is_active = sc.is_active
-        if sc.alert_level == AlertLevel.RED:
-            card_border = "#EF4444" if is_active else "#7F1D1D"
-            badge_bg = "rgba(239, 68, 68, 0.2)"
-            badge_color = "#F87171"
-            action_color = "#F87171"
-        elif sc.alert_level == AlertLevel.GREEN:
-            card_border = "#22C55E" if is_active else "#14532D"
-            badge_bg = "rgba(34, 197, 94, 0.2)"
-            badge_color = "#4ADE80"
-            action_color = "#4ADE80"
-        elif sc.alert_level == AlertLevel.YELLOW:
-            card_border = "#EAB308" if is_active else "#713F12"
-            badge_bg = "rgba(234, 179, 8, 0.2)"
-            badge_color = "#FACC15"
-            action_color = "#FACC15"
-        else:
-            card_border = "#475569" if is_active else "#1E293B"
-            badge_bg = "rgba(148, 163, 184, 0.15)"
-            badge_color = "#94A3B8"
-            action_color = "#94A3B8"
-
-        active_glow = f"box-shadow: 0 0 16px {card_border}; transform: scale(1.01); border: 2px solid {card_border};" if is_active else "opacity: 0.55; border: 1px solid #1E293B;"
-        active_tag = f'<span class="badge" style="background:{badge_bg}; color:{badge_color}; border:1px solid {card_border}; font-weight:800; box-shadow:0 0 8px {card_border};">ĐANG DIỄN RA (ACTIVE)</span>' if is_active else '<span class="badge" style="background:rgba(51,65,85,0.4); color:#94A3B8; border:1px solid #334155;">CHỜ TÍN HIỆU (CHƯA KÍCH HOẠT)</span>'
-        action_display = f'<span style="font-weight:800; color:{action_color};">{sc.action_label}</span>' if is_active else f'<span style="color:#64748B; font-weight:600;">{sc.action_label} <small style="color:#475569;">(Chưa áp dụng)</small></span>'
-
-        scenario_cards_html.append(f"""
-        <div id="card-{sc.code}" class="scenario-card" style="{active_glow} background:#0F172A; border-radius:10px; padding:14px; margin-bottom:12px; transition: all 0.3s ease;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-                <div style="font-size:13px; font-weight:800; color:{'#F8FAFC' if is_active else '#94A3B8'};">{sc.code}: {sc.title.upper()}</div>
-                <div id="card-tag-{sc.code}">{active_tag}</div>
-            </div>
-            <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">
-                <b>Điều kiện:</b> {sc.condition_desc}
-            </div>
-            <div style="background:rgba(15,23,42,0.7); border:1px solid #1E293B; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
-                <div style="font-size:11px; text-transform:uppercase; color:#64748B; font-weight:700;">Hành vi Market Maker:</div>
-                <div style="font-size:12px; color:#E2E8F0;">{sc.mm_state}</div>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1E293B; padding-top:8px;">
-                <div style="font-size:11px; color:#94A3B8;">HÀNH ĐỘNG CẦN LÀM:</div>
-                <div id="card-act-{sc.code}" style="font-size:12px; font-family:'JetBrains Mono', monospace;">{action_display}</div>
-            </div>
-        </div>
-        """)
-    scenario_cards_str = "".join(scenario_cards_html)
+    # Prepare Air Pockets & Wall Siege Ratios for All-in-One Orderflow Canvas
+    all_air_pockets = []
+    for p in (down_pockets + up_pockets):
+        all_air_pockets.append({
+            "from": getattr(p, "from_strike", 0.0),
+            "to": getattr(p, "to_strike", 0.0),
+            "severity": str(getattr(p, "severity", "MEDIUM")),
+        })
+    meta["air_pockets"] = all_air_pockets
+    meta["call_wall_siege"] = call_wall_siege
+    meta["put_wall_siege"] = put_wall_siege
 
     # Strategy Table Targets with Invariant Enforcement (BUY: TP > Entry, SELL: TP < Entry)
     front_run_tp = 1.00
@@ -1952,7 +1885,7 @@ def generate_html_terminal(
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
     <div class="table-box">
-        <div class="section-header">PHẦN 1: BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - ĂN 20-25 GIÁ)</div>
+        <div class="section-header">BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - 100% PURE CME FUTURES)</div>
         <table>
             <thead>
                 <tr>
@@ -2004,90 +1937,6 @@ def generate_html_terminal(
                 </tr>
             </tbody>
         </table>
-    </div>
-
-    <div class="table-box">
-        <div class="section-header">PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ (STRUCTURAL SWING WALLS - ĐÁNH SÓNG LỚN)</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Chiến Lược</th>
-                    <th>Vùng Kích Hoạt (CME)</th>
-                    <th>Entry CME</th>
-                    <th>Hard SL (CME)</th>
-                    <th>Take Profit (TP)</th>
-                    <th>Lot Size ($10K, R: 1%)</th>
-                    <th>Ghi Chú Cấu Trúc Khối Lượng MM</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td class="tag-sell">5. BÁN ĐỈNH CALL WALL ({call_wall:.0f} - {call_badge_text})</td>
-                    <td>{call_wall - 1.50:.2f} - {call_wall:.2f}</td>
-                    <td>{entry_call_wall:.2f}</td>
-                    <td style="color:#F87171;">{sl_call_wall:.2f} (${sl_dist_cw:.1f})</td>
-                    <td style="color:#4ADE80;">{tp_call_wall:.2f}</td>
-                    <td style="color:#FACC15; font-weight:700;">~{size_call_wall.recommended_lots:.2f} Lot</td>
-                    <td>{call_wall_tactical_note}</td>
-                </tr>
-                <tr>
-                    <td class="tag-buy">6. MUA ĐÁY PUT WALL ({put_wall:.0f} - {put_badge_text})</td>
-                    <td>{put_wall:.2f} - {put_wall + 1.50:.2f}</td>
-                    <td>{entry_put_wall:.2f}</td>
-                    <td style="color:#F87171;">{sl_put_wall:.2f} (${sl_dist_pw:.1f})</td>
-                    <td style="color:#4ADE80;">{tp_put_wall:.2f}</td>
-                    <td style="color:#FACC15; font-weight:700;">~{size_put_wall.recommended_lots:.2f} Lot</td>
-                    <td>{put_wall_tactical_note}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- KHỐI 7: BẢNG TÁC CHIẾN TỨC THÌ (GLANCEABLE 3-SECOND ACTION BANNER) -->
-    <div id="live-action-banner" class="action-banner action-banner-{active_sc.alert_level.value.lower()}">
-        <div class="action-header-row">
-            <div>
-                <span class="badge" style="background:#0F172A; color:#F8FAFC; border:1px solid #475569; font-size:12px; margin-right:6px;">KỊCH BẢN HIỆN TẠI</span>
-                <span id="banner-sc-title" style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">{active_sc.code}: {active_sc.title.upper()}</span>
-            </div>
-            <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#FACC15;">
-                GIÁ REALTIME CME GCZ26: <b id="banner-cme-price">${spot:,.2f}</b> (Trục ATM: <span id="banner-atm-strike">${atm_strike:,.0f}</span>)
-            </div>
-        </div>
-        <div class="action-grid">
-            <div id="banner-action-card" class="action-box" style="border-left: 4px solid {'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#22C55E' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
-                <div class="action-cmd-title">HÀNH ĐỘNG CẦN THỰC HIỆN NGAY:</div>
-                <div id="banner-action-cmd" class="action-cmd-val" style="color:{'#EF4444' if active_sc.alert_level == AlertLevel.RED else ('#4ADE80' if active_sc.alert_level == AlertLevel.GREEN else '#FACC15')};">
-                    {active_sc.action_label}
-                </div>
-                <div id="banner-action-desc" style="font-size:11.5px; color:#94A3B8;">{active_sc.entry_desc}</div>
-            </div>
-            <div class="action-box">
-                <div class="action-cmd-title">HÀNH VI CỦA MARKET MAKER:</div>
-                <div id="banner-mm-state" style="font-size:12px; color:#E2E8F0; margin-bottom:6px;">{active_sc.mm_state}</div>
-                <div style="font-size:11.5px; color:#38BDF8;">Dự đoán: <b id="banner-forecast">{active_sc.forecast}</b></div>
-            </div>
-            <div class="action-box">
-                <div class="action-cmd-title">THÔNG SỐ VÀO LỆNH (CME FUTURES):</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;">
-                    <div>Kích hoạt: <b id="banner-entry-trigger">{f'${active_sc.entry_trigger:,.2f}' if active_sc.entry_trigger > 0 else 'Chờ tín hiệu'}</b></div>
-                    <div>Khối lượng: <b id="banner-lot-size" style="color:#FACC15;">{f'~{active_sc.lot_size:.2f} Lot' if active_sc.lot_size > 0 else '0 Lot'}</b></div>
-                    <div>Cắt lỗ SL: <b id="banner-hard-sl" style="color:#F87171;">{f'${active_sc.hard_sl:,.2f}' if active_sc.hard_sl > 0 else 'N/A'}</b></div>
-                    <div>Chốt lời TP: <b id="banner-take-profit" style="color:#4ADE80;">{f'${active_sc.take_profit:,.2f}' if active_sc.take_profit > 0 else 'N/A'}</b></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MA TRẬN 6 KỊCH BẢN THỜI GIAN THỰC (6-SCENARIO DYNAMIC MATRIX) -->
-    <div class="table-box">
-        <div class="section-header">
-            <div>MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER (TỰ ĐỘNG BẬT SÁNG THEO GIÁ REALTIME)</div>
-            <div style="font-size:11.5px; font-weight:400; color:#94A3B8;">Kịch bản trùng khớp sẽ được viền sáng và báo động</div>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:12px;">
-            {scenario_cards_str}
-        </div>
     </div>
 
     <!-- KHỐI 7: TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (QUICK GLOSSARY - 1 DÒNG DỄ HIỂU, KHÔNG ICON) -->

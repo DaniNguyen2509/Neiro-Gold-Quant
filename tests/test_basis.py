@@ -171,56 +171,37 @@ def test_is_gold_spot_market_open():
 # ---------------------------------------------------------------------------
 
 def test_fetch_live_spot_gold_primary_success():
-    """Primary Gold-API returns valid price."""
-    fake_response = mock.MagicMock()
-    fake_response.status = 200
-    fake_response.read.return_value = json.dumps({"price": 4156.50}).encode("utf-8")
-    fake_response.__enter__.return_value = fake_response
-
-    with mock.patch("urllib.request.urlopen", return_value=fake_response):
-        quote = fetch_live_spot_gold_price()
-        assert quote is not None
-        assert quote.price == 4156.50
-        assert quote.source == "Gold-API"
+    """Pure CME Futures invariant: External spot scraping is decommissioned, returns None by design."""
+    from src.quant_engine.basis import clear_spot_cache
+    clear_spot_cache()
+    quote = fetch_live_spot_gold_price()
+    assert quote is None
 
 
 def test_fetch_live_spot_gold_fallback_to_binance():
-    """Primary fails, secondary Binance PAXG succeeds."""
-    call_count = 0
-
-    def mock_urlopen(req, timeout=5.0):
-        nonlocal call_count
-        call_count += 1
-        url = req.full_url if hasattr(req, "full_url") else str(req)
-        if "gold-api" in url:
-            raise urllib.error.URLError("Connection refused")
-        resp = mock.MagicMock()
-        resp.status = 200
-        resp.read.return_value = json.dumps({"price": "4155.80"}).encode("utf-8")
-        resp.__enter__.return_value = resp
-        return resp
-
-    import urllib.error
-    with mock.patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        quote = fetch_live_spot_gold_price()
-        assert quote is not None
-        assert quote.price == 4155.80
-        assert quote.source == "Binance-PAXG"
+    """Pure CME Futures invariant: returns None without external scraping."""
+    from src.quant_engine.basis import clear_spot_cache
+    clear_spot_cache()
+    quote = fetch_live_spot_gold_price()
+    assert quote is None
 
 
 def test_fetch_live_spot_gold_cache_ttl():
-    """Subsequent calls within TTL reuse the cached quote without network calls."""
-    fake_response = mock.MagicMock()
-    fake_response.status = 200
-    fake_response.read.return_value = json.dumps({"price": 4156.50}).encode("utf-8")
-    fake_response.__enter__.return_value = fake_response
+    """Injected cached quote is reused under TTL without network requests."""
+    from src.quant_engine import basis as b_mod
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    injected = SpotQuote(price=4156.50, source="MOCK", fetched_at=now)
+    with b_mod._cache_lock:
+        b_mod._cached_quote = injected
+        b_mod._last_fetch_mono = time.monotonic()
 
-    with mock.patch("urllib.request.urlopen", return_value=fake_response) as mock_urlopen:
-        quote1 = fetch_live_spot_gold_price()
-        quote2 = fetch_live_spot_gold_price()
-
-        assert quote1 == quote2
-        assert mock_urlopen.call_count == 1  # Network called only once!
+    quote1 = fetch_live_spot_gold_price()
+    quote2 = fetch_live_spot_gold_price()
+    assert quote1 == quote2
+    assert quote1 is not None
+    assert quote1.price == 4156.50
+    b_mod.clear_spot_cache()
 
 
 def test_fetch_live_spot_gold_all_fail():

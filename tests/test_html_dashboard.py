@@ -143,7 +143,7 @@ def test_generate_html_terminal_content():
     assert "Zero Gamma Flip" in html
     assert "$4,175.50" in html
     assert "Siege" in html
-    assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in html
+    assert "MA TRẬN 6 KỊCH BẢN" not in html
     assert "THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CÁC BỨC TƯỜNG CỦA MARKET MAKER" in html
     assert "TỪ ĐIỂN THUẬT NGỮ BỎ TÚI" in html
     assert "Sổ Sách Dealer (Net Delta / DEX)" in html
@@ -154,7 +154,7 @@ def test_generate_html_terminal_content():
     assert "SELL CHẶN TIỀN TUYẾN" in html
     assert "BUY BẮT SÀN ATM" in html
     assert "SELL THỦNG SÀN" in html
-    assert "BÁN ĐỈNH CALL WALL" in html
+    assert "PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ" not in html
     assert "refreshWithCacheBuster()" in html
     # Check Microstructure Greeks & Pinning Table
     assert "BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING" in html
@@ -178,7 +178,8 @@ def test_run_pipeline_end_to_end():
             content = out_html.read_text(encoding="utf-8")
             assert "<!DOCTYPE html>" in content
             assert "GOLD OPTIONS TACTICAL TERMINAL" in content
-            assert "MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER" in content
+            assert "BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY" in content
+            assert "MA TRẬN 6 KỊCH BẢN" not in content
             assert "refreshWithCacheBuster()" in content
 
 
@@ -373,9 +374,7 @@ def test_volatility_smile_figure_and_layout_ordering():
     pos_micro = html.find("KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX")
     pos_kpi = html.find("KHỐI 3: KPI THỐNG KÊ TOÀN CẢNH CME GOLD FUTURES")
     pos_orderflow = html.find("KHỐI 5: BĂNG GIÁ & XUNG LỰC VOLUME M5")
-    pos_strategy = html.find("KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN")
-    pos_banner = html.find("KHỐI 7: BẢNG TÁC CHIẾN TỨC THÌ")
-    pos_matrix = html.find("MA TRẬN 6 KỊCH BẢN HÀNH VI MARKET MAKER")
+    pos_strategy = html.find("BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY")
     pos_glossary = html.find("TỪ ĐIỂN THUẬT NGỮ BỎ TÚI")
 
     assert pos_smile != -1, "Smile panel must be present"
@@ -383,13 +382,17 @@ def test_volatility_smile_figure_and_layout_ordering():
     assert pos_kpi != -1, "7 KPI cards must be present"
     assert pos_orderflow != -1, "Orderflow must be present"
     assert pos_strategy != -1, "Strategy tables must be present"
-    assert pos_banner != -1, "Action banner must be present"
-    assert pos_matrix != -1, "Scenario matrix must be present"
     assert pos_glossary != -1, "Glossary must be present"
 
+    # Enforce strict absence of removed legacy sections
+    assert "KHỐI 7: BẢNG TÁC CHIẾN TỨC THÌ" not in html
+    assert "KỊCH BẢN HIỆN TẠI" not in html
+    assert "MA TRẬN 6 KỊCH BẢN" not in html
+    assert "PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ" not in html
+
     # Enforce strict top-to-bottom layout ordering:
-    # 1. Smile Panel -> 2. 3-Panel Micro Chart -> 3. 7 KPIs -> 4. Spine & Tape -> 5. Strategy -> 6. Banner -> 7. Matrix -> 8. Glossary
-    assert pos_smile < pos_micro < pos_kpi < pos_orderflow < pos_strategy < pos_banner < pos_matrix < pos_glossary
+    # 1. Smile Panel -> 2. 3-Panel Micro Chart -> 3. 7 KPIs -> 4. Spine & Tape -> 5. Strategy -> 6. Glossary
+    assert pos_smile < pos_micro < pos_kpi < pos_orderflow < pos_strategy < pos_glossary
 
 
 def test_load_and_preprocess_options_empty_csv_fallback(tmp_path):
