@@ -891,11 +891,11 @@ def build_volatility_smile_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -
         zero_gamma = float(zero_gamma)
 
     # Strike bounds around spot price
-    min_k_avail = float(df_full["strike"].min()) if not df_full.empty and "strike" in df_full.columns else spot_price - 220.0
-    max_k_avail = float(df_full["strike"].max()) if not df_full.empty and "strike" in df_full.columns else spot_price + 220.0
+    min_k_avail = float(df_full["strike"].min()) if not df_full.empty and "strike" in df_full.columns else spot_price - 350.0
+    max_k_avail = float(df_full["strike"].max()) if not df_full.empty and "strike" in df_full.columns else spot_price + 550.0
 
-    k_min = max(spot_price - 220.0, min_k_avail)
-    k_max = min(spot_price + 220.0, max_k_avail)
+    k_min = max(spot_price - 350.0, min_k_avail)
+    k_max = min(spot_price + 550.0, max_k_avail)
     if k_max <= k_min:
         k_min = spot_price - 100.0
         k_max = spot_price + 100.0
