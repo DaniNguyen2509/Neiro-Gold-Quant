@@ -52,6 +52,8 @@ def test_render_neiro_orderflow_component():
 
     assert "switchTerminalView" in comp["neiro_js_script"]
     assert "initNeiroGoldChart" in comp["neiro_js_script"]
+    assert "INITIAL_CANDLES" in comp["neiro_js_script"]
+    assert "resampleBars" in comp["neiro_js_script"]
     assert "generateRealisticGoldCandles" in comp["neiro_js_script"]
     assert "drawNeiroOverlay" in comp["neiro_js_script"]
     assert "AIR POCKET VACUUM" in comp["neiro_js_script"]

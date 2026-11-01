@@ -224,6 +224,7 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
         dict with keys:
             'available': bool
             'candles': list of dicts (time_vn, open, high, low, close, volume, ratio, is_spike, note, signal_class)
+            'chart_candles': list of dicts (time, open, high, low, close, volume) for Lightweight Charts
             'day_high': float
             'day_low': float
             'day_range': float
@@ -231,8 +232,8 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
             'latest_price': float
     """
     chart_urls = [
-        "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=1d",
-        "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=1d",
+        "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d",
+        "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d",
     ]
     for url in chart_urls:
         try:
@@ -274,6 +275,15 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                         # Discard Yahoo Finance trailing live tick snapshot (0 volume and zero spread)
                         if len(raw_candles) > 1 and raw_candles[-1]["volume"] <= 0 and (raw_candles[-1]["high"] - raw_candles[-1]["low"]) < 0.05:
                             raw_candles.pop()
+
+                        # Ensure strictly ascending unique timestamps for Lightweight Charts
+                        deduped = []
+                        seen_ts = set()
+                        for rc in raw_candles:
+                            if rc["t"] not in seen_ts:
+                                seen_ts.add(rc["t"])
+                                deduped.append(rc)
+                        raw_candles = deduped
 
                         if raw_candles:
                             valid_vols = [rc["volume"] for rc in raw_candles if rc["volume"] > 0]
@@ -333,9 +343,23 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                             day_low = float(meta.get("regularMarketDayLow") or min(rc["low"] for rc in raw_candles))
                             last_p = float(meta.get("regularMarketPrice") or raw_candles[-1]["close"])
 
+                            # Provide real M5 candles (up to 150 bars, ~12.5 hours of continuous trading)
+                            chart_candles = [
+                                {
+                                    "time": rc["t"],
+                                    "open": rc["open"],
+                                    "high": rc["high"],
+                                    "low": rc["low"],
+                                    "close": rc["close"],
+                                    "volume": rc["volume"],
+                                }
+                                for rc in raw_candles[-150:]
+                            ]
+
                             return {
                                 "available": True,
                                 "candles": processed,
+                                "chart_candles": chart_candles,
                                 "day_high": round(day_high, 2),
                                 "day_low": round(day_low, 2),
                                 "day_range": round(day_high - day_low, 2),
@@ -348,6 +372,7 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
     return {
         "available": False,
         "candles": [],
+        "chart_candles": [],
         "day_high": 0.0,
         "day_low": 0.0,
         "day_range": 0.0,

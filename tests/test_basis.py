@@ -338,6 +338,9 @@ def test_fetch_live_cme_m5_tape_mock_success():
         assert tape["day_low"] == 4134.50
         assert tape["day_range"] == 32.00
         assert len(tape["candles"]) == 4
+        assert "chart_candles" in tape
+        assert len(tape["chart_candles"]) == 4
+        assert tape["chart_candles"][-1]["close"] == 4143.20
 
         # Last candle (722 volume) should be recognized as spike + absorption
         last_c = tape["candles"][-1]

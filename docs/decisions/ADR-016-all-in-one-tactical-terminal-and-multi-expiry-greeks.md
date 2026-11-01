@@ -46,6 +46,11 @@ Mốc Zero Gamma Flip ($S^*$) được tìm nghiệm trên hàm liên tục tổ
 2. Nguồn dữ liệu thời gian thực duy nhất là hợp đồng CME Gold Futures (`GC=F`) qua Yahoo Finance (`query1.finance.yahoo.com`), đảm bảo dữ liệu miễn phí, tốc độ cao, không phụ thuộc tài khoản sàn.
 3. Cập nhật `config/settings.toml`: `show_spot = false`.
 
+### 2.5. Tích hợp Nến Thật 100% từ Yahoo Finance COMEX Gold Futures (`GC=F`)
+1. **Loại bỏ nến ngẫu nhiên:** Thay thế hoàn toàn cơ chế sinh nến ngẫu nhiên (`generateRealisticGoldCandles` dùng `Math.random()`) bằng luồng nến thực tế được nạp vào `window.INITIAL_CANDLES` từ API Yahoo Finance.
+2. **Khắc phục khoảng trống dữ liệu ngoài giờ / cuối tuần:** Cập nhật endpoint truy vấn sang `range=5d` (thay vì `range=1d` vốn trả về rỗng khi thị trường đóng cửa cuối tuần), đảm bảo luôn sẵn sàng 150 nến M5 gần nhất (~12.5 giờ giao dịch liên tục).
+3. **Resample Đa Khung Thời Gian (Multi-Timeframe):** Thuật toán `resampleBars()` trên frontend gom cụm nến 5M thành 15M và 1H chính xác theo chuẩn thời gian, đảm bảo hình thái nến (Open, High, Low, Close, Volume) khớp 100% với biểu đồ Yahoo Finance và TradingView COMEX Gold.
+
 ---
 
 ## 3. HỆ QUẢ & BẢO TOÀN KIẾN TRÚC (CONSEQUENCES)

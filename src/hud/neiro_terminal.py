@@ -81,8 +81,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             </button>
             <span style="color:#475569; margin:0 4px;">|</span>
             <div style="display:flex; gap:4px;">
-                <button class="neiro-tf-btn active" onclick="setTimeframe('1m')">1M</button>
-                <button class="neiro-tf-btn" onclick="setTimeframe('5m')">5M</button>
+                <button class="neiro-tf-btn" onclick="setTimeframe('1m')">1M</button>
+                <button class="neiro-tf-btn active" onclick="setTimeframe('5m')">5M</button>
                 <button class="neiro-tf-btn" onclick="setTimeframe('15m')">15M</button>
                 <button class="neiro-tf-btn" onclick="setTimeframe('1h')">1H</button>
             </div>
@@ -168,18 +168,23 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "air_pockets": air_pockets,
     })
 
+    m5_tape = meta.get("m5_tape") or {}
+    chart_candles = m5_tape.get("chart_candles") or []
+    json_candles_str = json.dumps(chart_candles)
+
     # 5. JavaScript Orderflow & Dual-View Engine (All-in-One Rendering)
     neiro_js_script = f"""
     <script>
     window.INITIAL_OPTIONS = {json_options_str};
     window.INITIAL_META = {json_meta_str};
+    window.INITIAL_CANDLES = {json_candles_str};
 
     let neiroChart = null;
     let candleSeries = null;
     let livePriceLine = null;
     let currentGoldPrice = window.INITIAL_META.spot;
-    let currentTf = '1m';
-    let currentPeriodSec = 60;
+    let currentTf = '5m';
+    let currentPeriodSec = 300;
 
     function switchTerminalView(view) {{
         const neiroView = document.getElementById('neiro-view-container');
@@ -217,8 +222,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const activeBtn = Array.from(document.querySelectorAll('.neiro-tf-btn')).find(b => b.innerText.trim().toLowerCase() === tf.toLowerCase());
         if (activeBtn) activeBtn.classList.add('active');
 
-        let period = 60;
-        if (tf === '5m') period = 300;
+        let period = 300;
+        if (tf === '1m') period = 60;
+        else if (tf === '5m') period = 300;
         else if (tf === '15m') period = 900;
         else if (tf === '1h') period = 3600;
 
@@ -226,6 +232,43 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (candleSeries) {{
             buildHistoricalGoldBars(period);
         }}
+    }}
+
+    function resampleBars(candles, targetPeriodSec) {{
+        if (!candles || candles.length === 0) return [];
+        if (targetPeriodSec <= 300) {{
+            return candles.map(c => ({{
+                time: c.time,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close
+            }}));
+        }}
+
+        const resampled = [];
+        let currentBar = null;
+
+        for (let i = 0; i < candles.length; i++) {{
+            const c = candles[i];
+            const bucketTime = c.time - (c.time % targetPeriodSec);
+            if (!currentBar || currentBar.time !== bucketTime) {{
+                if (currentBar) resampled.push(currentBar);
+                currentBar = {{
+                    time: bucketTime,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close
+                }};
+            }} else {{
+                currentBar.high = Math.max(currentBar.high, c.high);
+                currentBar.low = Math.min(currentBar.low, c.low);
+                currentBar.close = c.close;
+            }}
+        }}
+        if (currentBar) resampled.push(currentBar);
+        return resampled;
     }}
 
     function generateRealisticGoldCandles(currentP, numBars = 60, periodSec = 60) {{
@@ -266,16 +309,24 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return bars;
     }}
 
-    function buildHistoricalGoldBars(periodSec = 60) {{
+    function buildHistoricalGoldBars(periodSec = 300) {{
         if (!candleSeries) return;
-        const bars = generateRealisticGoldCandles(currentGoldPrice, 60, periodSec);
-        candleSeries.setData(bars);
-        const totalBars = bars.length;
-        if (neiroChart) {{
-            neiroChart.timeScale().setVisibleLogicalRange({{
-                from: Math.max(0, totalBars - 36),
-                to: totalBars + 6,
-            }});
+        let bars = [];
+        if (window.INITIAL_CANDLES && window.INITIAL_CANDLES.length > 0) {{
+            bars = resampleBars(window.INITIAL_CANDLES, periodSec);
+        }} else {{
+            bars = generateRealisticGoldCandles(currentGoldPrice, 60, periodSec);
+        }}
+
+        if (bars && bars.length > 0) {{
+            candleSeries.setData(bars);
+            const totalBars = bars.length;
+            if (neiroChart) {{
+                neiroChart.timeScale().setVisibleLogicalRange({{
+                    from: Math.max(0, totalBars - 36),
+                    to: totalBars + 6,
+                }});
+            }}
         }}
         setTimeout(drawNeiroOverlay, 80);
     }}
