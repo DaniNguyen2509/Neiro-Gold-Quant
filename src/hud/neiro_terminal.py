@@ -63,41 +63,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 charm_peak_strike = float(df.loc[ch_idx, "strike"])
                 charm_peak_val = float(df.loc[ch_idx, "netCHEX"])
 
-    # Build ladder rows for dedicated right-side Vanna & Charm sidebar
-    ladder_rows = []
-    ladder_df = df[(df["strike"] >= spot - 180.0) & (df["strike"] <= spot + 180.0)].sort_values("strike", ascending=False)
-    if len(ladder_df) < 10:
-        ladder_df = df.sort_values("strike", ascending=False)
-
-    for _, r in ladder_df.iterrows():
-        k_val = float(r["strike"])
-        vex_val = float(r.get("netVEX", 0.0) or 0.0)
-        chex_val = float(r.get("netCHEX", 0.0) or 0.0)
-        is_top_v = (abs(k_val - vanna_peak_strike) < 1.0)
-        is_top_ch = (abs(k_val - charm_peak_strike) < 1.0)
-        is_spot_k = (abs(k_val - spot) <= 2.5)
-
-        prefix_tag = ""
-        row_extra = ""
-        if is_top_v:
-            prefix_tag = "⚡ "
-            row_extra = "background: rgba(251, 146, 60, 0.22); font-weight:800;"
-        elif is_top_ch:
-            prefix_tag = "⏳ "
-            row_extra = "background: rgba(192, 132, 252, 0.22); font-weight:800;"
-        elif is_spot_k:
-            prefix_tag = "👉 "
-            row_extra = "background: rgba(56, 189, 248, 0.18);"
-
-        ladder_rows.append(f'''
-        <tr style="{row_extra}">
-            <td style="font-weight:700; color:{'#FB923C' if is_top_v else ('#C084FC' if is_top_ch else '#F8FAFC')}; white-space:nowrap;">
-                {prefix_tag}${k_val:,.0f}
-            </td>
-            <td style="color:#FB923C; text-align:right;">{vex_val:+.1f}M</td>
-            <td style="color:#C084FC; text-align:right;">{chex_val:+.1f}M</td>
-        </tr>''')
-    ladder_rows_html = "".join(ladder_rows)
 
     # 1. CSS styling for Fullscreen TradingView Cockpit
     neiro_css = """
@@ -213,7 +178,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
             <span style="color:#94A3B8; font-size:10px; background:rgba(30,41,59,0.7); padding:2px 7px; border-radius:4px; border:1px solid #334155;">
-                PROFILE: <b style="color:#4ADE80;">■ GEX</b> <b style="color:#38BDF8;">■ DEX</b> <b style="color:#FACC15;">■ CHEX</b> <b style="color:#C084FC;">■ VEX</b>
+                PROFILE: <b style="color:#4ADE80;">■ GEX</b> <b style="color:#38BDF8;">■ VANNA (XANH DƯƠNG)</b> <b style="color:#FACC15;">■ CHARM (VÀNG)</b>
             </span>
             <span style="color:#94A3B8; font-size:10.5px;">HỆ SỐ: <b style="color:#FACC15;">$100.0/oz</b></span>
             <span style="color:#94A3B8; font-size:10.5px;">| SPOT: <b style="color:#38BDF8; font-size:13px;" id="top-live-spot">${spot:,.2f}</b></span>
@@ -238,8 +203,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <div class="hud-row"><span class="hud-lbl">VOLUME / OI:</span> <b style="color:#F1F5F9;">{total_vol:,} / {total_oi:,} HĐ</b> <span style="color:#64748B;">(HĐTL)</span></div>
         </div>
         <div class="hud-col">
-            <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#FB923C;">${total_vex:+.1f}M</b> <span style="color:#94A3B8; font-size:10px;">(Đỉnh: <b style="color:#FB923C;">${vanna_peak_strike:,.0f}</b> {vanna_peak_val:+.1f}M)</span></div>
-            <div class="hud-row"><span class="hud-lbl">CHARM (CHEX):</span> <b style="color:#C084FC;">${total_chex:+.1f}M/d</b> <span style="color:#94A3B8; font-size:10px;">(Đỉnh: <b style="color:#C084FC;">${charm_peak_strike:,.0f}</b> {charm_peak_val:+.1f}M)</span></div>
+            <div class="hud-row"><span class="hud-lbl">VANNA (VEX):</span> <b style="color:#38BDF8;">${total_vex:+.1f}M</b> <span style="color:#94A3B8; font-size:10px;">(Đỉnh: <b style="color:#38BDF8;">${vanna_peak_strike:,.0f}</b> {vanna_peak_val:+.1f}M)</span></div>
+            <div class="hud-row"><span class="hud-lbl">CHARM (CHEX):</span> <b style="color:#FACC15;">${total_chex:+.1f}M/d</b> <span style="color:#94A3B8; font-size:10px;">(Đỉnh: <b style="color:#FACC15;">${charm_peak_strike:,.0f}</b> {charm_peak_val:+.1f}M)</span></div>
         </div>
         <div class="hud-col">
             <div class="hud-row"><span class="hud-lbl">ZERO GAMMA:</span> <b style="color:#FACC15;">${zero_gamma:,.1f}</b> <span style="color:#64748B;">(Flip)</span></div>
@@ -250,65 +215,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <div class="hud-row"><span class="hud-lbl">GAMMA WATERFALL ↓:</span> <b style="color:#F87171;">&lt;${strike_below:,.0f} → TP ${next_below:,.0f}</b></div>
         </div>
     </div>
-    <div id="neiro-view-container" style="display:flex; width:100%; height:700px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:14px; overflow:hidden;">
-        <div style="flex:1; height:100%; position:relative; min-width:0;">
-            <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
-            <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
-        </div>
-        <!-- CỘT RIÊNG NGAY BÊN PHẢI CỘT GIÁ: DEDICATED VANNA & CHARM GREEKS LADDER -->
-        <div id="neiro-greeks-sidebar" class="neiro-greeks-sidebar">
-            <div class="greeks-sidebar-header">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <span style="font-weight:800; font-size:11px; color:#F8FAFC; letter-spacing:0.4px;">⚡ VANNA &amp; ⏳ CHARM</span>
-                    <span class="badge" style="background:#1E293B; color:#94A3B8; font-size:9px; padding:1px 5px; border-radius:3px;">GREEKS BẬC 2</span>
-                </div>
-                <div style="font-size:9.5px; color:#64748B; margin-top:2px;">Cột hồ sơ độ nhạy theo từng Strike</div>
-            </div>
-
-            <!-- Thẻ Đỉnh Vanna -->
-            <div class="greeks-peak-card peak-vanna">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#FB923C; font-weight:800; font-size:10.5px;">⚡ ĐỈNH VANNA</span>
-                    <span style="color:#FDBA74; font-weight:800; font-size:12px;">${vanna_peak_strike:,.0f}</span>
-                </div>
-                <div style="font-size:10px; color:#FED7AA; margin-top:2px; font-weight:600;">
-                    Net VEX: <b style="color:#FB923C;">{vanna_peak_val:+.2f}M</b> / 1% IV
-                </div>
-                <div style="font-size:9px; color:#94A3B8; margin-top:2px; line-height:1.25;">
-                    Lực đẩy V-Rebound khi IV hạ • Áp lực xả khi IV tăng
-                </div>
-            </div>
-
-            <!-- Thẻ Đỉnh Charm -->
-            <div class="greeks-peak-card peak-charm">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#C084FC; font-weight:800; font-size:10.5px;">⏳ ĐỈNH CHARM</span>
-                    <span style="color:#E9D5FF; font-weight:800; font-size:12px;">${charm_peak_strike:,.0f}</span>
-                </div>
-                <div style="font-size:10px; color:#E9D5FF; margin-top:2px; font-weight:600;">
-                    Net CHEX: <b style="color:#C084FC;">{charm_peak_val:+.2f}M</b> / ngày
-                </div>
-                <div style="font-size:9px; color:#94A3B8; margin-top:2px; line-height:1.25;">
-                    Nam châm ghìm giá đêm • Dealer tự động mua bù Delta
-                </div>
-            </div>
-
-            <!-- Bảng Ladder từng Strike (Scrollable) -->
-            <div class="greeks-ladder-table-container">
-                <table class="greeks-ladder-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;">Strike</th>
-                            <th style="text-align:right; color:#FB923C;">VEX</th>
-                            <th style="text-align:right; color:#C084FC;">CHEX</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {ladder_rows_html}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div id="neiro-view-container" style="width:100%; height:700px; position:relative; background:#000000; border:1px solid #1E293B; border-radius:8px; margin-bottom:14px; overflow:hidden;">
+        <div id="neiro-tv-chart" style="width:100%; height:100%;"></div>
+        <canvas id="neiro-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10;"></canvas>
     </div>
     """
 
@@ -643,7 +552,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (window.INITIAL_META.vanna_peak_strike) {{
             candleSeries.createPriceLine({{
                 price: window.INITIAL_META.vanna_peak_strike,
-                color: '#FB923C',
+                color: '#38BDF8',
                 lineWidth: 1.5,
                 lineStyle: LightweightCharts.LineStyle.Dashed,
                 axisLabelVisible: true,
@@ -653,7 +562,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (window.INITIAL_META.charm_peak_strike) {{
             candleSeries.createPriceLine({{
                 price: window.INITIAL_META.charm_peak_strike,
-                color: '#C084FC',
+                color: '#FACC15',
                 lineWidth: 1.5,
                 lineStyle: LightweightCharts.LineStyle.Dashed,
                 axisLabelVisible: true,
@@ -721,75 +630,79 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }}
         }});
 
-        // 2. Draw Multi-Metric Profile per Strike (GEX, DEX, CHEX, Vol/OI)
+        // 2. Draw Vanna (Xanh Dương #38BDF8) & Charm (Vàng #FACC15) Profile per Strike (Fixed to chart price)
         const optionsData = window.INITIAL_OPTIONS || [];
+
+        // Profile Column Header at Right Margin
+        ctx.font = 'bold 9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#38BDF8';
+        ctx.fillText('⚡ VANNA (XANH DƯƠNG)', rightX - 85, 20);
+        ctx.fillStyle = '#FACC15';
+        ctx.fillText('⏳ CHARM (VÀNG)', rightX - 4, 20);
+
         optionsData.forEach(opt => {{
             const k = opt.strike;
             const y = candleSeries.priceToCoordinate(k);
-            if (y !== null && y >= 15 && y <= h - 15) {{
-                const gex = opt.netGEX || 0;
-                const vex = opt.netVEX || 0;
-                const chex = opt.netCHEX || 0;
-                const delta = opt.netDelta || 0;
-                const cVol = opt.c_vol || 0;
-                const pVol = opt.p_vol || 0;
-                const totVol = cVol + pVol;
-                const cOi = opt.c_oi || 0;
-                const pOi = opt.p_oi || 0;
-                const totOi = cOi + pOi;
+            if (y === null || y < 28 || y > h - 18) return;
 
-                const isPos = gex >= 0;
-                const barLen = Math.min(100, Math.abs(gex) * 2.8);
-                const deltaLen = Math.min(75, Math.abs(delta) * 0.030);
-                const chexLen = Math.min(50, Math.abs(chex) * 3.0);
+            const vex = opt.netVEX || 0;
+            const chex = opt.netCHEX || 0;
+            const gex = opt.netGEX || 0;
 
-                // 2a. Net GEX Bar (Top bar)
-                if (barLen > 2) {{
-                    ctx.fillStyle = isPos ? 'rgba(34, 197, 94, 0.40)' : 'rgba(239, 68, 68, 0.40)';
-                    ctx.fillRect(rightX - barLen, y - 6, barLen, 4);
-                    ctx.fillStyle = isPos ? '#4ADE80' : '#F87171';
-                    ctx.fillRect(rightX - 2, y - 6, 2, 4);
-                }}
+            const isTopVanna = Math.abs(k - m.vanna_peak_strike) < 1.0;
+            const isTopCharm = Math.abs(k - m.charm_peak_strike) < 1.0;
 
-                // 2b. Net Delta Bar (Middle bar)
-                if (deltaLen > 2) {{
-                    const isDeltaPos = delta >= 0;
-                    ctx.fillStyle = isDeltaPos ? 'rgba(56, 189, 248, 0.40)' : 'rgba(251, 146, 60, 0.40)';
-                    ctx.fillRect(rightX - deltaLen, y - 1, deltaLen, 3);
-                    ctx.fillStyle = isDeltaPos ? '#38BDF8' : '#FB923C';
-                    ctx.fillRect(rightX - 2, y - 1, 2, 3);
-                }}
+            // Bar lengths
+            const vexLen = Math.min(75, Math.abs(vex) * 5.2);
+            const chexLen = Math.min(75, Math.abs(chex) * 10.5);
 
-                // 2c. Net CHEX Bar (Bottom bar)
-                if (chexLen > 2) {{
-                    const isChexPos = chex >= 0;
-                    ctx.fillStyle = isChexPos ? 'rgba(250, 204, 21, 0.40)' : 'rgba(192, 132, 252, 0.40)';
-                    ctx.fillRect(rightX - chexLen, y + 3, chexLen, 3);
-                    ctx.fillStyle = isChexPos ? '#FACC15' : '#C084FC';
-                    ctx.fillRect(rightX - 2, y + 3, 2, 3);
-                }}
+            // 2a. Net Vanna Bar (Màu Xanh Dương #38BDF8 - độ nhạy IV)
+            if (vexLen > 2 || isTopVanna) {{
+                const dVex = Math.max(vexLen, isTopVanna ? 24 : 3);
+                ctx.fillStyle = isTopVanna ? 'rgba(56, 189, 248, 0.60)' : 'rgba(56, 189, 248, 0.35)';
+                ctx.fillRect(rightX - 85 - dVex, y - 5, dVex, 4);
+                ctx.fillStyle = '#38BDF8';
+                ctx.fillRect(rightX - 85 - 2, y - 5, 2, 4);
+            }}
 
-                // 2d. Detailed Multi-Metric Label for significant strikes
-                if (Math.abs(gex) >= 2.0 || Math.abs(delta) >= 250 || Math.abs(vex) >= 1.0 || totVol >= 150) {{
-                    ctx.font = '8px "JetBrains Mono", monospace';
-                    ctx.textAlign = 'right';
-                    const maxBar = Math.max(barLen, deltaLen, chexLen, 20);
-                    const txt = '$' + Math.round(k) +
-                        ' · GEX ' + (gex >= 0 ? '+' : '') + gex.toFixed(1) + 'M' +
-                        ' | DEX ' + (delta >= 0 ? '+' : '') + Math.round(delta) + ' HĐ' +
-                        ' | VEX ' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M' +
-                        ' | CHEX ' + (chex >= 0 ? '+' : '') + chex.toFixed(1) + 'M/d' +
-                        ' | Vol ' + totVol.toLocaleString() + ' (C:' + cVol.toLocaleString() + '/P:' + pVol.toLocaleString() + ')' +
-                        ' | OI ' + totOi.toLocaleString();
-                    const tw = ctx.measureText(txt).width;
-                    ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
-                    ctx.fillRect(rightX - maxBar - tw - 12, y - 8, tw + 8, 16);
-                    ctx.strokeStyle = isPos ? 'rgba(74, 222, 128, 0.35)' : 'rgba(248, 113, 113, 0.35)';
-                    ctx.lineWidth = 0.8;
-                    ctx.strokeRect(rightX - maxBar - tw - 12, y - 8, tw + 8, 16);
-                    ctx.fillStyle = isPos ? '#86EFAC' : '#FCA5A5';
-                    ctx.fillText(txt, rightX - maxBar - 8, y + 3);
-                }}
+            // 2b. Net Charm Bar (Màu Vàng #FACC15 - tốc độ bào mòn thời gian)
+            if (chexLen > 2 || isTopCharm) {{
+                const dChex = Math.max(chexLen, isTopCharm ? 24 : 3);
+                ctx.fillStyle = isTopCharm ? 'rgba(250, 204, 21, 0.60)' : 'rgba(250, 204, 21, 0.35)';
+                ctx.fillRect(rightX - dChex, y + 1, dChex, 4);
+                ctx.fillStyle = '#FACC15';
+                ctx.fillRect(rightX - 2, y + 1, 2, 4);
+            }}
+
+            // 2c. Peak Vanna Glowing Badge (Màu Xanh Dương)
+            if (isTopVanna) {{
+                const vTxt = '⚡ ĐỈNH VANNA $' + Math.round(k) + ' (' + (vex >= 0 ? '+' : '') + vex.toFixed(1) + 'M)';
+                ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
+                ctx.textAlign = 'right';
+                const vTw = ctx.measureText(vTxt).width;
+                ctx.fillStyle = 'rgba(6, 18, 38, 0.95)';
+                ctx.fillRect(rightX - 170 - vTw, y - 12, vTw + 8, 14);
+                ctx.strokeStyle = '#38BDF8';
+                ctx.lineWidth = 1.3;
+                ctx.strokeRect(rightX - 170 - vTw, y - 12, vTw + 8, 14);
+                ctx.fillStyle = '#38BDF8';
+                ctx.fillText(vTxt, rightX - 166, y - 1);
+            }}
+
+            // 2d. Peak Charm Glowing Badge (Màu Vàng)
+            if (isTopCharm) {{
+                const chTxt = '⏳ ĐỈNH CHARM $' + Math.round(k) + ' (' + (chex >= 0 ? '+' : '') + chex.toFixed(1) + 'M/d)';
+                ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
+                ctx.textAlign = 'right';
+                const chTw = ctx.measureText(chTxt).width;
+                ctx.fillStyle = 'rgba(38, 30, 6, 0.95)';
+                ctx.fillRect(rightX - 170 - chTw, y + 2, chTw + 8, 14);
+                ctx.strokeStyle = '#FACC15';
+                ctx.lineWidth = 1.3;
+                ctx.strokeRect(rightX - 170 - chTw, y + 2, chTw + 8, 14);
+                ctx.fillStyle = '#FACC15';
+                ctx.fillText(chTxt, rightX - 166, y + 13);
             }}
         }});
 
@@ -797,8 +710,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const keyLevels = [
             {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
-            {{ p: m.vanna_peak_strike,  c: '#FB923C', d: [4, 4], txt: '⚡ ĐỈNH VANNA $' + Math.round(m.vanna_peak_strike) + ' (' + ((m.vanna_peak_val || 0) >= 0 ? '+' : '') + (m.vanna_peak_val || 0).toFixed(1) + 'M) · LỰC ĐẨY V-REBOUND / NHẠY CẢM IV' }},
-            {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: '⏳ ĐỈNH CHARM $' + Math.round(m.charm_peak_strike) + ' (' + ((m.charm_peak_val || 0) >= 0 ? '+' : '') + (m.charm_peak_val || 0).toFixed(1) + 'M/d) · NAM CHÂM GHÌM GIÁ ĐÊM / DELTA DECAY' }},
+            {{ p: m.vanna_peak_strike,  c: '#38BDF8', d: [4, 4], txt: '⚡ ĐỈNH VANNA $' + Math.round(m.vanna_peak_strike) + ' (' + ((m.vanna_peak_val || 0) >= 0 ? '+' : '') + (m.vanna_peak_val || 0).toFixed(1) + 'M) · LỰC ĐẨY V-REBOUND / NHẠY CẢM IV' }},
+            {{ p: m.charm_peak_strike,  c: '#FACC15', d: [4, 4], txt: '⏳ ĐỈNH CHARM $' + Math.round(m.charm_peak_strike) + ' (' + ((m.charm_peak_val || 0) >= 0 ? '+' : '') + (m.charm_peak_val || 0).toFixed(1) + 'M/d) · NAM CHÂM GHÌM GIÁ ĐÊM / DELTA DECAY' }},
             {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
             {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA WATERFALL ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
             {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], txt: 'ZERO GAMMA FLIP (S*) $' + Math.round(m.zero_gamma_flip) + ' · MỐC ĐẢO CHIỀU TÂM LÝ' }},

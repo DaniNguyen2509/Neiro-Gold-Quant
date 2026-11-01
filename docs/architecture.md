@@ -201,17 +201,13 @@ on:
 
 
 
-## VII. CỘT HỒ SƠ RIÊNG BIỆT CHO ĐỈNH VANNA & ĐỈNH CHARM CẠNH CỘT GIÁ (ADR-020)
+## VII. CỐ ĐỊNH HỒ SƠ ĐỈNH VANNA (XANH DƯƠNG) & ĐỈNH CHARM (VÀNG) THEO TRỤC GIÁ BIỂU ĐỒ (ADR-020)
 
-1. **Khắc phục điểm mù Greeks bậc 2:**
-   - Trên đồ thị TradingView chuẩn, các mốc cực trị Đỉnh Vanna (VEX Peak) và Đỉnh Charm (CHEX Peak) khó quan sát trực tiếp nếu chỉ hiển thị dạng bảng dưới đáy.
-   - Kiến trúc giải pháp: Tích hợp cột hồ sơ chuyên dụng (#neiro-greeks-sidebar, width: 230px) ngay bên phải thước đo giá (
-ightPriceScale) của TradingView.
+1. **Khắc phục điểm mù và lệch trục giá (Zero Vertical Desynchronization):**
+   - Loại bỏ các bảng HTML độc lập ngoài chart để tránh hiện tượng lệch giá khi co giãn nến. Biểu đồ TradingView và Canvas chiếm trọn 100% diện tích màn hình.
+   - Sử dụng hàm \candleSeries.priceToCoordinate(k)\ tính tọa độ Y của từng mức giá trực tiếp trên Canvas 60 FPS, đảm bảo thanh bar profile Vanna và Charm luôn bám chặt và cố định theo mức giá của nến M1.
 
-2. **Cơ chế hiển thị đa tầng:**
-   - **Thẻ tiêu điểm phát sáng (Neon Cards):**
-     - ⚡ ĐỈNH VANNA ,XXX (Màu cam #FB923C): Mức strike có $|VEX|$ cực đại, đo độ nhạy của Delta theo IV (lực đẩy V-Rebound hoặc xả Waterfall khi IV co giãn).
-     - ⏳ ĐỈNH CHARM ,XXX (Màu tím #C084FC): Mức strike có $|CHEX|$ cực đại, đo tốc độ bào mòn Delta theo thời gian (nam châm ghìm giá qua đêm / delta decay).
-   - **Bảng Ladder cuộn dọc:** Liệt kê toàn bộ các Strike tác chiến quanh Spot với giá trị VEX và CHEX chi tiết.
-   - **Trục giá trực tiếp (Price Scale Lines):** Gọi candleSeries.createPriceLine() gắn badge nhãn giá màu cam ⚡ ĐỈNH VANNA và màu tím ⏳ ĐỈNH CHARM ngay trên thước đo giá của TradingView.
-   - **Canvas Overlay:** Kẻ đường nét đứt ngang xuyên suốt đồ thị nến M1 cho cả 2 mốc cực trị.
+2. **Quy chuẩn màu sắc & Nhận diện vi cấu trúc:**
+   - **Vanna (Net VEX - Màu Xanh Dương \#38BDF8\):** Đo lường độ nhạy của Delta theo IV. Điểm cực trị Đỉnh Vanna được làm nổi bật với badge phát sáng xanh dương trên canvas và PriceLine trên thước đo giá.
+   - **Charm (Net CHEX - Màu Vàng \#FACC15\):** Đo lường tốc độ bào mòn Delta theo thời gian (nam châm ghìm giá đêm). Điểm cực trị Đỉnh Charm được làm nổi bật với badge phát sáng vàng trên canvas và PriceLine trên thước đo giá.
+   - **Đồng bộ toàn diện:** Trục giá, Top HUD và Canvas Overlay đều áp dụng đồng nhất chuẩn màu Xanh Dương (Vanna) và Vàng (Charm).
