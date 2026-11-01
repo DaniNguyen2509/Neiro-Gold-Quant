@@ -49,3 +49,4 @@
 - **Trực quan:** Trader nhìn vào màn hình là thấy ngay vị trí Đỉnh Vanna và Đỉnh Charm ở 4 vị trí: Cột giá, Cột riêng bên phải, Đường kẻ trên chart, và Top HUD.
 - **Kiểm thử tự động:** 137/137 tests passed (100%) trong 24.48s.
 - **Zero-Waste:** Dung lượng repo đạt 12.00 MB (< 15MB).
+
