@@ -426,7 +426,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             const totalBars = bars.length;
             if (neiroChart) {{
                 neiroChart.timeScale().setVisibleLogicalRange({{
-                    from: Math.max(0, totalBars - 60),
+                    from: Math.max(0, totalBars - 120),
                     to: totalBars + 8,
                 }});
             }}
@@ -504,13 +504,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }});
 
         candleSeries = neiroChart.addCandlestickSeries({{
-            upColor: 'rgba(28, 34, 46, 0.75)',
-            downColor: 'rgba(28, 34, 46, 0.75)',
+            upColor: '#22C55E',
+            downColor: '#EF4444',
             borderVisible: true,
-            borderUpColor: '#A1A1AA',
-            borderDownColor: '#71717A',
-            wickUpColor: '#A1A1AA',
-            wickDownColor: '#71717A',
+            borderUpColor: '#22C55E',
+            borderDownColor: '#EF4444',
+            wickUpColor: '#22C55E',
+            wickDownColor: '#EF4444',
         }});
 
         buildHistoricalGoldBars(60);

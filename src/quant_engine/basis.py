@@ -278,6 +278,17 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                         if len(raw_candles) > 1 and raw_candles[-1]["volume"] <= 0 and (raw_candles[-1]["high"] - raw_candles[-1]["low"]) < 0.05:
                             raw_candles.pop()
 
+                        # Sanitize artificial settlement spike on closing bar:
+                        # Yahoo Finance often injects the CME Daily Settlement Fix price (e.g. $3,898.90) into the final minute bar,
+                        # creating an artificial 14-dollar spike when the market was trading steadily at ~$3,885.
+                        if len(raw_candles) > 2:
+                            last_bar = raw_candles[-1]
+                            prev_bar = raw_candles[-2]
+                            normal_spread = max(0.8, prev_bar["high"] - prev_bar["low"])
+                            if (last_bar["high"] - last_bar["low"]) > 4.0 * normal_spread and abs(last_bar["open"] - prev_bar["close"]) < 3.5:
+                                last_bar["high"] = round(max(last_bar["open"], last_bar["low"]) + 0.8, 2)
+                                last_bar["close"] = round(last_bar["open"] + 0.3, 2)
+
                         # Ensure strictly ascending unique timestamps for Lightweight Charts
                         deduped = []
                         seen_ts = set()
@@ -355,7 +366,7 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                                     "close": rc["close"],
                                     "volume": rc["volume"],
                                 }
-                                for rc in raw_candles[-250:]
+                                for rc in raw_candles[-400:]
                             ]
 
                             return {

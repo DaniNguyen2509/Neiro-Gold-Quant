@@ -219,3 +219,9 @@ on:
      * CHEX: Tím (`#C084FC` / `#7E22CE`).
      * THETA: Cam (`#FDBA74` / `#EA580C`).
    - **Pinned Edge Indicators:** Ghim cảnh báo `▲ CALL WALL` khi nằm vượt lên trên khung hình, `▼ PUT WALL` khi nằm tụt xuống dưới đáy khung hình.
+
+
+3. **Chuẩn Hóa Nến M1 & Khử Nhiễu Settlement Spike Artifact:**
+   - **Màu sắc TradingView chuẩn:** Nến tăng Xanh lá (#22C55E) và nến giảm Đỏ tươi (#EF4444) với viền và râu đồng màu, tối ưu độ tương phản trên nền đen sâu #000000.
+   - **Khử nhiễu CME Settlement Fix:** Bộ lọc asis.py tự động nhận diện và gọt bỏ hiện tượng Yahoo Finance chèn giá chốt ngày ,898.90 vào cây nến 1 phút cuối (gây ra cây nến râu dài 14 USD dị thường). Thân nến M1 được giữ nguyên giá khớp thực tế (~,885.50), trong khi mốc thanh toán ,898.90 được biểu diễn qua đường ngang livePriceLine (F0 LIVE / CME SETTLE).
+   - **Độ sâu nến lịch sử:** Mở rộng lên 400 nến M1 liên tục, cho phép trader cuộn xem trọn vẹn diễn biến phiên giao dịch.
