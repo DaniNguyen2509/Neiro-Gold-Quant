@@ -1,7 +1,7 @@
 # 🪙 Neiro-Gold-Quant — Market Microstructure & Dual-View Tactical Combat Terminal
 
 [![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Quant/actions)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Gold-Quant/actions)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12%20%7C%203.14-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Unit Tests](https://img.shields.io/badge/Tests-133%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Zero-Waste](https://img.shields.io/badge/Zero--Waste-%3C%2015MB-green?style=for-the-badge)](docs/spec.md)
