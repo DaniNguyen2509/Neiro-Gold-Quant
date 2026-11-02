@@ -173,3 +173,32 @@ def test_find_atm_strike_prefers_liquid():
     )
     atm = find_atm_strike(snapshot)
     assert atm.strike == 4180.0
+
+def test_find_atm_strike_all_illiquid_anchors_to_spot():
+    """Verify that when ALL strikes have zero bid/ask, find_atm_strike anchors to spot_price rather than picking deep OTM strikes."""
+    strikes = (
+        make_strike(1350.0, call_mid=0.0, put_mid=0.0),
+        make_strike(4000.0, call_mid=0.0, put_mid=0.0),
+        make_strike(5500.0, call_mid=0.0, put_mid=0.0),
+    )
+    # Zero out all bids and asks
+    zero_strikes = tuple(
+        OptionsStrike(
+            strike=s.strike,
+            call_bid=0.0, call_ask=0.0, put_bid=0.0, put_ask=0.0,
+            call_oi=100, put_oi=100, call_volume=0, put_volume=0
+        ) for s in strikes
+    )
+    snapshot = OptionsSnapshot(
+        symbol="GC",
+        expiry="2026-11-25",
+        timestamp="2026-11-02T00:00:00",
+        strikes=zero_strikes,
+    )
+    # With spot_price = 4010.0, nearest strike is 4000.0
+    atm = find_atm_strike(snapshot, spot_price=4010.0)
+    assert atm.strike == 4000.0
+
+    # Without spot_price, falls back to median strike (4000.0), NOT 1350.0!
+    atm_fallback = find_atm_strike(snapshot)
+    assert atm_fallback.strike == 4000.0

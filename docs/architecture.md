@@ -246,3 +246,39 @@ on:
 
 3. **Interactive Greeks Tooltip Inspection:**
    - Khi người dùng rê chuột vào vùng 4 cột Greeks bên phải, Canvas tự động kích hoạt gióng Strike gần nhất và hiển thị thẻ Tooltip Card nổi bật: `Strike $K`, `GEX ($M)`, `VEX ($M)`, `CHEX ($M/d)`.
+
+
+---
+
+## IX. KHUNG KIỂM THỬ TOÀN DIỆN & CÁC BẤT BIẾN VI CẤU TRÚC (ADR-022)
+
+1. **Thiết kế 4 trụ cột kiểm thử chuyên biệt (125 tests mở rộng):**
+   - **Cổng dữ liệu & CI Invariant (`tests/test_data_gate.py`):** Kiểm định độ bao phủ Strike quanh giá GC hiện tại, cờ Stale độc lập với mtime, cơ chế chặn rò rỉ rác (`clean_val`), và yêu cầu CI verify step phải báo lỗi minh bạch thay vì lặng lẽ revert.
+   - **Lõi toán định lượng thuần Python (`tests/test_math_core.py`):** Kiểm định độ chính xác của Dekker-Brent `_brentq`, tính bất biến tỷ lệ OI của Zero Gamma Flip ($S^*$), xử lý biên độ biến động Black-76 IV.
+   - **Tính nhất quán $T_{\text{floor}}$ & Rollover vi mô (`tests/test_expiry_rollover.py`):** Kiểm tra tính hữu hạn của Greeks khi $T \to 0$ (1 phút), logic tự động chuyển đổi hợp đồng cơ sở (`underlying_futures`), và loại bỏ ngày hết hạn trong quá khứ ở nhánh fallback.
+   - **Smoke test render Dashboard end-to-end (`tests/test_hud_smoke.py`):** Xác minh toàn trình chuyển hóa CSV $\to$ HTML, kiểm tra hiển thị mốc tường/flip, bắt lỗi biến `stale_badge_html` bị bỏ quên và cờ fallback benchmark.
+
+2. **Cơ chế Khóa Lỗi Đỏ (RED-EXPECTED Gates):**
+   - Duy trì 16 ca kiểm thử ở trạng thái RED-EXPECTED để bảo vệ nguyên trạng hệ thống, hỗ trợ chủ dự án kiểm soát rủi ro và phê duyệt khắc phục từng bước có kiểm chứng (TDD / Doubt-Driven Development).
+
+---
+
+## X. ĐỒNG BỘ MÚI GIỜ MÙA ĐÔNG HOA KỲ & KHẢ NĂNG TỰ PHỤC HỒI DỮ LIỆU ĐẦU VÀO (ADR-023)
+
+1. **Thích ứng Múi Giờ Mùa Đông (US Standard Time - EST/CST):**
+   - Kể từ 01/11/2026, thị trường Mỹ chuyển dịch giờ giao dịch (lùi 1 giờ so với mùa hè):
+     * Mở phiên chứng khoán & GLD ETF: 09:30 AM EST = 14:30 UTC = 21:30 VN.
+     * Tin vĩ mô nhạy cảm (CPI/NFP): 08:30 AM EST = 13:30 UTC = 20:30 VN.
+     * Giờ chốt phiên COMEX & Hết hạn Options: 13:30 CST = 19:30 UTC = 02:30 VN (ngày hôm sau).
+   - Hàm `get_cme_cutoff_dt()` trong `src/quant_engine/synthetic.py` sử dụng `zoneinfo.ZoneInfo("America/Chicago")` tự động định tuyến chính xác 18:30 UTC vào mùa hè và 19:30 UTC vào mùa đông.
+
+2. **Ma Trận Lập Lịch Tự Động Toàn Mùa (Dual-Season CI Radar):**
+   - Workflow `.github/workflows/daily_options_sync.yml` tích hợp các mốc quét tự động:
+     * `15 12,13,14 * * 1-5`: Đón đầu tin vĩ mô và trước giờ mở cửa New York (cả 2 mùa).
+     * `45 13,14,15,16,17,18,19 * * 1-5`: Bám sát đà rung lắc cao điểm, London PM Fix và thu hoạch chính xác giá chốt sổ (18:45 UTC hè / 19:45 UTC đông).
+
+3. **Tự Động Tính Black-76 IV Ngay Tại Scraper:**
+   - Hàm `_enrich_options_iv_and_greeks()` trong `src/collector/scraper.py` tự động giải nghiệm độ biến động ngầm định bằng mô hình Black-76 nếu Barchart trả về `callIV == 0.0` hoặc `putIV == 0.0`.
+
+4. **Neo Giữ ATM Strike Khi Thị Trường Kém Thanh Khoản (Spot-Anchored ATM):**
+   - `find_atm_strike()` ưu tiên các strike có chào giá 2 chiều (Bid/Ask > 0). Trường hợp phiên ngoài giờ hoặc cuối tuần chưa mở bảng giá (`bid=0, ask=0`), hàm tự động neo vào `spot_price` (hoặc Strike trung vị) thay vì chọn nhầm strike xa lắc như $1,350.

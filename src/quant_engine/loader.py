@@ -659,6 +659,47 @@ def _load_from_path(file_path: str, data_dir: Optional[str] = None) -> pd.DataFr
     return parse_dual_files(file_path, greeks_file if os.path.exists(greeks_file) else None)
 
 
+def _resolve_safe_spot_and_atm(df: pd.DataFrame, spot: float | None = None) -> tuple[float, int]:
+    """Resolves ATM index and spot price anchored to market price or median strike.
+
+    Guarantees against 0-0 difference collapsing to extreme strike (e.g. $1,350)
+    when options chain lacks two-sided liquidity.
+    """
+    if df is None or df.empty:
+        return 4000.0, 0
+
+    if spot is not None and spot > 500.0:
+        atm_idx = int((df["strike"] - spot).abs().idxmin())
+        return float(spot), atm_idx
+
+    try:
+        from src.quant_engine.basis import fetch_live_cme_futures_price
+        lp = fetch_live_cme_futures_price()
+        if lp and lp > 500.0:
+            atm_idx = int((df["strike"] - lp).abs().idxmin())
+            return float(lp), atm_idx
+    except Exception:
+        pass
+
+    # Check two-sided liquid strikes
+    liq = (df["callMid"] > 0) & (df["putMid"] > 0)
+    if liq.any():
+        diff = (df.loc[liq, "callMid"] - df.loc[liq, "putMid"]).abs()
+        atm_idx = int(diff.idxmin())
+        return float(df.loc[atm_idx, "strike"]), atm_idx
+
+    # Single-sided quoted strikes
+    quoted = (df["callMid"] > 0) | (df["putMid"] > 0)
+    if quoted.any():
+        diff = (df.loc[quoted, "callMid"] - df.loc[quoted, "putMid"]).abs()
+        atm_idx = int(diff.idxmin())
+        return float(df.loc[atm_idx, "strike"]), atm_idx
+
+    # Median strike fallback
+    atm_idx = len(df) // 2
+    return float(df.iloc[atm_idx]["strike"]), atm_idx
+
+
 def aggregate_options_dataframes(
     dfs: list[pd.DataFrame],
     spot_price: Optional[float] = None,
@@ -708,10 +749,7 @@ def aggregate_options_dataframes(
 
     valid_dfs.sort(key=get_dte)
 
-    spot = spot_price
-    if spot is None or spot <= 0:
-        atm_idx = (valid_dfs[0]["callMid"] - valid_dfs[0]["putMid"]).abs().idxmin()
-        spot = float(valid_dfs[0].loc[atm_idx, "strike"])
+    spot, atm_idx = _resolve_safe_spot_and_atm(valid_dfs[0], spot=spot_price)
 
     MULT = 100.0
     scale = (spot ** 2) * 0.01 / 1e6
@@ -919,16 +957,16 @@ def compute_tactical_matrix(
     else:
         effective_dte = float(dte_days)
 
-    # 1. Determine Spot Price via Implied Spot if not provided
-    atm_idx = (df['callMid'] - df['putMid']).abs().idxmin()
+    # 1. Determine Spot Price via Safe Spot & ATM Resolver
+    spot_price, atm_idx = _resolve_safe_spot_and_atm(df, spot=spot)
     atm_strike = float(df.loc[atm_idx, 'strike'])
     c_mid_atm = float(df.loc[atm_idx, 'callMid'])
     p_mid_atm = float(df.loc[atm_idx, 'putMid'])
 
-    if spot is None or spot <= 0:
-        spot_price = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=r, T=effective_dte / 365.0)
-    else:
-        spot_price = float(spot)
+    if (spot is None or spot <= 0) and c_mid_atm > 0 and p_mid_atm > 0:
+        implied = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=r, T=effective_dte / 365.0)
+        if implied > 500.0:
+            spot_price = implied
 
     # 2. Net GEX & Delta Flow Calculation
     # MULT = 100 troy oz per CME Gold contract
@@ -1187,14 +1225,15 @@ def to_market_snapshot(
         for _, r in df.iterrows()
     )
 
-    if spot is None or spot <= 0:
-        atm_idx = (df['callMid'] - df['putMid']).abs().idxmin()
-        atm_strike = float(df.loc[atm_idx, 'strike'])
-        c_mid_atm = float(df.loc[atm_idx, 'callMid'])
-        p_mid_atm = float(df.loc[atm_idx, 'putMid'])
-        spot_price = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=risk_free_rate, T=effective_dte / 365.0)
-    else:
-        spot_price = float(spot)
+    spot_price, atm_idx = _resolve_safe_spot_and_atm(df, spot=spot)
+    atm_strike = float(df.loc[atm_idx, 'strike'])
+    c_mid_atm = float(df.loc[atm_idx, 'callMid'])
+    p_mid_atm = float(df.loc[atm_idx, 'putMid'])
+
+    if (spot is None or spot <= 0) and c_mid_atm > 0 and p_mid_atm > 0:
+        implied = compute_implied_spot(atm_strike, c_mid_atm, p_mid_atm, r=risk_free_rate, T=effective_dte / 365.0)
+        if implied > 500.0:
+            spot_price = implied
 
     return MarketSnapshot(
         spot=spot_price,

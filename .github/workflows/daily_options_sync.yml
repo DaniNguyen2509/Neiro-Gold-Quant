@@ -12,10 +12,22 @@ on:
     #    07:30 UTC = 14:30 VN (In-Session Europe Mua He sau khi London chay 30p)
     #    08:30 UTC = 15:30 VN (In-Session Europe Mua Dong sau khi London chay 30p)
     - cron: '30 5,6,7,8 * * 1-5'
-    # 4. Phien My don dau tin vi mo (18:45 VN) & gio cao diem NYSE / London Fix:
-    #    11:45 UTC = 18:45 VN (Pre-US: truoc tin vi mo 19:30 he / 20:30 dong)
-    #    12:45, 13:45, 14:45, 15:45, 16:45 UTC = 19:45, 20:45, 21:45, 22:45, 23:45 VN
-    - cron: '45 11,12,13,14,15,16 * * 1-5'
+    # 4. Phien My & Gio Cao Diem Toan Dien (Thich ung Hoan Hao ca 2 Mua He / Dong):
+    #    - Pre-US Macro Releases (Don dau tin vi mo 08:30 EST/EDT):
+    #      12:15 UTC = 19:15 VN (truoc tin vi mo mua he 19:30 15 phut)
+    #      13:15 UTC = 20:15 VN (truoc tin vi mo mua dong 20:30 15 phut)
+    #    - Pre-NYSE & US Market Open (Don dau mo phien co phieu / ETF GLD 09:30 EST/EDT):
+    #      14:15 UTC = 21:15 VN (truoc gio mo cua mua dong 21:30 15 phut)
+    - cron: '15 12,13,14 * * 1-5'
+    #    - High-Velocity US Trading, London Fix & Power Hour:
+    #      13:45 UTC = 20:45 VN (sau mo cua mua he 20:30 15 phut)
+    #      14:45 UTC = 21:45 VN (sau mo cua mua dong 21:30 15 phut)
+    #      15:45 UTC = 22:45 VN (London PM Fix mua dong 22:00)
+    #      16:45, 17:45 UTC = 23:45, 00:45 VN (Midday New York)
+    #    - Power Hour, COMEX Pit Close & Options Settlement (13:30 CST/CDT):
+    #      18:45 UTC = 01:45 VN (chot phien COMEX mua he 01:30 VN)
+    #      19:45 UTC = 02:45 VN (chot phien COMEX mua dong 02:30 VN)
+    - cron: '45 13,14,15,16,17,18,19 * * 1-5'
   push:
     branches: [main]
     paths:
@@ -82,7 +94,7 @@ jobs:
               assert total_oi > 0, 'Total Open Interest is zero'
               print(f'[VERIFIED] Data integrity passed: {len(strikes)} strikes ({strikes.min()} to {strikes.max()}), Total OI: {total_oi}')
           except Exception as e:
-              print(f'[WARNING] Scraped file verification failed: {e}. Reverting data/options_prices_GCZ26.csv to repository valid state...')
+              print(f'::warning title=Options Scrape Verification Failed::Scraped file verification failed: {e}. Reverting data/options_prices_GCZ26.csv to repository valid state...')
               subprocess.run(['git', 'checkout', 'data/options_prices_GCZ26.csv'], check=False)
           "
 

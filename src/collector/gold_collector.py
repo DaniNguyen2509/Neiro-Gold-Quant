@@ -296,7 +296,7 @@ class GoldCollector:
                     break
 
         dte_days = calculate_dte(target_exp)
-        t_years = max(0.0035, dte_days / 365.0)
+        t_years = max(1.0 / 365.0, dte_days / 365.0)
 
         df_chain = None
         try:

@@ -549,7 +549,7 @@ def compute_gold_cost_of_carry(
     """
     if spot_price <= 0.0:
         return 0.0
-    t = max(0.0035, dte_days / 365.0)
+    t = max(1.0 / 365.0, dte_days / 365.0)
     net_carry = risk_free_rate + storage_cost - lease_rate
     return round(spot_price * math.exp(net_carry * t), 2)
 

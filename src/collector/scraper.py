@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -175,6 +176,53 @@ async def fetch_barchart_options_playwright(
         raise RuntimeError("Failed to obtain Barchart options data via browser evaluation")
 
 
+def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float = 23.0) -> pd.DataFrame:
+    """Enriches scraped options chain with calibrated Black-76 IV if Barchart provides 0."""
+    if df is None or df.empty or "strike" not in df.columns:
+        return df
+
+    from src.quant_engine.dealer import solve_black76_iv
+    ref_p = 4000.0
+    try:
+        from src.quant_engine.basis import fetch_live_cme_futures_price
+        lp = fetch_live_cme_futures_price()
+        if lp and lp > 500.0:
+            ref_p = lp
+    except Exception:
+        pass
+
+    t_years = max(1.0 / 365.0, float(dte_days) / 365.0)
+    r = 0.045
+
+    if "callIV" in df.columns and (df["callIV"] <= 0.01).all():
+        solved_c = []
+        for _, row in df.iterrows():
+            k = float(row.get("strike", 0))
+            mid = float(row.get("callMid", 0))
+            if mid <= 0:
+                bid = float(row.get("callBid", 0))
+                ask = float(row.get("callAsk", 0))
+                mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get("callLatest", 0))
+            iv = solve_black76_iv(ref_p, k, t_years, mid, is_call=True, r=r) if mid > 0 else 0.20
+            solved_c.append(round(iv, 4))
+        df["callIV"] = solved_c
+
+    if "putIV" in df.columns and (df["putIV"] <= 0.01).all():
+        solved_p = []
+        for _, row in df.iterrows():
+            k = float(row.get("strike", 0))
+            mid = float(row.get("putMid", 0))
+            if mid <= 0:
+                bid = float(row.get("putBid", 0))
+                ask = float(row.get("putAsk", 0))
+                mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get("putLatest", 0))
+            iv = solve_black76_iv(ref_p, k, t_years, mid, is_call=False, r=r) if mid > 0 else 0.20
+            solved_p.append(round(iv, 4))
+        df["putIV"] = solved_p
+
+    return df
+
+
 def scrape_and_save(
     output_path: str = "data/options_prices_GCZ26.csv",
     page_url: str = DEFAULT_BARCHART_URL,
@@ -218,6 +266,9 @@ def scrape_and_save(
             return str(out_file)
 
     out_file.parent.mkdir(parents=True, exist_ok=True)
+    if "scraped_at_utc" not in df.columns:
+        df["scraped_at_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    df = _enrich_options_iv_and_greeks(df)
     df.to_csv(out_file, index=False)
     logger.info("Saved %d strikes to %s (file size: %d bytes)", len(df), out_file, out_file.stat().st_size)
 
@@ -304,16 +355,27 @@ def scrape_multi_expiry_and_save(
         agg_df = aggregate_options_dataframes(scraped_dfs)
         master_path = out_dir_path / f"options_prices_{underlying_futures}.csv"
         if not dry_run and not agg_df.empty:
-            max_strike = float(agg_df["strike"].max())
-            min_strike = float(agg_df["strike"].min())
-            if (max_strike < 2600.0 or min_strike > 2800.0) and master_path.exists():
+            from src.collector.validator import validate_options_frame
+            ref_price = 4000.0
+            try:
+                from src.quant_engine.basis import fetch_live_cme_futures_price
+                live_p = fetch_live_cme_futures_price()
+                if live_p and live_p > 500.0:
+                    ref_price = live_p
+            except Exception:
+                pass
+
+            val = validate_options_frame(agg_df, reference_price=ref_price)
+            if not val.ok and master_path.exists():
                 logger.warning(
-                    "Aggregated strikes [%.1f, %.1f] do not cover active gold market (2600-2800). Preserving existing active dataset at %s",
-                    min_strike,
-                    max_strike,
+                    "Aggregated options chain failed validation (%s). Preserving existing active dataset at %s",
+                    val.errors,
                     master_path,
                 )
             else:
+                if "scraped_at_utc" not in agg_df.columns:
+                    agg_df["scraped_at_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                agg_df = _enrich_options_iv_and_greeks(agg_df)
                 agg_df.to_csv(master_path, index=False)
                 saved_files.append(str(master_path))
                 logger.info("Master aggregated dataset saved to %s (%d strikes)", master_path, len(agg_df))

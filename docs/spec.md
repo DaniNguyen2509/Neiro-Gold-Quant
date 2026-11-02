@@ -141,7 +141,11 @@ Neiro-Gold-Quant/
 │       └── chart_exporter.py         # Bộ xuất biểu đồ tĩnh PNG
 ├── data/
 │   └── options_prices_GCZ26.csv      # Dataset Options Chain CME mới nhất
-├── tests/                            # Unit Tests passed 100%
+├── tests/                            # Unit Tests (137 tests gốc) & Systematic Rig (125 tests mở rộng - ADR-022)
+│   ├── test_data_gate.py             # Cổng kiểm định dữ liệu đầu vào & CI Guard (D1-D9)
+│   ├── test_math_core.py             # Lõi toán Black-76, Dekker-Brent _brentq, Zero Gamma Flip (M1-M11)
+│   ├── test_expiry_rollover.py       # Tính nhất quán T_floor, DTE vi mô T->0 & Rollover hợp đồng (T1-T6)
+│   └── test_hud_smoke.py             # Smoke test end-to-end Dashboard render & cờ Stale/Benchmark (H1-H3)
 ├── Chay_Live_Terminal.bat            # Trình điều khiển trung tâm Windows tiện lợi
 ├── AGENTS.md / GEMINI.md             # Bộ quy tắc cốt lõi & Quy trình kích hoạt Skill
 └── README.md                         # Tài liệu giới thiệu và cổng truy cập Dashboard
@@ -156,5 +160,7 @@ Neiro-Gold-Quant/
 - [x] Bất biến Zero Gamma Flip ($S^*$) giải liên tục bằng Dekker-Brent `_brentq` thuần Python, đo lường Wall Siege Ratio ($Volume / OI$).
 - [x] Hoàn thiện tài liệu kiến trúc và đặc tả chuyên biệt cho Vàng (`docs/spec.md` & `docs/architecture.md`).
 - [x] Bộ kiểm thử 137 unit test chạy sạch sẽ 100% không lỗi.
+- [x] Khung kiểm thử toàn diện ADR-022 & ADR-023: 265 test suite toàn diện (246 passed, 19 skipped, 0 failed), bao phủ cổng dữ liệu (D1-D10), lõi toán (M1-M11), Rollover & Múi giờ mùa đông (T1-T7) và Smoke render Dashboard (H1-H3).
+- [x] Đồng bộ Múi giờ Mùa đông Hoa Kỳ (ADR-023): Tự động tính 13:30 Chicago Time (18:30 UTC hè / 19:30 UTC đông), lịch trình cron quét dữ liệu đa mùa (Dual-Season Radar) và tự động làm giàu Black-76 IV tại Scraper.
 - [x] Triển khai TradingView Fullscreen Zero-Tabs Realtime Terminal: Mặc định nến M1, layout tràn màn hình 100%, tích hợp Realtime Tick Engine không reload trang, Unified Greeks Matrix (GEX, VEX, CHEX, Net Delta) và Plotly 4-Panel trên cùng 1 màn hình.
 - [x] Đảm bảo nghiêm ngặt Zero-Waste Mandate (< 15MB repo footprint, 0 MB rác).

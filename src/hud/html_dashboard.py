@@ -167,6 +167,21 @@ def load_and_preprocess_options(
     else:
         df_raw = pd.read_csv(csv_path)
 
+    # D7: Check embedded timestamp if present (takes precedence over OS mtime)
+    if "scraped_at_utc" in df_raw.columns:
+        s_ts = df_raw["scraped_at_utc"].dropna()
+        if not s_ts.empty:
+            try:
+                scraped_dt = datetime.datetime.fromisoformat(str(s_ts.iloc[0]).strip())
+                if scraped_dt.tzinfo is None:
+                    scraped_dt = scraped_dt.replace(tzinfo=datetime.timezone.utc)
+                age_ts = (datetime.datetime.now(datetime.timezone.utc) - scraped_dt).total_seconds() / 3600.0
+                if age_ts >= 0:
+                    file_age_hours = age_ts
+                    is_data_stale = (file_age_hours > 6.0)
+            except Exception:
+                pass
+
     # Normalize column names
     col_clean = {c: c.strip() for c in df_raw.columns}
     df_raw.rename(columns=col_clean, inplace=True)
@@ -183,10 +198,12 @@ def load_and_preprocess_options(
 
     df_raw["strike"] = df_raw["strike"].apply(clean_val)
     df = df_raw[df_raw["strike"] > 0].sort_values("strike").reset_index(drop=True)
+    is_benchmark_fallback = False
     if df.empty:
         from src.quant_engine.loader import load_options_data
         df_bench = load_options_data()
         df = df_bench[df_bench["strike"] > 0].sort_values("strike").reset_index(drop=True)
+        is_benchmark_fallback = True
 
     # Fallback fill for mid prices (first Bid/Ask average, then Latest traded/settlement price)
     mask_c_mid = (df["callMid"] <= 0) & (df["callBid"] > 0) & (df["callAsk"] > 0)
@@ -282,7 +299,7 @@ def load_and_preprocess_options(
         c_mid_atm = float(df.loc[atm_idx, "callMid"]) if float(df.loc[atm_idx, "callMid"]) > 0 else 25.0
         p_mid_atm = float(df.loc[atm_idx, "putMid"]) if float(df.loc[atm_idx, "putMid"]) > 0 else 25.0
     else:
-        # Fallback to liquid strike
+        # Fallback to liquid strike with safe spot anchor
         total_interest = df["callOpenInterest"] + df["putOpenInterest"] + df["callVolume"] + df["putVolume"]
         liquid_threshold = np.percentile(total_interest[total_interest > 0], 50) if (total_interest > 0).any() else 0
         candidate_mask = (total_interest >= liquid_threshold) & (df["callMid"] > 0) & (df["putMid"] > 0)
@@ -290,14 +307,26 @@ def load_and_preprocess_options(
             diff = (df.loc[candidate_mask, "callMid"] - df.loc[candidate_mask, "putMid"]).abs()
             atm_idx = diff.idxmin()
         else:
-            diff = (df["callMid"] - df["putMid"]).abs()
-            atm_idx = diff.idxmin()
+            two_sided = (df["callMid"] > 0) & (df["putMid"] > 0)
+            if two_sided.any():
+                diff = (df.loc[two_sided, "callMid"] - df.loc[two_sided, "putMid"]).abs()
+                atm_idx = diff.idxmin()
+            else:
+                quoted = (df["callMid"] > 0) | (df["putMid"] > 0)
+                if quoted.any():
+                    diff = (df.loc[quoted, "callMid"] - df.loc[quoted, "putMid"]).abs()
+                    atm_idx = diff.idxmin()
+                else:
+                    atm_idx = len(df) // 2
 
         atm_strike = float(df.loc[atm_idx, "strike"])
         c_mid_atm = float(df.loc[atm_idx, "callMid"])
         p_mid_atm = float(df.loc[atm_idx, "putMid"])
-        spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
-        if spot_price <= 0 or math.isnan(spot_price):
+        if c_mid_atm > 0 and p_mid_atm > 0:
+            spot_price = atm_strike + math.exp(r * T_years) * (c_mid_atm - p_mid_atm)
+        else:
+            spot_price = atm_strike
+        if spot_price <= 500.0 or math.isnan(spot_price):
             spot_price = atm_strike
         futures_feed = "ATM STRIKE SYNTHESIS"
 
@@ -574,6 +603,7 @@ def load_and_preprocess_options(
         "f_chain": f_chain,
         "file_age_hours": round(file_age_hours, 1),
         "is_data_stale": is_data_stale,
+        "is_benchmark_fallback": is_benchmark_fallback,
     }
     strike_above_res, _, strike_below_res, _, _, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
         df["strike"].values, spot_price, dte_days=dte_days, call_wall=call_wall, put_wall=put_wall
@@ -1258,7 +1288,7 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
         zero_gamma = float(zero_gamma)
     sigma_atm = float(meta.get("sigma_atm", 0.1724))
     dte_days = float(meta.get("dte_days", 28.0))
-    T_years = max(1e-4, dte_days / 365.0)
+    T_years = max(1.0 / 365.0, dte_days / 365.0)
     r = 0.045
     MULT = 100.0
     pdf_atm = 1.0 / math.sqrt(2.0 * math.pi)
@@ -1590,8 +1620,11 @@ def generate_html_terminal(
     # Prepare Micro-Guard & Stale Data Badges
     stale_badge_html = ""
     if meta.get("is_data_stale", False):
-        stale_badge_html = f'<span class="badge" style="background:#7F1D1D; color:#FCA5A5; border:1px solid #EF4444; font-size:10px; padding:2px 7px; border-radius:4px; font-weight:700; margin-left:6px;">⚠️ OPTIONS DATA CŨ ({meta.get("file_age_hours", 0.0):.1f}h)</span>'
+        stale_badge_html = f'<div style="margin-bottom:8px; text-align:center;"><span class="badge" style="background:#7F1D1D; color:#FCA5A5; border:1px solid #EF4444; font-size:11px; padding:3px 10px; border-radius:4px; font-weight:700;">⚠️ OPTIONS DATA CŨ ({meta.get("file_age_hours", 0.0):.1f}h) — CHUỖI OPTIONS CÓ THỂ CHƯA NẠP CÁC STRIKE MỚI</span></div>'
 
+    benchmark_badge_html = ""
+    if meta.get("is_benchmark_fallback", False):
+        benchmark_badge_html = '<div style="margin-bottom:8px; text-align:center;"><span class="badge" style="background:#7F1D1D; color:#FCA5A5; border:1px solid #EF4444; font-size:11px; padding:3px 10px; border-radius:4px; font-weight:700;">⚠️ CẢNH BÁO: DỮ LIỆU ĐANG DÙNG LÀ BENCHMARK DỰ PHÒNG (KHÔNG PHẢI LIVE REALTIME)</span></div>'
     guard_tag = " (VI MÔ)" if is_micro_guarded else ""
 
     pinning_table_html = build_microstructure_pinning_table_html(df, meta)
@@ -1673,6 +1706,8 @@ def generate_html_terminal(
 </head>
 <body>
 <div class="container">
+    {stale_badge_html}
+    {benchmark_badge_html}
     {neiro_comp['nav_topbar_html']}
     {neiro_comp['neiro_container_html']}
 

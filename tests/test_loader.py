@@ -233,4 +233,22 @@ class TestCMEOptionsResolver:
         assert res2['expiration_date'] == '2026-11-25'
         assert 'GCZ26' in res2['barchart_url']
 
+def test_resolve_safe_spot_and_atm_illiquid_never_collapses_to_edge():
+    """When all callMid and putMid are 0, _resolve_safe_spot_and_atm must anchor to spot or median, never index 0."""
+    from src.quant_engine.loader import _resolve_safe_spot_and_atm
 
+    strikes = [1350.0, 1400.0, 4000.0, 5000.0, 6000.0]
+    df = pd.DataFrame({
+        "strike": strikes,
+        "callMid": [0.0] * len(strikes),
+        "putMid": [0.0] * len(strikes),
+    })
+
+    # Case 1: spot is provided (e.g. 4010.0) -> must select 4000.0, not 1350.0
+    spot, idx = _resolve_safe_spot_and_atm(df, spot=4010.0)
+    assert df.loc[idx, "strike"] == 4000.0
+    assert spot == 4010.0
+
+    # Case 2: spot is None -> fallback to median strike (4000.0), not index 0 (1350.0)
+    spot_med, idx_med = _resolve_safe_spot_and_atm(df, spot=None)
+    assert df.loc[idx_med, "strike"] == 4000.0

@@ -111,7 +111,13 @@ def solve_black76_iv(
         f_high = b76_price(2.00) - price
         if f_low * f_high <= 0:
             sol = float(_brentq(lambda s: b76_price(s) - price, 0.02, 2.00, xtol=0.001))
-            return float(np.clip(sol, 0.03, 1.50))
+            return float(np.clip(sol, 0.035, 1.50))
+        elif f_high < 0:
+            # Market price exceeds 200% implied volatility ceiling -> clip to upper calibrated bound 1.50
+            return 1.50
+        elif f_low > 0:
+            # Market price is below 2% implied volatility floor -> clip to lower calibrated bound 0.035
+            return 0.035
     except Exception:
         pass
 

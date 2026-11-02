@@ -2,6 +2,28 @@ import calendar
 import datetime
 from typing import Any, Dict, Optional, Union
 
+try:
+    import zoneinfo
+    CHI_ZONE = zoneinfo.ZoneInfo("America/Chicago")
+except Exception:
+    CHI_ZONE = None
+
+
+def get_cme_cutoff_dt(exp: datetime.date) -> datetime.datetime:
+    """Computes the COMEX Gold Options expiration cutoff at 13:30 Chicago Time (CT).
+
+    Seamlessly adapts to both US Summer Time (CDT: 18:30 UTC) and Winter Time (CST: 19:30 UTC).
+    """
+    if CHI_ZONE is not None:
+        try:
+            exp_ct = datetime.datetime.combine(exp, datetime.time(13, 30), tzinfo=CHI_ZONE)
+            return exp_ct.astimezone(datetime.timezone.utc)
+        except Exception:
+            pass
+    # Fallback heuristic: Nov-Mar is CST (UTC-6 => 19:30 UTC), Apr-Oct is CDT (UTC-5 => 18:30 UTC)
+    utc_hour = 19 if (exp.month in (11, 12, 1, 2) or (exp.month == 3 and exp.day < 10)) else 18
+    return datetime.datetime(exp.year, exp.month, exp.day, utc_hour, 30, tzinfo=datetime.timezone.utc)
+
 from .models import OptionsSnapshot, OptionsStrike
 
 CME_OPTION_MONTH_CODES = {
@@ -52,31 +74,45 @@ def resolve_front_month_cme_option(
         target_m = ((m - 1 + offset) % 12) + 1
         target_y = y + ((m - 1 + offset) // 12)
         exp = get_cme_option_expiry_date(target_y, target_m)
-        # COMEX Gold options expiration cutoff: 13:30 CT (18:30 UTC)
-        exp_cutoff_dt = datetime.datetime.combine(exp, datetime.time(18, 30), tzinfo=datetime.timezone.utc)
+        exp_cutoff_dt = get_cme_cutoff_dt(exp)
         if exp_cutoff_dt >= now_dt:
             month_code = CME_OPTION_MONTH_CODES[target_m]
             yr_code = str(target_y)[-2:]
             opt_symbol = f"OG{month_code}{yr_code}"
-            # Barchart serves front-month monthly options under /options?futuresOptionsView=merged
-            url = f"https://www.barchart.com/futures/quotes/{underlying_futures}/options?futuresOptionsView=merged"
+            # COMEX Gold Futures primary active contract months: G(Feb), J(Apr), M(Jun), Q(Aug), V(Oct), Z(Dec)
+            fut_month = {1: 'G', 2: 'G', 3: 'J', 4: 'J', 5: 'M', 6: 'M', 7: 'Q', 8: 'Q', 9: 'V', 10: 'V', 11: 'Z', 12: 'Z'}[target_m]
+            active_underlying = f"GC{fut_month}{yr_code}"
+            # If underlying_futures is default GCZ26 but we rolled into a later contract year/month, dynamically update underlying
+            if underlying_futures == "GCZ26" and (target_y > 2026 or (target_y == 2026 and target_m != 12)):
+                underlying = active_underlying
+            else:
+                underlying = underlying_futures
+
+            url = f"https://www.barchart.com/futures/quotes/{underlying}/options?futuresOptionsView=merged"
             return {
                 "option_symbol": opt_symbol,
-                "underlying": underlying_futures,
+                "underlying": underlying,
                 "expiration_date": exp.isoformat(),
                 "contract_month": target_m,
                 "contract_year": target_y,
                 "barchart_url": url,
             }
 
-    # Ultimate fallback
+    # Ultimate dynamic fallback (never returns expired date in the past)
+    fb_m = (m % 12) + 1
+    fb_y = y + (1 if fb_m == 1 else 0)
+    fb_exp = get_cme_option_expiry_date(fb_y, fb_m)
+    fb_opt_code = CME_OPTION_MONTH_CODES[fb_m]
+    fb_yr_code = str(fb_y)[-2:]
+    fb_fut_m = {1: 'G', 2: 'G', 3: 'J', 4: 'J', 5: 'M', 6: 'M', 7: 'Q', 8: 'Q', 9: 'V', 10: 'V', 11: 'Z', 12: 'Z'}[fb_m]
+    fb_underlying = f"GC{fb_fut_m}{fb_yr_code}"
     return {
-        "option_symbol": "OGX26",
-        "underlying": underlying_futures,
-        "expiration_date": "2026-10-27",
-        "contract_month": 11,
-        "contract_year": 2026,
-        "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options?futuresOptionsView=merged",
+        "option_symbol": f"OG{fb_opt_code}{fb_yr_code}",
+        "underlying": fb_underlying,
+        "expiration_date": fb_exp.isoformat(),
+        "contract_month": fb_m,
+        "contract_year": fb_y,
+        "barchart_url": f"https://www.barchart.com/futures/quotes/{fb_underlying}/options?futuresOptionsView=merged",
     }
 
 
@@ -112,7 +148,7 @@ def resolve_active_expirations(
     # COMEX Gold options expiration cutoff: 13:30 CT (18:30 UTC)
     while fridays_found < weekly_count:
         if curr.weekday() == 4:  # Friday
-            cutoff_dt = datetime.datetime.combine(curr, datetime.time(18, 30), tzinfo=datetime.timezone.utc)
+            cutoff_dt = get_cme_cutoff_dt(curr)
             if cutoff_dt >= now_dt:
                 day = curr.day
                 week_num = min(5, (day - 1) // 7 + 1)
@@ -196,8 +232,15 @@ def compute_dynamic_dte(
 
 
 
-def find_atm_strike(snapshot: OptionsSnapshot) -> OptionsStrike:
-    """Find the ATM strike where |Call_mid - Put_mid| is smallest (preferring liquid strikes)."""
+def find_atm_strike(
+    snapshot: OptionsSnapshot,
+    spot_price: Optional[float] = None,
+) -> OptionsStrike:
+    """Find the ATM strike where |Call_mid - Put_mid| is smallest (preferring liquid strikes).
+
+    If two-sided market quotes are absent (e.g. illiquid off-hours / weekend), anchors to spot_price
+    or median strike to prevent choosing unquoted deep OTM strikes (e.g. $1,350).
+    """
     if not snapshot.strikes:
         raise ValueError("Empty options chain")
 
@@ -207,22 +250,41 @@ def find_atm_strike(snapshot: OptionsSnapshot) -> OptionsStrike:
         if (s.call_bid > 0 and s.call_ask > 0 and s.put_bid > 0 and s.put_ask > 0)
         or (s.call_mid > 0 and s.put_mid > 0)
     ]
-    candidates = liquid if liquid else list(snapshot.strikes)
-    return min(candidates, key=lambda s: abs(s.call_mid - s.put_mid))
+    if liquid:
+        return min(liquid, key=lambda s: abs(s.call_mid - s.put_mid))
+
+    # Illiquid / off-hours fallback anchored to spot price:
+    if spot_price is not None and spot_price > 0:
+        return min(snapshot.strikes, key=lambda s: abs(s.strike - spot_price))
+
+    # Quoted strikes fallback
+    quoted = [s for s in snapshot.strikes if (s.call_mid > 0 or s.put_mid > 0)]
+    if quoted:
+        return min(quoted, key=lambda s: abs(s.call_mid - s.put_mid))
+
+    # Pure fallback to median strike (guarantees reasonable strike selection)
+    median_k = snapshot.strikes[len(snapshot.strikes) // 2].strike
+    return min(snapshot.strikes, key=lambda s: abs(s.strike - median_k))
 
 
-def synthetic_atm_pivot(snapshot: OptionsSnapshot) -> float:
+def synthetic_atm_pivot(
+    snapshot: OptionsSnapshot,
+    spot_price: Optional[float] = None,
+) -> float:
     """Compute Implied Underlying via Put-Call Parity.
 
     S_Implied = K_ATM + Call_mid - Put_mid
     """
-    atm = find_atm_strike(snapshot)
+    atm = find_atm_strike(snapshot, spot_price=spot_price)
     return atm.strike + atm.call_mid - atm.put_mid
 
 
-def implied_straddle(snapshot: OptionsSnapshot) -> float:
+def implied_straddle(
+    snapshot: OptionsSnapshot,
+    spot_price: Optional[float] = None,
+) -> float:
     """Compute ATM Straddle = Call_mid(ATM) + Put_mid(ATM)."""
-    atm = find_atm_strike(snapshot)
+    atm = find_atm_strike(snapshot, spot_price=spot_price)
     return atm.call_mid + atm.put_mid
 
 
