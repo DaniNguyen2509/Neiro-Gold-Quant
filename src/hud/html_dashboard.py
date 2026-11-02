@@ -1473,13 +1473,28 @@ def generate_html_terminal(
     has_up_air_pocket = len(up_pockets) > 0 or (abs(major_up_wall - strike_above) > step * 1.5)
 
     # Prepare Air Pockets & Wall Siege Ratios for All-in-One Orderflow Canvas
+    # Scan both immediately adjacent pockets and structural pockets below Put Wall / above Call Wall
+    down_beyond = detect_strike_air_pockets(df, major_down_wall - 80.0, major_down_wall, threshold_ratio=0.40)
+    up_beyond = detect_strike_air_pockets(df, major_up_wall, min(major_up_wall + 80.0, call_wall), threshold_ratio=0.40)
+
+    all_raw_pockets = down_pockets + down_beyond + up_pockets + up_beyond
     all_air_pockets = []
-    for p in (down_pockets + up_pockets):
-        all_air_pockets.append({
-            "from": getattr(p, "from_strike", 0.0),
-            "to": getattr(p, "to_strike", 0.0),
-            "severity": str(getattr(p, "severity", "MEDIUM")),
-        })
+    seen_zones = set()
+    for p in all_raw_pockets:
+        p_from = float(getattr(p, "start_strike", getattr(p, "low_strike", getattr(p, "from_strike", 0.0))))
+        p_to = float(getattr(p, "end_strike", getattr(p, "high_strike", getattr(p, "to_strike", 0.0))))
+        gap = abs(p_to - p_from)
+        zone_key = (round(min(p_from, p_to), 1), round(max(p_from, p_to), 1))
+        if gap >= 5.0 and zone_key not in seen_zones:
+            seen_zones.add(zone_key)
+            avg_oi = float(getattr(p, "avg_oi", 0.0))
+            all_air_pockets.append({
+                "from": min(p_from, p_to),
+                "to": max(p_from, p_to),
+                "avg_oi": avg_oi,
+                "gap": gap,
+                "severity": "HIGH" if avg_oi < 150.0 else "MEDIUM",
+            })
     meta["air_pockets"] = all_air_pockets
     meta["call_wall_siege"] = call_wall_siege
     meta["put_wall_siege"] = put_wall_siege

@@ -562,11 +562,56 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         neiroChart.timeScale().subscribeVisibleTimeRangeChange(() => drawNeiroOverlay());
         neiroChart.timeScale().subscribeVisibleLogicalRangeChange(() => drawNeiroOverlay());
 
+        if (canvas) {{
+            canvas.addEventListener('mousemove', (e) => {{
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                const rightX = canvas.width - 70;
+                const panelW = 4 * 68 + 8;
+                const panelX = rightX - panelW;
+                if (mx >= panelX - 4 && mx <= rightX) {{
+                    const opts = window.INITIAL_OPTIONS || [];
+                    let closest = null;
+                    let minDist = 16;
+                    let closestY = null;
+                    opts.forEach(o => {{
+                        const y = candleSeries.priceToCoordinate(o.strike);
+                        if (y !== null) {{
+                            const d = Math.abs(y - my);
+                            if (d < minDist) {{
+                                minDist = d;
+                                closest = o;
+                                closestY = y;
+                            }}
+                        }}
+                    }});
+                    hoveredOption = closest;
+                    hoveredY = closestY;
+                }} else {{
+                    hoveredOption = null;
+                    hoveredY = null;
+                }}
+                drawNeiroOverlay();
+            }});
+            canvas.addEventListener('mouseleave', () => {{
+                hoveredOption = null;
+                hoveredY = null;
+                drawNeiroOverlay();
+            }});
+        }}
+        neiroChart.subscribeCrosshairMove(() => {{
+            drawNeiroOverlay();
+        }});
+
         handleResize();
     }}
 
+    let hoveredOption = null;
+    let hoveredY = null;
+
     // ----------------------------------------------------------------------------
-    // Canvas Overlay Engine: Cloned 1:1 from Neiro-NQ-Quant with 4-Column Greeks
+    // Canvas Overlay Engine: Standardized 4-Column Greeks & Air Pocket Matrix
     // ----------------------------------------------------------------------------
     function drawNeiroOverlay() {{
         const canvas = document.getElementById('neiro-canvas');
@@ -578,8 +623,25 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         const m = window.INITIAL_META;
         const rightX = w - 70;
+        const colW = 68;
+        const cols = [
+            {{ key: 'currentNetGEX',  name: 'GEX',   unit: 'M',   pos: '#10B981', neg: '#EF4444', bPos: '#34D399', bNeg: '#F87171' }},
+            {{ key: 'currentNetVEX',  name: 'VEX',   unit: 'M',   pos: '#06B6D4', neg: '#0284C7', bPos: '#22D3EE', bNeg: '#38BDF8' }},
+            {{ key: 'currentNetCHEX', name: 'CHEX',  unit: 'M/d', pos: '#A855F7', neg: '#7E22CE', bPos: '#C084FC', bNeg: '#D8B4FE' }},
+            {{ key: 'currentNetTEX',  name: 'THETA', unit: 'M/d', pos: '#F59E0B', neg: '#D97706', bPos: '#FBBF24', bNeg: '#FCD34D' }},
+        ];
+        const panelW = cols.length * colW + 8;
+        const panelX = rightX - panelW;
+        const chartW = panelX - 6;
 
-        // 1. Draw Air Pocket Vacuum Zones
+        // 1. Right Greeks Panel Background
+        ctx.fillStyle = 'rgba(5, 7, 11, 0.82)';
+        ctx.fillRect(panelX - 4, 0, panelW, h);
+        ctx.strokeStyle = 'rgba(30, 41, 59, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX - 4, 0, panelW, h);
+
+        // 2. Draw Air Pocket Vacuum Zones (Both Main Chart Canvas and Right Greeks Panel)
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
             const pFrom = parseFloat(ap.from || 0);
@@ -590,25 +652,49 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             if (y1 !== null && y2 !== null) {{
                 const topY = Math.min(y1, y2);
                 const botY = Math.max(y1, y2);
-                const bandH = Math.max(12, botY - topY);
+                const bandH = Math.max(14, botY - topY);
                 if (topY <= h && botY >= 0) {{
+                    // A. Main Chart Canvas Area:
                     ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-                    ctx.fillRect(0, topY, rightX, bandH);
+                    ctx.fillRect(0, topY, chartW, bandH);
                     ctx.strokeStyle = '#F59E0B';
                     ctx.setLineDash([4, 4]);
                     ctx.lineWidth = 1;
-                    ctx.strokeRect(0, topY, rightX, bandH);
+                    ctx.strokeRect(0, topY, chartW, bandH);
                     ctx.setLineDash([]);
 
                     ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
                     ctx.textAlign = 'left';
                     ctx.fillStyle = '#FACC15';
-                    ctx.fillText('⚠️ AIR POCKET VACUUM [$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + '] · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)', 20, topY + 13);
+                    ctx.fillText('⚠️ AIR POCKET VACUUM [$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + '] · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)', 20, topY + Math.min(bandH - 3, 13));
+
+                    // B. Right Greeks / Orderflow Panel Area (User requested: highlight right profile):
+                    ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+                    ctx.fillRect(panelX - 4, topY, panelW, bandH);
+                    ctx.strokeStyle = '#F59E0B';
+                    ctx.setLineDash([3, 3]);
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(panelX - 4, topY, panelW, bandH);
+                    ctx.setLineDash([]);
+
+                    // Amber caution badge inside right panel
+                    const bW = Math.min(panelW - 14, 210);
+                    const bX = panelX + (panelW - bW) / 2 - 4;
+                    const bY = topY + Math.max(1, (bandH - 15) / 2);
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+                    ctx.fillRect(bX, bY, bW, 15);
+                    ctx.strokeStyle = '#F59E0B';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(bX, bY, bW, 15);
+                    ctx.fillStyle = '#FDE047';
+                    ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('⚠️ AIR POCKET [CẤM ĐỠ] $' + Math.min(pFrom, pTo).toFixed(0) + '-' + Math.max(pFrom, pTo).toFixed(0), bX + bW / 2, bY + 11);
                 }}
             }}
         }});
 
-        // 2. Key Quant Options Levels: Call/Put Wall, Gamma Flip, Squeeze, Vanna, Charm
+        // 3. Key Quant Options Levels: Call/Put Wall, Gamma Flip, Squeeze, Vanna, Charm
         const keyLevels = [
             {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
@@ -636,12 +722,12 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 ctx.textAlign = 'right';
                 const tw = ctx.measureText(L.txt).width;
                 ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
-                ctx.fillRect(rightX - tw - 14, y - 12, tw + 10, 14);
+                ctx.fillRect(chartW - tw - 14, y - 12, tw + 10, 14);
                 ctx.strokeStyle = L.c;
                 ctx.lineWidth = 1;
-                ctx.strokeRect(rightX - tw - 14, y - 12, tw + 10, 14);
+                ctx.strokeRect(chartW - tw - 14, y - 12, tw + 10, 14);
                 ctx.fillStyle = L.c;
-                ctx.fillText(L.txt, rightX - 9, y - 2);
+                ctx.fillText(L.txt, chartW - 9, y - 2);
             }} else if (y !== null && y < 0) {{
                 // Pinned Top Edge Indicator
                 const edgeY = 14;
@@ -650,12 +736,12 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 const shortTxt = '▲ ' + L.txt.split('·')[0];
                 const tw = ctx.measureText(shortTxt).width;
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                ctx.fillRect(rightX - tw - 14, edgeY - 11, tw + 10, 14);
+                ctx.fillRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
                 ctx.strokeStyle = L.c;
                 ctx.lineWidth = 1;
-                ctx.strokeRect(rightX - tw - 14, edgeY - 11, tw + 10, 14);
+                ctx.strokeRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
                 ctx.fillStyle = L.c;
-                ctx.fillText(shortTxt, rightX - 9, edgeY);
+                ctx.fillText(shortTxt, chartW - 9, edgeY);
             }} else if (y !== null && y > h) {{
                 // Pinned Bottom Edge Indicator
                 const edgeY = h - 8;
@@ -664,48 +750,115 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 const shortTxt = '▼ ' + L.txt.split('·')[0];
                 const tw = ctx.measureText(shortTxt).width;
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                ctx.fillRect(rightX - tw - 14, edgeY - 11, tw + 10, 14);
+                ctx.fillRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
                 ctx.strokeStyle = L.c;
                 ctx.lineWidth = 1;
-                ctx.strokeRect(rightX - tw - 14, edgeY - 11, tw + 10, 14);
+                ctx.strokeRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
                 ctx.fillStyle = L.c;
-                ctx.fillText(shortTxt, rightX - 9, edgeY);
+                ctx.fillText(shortTxt, chartW - 9, edgeY);
             }}
         }});
 
-        // 3. Per-strike Greeks exposure profile (GEX | VEX | CHEX | THETA)
-        // Standardized 1:1 against Neiro-NQ-Quant architecture
+        // 4. Per-strike Greeks exposure profile (GEX | VEX | CHEX | THETA)
         const opts = window.INITIAL_OPTIONS || [];
         if (opts.length && opts[0].currentNetGEX !== undefined) {{
-            const cols = [
-                {{ key: 'currentNetGEX',  name: 'GEX',   pos: '#22C55E', neg: '#EF4444' }},
-                {{ key: 'currentNetVEX',  name: 'VEX',   pos: '#22D3EE', neg: '#0E7490' }},
-                {{ key: 'currentNetCHEX', name: 'CHEX',  pos: '#C084FC', neg: '#7E22CE' }},
-                {{ key: 'currentNetTEX',  name: 'THETA', pos: '#FDBA74', neg: '#EA580C' }},
-            ];
-            const colW = 60;
-            const panelX = rightX - cols.length * colW - 8;
-            ctx.fillStyle = 'rgba(5, 7, 11, 0.72)';
-            ctx.fillRect(panelX - 4, 0, cols.length * colW + 8, h);
             cols.forEach((c, ci) => {{
                 const cx = panelX + ci * colW + colW / 2;
-                let maxAbs = 1e-9;
-                opts.forEach(o => {{ maxAbs = Math.max(maxAbs, Math.abs(o[c.key] || 0)); }});
-                ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
-                ctx.beginPath(); ctx.moveTo(cx, 18); ctx.lineTo(cx, h); ctx.stroke();
-                ctx.fillStyle = '#94A3B8';
+                
+                // Dynamic Visible Normalization
+                let visibleMaxAbs = 1e-9;
+                let globalMaxAbs = 1e-9;
+                opts.forEach(o => {{
+                    const val = Math.abs(o[c.key] || 0);
+                    globalMaxAbs = Math.max(globalMaxAbs, val);
+                    const y = candleSeries.priceToCoordinate(o.strike);
+                    if (y !== null && y >= 28 && y <= h - 4) {{
+                        visibleMaxAbs = Math.max(visibleMaxAbs, val);
+                    }}
+                }});
+                if (visibleMaxAbs < 1e-6) visibleMaxAbs = globalMaxAbs > 1e-6 ? globalMaxAbs : 1.0;
+
+                // Center divider line
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                ctx.beginPath();
+                ctx.moveTo(cx, 26);
+                ctx.lineTo(cx, h);
+                ctx.stroke();
+
+                // Column Header: Name
+                ctx.fillStyle = c.name === 'VEX' ? '#22D3EE' : (c.name === 'CHEX' ? '#C084FC' : (c.name === 'GEX' ? '#34D399' : '#FBBF24'));
                 ctx.font = 'bold 10px "JetBrains Mono", monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText(c.name, cx, 12);
+
+                // Column Subheader: Visible Magnitude Scale (e.g. ±2.8M or ±1.1M/d)
+                const scaleTxt = '±' + (visibleMaxAbs >= 10 ? visibleMaxAbs.toFixed(0) : (visibleMaxAbs >= 1 ? visibleMaxAbs.toFixed(1) : visibleMaxAbs.toFixed(2))) + c.unit;
+                ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+                ctx.font = '8px "JetBrains Mono", monospace';
+                ctx.fillText(scaleTxt, cx, 22);
+
+                // Render Per-Strike Bars with Square-Root / Sublinear Boost
+                const maxBarW = colW / 2 - 3;
                 opts.forEach(o => {{
                     const y = candleSeries.priceToCoordinate(o.strike);
                     const v = o[c.key] || 0;
-                    if (y === null || y < 18 || y > h - 4 || v === 0) return;
-                    const len = (Math.abs(v) / maxAbs) * (colW / 2 - 4);
+                    if (y === null || y < 28 || y > h - 4 || v === 0) return;
+                    
+                    // Square-root boost: makes small VEX and CHEX clearly visible without blowing out
+                    const norm = Math.min(1.0, Math.abs(v) / visibleMaxAbs);
+                    const scaled = Math.pow(norm, 0.50);
+                    let len = scaled * maxBarW;
+                    if (Math.abs(v) > 0.0001) len = Math.max(3.5, len);
+
+                    const barX = v >= 0 ? cx : cx - len;
+                    const barH = 6;
                     ctx.fillStyle = v >= 0 ? c.pos : c.neg;
-                    ctx.fillRect(v >= 0 ? cx : cx - len, y - 2.5, len, 5);
+                    ctx.fillRect(barX, y - barH / 2, len, barH);
+                    ctx.strokeStyle = v >= 0 ? c.bPos : c.bNeg;
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeRect(barX, y - barH / 2, len, barH);
                 }});
             }});
+        }}
+
+        // 5. Interactive Tooltip when hovering over Greeks panel
+        if (hoveredOption && hoveredY !== null && hoveredY >= 28 && hoveredY <= h - 4) {{
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
+            ctx.setLineDash([2, 2]);
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(panelX - 4, hoveredY);
+            ctx.lineTo(rightX, hoveredY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const ttLines = [
+                'Strike $' + hoveredOption.strike.toFixed(0),
+                'GEX: ' + (hoveredOption.currentNetGEX >= 0 ? '+' : '') + hoveredOption.currentNetGEX.toFixed(1) + 'M',
+                'VEX: ' + (hoveredOption.currentNetVEX >= 0 ? '+' : '') + hoveredOption.currentNetVEX.toFixed(2) + 'M',
+                'CHEX: ' + (hoveredOption.currentNetCHEX >= 0 ? '+' : '') + hoveredOption.currentNetCHEX.toFixed(2) + 'M/d',
+            ];
+            const ttW = 120;
+            const ttH = 62;
+            const ttX = Math.max(10, panelX - ttW - 8);
+            const ttY = Math.min(h - ttH - 10, Math.max(10, hoveredY - ttH / 2));
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+            ctx.fillRect(ttX, ttY, ttW, ttH);
+            ctx.strokeStyle = '#38BDF8';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(ttX, ttY, ttW, ttH);
+
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
+            ctx.fillStyle = '#F8FAFC';
+            ctx.fillText(ttLines[0], ttX + 6, ttY + 13);
+            ctx.font = '8.5px "JetBrains Mono", monospace';
+            ctx.fillStyle = hoveredOption.currentNetGEX >= 0 ? '#4ADE80' : '#F87171';
+            ctx.fillText(ttLines[1], ttX + 6, ttY + 27);
+            ctx.fillStyle = '#22D3EE';
+            ctx.fillText(ttLines[2], ttX + 6, ttY + 41);
+            ctx.fillStyle = '#C084FC';
+            ctx.fillText(ttLines[3], ttX + 6, ttY + 55);
         }}
     }}
 
