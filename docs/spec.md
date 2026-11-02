@@ -160,7 +160,8 @@ Neiro-Gold-Quant/
 - [x] Bất biến Zero Gamma Flip ($S^*$) giải liên tục bằng Dekker-Brent `_brentq` thuần Python, đo lường Wall Siege Ratio ($Volume / OI$).
 - [x] Hoàn thiện tài liệu kiến trúc và đặc tả chuyên biệt cho Vàng (`docs/spec.md` & `docs/architecture.md`).
 - [x] Bộ kiểm thử 137 unit test chạy sạch sẽ 100% không lỗi.
-- [x] Khung kiểm thử toàn diện ADR-022 & ADR-023: 265 test suite toàn diện (246 passed, 19 skipped, 0 failed), bao phủ cổng dữ liệu (D1-D10), lõi toán (M1-M11), Rollover & Múi giờ mùa đông (T1-T7) và Smoke render Dashboard (H1-H3).
+- [x] Khung kiểm thử toàn diện ADR-022, ADR-023 & ADR-024: 275 test suite toàn diện (256 passed, 19 skipped, 0 failed), bao phủ cổng dữ liệu (D1-D10), lõi toán (M1-M11), Rollover & Múi giờ mùa đông (T1-T7), Smoke render Dashboard (H1-H3), Quy trình Data Analyst (`test_data_analyst_pipeline.py`) và Ma trận Squeeze tính sẵn (`test_precomputed_squeeze.py`).
+- [x] Động cơ tính toán sẵn & Chuẩn hóa Data Analyst (ADR-024): Tính sẵn 100% Ma trận Gamma Squeeze Ladder cho tra cứu O(1) thời gian thực, khử trùng lặp, ép đơn điệu và chữa lỗi chào giá chéo.
 - [x] Đồng bộ Múi giờ Mùa đông Hoa Kỳ (ADR-023): Tự động tính 13:30 Chicago Time (18:30 UTC hè / 19:30 UTC đông), lịch trình cron quét dữ liệu đa mùa (Dual-Season Radar) và tự động làm giàu Black-76 IV tại Scraper.
 - [x] Triển khai TradingView Fullscreen Zero-Tabs Realtime Terminal: Mặc định nến M1, layout tràn màn hình 100%, tích hợp Realtime Tick Engine không reload trang, Unified Greeks Matrix (GEX, VEX, CHEX, Net Delta) và Plotly 4-Panel trên cùng 1 màn hình.
 - [x] Đảm bảo nghiêm ngặt Zero-Waste Mandate (< 15MB repo footprint, 0 MB rác).

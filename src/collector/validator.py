@@ -80,3 +80,70 @@ def validate_options_frame(
 
     return ValidationResult(ok=len(errors) == 0, errors=errors)
 
+def clean_and_sanitize_options_dataset(
+    df: pd.DataFrame,
+    reference_price: float | None = 4000.0,
+) -> pd.DataFrame:
+    """Rigorous Data Analyst cleaning & normalization pipeline for CME Options datasets.
+
+    Enforces data purity before quant calculations:
+    1. Strips leading/trailing whitespaces from all column headers.
+    2. Removes duplicate strikes (keeps first occurrence).
+    3. Coerces numeric columns using clean_val (stripping currency, commas, formula errors).
+    4. Drops null, NaN, and negative strike rows; filters realistic Gold band [1000, 10000].
+    5. Enforces strict ascending monotonicity (sorted by strike).
+    6. Verifies spread integrity: when both bid and ask > 0, ensures ask >= bid (swaps crossed quotes).
+    7. Clamps open interest, volume, and IV to non-negative bounds.
+    """
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+
+    clean_df = df.copy()
+
+    # 1. Clean column headers
+    clean_df.columns = [str(c).strip() for c in clean_df.columns]
+
+    if clean_df.empty or "strike" not in clean_df.columns:
+        return clean_df
+
+    # 2. Sanitize strike column
+    from src.quant_engine.loader import clean_val
+    clean_df["strike"] = clean_df["strike"].apply(clean_val)
+    clean_df = clean_df[clean_df["strike"] > 0]
+    clean_df = clean_df[(clean_df["strike"] >= 1000.0) & (clean_df["strike"] <= 10000.0)]
+
+    # 3. Deduplicate strikes
+    clean_df = clean_df.drop_duplicates(subset=["strike"], keep="first")
+
+    # 4. Strict ascending sorting (monotonicity)
+    clean_df = clean_df.sort_values("strike").reset_index(drop=True)
+
+    # 5. Sanitize numeric columns
+    numeric_cols = [
+        "callOpenInterest", "putOpenInterest", "callVolume", "putVolume",
+        "callBid", "callAsk", "callMid", "callLatest", "callIV", "callGamma",
+        "putBid", "putAsk", "putMid", "putLatest", "putIV", "putGamma",
+        "callGEX", "putGEX", "netGEX", "callVEX", "putVEX", "netVEX",
+        "callCHEX", "putCHEX", "netCHEX",
+    ]
+    for col in numeric_cols:
+        if col in clean_df.columns:
+            clean_df[col] = clean_df[col].apply(clean_val)
+
+    # 6. Spread sanity (Ask >= Bid)
+    if "callBid" in clean_df.columns and "callAsk" in clean_df.columns:
+        crossed_call = (clean_df["callBid"] > 0) & (clean_df["callAsk"] > 0) & (clean_df["callAsk"] < clean_df["callBid"])
+        if crossed_call.any():
+            clean_df.loc[crossed_call, ["callBid", "callAsk"]] = clean_df.loc[crossed_call, ["callAsk", "callBid"]].values
+
+    if "putBid" in clean_df.columns and "putAsk" in clean_df.columns:
+        crossed_put = (clean_df["putBid"] > 0) & (clean_df["putAsk"] > 0) & (clean_df["putAsk"] < clean_df["putBid"])
+        if crossed_put.any():
+            clean_df.loc[crossed_put, ["putBid", "putAsk"]] = clean_df.loc[crossed_put, ["putAsk", "putBid"]].values
+
+    # 7. Clamp non-negative bounds for volumes and OIs
+    for non_neg in ["callOpenInterest", "putOpenInterest", "callVolume", "putVolume", "callIV", "putIV"]:
+        if non_neg in clean_df.columns:
+            clean_df[non_neg] = clean_df[non_neg].clip(lower=0.0)
+
+    return clean_df

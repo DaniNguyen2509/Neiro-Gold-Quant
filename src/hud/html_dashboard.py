@@ -182,6 +182,10 @@ def load_and_preprocess_options(
             except Exception:
                 pass
 
+    # Data Analyst cleaning & sanitization pipeline
+    from src.collector.validator import clean_and_sanitize_options_dataset
+    df_raw = clean_and_sanitize_options_dataset(df_raw)
+
     # Normalize column names
     col_clean = {c: c.strip() for c in df_raw.columns}
     df_raw.rename(columns=col_clean, inplace=True)
@@ -196,7 +200,10 @@ def load_and_preprocess_options(
         else:
             df_raw[col] = df_raw[col].apply(clean_val)
 
-    df_raw["strike"] = df_raw["strike"].apply(clean_val)
+    if "strike" in df_raw.columns:
+        df_raw["strike"] = df_raw["strike"].apply(clean_val)
+    else:
+        df_raw["strike"] = pd.Series(dtype=float)
     df = df_raw[df_raw["strike"] > 0].sort_values("strike").reset_index(drop=True)
     is_benchmark_fallback = False
     if df.empty:
@@ -611,6 +618,16 @@ def load_and_preprocess_options(
     meta["strike_above"] = strike_above_res
     meta["strike_below"] = strike_below_res
     meta["is_micro_guarded"] = is_micro_guarded_res
+
+    # Pre-computed Squeeze Ladder for O(1) realtime execution
+    from src.quant_engine.strategy import precompute_squeeze_ladder
+    net_gex_map = dict(zip(df["strike"], df.get("netGEX", [0.0] * len(df))))
+    meta["squeeze_ladder"] = precompute_squeeze_ladder(
+        df["strike"].values,
+        call_wall=call_wall,
+        put_wall=put_wall,
+        net_gex_by_strike=net_gex_map,
+    )
     return df, meta
 
 

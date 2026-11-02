@@ -560,6 +560,116 @@ def generate_signals(snapshot: MarketSnapshot) -> Dict[str, object]:
     }
 
 
+
+
+@dataclass(frozen=True, slots=True)
+class PrecomputedSqueezeLevel:
+    strike: float
+    squeeze_trigger: float
+    squeeze_tp: float
+    squeeze_sl: float
+    waterfall_trigger: float
+    waterfall_tp: float
+    waterfall_sl: float
+    regime: str
+    is_call_wall: bool
+    is_put_wall: bool
+
+
+def precompute_squeeze_ladder(
+    strikes: list[float] | np.ndarray,
+    call_wall: float = 0.0,
+    put_wall: float = 0.0,
+    net_gex_by_strike: dict[float, float] | None = None,
+    air_pockets: list[dict[str, Any]] | tuple | None = None,
+) -> dict[float, PrecomputedSqueezeLevel]:
+    """Pre-computes invariant Squeeze triggers and targets across all strikes.
+
+    Since Open Interest (OI) profile and strike steps are static during the trading session,
+    the squeeze triggers and TP destinations are invariant and pre-computable.
+    """
+    sorted_k = sorted(list(set(float(k) for k in strikes if k > 0)))
+    if not sorted_k:
+        return {}
+
+    gex_map = net_gex_by_strike or {}
+    pocket_ranges = []
+    if air_pockets:
+        for p in air_pockets:
+            if isinstance(p, dict):
+                pocket_ranges.append((p.get("from", 0.0), p.get("to", 0.0)))
+            elif hasattr(p, "start_strike") and hasattr(p, "end_strike"):
+                pocket_ranges.append((p.start_strike, p.end_strike))
+
+    ladder: dict[float, PrecomputedSqueezeLevel] = {}
+    n = len(sorted_k)
+
+    for i, k in enumerate(sorted_k):
+        next_k = sorted_k[i + 1] if i + 1 < n else k + 25.0
+        prev_k = sorted_k[i - 1] if i - 1 >= 0 else k - 25.0
+
+        step_up = next_k - k
+        step_down = k - prev_k
+        buf_up = min(step_up * 0.10, 2.50) if step_up > 0 else 2.50
+        buf_down = min(step_down * 0.10, 2.50) if step_down > 0 else 2.50
+
+        sq_trig = round(k + buf_up + 0.50, 2)
+        sq_sl = round(k - 1.50, 2)
+
+        tp_target = next_k - 1.00
+        for p_from, p_to in pocket_ranges:
+            if p_from <= next_k <= p_to:
+                tp_target = max(tp_target, p_to)
+                break
+        sq_tp = round(max(sq_trig + 2.00, tp_target), 2)
+
+        wf_trig = round(k - buf_down - 0.50, 2)
+        wf_sl = round(k + 1.50, 2)
+
+        wf_target = prev_k + 1.00
+        for p_from, p_to in pocket_ranges:
+            if p_from <= prev_k <= p_to:
+                wf_target = min(wf_target, p_from)
+                break
+        wf_tp = round(min(wf_trig - 2.00, wf_target), 2)
+
+        k_gex = gex_map.get(k, 0.0)
+        regime = "SHORT_GAMMA_ACCELERATOR" if k_gex < -1.0 else ("LONG_GAMMA_DAMPER" if k_gex > 1.0 else "NEUTRAL")
+
+        ladder[k] = PrecomputedSqueezeLevel(
+            strike=k,
+            squeeze_trigger=sq_trig,
+            squeeze_tp=sq_tp,
+            squeeze_sl=sq_sl,
+            waterfall_trigger=wf_trig,
+            waterfall_tp=wf_tp,
+            waterfall_sl=wf_sl,
+            regime=regime,
+            is_call_wall=bool(abs(k - call_wall) < 1.0),
+            is_put_wall=bool(abs(k - put_wall) < 1.0),
+        )
+
+    return ladder
+
+
+def lookup_precomputed_squeeze(
+    ladder: dict[float, PrecomputedSqueezeLevel],
+    spot: float,
+) -> tuple[PrecomputedSqueezeLevel | None, PrecomputedSqueezeLevel | None]:
+    """O(1) / fast bisect lookup of immediate strike above and below spot from precomputed ladder."""
+    if not ladder:
+        return None, None
+
+    sorted_k = sorted(ladder.keys())
+    import bisect
+    idx = bisect.bisect_right(sorted_k, spot)
+
+    level_below = ladder[sorted_k[idx - 1]] if idx > 0 else ladder[sorted_k[0]]
+    level_above = ladder[sorted_k[idx]] if idx < len(sorted_k) else ladder[sorted_k[-1]]
+
+    return level_above, level_below
+
+
 # ==============================================================================
 # SELF-TEST (run: python -m src.quant_engine.strategy)
 # ==============================================================================
