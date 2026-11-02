@@ -78,9 +78,10 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 │  │ KHỐI 1: TRADINGVIEW FULLSCREEN CANVAS 60 FPS (LIGHTWEIGHT CHARTS 4.2)                 │ │
 │  │  - Mặc định M1 nến 1 phút liên tục CME GC=F, Topbar Live Badge, Multiplier $100.0/oz  │ │
 │  │  - Floating Tactical HUD Card góc trên bên trái (GEX, SQZ, VEX, CHEX, TEX, 1-σ)       │ │
-│  │  - 4 Cột Profile Greeks trên Canvas: GEX | VEX | CHEX | THETA bám chặt trục giá nến   │ │
+│  │  - 4 Cột Profile Greeks (ADR-021): Dynamic Visible Normalization & Sublinear Boost     │ │
+│  │  - Cross-Canvas Air Pocket Matrix: Dải chân không quét xuyên suốt nến & cột Greeks     │ │
+│  │  - Interactive Greeks Tooltip: Rê chuột xem chi tiết Strike, GEX, VEX, CHEX           │ │
 │  │  - Pinned Edge Indicators: ▲ CALL WALL trên đỉnh, ▼ PUT WALL dưới đáy                 │ │
-│  │  - Air Pocket Vacuum Zones, Realtime Tick Line, Subbar Live Greeks Radar              │ │
 │  ├───────────────────────────────────────────────────────────────────────────────────────┤ │
 │  │ KHỐI 2: UNIFIED GREEKS & ORDERFLOW PINNING MATRIX (FULL-BLEED 100% WIDTH)             │ │
 │  │  - Hợp nhất toàn bộ: Net GEX ($M), Net VEX ($M/1%), Net CHEX ($M/d), Net Delta, OI, Vol│ │
@@ -225,3 +226,23 @@ on:
    - **Màu sắc TradingView chuẩn:** Nến tăng Xanh lá (#22C55E) và nến giảm Đỏ tươi (#EF4444) với viền và râu đồng màu, tối ưu độ tương phản trên nền đen sâu #000000.
    - **Khử nhiễu CME Settlement Fix:** Bộ lọc asis.py tự động nhận diện và gọt bỏ hiện tượng Yahoo Finance chèn giá chốt ngày ,898.90 vào cây nến 1 phút cuối (gây ra cây nến râu dài 14 USD dị thường). Thân nến M1 được giữ nguyên giá khớp thực tế (~,885.50), trong khi mốc thanh toán ,898.90 được biểu diễn qua đường ngang livePriceLine (F0 LIVE / CME SETTLE).
    - **Độ sâu nến lịch sử:** Mở rộng lên 400 nến M1 liên tục, cho phép trader cuộn xem trọn vẹn diễn biến phiên giao dịch.
+
+
+---
+
+## VIII. TÍCH HỢP XUYÊN SUỐT AIR POCKET MATRIX & DYNAMIC VISIBLE GREEKS NORMALIZATION (ADR-021)
+
+1. **Khắc phục điểm mù Vanna/Charm quá nhỏ (Dynamic Visible Normalization & Sublinear Boost):**
+   - Loại bỏ cơ chế chuẩn hóa toàn cầu theo cực đại toàn chuỗi (`globalMaxAbs = 26M`), vốn làm tê liệt các mốc Vanna/Charm quanh vùng ATM (chỉ rộng ~0.02 pixel).
+   - Áp dụng **Dynamic Visible Normalization**: Chỉ chuẩn hóa theo cực trị của các Strike đang hiển thị trong viewport hiện tại (`visibleMaxAbs`).
+   - Kết hợp **Perceptual Sublinear Scaling**: $	ext{scaled} = (|v| / 	ext{visibleMaxAbs})^{0.50}$ và ép `minLen = 3.5px`, giúp các thanh bar VEX và CHEX luôn bung đều, đậm nét và có viền tương phản cao.
+   - Bổ sung chỉ số biên độ thang đo động dưới tiêu đề cột (ví dụ: `VEX: ±2.8M`, `CHEX: ±1.1M/d`).
+
+2. **Cross-Canvas Air Pocket Matrix (Tích hợp túi chân không vào cột Greeks):**
+   - Sửa lỗi đa hình dataclass (`start_strike`/`end_strike`) trong pipeline Python, mở rộng quét túi chân không cấu trúc tầng sâu bên dưới Put Wall ($3,880 - $3,900) và tầng trên Call Wall.
+   - Dải cảnh báo chân không quét xuyên suốt từ biểu đồ nến sang tận mép ngoài của 4 cột Greeks bên phải:
+     * Nền cảnh báo hổ phách trong suốt `rgba(245, 158, 11, 0.22)` kèm viền nét đứt vàng cam.
+     * Hiển thị trực tiếp Badge cảnh báo nổi giữa cột Greeks: `⚠️ AIR POCKET [CẤM ĐỠ] $from - $to`.
+
+3. **Interactive Greeks Tooltip Inspection:**
+   - Khi người dùng rê chuột vào vùng 4 cột Greeks bên phải, Canvas tự động kích hoạt gióng Strike gần nhất và hiển thị thẻ Tooltip Card nổi bật: `Strike $K`, `GEX ($M)`, `VEX ($M)`, `CHEX ($M/d)`.

@@ -250,15 +250,22 @@ Trên Dashboard, mỗi bức tường được phân loại rõ ràng thành 2 n
 
 ---
 
-## 6. QUÉT TÚI CHÂN KHÔNG THANH KHOẢN (AIR POCKET) & QUY TẮC CẤM ĐỠ DAO
+## 6. QUÉT TÚI CHÂN KHÔNG THANH KHOẢN (AIR POCKET) & QUY TẮC CẤM ĐỠ DAO (ADR-021)
 
 * **Túi chân không thanh khoản (Air Pocket):**  
   Là khoảng trống giữa các Strike mà tại đó tổng Open Interest Call và Put rơi xuống dưới **35% mức trung bình 20 Strike lân cận**:
   $$\text{Air Pocket}: \quad OI_k < 0.35 \times \text{MA}_{20}(OI)$$
 * **Hiện tượng "Rơi tự do":**  
   Khi giá đi trong vùng có OI dày đặc, mỗi bước giá đều có người khớp lệnh mua bán nên giá đi chậm và tôn trọng hỗ trợ kháng cự. Nhưng khi giá lọt vào **Air Pocket**, không có lệnh đối ứng chờ sẵn $\rightarrow$ Chỉ cần một lực bán nhỏ cũng khiến giá rơi hàng chục giá trong vài phút.
+* **Dấu hiệu nhận biết trực quan trên Terminal v3.2 (ADR-021):**
+  - **Trên biểu đồ nến (Main Chart):** Dải cảnh báo màu hổ phách nét đứt quét ngang với nhãn:
+    `⚠️ AIR POCKET VACUUM [$from - $to] · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)`.
+  - **Trên cột 4 Profile Greeks bên phải (GEX | VEX | CHEX | THETA):** Dải cảnh báo hổ phách phủ trọn hàng Strike chân không, xuất hiện trực tiếp Badge cảnh báo:
+    `[⚠️ AIR POCKET (CẤM ĐỠ) $from - $to]`.
+  - **Khi rê chuột vào cột Greeks:** Bảng Tooltip Card sẽ hiển thị chi tiết số liệu của từng Strike, giúp trader nhận diện ngay các Strike có OI cạn kiệt.
 * **Chiến thuật thực chiến:**
   - Khi thấy khoảng cách giữa giá hiện tại và mốc hỗ trợ tiếp theo là một dải Air Pocket: **ĐÓNG TẤT CẢ CÁC VỊ THẾ BUY NGAY LẬP TỨC**.
+  - **Tuyệt đối cấm đặt lệnh Limit (Buy Limit / Sell Limit) đón đầu** ở lưng chừng các dải Air Pocket.
   - Kích hoạt chế độ `BREAKDOWN SLICING RUNNER` để thu lợi nhuận từ cú trượt chân không.
 
 ---

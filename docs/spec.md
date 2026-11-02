@@ -31,7 +31,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
    - **Mặc định Timeframe M1:** Hệ thống ưu tiên truy vấn 250 nến 1 phút liên tục gần nhất (~4 giờ giao dịch) từ COMEX Gold Futures `GC=F`, nút `1M` kích hoạt mặc định.
    - **Fullscreen TradingView Canvas (Full-bleed 100%):** Bố cục giao diện mở rộng tràn toàn bộ chiều ngang và chiều dọc (700px mặc định, tùy chọn ↕ Fullscreen 880px), thanh Topbar chuẩn TradingView với badge `● LIVE CME GC=F` nhấp nháy và hệ số nhân `$100.0/oz`.
    - **Giao diện Không Tab (Zero Tabs):** Loại bỏ toàn bộ các nút tab chuyển màn hình. Toàn bộ thông tin hiển thị liền mạch trên 1 trang cuộn duy nhất:
-     * Khối 1: Canvas Lightweight Charts 60 FPS tích hợp Air Pocket Vacuum Zones, Net GEX/CHEX Profile Bars, Wall Lines, Floating HUD, Live Price Line.
+     * Khối 1: Canvas Lightweight Charts 60 FPS tích hợp Air Pocket Vacuum Zones (hiển thị xuyên suốt cả biểu đồ nến và cột Greeks Profile với nhãn cảnh báo [CẤM ĐỠ DAO]), 4-Column Greeks Profile (GEX, VEX, CHEX, THETA với Dynamic Visible Normalization & Sublinear Boost giúp hiển thị sắc nét Vanna/Charm ở mọi khung zoom, kèm Tooltip trực quan khi rê chuột), Wall Lines, Floating HUD, Live Price Line.
      * Khối 2: Unified Greeks & Orderflow Matrix (tích hợp đầy đủ Net GEX, Net VEX, Net CHEX, Net Delta, OI, Volume, Pinning Pressure).
      * Khối 3: Plotly 4-Panel Quant Ladder (GEX, Volume/OI, VEX, CHEX) hiển thị song song ngay phía dưới.
    - **Realtime Tick Engine (Zero Reload):** Gỡ bỏ hoàn toàn nút "Làm mới" thủ công và bộ đếm ngược 60s tự reload trang. Giá từng tick được cập nhật mượt mà qua cơ chế `window.onLiveTick(data)` và `candleSeries.update(...)`, không giật lag, không chớp trắng màn hình, bảo toàn nguyên vẹn tọa độ zoom/pan của trader.
