@@ -67,6 +67,9 @@ Cac model **TUYET DOI KHONG DUOC** tu bien ho de bo qua viec goi skill.
 
 
 
+8. **100% PURE CME GOLD FUTURES QUOTE INVARIANT:**
+   Trong mọi phân tích, nhận định chiến lược, báo cáo và giao tiếp với người dùng, hệ thống **bắt buộc đồng bộ 100% chỉ sử dụng duy nhất giá Hợp đồng Tương lai Vàng (CME Gold Futures - GC / GCZ26)**. Tuyệt đối không tự ý quy đổi hoặc đề cập kèm giá Spot CFD / MT5 (XAUUSD) nếu người dùng không yêu cầu rõ ràng, nhằm tránh gây nhiễu và bảo toàn tính chuẩn xác tuyệt đối theo các mức Strike Options của sàn COMEX.
+
 ---
 
 ## 🧹 3. QUY ĐỊNH BẮT BUỘC: DỌN RÁC & BẢO TỒN DUNG LƯỢNG MÁY TÍNH (ZERO-WASTE MANDATE)

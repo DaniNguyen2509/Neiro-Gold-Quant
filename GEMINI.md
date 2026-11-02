@@ -40,6 +40,8 @@ Nghiêm cấm Gemini tự đưa ra các lý do sau để bỏ qua việc mở sk
 7. **CME OPTIONS MICROSTRUCTURE & ZERO GAMMA INVARIANT:** Dữ liệu Open Interest (OI) của CME Options là tĩnh trong phiên (chỉ cập nhật qua đêm bởi Clearing House). Mọi đánh giá áp lực thành trì trong ngày (Intraday Pressure/Flow Rate) phải đo lường bằng tỷ lệ Volume so với OI nền (`Wall Siege Ratio = Volume / OI`). Mốc Zero Gamma Flip ($S^*$) bắt buộc phải giải liên tục bằng phương trình hàm giải nghiệm số (Dekker-Brent `_brentq` thuần Python), không được dùng xấp xỉ strike thô để tránh sai lệch toán học do bất đẳng thức Jensen và Black-76 convexity.
 
 
+8. **100% PURE CME GOLD FUTURES QUOTE INVARIANT:** Trong mọi phân tích, nhận định chiến lược, báo cáo và giao tiếp với người dùng, hệ thống **bắt buộc đồng bộ 100% chỉ sử dụng duy nhất giá Hợp đồng Tương lai Vàng (CME Gold Futures - GC / GCZ26)**. Tuyệt đối không tự ý quy đổi hoặc đề cập kèm giá Spot CFD / MT5 (XAUUSD) nếu người dùng không yêu cầu rõ ràng, nhằm tránh gây nhiễu và bảo toàn tính chuẩn xác tuyệt đối theo các mức Strike Options của sàn COMEX.
+
 ---
 
 ## 🧹 3. QUY ĐỊNH BẮT BUỘC: DỌN RÁC & BẢO TỒN DUNG LƯỢNG MÁY TÍNH (ZERO-WASTE MANDATE)
