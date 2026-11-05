@@ -10,28 +10,53 @@ echo                NEIRO-QUANT: 100%% PURE CME GOLD FUTURES TERMINAL
 echo               Zero-Touch Automation ^| Zero-Leak Memory Architecture
 echo ===============================================================================
 echo.
-echo   [1] CHAY LIVE TERMINAL REALTIME (Cap nhat 15s/lan + Tu dong don RAM)
-echo   [2] CAO DU LIEU OPTIONS CHAIN CME MOI NHAT (Multi-Expiry Scraper)
-echo   [3] DON SACH CACHE & GIAI PHONG BO NHO (Clear Cache & Flush RAM)
-echo   [4] CAP NHAT SNAPSHOT 1 LAN (Generate 1-Shot Dashboard)
-echo   [5] KIEM THU HE THONG TOAN DIEN (Run Pytest Suite)
-echo   [6] MO THU MUC DATA DE THA FILE (Open Data Folder)
-echo   [7] THOAT
+echo   [1] MO TERMINAL ONLINE 100%% (GitHub Pages Cloud - Khong can Python)
+echo   [2] DONG BO DU LIEU MOI NHAT TU GITHUB CLOUD (git pull origin main)
+echo   [3] CHAY LIVE TERMINAL NOI BO (Cap nhat 15s/lan + Tu dong don RAM)
+echo   [4] CAO DU LIEU OPTIONS CHAIN CME THU CONG (Multi-Expiry Scraper)
+echo   [5] DON SACH CACHE & GIAI PHONG BO NHO (Clear Cache & Flush RAM)
+echo   [6] CAP NHAT SNAPSHOT 1 LAN (Generate 1-Shot Dashboard)
+echo   [7] KIEM THU HE THONG TOAN DIEN (Run Pytest Suite)
+echo   [8] MO THU MUC DATA DE THA FILE (Open Data Folder)
+echo   [9] THOAT
 echo.
 echo ===============================================================================
-set /p opt="Nhap lua chon cua ban [1-7]: "
+set /p opt="Nhap lua chon cua ban [1-9]: "
 
-if "%opt%"=="1" goto RUN_LIVE
-if "%opt%"=="2" goto RUN_SCRAPER
-if "%opt%"=="3" goto CLEAR_CACHE
-if "%opt%"=="4" goto RUN_ONCE
-if "%opt%"=="5" goto RUN_TESTS
-if "%opt%"=="6" goto OPEN_DATA
-if "%opt%"=="7" goto EXIT_SCRIPT
+if "%opt%"=="1" goto OPEN_ONLINE
+if "%opt%"=="2" goto SYNC_CLOUD
+if "%opt%"=="3" goto RUN_LIVE
+if "%opt%"=="4" goto RUN_SCRAPER
+if "%opt%"=="5" goto CLEAR_CACHE
+if "%opt%"=="6" goto RUN_ONCE
+if "%opt%"=="7" goto RUN_TESTS
+if "%opt%"=="8" goto OPEN_DATA
+if "%opt%"=="9" goto EXIT_SCRIPT
 
 echo.
-echo [LOI] Lua chon khong hop le. Vui long chon tu 1 den 7.
+echo [LOI] Lua chon khong hop le. Vui long chon tu 1 den 9.
 timeout /t 2 >nul
+goto MENU
+
+:OPEN_ONLINE
+cls
+echo ===============================================================================
+echo [NEIRO CLOUD] Dang mo Terminal truc tuyen dong bo 100%% tren GitHub Pages...
+echo Link: https://daninguyen2509.github.io/Neiro-Gold-Quant/
+echo ===============================================================================
+start https://daninguyen2509.github.io/Neiro-Gold-Quant/
+timeout /t 3 >nul
+goto MENU
+
+:SYNC_CLOUD
+cls
+echo ===============================================================================
+echo [GIT PULL] Dang dong bo du lieu va code moi nhat tu GitHub Cloud...
+echo ===============================================================================
+git pull origin main
+echo.
+echo [HOAN TAT] Da dong bo thanh cong voi GitHub Cloud.
+pause
 goto MENU
 
 :RUN_LIVE

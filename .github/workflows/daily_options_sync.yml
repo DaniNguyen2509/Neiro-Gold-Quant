@@ -2,32 +2,14 @@ name: ⚡ CME Gold Options Automated Sync & Tactical Terminal (Neiro-Quant)
 
 on:
   schedule:
-    # 1. Chot Open Interest ngay moi tu CME Clearing (07:15 VN):
-    - cron: '15 0 * * 1-5'
-    # 2. Phien A / Tokyo Midday (11:00 VN = 04:00 UTC):
-    - cron: '0 4 * * 1-5'
-    # 3. Phien Au 2 nac (Pre-Europe & In-Session Europe thich ung ca 2 mua):
-    #    05:30 UTC = 12:30 VN (Pre-Europe Mua He: truoc Frankfurt 13:00 & London 14:00)
-    #    06:30 UTC = 13:30 VN (Pre-Europe Mua Dong: truoc Frankfurt 14:00 & London 15:00)
-    #    07:30 UTC = 14:30 VN (In-Session Europe Mua He sau khi London chay 30p)
-    #    08:30 UTC = 15:30 VN (In-Session Europe Mua Dong sau khi London chay 30p)
-    - cron: '30 5,6,7,8 * * 1-5'
-    # 4. Phien My & Gio Cao Diem Toan Dien (Thich ung Hoan Hao ca 2 Mua He / Dong):
-    #    - Pre-US Macro Releases (Don dau tin vi mo 08:30 EST/EDT):
-    #      12:15 UTC = 19:15 VN (truoc tin vi mo mua he 19:30 15 phut)
-    #      13:15 UTC = 20:15 VN (truoc tin vi mo mua dong 20:30 15 phut)
-    #    - Pre-NYSE & US Market Open (Don dau mo phien co phieu / ETF GLD 09:30 EST/EDT):
-    #      14:15 UTC = 21:15 VN (truoc gio mo cua mua dong 21:30 15 phut)
-    - cron: '15 12,13,14 * * 1-5'
-    #    - High-Velocity US Trading, London Fix & Power Hour:
-    #      13:45 UTC = 20:45 VN (sau mo cua mua he 20:30 15 phut)
-    #      14:45 UTC = 21:45 VN (sau mo cua mua dong 21:30 15 phut)
-    #      15:45 UTC = 22:45 VN (London PM Fix mua dong 22:00)
-    #      16:45, 17:45 UTC = 23:45, 00:45 VN (Midday New York)
-    #    - Power Hour, COMEX Pit Close & Options Settlement (13:30 CST/CDT):
-    #      18:45 UTC = 01:45 VN (chot phien COMEX mua he 01:30 VN)
-    #      19:45 UTC = 02:45 VN (chot phien COMEX mua dong 02:30 VN)
-    - cron: '45 13,14,15,16,17,18,19 * * 1-5'
+    # 1. Chot Open Interest ngay moi tu CME Clearing (07:17 VN = 00:17 UTC) va Phien A (Tokyo):
+    - cron: '17 0,2,4 * * 1-5'
+    # 2. Phien Au & Giao thoa A-Au (12:47 - 18:47 VN = 05:47 - 11:47 UTC):
+    - cron: '47 5,6,7,8,9,10,11 * * 1-5'
+    # 3. Phien My & Gio Cao Diem Toan Dien (19:17 - 03:47 VN = 12:17 - 20:47 UTC - Chay moi 30p):
+    - cron: '17,47 12,13,14,15,16,17,18,19,20 * * 1-5'
+    # 4. After-hours & Dong phien New York (04:17 - 06:17 VN = 21:17 - 23:17 UTC):
+    - cron: '17 21,22,23 * * 1-5'
   push:
     branches: [main]
     paths:
@@ -109,6 +91,8 @@ jobs:
           name: gold-tactical-dashboard
           path: |
             exports/latest_gold_dashboard.html
+            exports/version.json
+            exports/tactical_levels.json
             data/options_prices_GCZ26.csv
           retention-days: 7
 
@@ -124,5 +108,5 @@ jobs:
         run: |
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/options_prices_GCZ26.csv index.html
+          git add data/options_prices_GCZ26.csv index.html version.json tactical_levels.json
           git diff --staged --quiet || (git commit -m "chore(data): auto-sync CME Gold GCZ26 options chain and index.html [skip ci]" && git pull --rebase origin main && git push)

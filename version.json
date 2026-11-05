@@ -1,0 +1,16 @@
+{
+  "timestamp_utc": "2026-11-05T15:11:02.134027+00:00",
+  "synced_at_vn": "05/11/2026 22:11:02 VN",
+  "spot_price": 4121.8,
+  "atm_strike": 4120.0,
+  "call_wall": 5500.0,
+  "put_wall": 3700.0,
+  "zero_gamma_flip": 4087.71,
+  "regime": "LONG_GAMMA",
+  "total_net_gex": 258.2638768648646,
+  "total_net_vex": 331.2676155195569,
+  "total_net_chex": -160.14738666814156,
+  "strike_above": 4125.0,
+  "strike_below": 4120.0,
+  "expected_move_1s": 185.01705903455525
+}

@@ -611,6 +611,8 @@ def load_and_preprocess_options(
         "file_age_hours": round(file_age_hours, 1),
         "is_data_stale": is_data_stale,
         "is_benchmark_fallback": is_benchmark_fallback,
+        "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "synced_at_vn": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%d/%m/%Y %H:%M:%S VN"),
     }
     strike_above_res, _, strike_below_res, _, _, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
         df["strike"].values, spot_price, dte_days=dte_days, call_wall=call_wall, put_wall=put_wall
@@ -2052,6 +2054,32 @@ def run_pipeline(
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(html_content, encoding="utf-8")
         saved_paths.append(str(p))
+
+    # Export lightweight JSON metadata & tactical levels for 100% online auto-sync
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_vn = now_utc.astimezone(datetime.timezone(datetime.timedelta(hours=7)))
+    version_data = {
+        "timestamp_utc": now_utc.isoformat(),
+        "synced_at_vn": now_vn.strftime("%d/%m/%Y %H:%M:%S VN"),
+        "spot_price": float(meta.get("spot_price", 0.0)),
+        "atm_strike": float(meta.get("atm_strike", 0.0)),
+        "call_wall": float(meta.get("call_wall", 0.0)),
+        "put_wall": float(meta.get("put_wall", 0.0)),
+        "zero_gamma_flip": float(meta.get("zero_gamma_flip", 0.0)),
+        "regime": str(meta.get("regime", "UNKNOWN")),
+        "total_net_gex": float(meta.get("total_net_gex", 0.0)),
+        "total_net_vex": float(meta.get("total_net_vex", 0.0)),
+        "total_net_chex": float(meta.get("total_net_chex", 0.0)),
+        "strike_above": float(meta.get("strike_above", 0.0)),
+        "strike_below": float(meta.get("strike_below", 0.0)),
+        "expected_move_1s": float(meta.get("expected_move_1s", 0.0)),
+    }
+    version_json_str = json.dumps(version_data, indent=2)
+    for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:
+        jp = Path(json_out)
+        jp.parent.mkdir(parents=True, exist_ok=True)
+        jp.write_text(version_json_str, encoding="utf-8")
+        saved_paths.append(str(jp))
 
     # Optional mirror to Google Drive Desktop if available locally
     drive_target = Path("H:/My Drive/Neiro-Quant/latest_gold_dashboard.html")
