@@ -1,16 +1,16 @@
 {
-  "timestamp_utc": "2026-11-06T23:50:30.426984+00:00",
-  "synced_at_vn": "07/11/2026 06:50:30 VN",
+  "timestamp_utc": "2026-11-07T00:58:17.116169+00:00",
+  "synced_at_vn": "07/11/2026 07:58:17 VN",
   "spot_price": 4079.5,
   "atm_strike": 4080.0,
   "call_wall": 5500.0,
   "put_wall": 3700.0,
   "zero_gamma_flip": 4089.94,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -72.23067996478721,
-  "total_net_vex": 313.1928907543992,
-  "total_net_chex": -184.0044386837377,
+  "total_net_gex": -72.23334727559352,
+  "total_net_vex": 312.8013048693695,
+  "total_net_chex": -184.45917983694585,
   "strike_above": 4080.0,
   "strike_below": 4075.0,
-  "expected_move_1s": 200.92593104182293
+  "expected_move_1s": 200.9247640913525
 }
