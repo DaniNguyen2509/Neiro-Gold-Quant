@@ -302,5 +302,16 @@ def test_three_tier_auto_discovery_weekly_monthly_quarterly_and_holidays():
     weekly_easter = next(e for e in exps_easter if e["type"] == "WEEKLY")
     assert weekly_easter["expiration_date"] == "2026-04-02"
 
+    # 3. Full 2027 Year Verification (Good Friday 2027-03-26 -> 2027-03-25 for OGJ27, Thanksgiving 2027-11-25 -> 2027-11-24 for OGZ27)
+    from src.quant_engine.synthetic import get_cme_option_expiry_date, is_cme_business_day
+    assert get_cme_option_expiry_date(2027, 4) == datetime.date(2027, 3, 25)
+    assert get_cme_option_expiry_date(2027, 12) == datetime.date(2027, 11, 24)
+    for m in range(1, 13):
+        exps_2027 = resolve_active_expirations(now=datetime.date(2027, m, 10), weekly_count=1, include_quarterly=True)
+        assert len(exps_2027) >= 2
+        for e in exps_2027:
+            exp_dt = datetime.date.fromisoformat(e["expiration_date"])
+            assert is_cme_business_day(exp_dt, adjust_holidays=True), f"2027 expiry {e} fell on holiday/weekend!"
+
 
 

@@ -127,6 +127,17 @@ async def fetch_barchart_options_playwright(
 
         # Fallback: Execute direct API call in browser context (using active XSRF token)
         logger.info("Evaluating internal API fetch in browser context...")
+        active_sym = "GCZ26"
+        try:
+            parts = [p for p in (page_url or "").split("?")[0].split("/") if p]
+            if "options" in parts:
+                idx = parts.index("options")
+                if idx + 1 < len(parts):
+                    active_sym = parts[idx + 1]
+                elif idx - 1 >= 0:
+                    active_sym = parts[idx - 1]
+        except Exception:
+            pass
         js_code = f"""
         async () => {{
             function getCookie(n) {{
@@ -136,7 +147,7 @@ async def fetch_barchart_options_playwright(
             let xsrf = getCookie('XSRF-TOKEN');
             let perf = performance.getEntriesByType('resource').map(e => e.name);
             let apiUrls = perf.filter(u => u.includes('proxies/core-api') && (u.includes('quotes/get') || u.includes('options')));
-            let targetUrl = apiUrls.length > 0 ? apiUrls[apiUrls.length - 1] : '/proxies/core-api/v1/quotes/get?symbol=GCZ26&list=futures.options&groupBy=optionType&orderBy=strike&orderDir=asc';
+            let targetUrl = apiUrls.length > 0 ? apiUrls[apiUrls.length - 1] : '/proxies/core-api/v1/quotes/get?symbol={active_sym}&list=futures.options&groupBy=optionType&orderBy=strike&orderDir=asc';
             
             if (targetUrl.includes('fields=')) {{
                 targetUrl = targetUrl.replace(/fields=[^&]+/, 'fields=' + encodeURIComponent('{ALL_FIELDS}'));

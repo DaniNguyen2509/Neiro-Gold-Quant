@@ -137,6 +137,10 @@ def get_cme_option_expiry_date(year: int, contract_month: int, adjust_holidays: 
         if is_cme_business_day(d, adjust_holidays=adjust_holidays):
             biz_count += 1
             if biz_count == 4:
+                # CME Rule 120102.E: if the 4th last business day falls on a CME holiday
+                # (e.g. Good Friday 2027-03-26 or Thanksgiving 2027-11-25), shift to prior business day
+                while not is_cme_business_day(d, adjust_holidays=True):
+                    d -= datetime.timedelta(days=1)
                 return d
         d -= datetime.timedelta(days=1)
     return d
