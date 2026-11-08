@@ -296,14 +296,19 @@ def scrape_multi_expiry_and_save(
     output_dir: str = "data",
     underlying_futures: str = "GCZ26",
     weekly_count: int = 1,
+    include_quarterly: bool = True,
     dry_run: bool = False,
 ) -> list[str]:
-    """Scrape both nearest Weekly and Front-Month Monthly contracts and aggregate them into primary dataset."""
-    from src.quant_engine.synthetic import resolve_active_expirations
+    """Scrape 3-Tier CME expirations (Weekly + Monthly + Quarterly Anchor) and aggregate into primary dataset."""
+    from src.quant_engine.synthetic import compute_dynamic_dte, resolve_active_expirations
     from src.quant_engine.loader import aggregate_options_dataframes
 
-    expirations = resolve_active_expirations(underlying_futures=underlying_futures, weekly_count=weekly_count)
-    logger.info("Targeting %d active CME expirations (Weekly + Monthly)", len(expirations))
+    expirations = resolve_active_expirations(
+        underlying_futures=underlying_futures,
+        weekly_count=weekly_count,
+        include_quarterly=include_quarterly,
+    )
+    logger.info("Targeting %d active CME expirations (Weekly + Monthly + Quarterly)", len(expirations))
 
     saved_files = []
     scraped_dfs = []
@@ -328,15 +333,25 @@ def scrape_multi_expiry_and_save(
                         min_k, max_k, exp["name"], sym
                     )
                     continue
-                df = _enrich_options_iv_and_greeks(df, dte_days=float(exp.get("dte", 23.0)))
-                df.attrs["expiration_date"] = exp["expiration_date"]
-                df.attrs["dte_days"] = exp["dte"]
+                # Prefer official expirationDate returned by Barchart JSON if present
+                live_exp = str(df.attrs.get("expiration_date") or "").strip()
+                if not live_exp and "expirationDate" in df.columns:
+                    s_exp = df["expirationDate"].dropna()
+                    if not s_exp.empty:
+                        live_exp = str(s_exp.iloc[0]).strip()
+                resolved_exp = live_exp if len(live_exp) >= 10 else str(exp["expiration_date"])
+                resolved_dte = compute_dynamic_dte(resolved_exp, default_dte=float(exp.get("dte", 23.0)))
+
+                df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
+                df.attrs["expiration_date"] = resolved_exp
+                df.attrs["dte_days"] = resolved_dte
                 df.attrs["option_symbol"] = sym
+                df.attrs["expiry_tier"] = exp.get("type", "MONTHLY")
                 scraped_dfs.append(df)
                 if not dry_run:
                     df.to_csv(sub_csv, index=False)
                     saved_files.append(str(sub_csv))
-                    logger.info("Saved %s options chain with %d strikes to %s", sym, len(df), sub_csv)
+                    logger.info("Saved %s options chain with %d strikes (exp=%s, DTE=%.2fd) to %s", sym, len(df), resolved_exp, resolved_dte, sub_csv)
         except Exception as e:
             logger.warning("Could not scrape %s (%s): %s", exp["name"], sym, e)
             if sub_csv.exists():
@@ -349,9 +364,12 @@ def scrape_multi_expiry_and_save(
                         and float(df["strike"].max()) >= 3000.0
                         and float(df["strike"].min()) <= 5000.0
                     ):
+                        resolved_dte = float(exp.get("dte", 23.0))
+                        df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
                         df.attrs["expiration_date"] = exp["expiration_date"]
-                        df.attrs["dte_days"] = exp["dte"]
+                        df.attrs["dte_days"] = resolved_dte
                         df.attrs["option_symbol"] = sym
+                        df.attrs["expiry_tier"] = exp.get("type", "MONTHLY")
                         scraped_dfs.append(df)
                         logger.info("Loaded cached dataset for %s: %s", sym, sub_csv)
                 except Exception:

@@ -281,3 +281,26 @@ def test_unphysical_flat_gamma_healed_by_black76_in_wall_scoring():
     assert pw[0].strike == 4000.0, f"Expected Put Wall 4000.0, got {pw[0].strike}"
 
 
+def test_three_tier_auto_discovery_weekly_monthly_quarterly_and_holidays():
+    """Verify 3-Tier auto-discovery (Weekly + Monthly + Quarterly) and CME holiday adjustment."""
+    # 1. After OGZ26 expires on Nov 25, 2026 -> Front-Month is OGF27 (Jan serial) and Quarterly Anchor is OGG27 (Feb primary)
+    dt_late_nov = datetime.datetime(2026, 11, 26, 12, 0, tzinfo=datetime.timezone.utc)
+    exps = resolve_active_expirations(now=dt_late_nov, underlying_futures="GCZ26", weekly_count=1, include_quarterly=True)
+    tiers = {e["type"]: e for e in exps}
+    assert "WEEKLY" in tiers
+    assert "MONTHLY" in tiers
+    assert "QUARTERLY" in tiers
+    assert tiers["MONTHLY"]["option_symbol"] == "OGF27"
+    assert tiers["MONTHLY"]["underlying"] == "GCG27"
+    assert tiers["WEEKLY"]["underlying"] == "GCG27"
+    assert tiers["QUARTERLY"]["option_symbol"] == "OGG27"
+    assert tiers["QUARTERLY"]["underlying"] == "GCG27"
+
+    # 2. Good Friday 2026 (April 3, 2026 is Good Friday) -> Weekly Friday shifts back to Thursday April 2, 2026
+    dt_holy_week = datetime.datetime(2026, 4, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    exps_easter = resolve_active_expirations(now=dt_holy_week, underlying_futures="GCJ26", weekly_count=1)
+    weekly_easter = next(e for e in exps_easter if e["type"] == "WEEKLY")
+    assert weekly_easter["expiration_date"] == "2026-04-02"
+
+
+

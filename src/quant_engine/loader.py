@@ -759,15 +759,36 @@ def aggregate_options_dataframes(
         d_copy = df_item.copy()
         dte = get_dte(d_copy)
         t_years = max(float(dte) / 365.0, 1.0 / 365.0)
-        sigma = max(0.01, float(default_iv))
-        denom = sigma * math.sqrt(t_years)
-        half_sig2_t = 0.5 * (sigma ** 2) * t_years
+        base_sigma = max(0.01, float(default_iv))
+        sqrt_t = math.sqrt(t_years)
         df_disc = math.exp(-r * t_years)
 
+        # Use per-strike IV (Volatility Skew) if enriched (>0.01 and not uniform 0.165 dummy), else base_sigma
+        if "callIV" in d_copy.columns and d_copy["callIV"].nunique() > 1:
+            raw_civ = d_copy["callIV"].values.astype(float)
+            raw_civ = np.where(raw_civ > 2.0, raw_civ / 100.0, raw_civ)
+            sigma_c = np.where(raw_civ > 0.01, np.clip(raw_civ, 0.05, 1.50), base_sigma)
+        else:
+            sigma_c = np.full(len(d_copy), base_sigma)
+
+        if "putIV" in d_copy.columns and d_copy["putIV"].nunique() > 1:
+            raw_piv = d_copy["putIV"].values.astype(float)
+            raw_piv = np.where(raw_piv > 2.0, raw_piv / 100.0, raw_piv)
+            sigma_p = np.where(raw_piv > 0.01, np.clip(raw_piv, 0.05, 1.50), base_sigma)
+        else:
+            sigma_p = np.full(len(d_copy), base_sigma)
+
+        denom_c = np.maximum(1e-5, sigma_c * sqrt_t)
+        denom_p = np.maximum(1e-5, sigma_p * sqrt_t)
+
         strikes_arr = d_copy["strike"].values.astype(float)
-        d1 = (np.log(np.maximum(1e-4, spot / strikes_arr)) + half_sig2_t) / denom
-        pdf_d1 = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1 ** 2))
-        b76_gamma = (df_disc * pdf_d1) / np.maximum(1e-4, spot * denom)
+        log_fk = np.log(np.maximum(1e-4, spot / strikes_arr))
+        d1_c = (log_fk + 0.5 * (sigma_c ** 2) * t_years) / denom_c
+        d1_p = (log_fk + 0.5 * (sigma_p ** 2) * t_years) / denom_p
+        pdf_d1_c = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1_c ** 2))
+        pdf_d1_p = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1_p ** 2))
+        b76_gamma_c = (df_disc * pdf_d1_c) / np.maximum(1e-4, spot * denom_c)
+        b76_gamma_p = (df_disc * pdf_d1_p) / np.maximum(1e-4, spot * denom_p)
 
         # Fill gamma if missing, zero, or uniform dummy fallback (0.0037)
         c_unphys = (
@@ -780,8 +801,8 @@ def aggregate_options_dataframes(
             or (len(d_copy) > 5 and d_copy["putGamma"].nunique() <= 3)
             or bool(((d_copy["strike"] > (spot + 800.0)) & (d_copy["putGamma"] > 0.001)).any())
         )
-        d_copy["callGamma"] = b76_gamma if c_unphys else np.where(d_copy["callGamma"] > 0, d_copy["callGamma"], b76_gamma)
-        d_copy["putGamma"] = b76_gamma if p_unphys else np.where(d_copy["putGamma"] > 0, d_copy["putGamma"], b76_gamma)
+        d_copy["callGamma"] = b76_gamma_c if c_unphys else np.where(d_copy["callGamma"] > 0, d_copy["callGamma"], b76_gamma_c)
+        d_copy["putGamma"] = b76_gamma_p if p_unphys else np.where(d_copy["putGamma"] > 0, d_copy["putGamma"], b76_gamma_p)
 
         d_copy["callGammaPower"] = d_copy["callOpenInterest"] * d_copy["callGamma"]
         d_copy["putGammaPower"] = d_copy["putOpenInterest"] * d_copy["putGamma"]
@@ -791,34 +812,38 @@ def aggregate_options_dataframes(
         d_copy["netGEX"] = d_copy["callGEX"] + d_copy["putGEX"]
 
         # Multi-Expiry Greeks: Vanna (VEX), Charm (CHEX), Vega & Theta
-        d2 = d1 - denom
-        cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
-        cdf_d2 = 0.5 * (1.0 + np.vectorize(math.erf)(d2 / np.sqrt(2.0)))
-        cdf_neg_d1 = 1.0 - cdf_d1
-        cdf_neg_d2 = 1.0 - cdf_d2
+        d2_c = d1_c - denom_c
+        d2_p = d1_p - denom_p
+        cdf_d1_c = 0.5 * (1.0 + np.vectorize(math.erf)(d1_c / np.sqrt(2.0)))
+        cdf_d2_c = 0.5 * (1.0 + np.vectorize(math.erf)(d2_c / np.sqrt(2.0)))
+        cdf_neg_d1_p = 1.0 - (0.5 * (1.0 + np.vectorize(math.erf)(d1_p / np.sqrt(2.0))))
+        cdf_neg_d2_p = 1.0 - (0.5 * (1.0 + np.vectorize(math.erf)(d2_p / np.sqrt(2.0))))
 
-        vanna = - df_disc * pdf_d1 * (d2 / sigma)
-        d_copy["callVEX"] = vanna * d_copy["callOpenInterest"] * MULT * spot * 0.01 / 1e6
-        d_copy["putVEX"] = - (vanna * d_copy["putOpenInterest"] * MULT * spot * 0.01 / 1e6)
+        vanna_c = - df_disc * pdf_d1_c * (d2_c / sigma_c)
+        vanna_p = - df_disc * pdf_d1_p * (d2_p / sigma_p)
+        d_copy["callVEX"] = vanna_c * d_copy["callOpenInterest"] * MULT * spot * 0.01 / 1e6
+        d_copy["putVEX"] = - (vanna_p * d_copy["putOpenInterest"] * MULT * spot * 0.01 / 1e6)
         d_copy["netVEX"] = d_copy["callVEX"] + d_copy["putVEX"]
 
         # Black-76 Charm: Rate of delta decay per calendar day (CNGTHCTNHTON.html)
         # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
         # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * cdf(-d1)] / 365
-        charm_call = df_disc * (pdf_d1 * (d2 / (2.0 * t_years)) - r * cdf_d1)
-        charm_put = df_disc * (pdf_d1 * (d2 / (2.0 * t_years)) + r * cdf_neg_d1)
+        charm_call = df_disc * (pdf_d1_c * (d2_c / (2.0 * t_years)) - r * cdf_d1_c)
+        charm_put = df_disc * (pdf_d1_p * (d2_p / (2.0 * t_years)) + r * cdf_neg_d1_p)
         d_copy["callCHEX"] = (charm_call / 365.0) * d_copy["callOpenInterest"] * MULT * spot / 1e6
         d_copy["putCHEX"] = - ((charm_put / 365.0) * d_copy["putOpenInterest"] * MULT * spot / 1e6)
         d_copy["netCHEX"] = d_copy["callCHEX"] + d_copy["putCHEX"]
 
-        vega = spot * df_disc * math.sqrt(t_years) * pdf_d1
-        d_copy["totalVega"] = (d_copy["callOpenInterest"] + d_copy["putOpenInterest"]) * MULT * vega * 0.01 / 1e6
+        vega_c = spot * df_disc * sqrt_t * pdf_d1_c
+        vega_p = spot * df_disc * sqrt_t * pdf_d1_p
+        d_copy["totalVega"] = (d_copy["callOpenInterest"] * vega_c + d_copy["putOpenInterest"] * vega_p) * MULT * 0.01 / 1e6
 
-        theta_common = - (spot * df_disc * pdf_d1 * sigma) / (2.0 * math.sqrt(t_years))
-        call_price = df_disc * (spot * cdf_d1 - strikes_arr * cdf_d2)
-        put_price = df_disc * (strikes_arr * cdf_neg_d2 - spot * cdf_neg_d1)
-        theta_call = (theta_common + r * call_price) / 365.0
-        theta_put = (theta_common + r * put_price) / 365.0
+        theta_common_c = - (spot * df_disc * pdf_d1_c * sigma_c) / (2.0 * sqrt_t)
+        theta_common_p = - (spot * df_disc * pdf_d1_p * sigma_p) / (2.0 * sqrt_t)
+        call_price = df_disc * (spot * cdf_d1_c - strikes_arr * cdf_d2_c)
+        put_price = df_disc * (strikes_arr * cdf_neg_d2_p - spot * cdf_neg_d1_p)
+        theta_call = (theta_common_c + r * call_price) / 365.0
+        theta_put = (theta_common_p + r * put_price) / 365.0
         d_copy["totalTheta"] = (d_copy["callOpenInterest"] * np.abs(theta_call) + d_copy["putOpenInterest"] * np.abs(theta_put)) * MULT / 1e6
 
         processed_dfs.append(d_copy)
@@ -871,9 +896,17 @@ def aggregate_options_dataframes(
             agg_df[col] = 0.0
 
     agg_df = agg_df.sort_values("strike").reset_index(drop=True)
+    nearest_exp = valid_dfs[0].attrs.get("expiration_date")
+    if not nearest_exp and "expirationDate" in valid_dfs[0].columns:
+        s_exp = valid_dfs[0]["expirationDate"].dropna()
+        if not s_exp.empty:
+            nearest_exp = str(s_exp.iloc[0]).strip()
+    nearest_exp = nearest_exp or "MULTI-EXPIRY"
+    if nearest_exp != "MULTI-EXPIRY":
+        agg_df["expirationDate"] = nearest_exp
     agg_df.attrs["is_aggregated"] = True
     agg_df.attrs["aggregated_count"] = len(processed_dfs)
-    agg_df.attrs["expiration_date"] = valid_dfs[0].attrs.get("expiration_date", "MULTI-EXPIRY")
+    agg_df.attrs["expiration_date"] = nearest_exp
     agg_df.attrs["dte_days"] = get_dte(valid_dfs[0])
 
     return agg_df

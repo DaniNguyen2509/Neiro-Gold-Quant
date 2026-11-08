@@ -31,9 +31,100 @@ CME_OPTION_MONTH_CODES = {
     7: 'N', 8: 'Q', 9: 'U', 10: 'V', 11: 'X', 12: 'Z'
 }
 
+# Primary COMEX Gold Futures & Institutional Anchor Cycles: Feb(G), Apr(J), Jun(M), Aug(Q), Dec(Z)
+CME_PRIMARY_GOLD_MONTHS = (2, 4, 6, 8, 12)
 
-def get_cme_option_expiry_date(year: int, contract_month: int) -> datetime.date:
-    """Computes the 4th last business day of the month preceding contract_month (CME Rule 120102.E)."""
+
+def _compute_easter_sunday(year: int) -> datetime.date:
+    """Computes Easter Sunday using the Anonymous Gregorian algorithm (for Good Friday)."""
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l_val = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l_val) // 451
+    month = (h + l_val - 7 * m + 114) // 31
+    day = ((h + l_val - 7 * m + 114) % 31) + 1
+    return datetime.date(year, month, day)
+
+
+def get_cme_holidays(year: int) -> set[datetime.date]:
+    """Returns official US / CME Group market holidays for a given year."""
+    holidays: set[datetime.date] = set()
+
+    def _observe(dt: datetime.date) -> datetime.date:
+        if dt.weekday() == 5:  # Saturday -> Friday
+            return dt - datetime.timedelta(days=1)
+        if dt.weekday() == 6:  # Sunday -> Monday
+            return dt + datetime.timedelta(days=1)
+        return dt
+
+    # 1. New Year's Day (Jan 1; if Sunday, observed Jan 2)
+    ny = datetime.date(year, 1, 1)
+    holidays.add(ny if ny.weekday() != 6 else datetime.date(year, 1, 2))
+
+    # 2. Martin Luther King Jr. Day (3rd Monday of January)
+    jan1 = datetime.date(year, 1, 1)
+    mlk = jan1 + datetime.timedelta(days=(0 - jan1.weekday()) % 7 + 14)
+    holidays.add(mlk)
+
+    # 3. Presidents' Day (3rd Monday of February)
+    feb1 = datetime.date(year, 2, 1)
+    pres = feb1 + datetime.timedelta(days=(0 - feb1.weekday()) % 7 + 14)
+    holidays.add(pres)
+
+    # 4. Good Friday (2 days before Easter Sunday - full CME holiday)
+    easter = _compute_easter_sunday(year)
+    holidays.add(easter - datetime.timedelta(days=2))
+
+    # 5. Memorial Day (Last Monday of May)
+    may31 = datetime.date(year, 5, 31)
+    memorial = may31 - datetime.timedelta(days=(may31.weekday() - 0) % 7)
+    holidays.add(memorial)
+
+    # 6. Juneteenth (June 19)
+    holidays.add(_observe(datetime.date(year, 6, 19)))
+
+    # 7. Independence Day (July 4)
+    holidays.add(_observe(datetime.date(year, 7, 4)))
+
+    # 8. Labor Day (1st Monday of September)
+    sep1 = datetime.date(year, 9, 1)
+    labor = sep1 + datetime.timedelta(days=(0 - sep1.weekday()) % 7)
+    holidays.add(labor)
+
+    # 9. Thanksgiving Day (4th Thursday of November)
+    nov1 = datetime.date(year, 11, 1)
+    thanksgiving = nov1 + datetime.timedelta(days=(3 - nov1.weekday()) % 7 + 21)
+    holidays.add(thanksgiving)
+
+    # 10. Christmas Day (December 25)
+    holidays.add(_observe(datetime.date(year, 12, 25)))
+
+    return holidays
+
+
+def is_cme_business_day(d: datetime.date, adjust_holidays: bool = True) -> bool:
+    """Checks if a date is a valid CME business day."""
+    if d.weekday() >= 5:
+        return False
+    if adjust_holidays and d in get_cme_holidays(d.year):
+        return False
+    return True
+
+
+def get_cme_option_expiry_date(year: int, contract_month: int, adjust_holidays: bool = False) -> datetime.date:
+    """Computes the 4th last business day of the month preceding contract_month (CME Rule 120102.E).
+
+    If the day before Christmas (Dec 24) or New Year's Eve (Dec 31) falls on that 4th business day,
+    or if adjust_holidays=True excludes US federal holidays, shifts to the preceding business day.
+    """
     if contract_month == 1:
         prev_month, prev_year = 12, year - 1
     else:
@@ -43,7 +134,7 @@ def get_cme_option_expiry_date(year: int, contract_month: int) -> datetime.date:
     d = datetime.date(prev_year, prev_month, last_day)
     biz_count = 0
     while biz_count < 4:
-        if d.weekday() < 5:  # Mon-Fri
+        if is_cme_business_day(d, adjust_holidays=adjust_holidays):
             biz_count += 1
             if biz_count == 4:
                 return d
@@ -116,16 +207,64 @@ def resolve_front_month_cme_option(
     }
 
 
+def resolve_next_quarterly_cme_option(
+    now: Optional[Union[datetime.date, datetime.datetime]] = None,
+    front_monthly: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Resolves the next Primary/Quarterly COMEX Gold Option anchor (Feb-G, Apr-J, Jun-M, Aug-Q, Dec-Z).
+
+    If front_monthly is a serial month (Jan, Mar, May, Jul, Sep, Oct, Nov), returns the immediately
+    upcoming Primary cycle month. If front_monthly is already a Primary cycle month, returns the
+    subsequent Primary cycle anchor after front_monthly.
+    """
+    if now is None:
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+    elif isinstance(now, datetime.datetime):
+        now_dt = now if now.tzinfo is not None else now.replace(tzinfo=datetime.timezone.utc)
+    else:
+        now_dt = datetime.datetime.combine(now, datetime.time(0, 0), tzinfo=datetime.timezone.utc)
+
+    if front_monthly is None:
+        front_monthly = resolve_front_month_cme_option(now=now_dt)
+
+    start_y = int(front_monthly.get("contract_year", now_dt.year))
+    start_m = int(front_monthly.get("contract_month", now_dt.month))
+
+    # Search forward from the month after front_monthly for the next Primary Cycle (G, J, M, Q, Z)
+    for offset in range(1, 15):
+        target_m = ((start_m - 1 + offset) % 12) + 1
+        target_y = start_y + ((start_m - 1 + offset) // 12)
+        if target_m in CME_PRIMARY_GOLD_MONTHS:
+            exp = get_cme_option_expiry_date(target_y, target_m)
+            month_code = CME_OPTION_MONTH_CODES[target_m]
+            yr_code = str(target_y)[-2:]
+            opt_symbol = f"OG{month_code}{yr_code}"
+            underlying = f"GC{month_code}{yr_code}"
+            return {
+                "option_symbol": opt_symbol,
+                "underlying": underlying,
+                "expiration_date": exp.isoformat(),
+                "contract_month": target_m,
+                "contract_year": target_y,
+                "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying}/options/{opt_symbol}?futuresOptionsView=merged",
+            }
+
+    return front_monthly
+
+
 def resolve_active_expirations(
     now: Optional[Union[datetime.date, datetime.datetime]] = None,
     underlying_futures: str = "GCZ26",
     weekly_count: int = 2,
+    include_quarterly: bool = True,
 ) -> list[Dict[str, Any]]:
-    """Resolves active CME Gold Options expirations (Weekly + Monthly).
+    """Resolves active 3-Tier CME Gold Options expirations (Weekly + Monthly + Quarterly Anchor).
 
     CME Gold Options structure:
-    - Weekly options (OG1..OG5) expire every Friday. On Barchart, they are listed as IG1..IG5.
-    - Monthly option (OG) expires on the 4th business day prior to the end of the preceding month.
+    - Tier 1 (WEEKLY): Weekly options (OG1..OG5 / Barchart IG1..IG5) expiring every Friday
+      (automatically shifted to Thursday if Friday is a CME market holiday).
+    - Tier 2 (MONTHLY): Front-month option (OG) expiring on the 4th business day prior to the end of the preceding month.
+    - Tier 3 (QUARTERLY): Institutional Primary Cycle Anchor (G-Feb, J-Apr, M-Jun, Q-Aug, Z-Dec).
 
     Returns:
         List of dicts containing contract details, DTE, and Barchart URL for multi-expiry aggregation.
@@ -139,49 +278,85 @@ def resolve_active_expirations(
 
     now_date = now_dt.date()
     front_monthly = resolve_front_month_cme_option(now=now_dt, underlying_futures=underlying_futures)
+    active_underlying = front_monthly.get("underlying", underlying_futures)
 
     results: list[Dict[str, Any]] = []
+    seen_dates: set[str] = {front_monthly["expiration_date"]}
 
-    # 1. Upcoming Weekly Friday expirations
+    # 1. Tier 1: Upcoming Weekly Friday expirations (with CME Holiday adjustment)
     curr = now_date
     fridays_found = 0
-    # COMEX Gold options expiration cutoff: 13:30 CT (18:30 UTC)
-    while fridays_found < weekly_count:
+    days_searched = 0
+    # COMEX Gold options expiration cutoff: 13:30 CT (18:30 UTC Summer / 19:30 UTC Winter)
+    while fridays_found < weekly_count and days_searched < 45:
         if curr.weekday() == 4:  # Friday
-            cutoff_dt = get_cme_cutoff_dt(curr)
+            # If Friday is a CME holiday (e.g. Good Friday, Christmas), expiration shifts to Thursday
+            exp_day = curr
+            while not is_cme_business_day(exp_day, adjust_holidays=True) and (curr - exp_day).days < 3:
+                exp_day -= datetime.timedelta(days=1)
+
+            cutoff_dt = get_cme_cutoff_dt(exp_day)
             if cutoff_dt >= now_dt:
-                day = curr.day
-                week_num = min(5, (day - 1) // 7 + 1)
-                month_code = CME_OPTION_MONTH_CODES[curr.month]
-                yr_code = str(curr.year)[-2:]
-                opt_sym = f"OG{week_num}{month_code}{yr_code}"
-                # Barchart uses IG prefix for Friday Weekly options
-                barchart_sym = f"IG{week_num}{month_code}{yr_code}"
-                dte_val = compute_dynamic_dte(curr, now_dt)
+                exp_iso = exp_day.isoformat()
+                if exp_iso not in seen_dates:
+                    day = curr.day
+                    week_num = min(5, (day - 1) // 7 + 1)
+                    month_code = CME_OPTION_MONTH_CODES[curr.month]
+                    yr_code = str(curr.year)[-2:]
+                    opt_sym = f"OG{week_num}{month_code}{yr_code}"
+                    # Barchart uses IG prefix for Friday Weekly options
+                    barchart_sym = f"IG{week_num}{month_code}{yr_code}"
+                    dte_val = compute_dynamic_dte(exp_day, now_dt)
 
-                results.append({
-                    "type": "WEEKLY",
-                    "name": f"Weekly {week_num} ({curr.strftime('%b %d')})",
-                    "option_symbol": opt_sym,
-                    "underlying": underlying_futures,
-                    "expiration_date": curr.isoformat(),
-                    "dte": dte_val,
-                    "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying_futures}/options/{barchart_sym}?futuresOptionsView=merged",
-                })
-                fridays_found += 1
+                    results.append({
+                        "type": "WEEKLY",
+                        "name": f"Weekly {week_num} ({exp_day.strftime('%b %d')})",
+                        "option_symbol": opt_sym,
+                        "barchart_symbol": barchart_sym,
+                        "underlying": active_underlying,
+                        "expiration_date": exp_iso,
+                        "dte": dte_val,
+                        "barchart_url": f"https://www.barchart.com/futures/quotes/{active_underlying}/options/{barchart_sym}?futuresOptionsView=merged",
+                    })
+                    seen_dates.add(exp_iso)
+                    fridays_found += 1
         curr += datetime.timedelta(days=1)
+        days_searched += 1
 
-    # 2. Front-Month Monthly expiration
+    # 2. Tier 2: Front-Month Monthly expiration
     monthly_dte = compute_dynamic_dte(front_monthly["expiration_date"], now_dt)
     results.append({
         "type": "MONTHLY",
         "name": f"Monthly ({front_monthly['option_symbol']})",
         "option_symbol": front_monthly["option_symbol"],
-        "underlying": underlying_futures,
+        "barchart_symbol": front_monthly["option_symbol"],
+        "underlying": active_underlying,
         "expiration_date": front_monthly["expiration_date"],
         "dte": monthly_dte,
         "barchart_url": front_monthly["barchart_url"],
     })
+
+    # 3. Tier 3: Quarterly / Primary Institutional Anchor (G, J, M, Q, Z)
+    # Automatically included when include_quarterly=True and either:
+    # - Front-month is a Serial month (Jan, Mar, May, Jul, Sep, Oct, Nov), OR
+    # - Front-month is within 21 days of expiration, OR
+    # - Always as the next macro structural anchor
+    if include_quarterly:
+        q_opt = resolve_next_quarterly_cme_option(now=now_dt, front_monthly=front_monthly)
+        q_exp_iso = q_opt["expiration_date"]
+        if q_exp_iso not in seen_dates and q_opt["option_symbol"] != front_monthly["option_symbol"]:
+            q_dte = compute_dynamic_dte(q_exp_iso, now_dt)
+            results.append({
+                "type": "QUARTERLY",
+                "name": f"Quarterly Anchor ({q_opt['option_symbol']})",
+                "option_symbol": q_opt["option_symbol"],
+                "barchart_symbol": q_opt["option_symbol"],
+                "underlying": q_opt["underlying"],
+                "expiration_date": q_exp_iso,
+                "dte": q_dte,
+                "barchart_url": q_opt["barchart_url"],
+            })
+            seen_dates.add(q_exp_iso)
 
     return results
 
