@@ -174,11 +174,11 @@ def resolve_front_month_cme_option(
             month_code = CME_OPTION_MONTH_CODES[target_m]
             yr_code = str(target_y)[-2:]
             opt_symbol = f"OG{month_code}{yr_code}"
-            # COMEX Gold Futures primary active contract months: G(Feb), J(Apr), M(Jun), Q(Aug), V(Oct), Z(Dec)
-            fut_month = {1: 'G', 2: 'G', 3: 'J', 4: 'J', 5: 'M', 6: 'M', 7: 'Q', 8: 'Q', 9: 'V', 10: 'V', 11: 'Z', 12: 'Z'}[target_m]
+            # COMEX Gold Futures primary active contract months: G(Feb), J(Apr), M(Jun), Q(Aug), Z(Dec)
+            fut_month = {1: 'G', 2: 'G', 3: 'J', 4: 'J', 5: 'M', 6: 'M', 7: 'Q', 8: 'Q', 9: 'Z', 10: 'Z', 11: 'Z', 12: 'Z'}[target_m]
             active_underlying = f"GC{fut_month}{yr_code}"
-            # If underlying_futures is default GCZ26 but we rolled into a later contract year/month, dynamically update underlying
-            if underlying_futures == "GCZ26" and (target_y > 2026 or (target_y == 2026 and target_m != 12)):
+            # Pure clock-driven resolution for any year/month unless caller explicitly overrides a custom contract
+            if not underlying_futures or underlying_futures in ("AUTO", "GCZ26"):
                 underlying = active_underlying
             else:
                 underlying = underlying_futures

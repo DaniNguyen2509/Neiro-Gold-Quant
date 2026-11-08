@@ -187,12 +187,25 @@ async def fetch_barchart_options_playwright(
         raise RuntimeError("Failed to obtain Barchart options data via browser evaluation")
 
 
-def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float = 23.0) -> pd.DataFrame:
+def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = None) -> pd.DataFrame:
     """Enriches scraped options chain with calibrated Black-76 IV if Barchart provides 0."""
     if df is None or df.empty or "strike" not in df.columns:
         return df
 
     from src.quant_engine.dealer import solve_black76_iv
+    if dte_days is None:
+        try:
+            from src.quant_engine.synthetic import compute_dynamic_dte, resolve_front_month_cme_option
+            exp_attr = str(df.attrs.get("expiration_date") or "").strip()
+            if not exp_attr and "expirationDate" in df.columns:
+                s_exp = df["expirationDate"].dropna()
+                if not s_exp.empty:
+                    exp_attr = str(s_exp.iloc[0]).strip()
+            if not exp_attr:
+                exp_attr = resolve_front_month_cme_option()["expiration_date"]
+            dte_days = compute_dynamic_dte(exp_attr, default_dte=15.0)
+        except Exception:
+            dte_days = 15.0
     ref_p = 4000.0
     try:
         from src.quant_engine.basis import fetch_live_cme_futures_price
@@ -321,6 +334,16 @@ def scrape_multi_expiry_and_save(
     )
     logger.info("Targeting %d active CME expirations (Weekly + Monthly + Quarterly)", len(expirations))
 
+    from src.collector.validator import validate_options_frame
+    ref_price = 4000.0
+    try:
+        from src.quant_engine.basis import fetch_live_cme_futures_price
+        live_p = fetch_live_cme_futures_price()
+        if live_p and live_p > 500.0:
+            ref_price = live_p
+    except Exception:
+        pass
+
     saved_files = []
     scraped_dfs = []
     out_dir_path = Path(output_dir)
@@ -336,12 +359,11 @@ def scrape_multi_expiry_and_save(
             raw_json = asyncio.run(fetch_barchart_options_playwright(page_url=url))
             df = parse_barchart_json(raw_json)
             if df is not None and len(df) > 0 and "strike" in df.columns:
-                min_k = float(df["strike"].min())
-                max_k = float(df["strike"].max())
-                if max_k < 3000.0 or min_k > 5000.0:
+                val_sub = validate_options_frame(df, reference_price=ref_price)
+                if not val_sub.ok:
                     logger.warning(
-                        "Scraped strikes [%.1f, %.1f] for %s (%s) do not match active Gold market (3000-5000). Discarding corrupt data.",
-                        min_k, max_k, exp["name"], sym
+                        "Scraped chain for %s (%s) failed validation against live GC=%.1f (%s). Discarding corrupt data.",
+                        exp["name"], sym, ref_price, val_sub.errors
                     )
                     continue
                 # Prefer official expirationDate returned by Barchart JSON if present
@@ -351,7 +373,7 @@ def scrape_multi_expiry_and_save(
                     if not s_exp.empty:
                         live_exp = str(s_exp.iloc[0]).strip()
                 resolved_exp = live_exp if len(live_exp) >= 10 else str(exp["expiration_date"])
-                resolved_dte = compute_dynamic_dte(resolved_exp, default_dte=float(exp.get("dte", 23.0)))
+                resolved_dte = compute_dynamic_dte(resolved_exp, default_dte=float(exp.get("dte", 15.0)))
 
                 df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
                 df.attrs["expiration_date"] = resolved_exp
@@ -368,14 +390,8 @@ def scrape_multi_expiry_and_save(
             if sub_csv.exists():
                 try:
                     df = pd.read_csv(sub_csv)
-                    if (
-                        df is not None
-                        and not df.empty
-                        and "strike" in df.columns
-                        and float(df["strike"].max()) >= 3000.0
-                        and float(df["strike"].min()) <= 5000.0
-                    ):
-                        resolved_dte = float(exp.get("dte", 23.0))
+                    if df is not None and not df.empty and validate_options_frame(df, reference_price=ref_price).ok:
+                        resolved_dte = float(exp.get("dte", 15.0))
                         df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
                         df.attrs["expiration_date"] = exp["expiration_date"]
                         df.attrs["dte_days"] = resolved_dte
