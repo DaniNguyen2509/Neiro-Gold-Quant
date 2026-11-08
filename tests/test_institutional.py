@@ -167,3 +167,33 @@ def test_reconstruct_institutional_orderflow_lee_ready_bvc_and_whales():
     assert res["bvc_buy_pct"] > 50.0
     assert res["kyle_lambda_regime"] == "ICEBERG_ABSORPTION"
 
+
+def test_evaluate_gamma_flip_integrity_true_vs_fake_bull_trap():
+    """Verify True Gamma Flip vs Fakeout Bull Trap classification when price crosses Zero Gamma Flip."""
+    from src.quant_engine.dealer import evaluate_gamma_flip_integrity
+
+    # 1. TRUE_BULLISH_FLIP: Price above Zero Gamma ($4,095 vs $4,090) WITH strong dealer buying & parity lead
+    true_flip = evaluate_gamma_flip_integrity(
+        spot_price=4095.0,
+        zero_gamma_flip=4090.0,
+        dealer_hedge_flow=180.0,
+        forward_dislocation_usd=1.25,
+        bvc_buy_pct=64.0,
+        kyle_lambda_regime="LIQUIDITY_VACUUM_SWEEP",
+    )
+    assert true_flip["flip_integrity_regime"] == "TRUE_BULLISH_FLIP"
+    assert "FLIP THẬT" in true_flip["flip_integrity_label"]
+
+    # 2. FAKE_BULL_TRAP: Price crossed above Zero Gamma ($4,095 vs $4,090), but Dealer is selling / Iceberg absorption
+    fake_flip = evaluate_gamma_flip_integrity(
+        spot_price=4095.0,
+        zero_gamma_flip=4090.0,
+        dealer_hedge_flow=-45.0,
+        forward_dislocation_usd=-1.40,
+        bvc_buy_pct=44.0,
+        kyle_lambda_regime="ICEBERG_ABSORPTION",
+    )
+    assert fake_flip["flip_integrity_regime"] == "FAKE_BULL_TRAP"
+    assert "BẪY FAKEOUT" in fake_flip["flip_integrity_label"]
+
+

@@ -635,12 +635,101 @@ def compute_net_delta_positions(
     }
 
 
+def evaluate_gamma_flip_integrity(
+    spot_price: float,
+    zero_gamma_flip: float | None,
+    dealer_hedge_flow: float,
+    forward_dislocation_usd: float,
+    bvc_buy_pct: float,
+    kyle_lambda_regime: str = "NORMAL_LIQUIDITY",
+) -> dict[str, str]:
+    """Classifies whether a Gamma Flip / Breakout is a TRUE structural flip or a FAKEOUT (Bull/Bear Trap).
+
+    Addresses the core institutional microstructure phenomenon:
+    When price crosses above Zero Gamma Flip (S*) into Positive Gamma, Market Makers are Long Gamma
+    and naturally SELL Futures into rallies (mean-reversion headwind). Price will get slammed back down
+    (Fake Flip / Bull Trap) UNLESS aggressive options buying (dealer_hedge_flow > 0, delta_F >= 0) and
+    BVC orderflow override Dealer mean-reversion selling.
+    """
+    z_flip = float(zero_gamma_flip) if (zero_gamma_flip is not None and zero_gamma_flip > 0) else float(spot_price)
+    dist_to_flip = float(spot_price) - z_flip
+
+    # 1. Price is ABOVE Zero Gamma Flip (in Positive Gamma territory)
+    if dist_to_flip >= 0.0:
+        if (
+            dealer_hedge_flow >= 35.0
+            and forward_dislocation_usd >= -0.60
+            and bvc_buy_pct >= 52.0
+            and kyle_lambda_regime != "ICEBERG_ABSORPTION"
+        ):
+            return {
+                "flip_integrity_regime": "TRUE_BULLISH_FLIP",
+                "flip_integrity_label": "🟢 FLIP THẬT (TRUE BREAKOUT): OPTIONS + MM ĐỒNG THUẬN MUA ĐUỔI",
+                "flip_integrity_color": "#4ADE80",
+            }
+        return {
+            "flip_integrity_regime": "FAKE_BULL_TRAP",
+            "flip_integrity_label": "🚨 BẪY FAKEOUT (BULL TRAP): VƯỢT GAMMA NHƯNG MM ĐANG XẢ ĐÈ (DỄ BỊ ĐẠP SẬP)",
+            "flip_integrity_color": "#F87171",
+        }
+
+    # 2. Price is testing / approaching Zero Gamma Flip from below (within $15)
+    if dist_to_flip >= -15.0:
+        if (
+            dealer_hedge_flow >= 45.0
+            and forward_dislocation_usd >= 0.25
+            and bvc_buy_pct >= 55.0
+            and kyle_lambda_regime != "ICEBERG_ABSORPTION"
+        ):
+            return {
+                "flip_integrity_regime": "TRUE_APPROACH_IMPULSE",
+                "flip_integrity_label": "🟢 XUNG LỰC THẬT: DÒNG TIỀN OPTIONS ÉP VƯỢT TRỤC GAMMA FLIP",
+                "flip_integrity_color": "#4ADE80",
+            }
+        if (
+            dealer_hedge_flow < 20.0
+            or forward_dislocation_usd < -0.50
+            or bvc_buy_pct < 50.0
+            or kyle_lambda_regime == "ICEBERG_ABSORPTION"
+        ):
+            return {
+                "flip_integrity_regime": "FAKE_RALLY_REJECT",
+                "flip_integrity_label": "🚨 RƯỚN GIẢ (FAKE FLIP): THIẾU LỰC OPTIONS — CẨN TRỌNG BỊ ĐẠP TẠI GAMMA FLIP",
+                "flip_integrity_color": "#FACC15",
+            }
+        return {
+            "flip_integrity_regime": "CONTESTED_FLIP_ZONE",
+            "flip_integrity_label": "⚖️ TRANH CHẤP SÁT GAMMA FLIP: CHỜ XÁC NHẬN DÒNG TIỀN QUYỀN CHỌN",
+            "flip_integrity_color": "#38BDF8",
+        }
+
+    # 3. Price is deep below Zero Gamma Flip (Negative Gamma territory)
+    if dealer_hedge_flow <= -40.0 and bvc_buy_pct <= 46.0:
+        return {
+            "flip_integrity_regime": "TRUE_SHORT_GAMMA_CASCADE",
+            "flip_integrity_label": "🔴 SẬP THẬT (SHORT GAMMA): MM BÁN ĐUỔI THUẬN XU HƯỚNG",
+            "flip_integrity_color": "#F87171",
+        }
+    if dealer_hedge_flow >= 40.0 and bvc_buy_pct >= 54.0 and forward_dislocation_usd >= -0.40:
+        return {
+            "flip_integrity_regime": "BULLISH_ABSORPTION_DIVERGENCE",
+            "flip_integrity_label": "🟢 HẤP THỤ ĐÁY (BEAR TRAP): CÁ MẬP GOM CALL ÉP MM MUA ĐỠ GIÁ",
+            "flip_integrity_color": "#4ADE80",
+        }
+    return {
+        "flip_integrity_regime": "NEGATIVE_GAMMA_CHOP",
+        "flip_integrity_label": "⚡ VÙNG ÂM GAMMA (DƯỚI FLIP): MM KHUẾCH ĐẠI BIẾN ĐỘNG — CHỜ ĐỒNG THUẬN",
+        "flip_integrity_color": "#FACC15",
+    }
+
+
 def reconstruct_institutional_orderflow(
     df: Any,
     spot_price: float,
     r: float = 0.045,
     dte_days: float = 15.0,
     m5_tape: dict[str, Any] | None = None,
+    zero_gamma_flip: float | None = None,
 ) -> dict[str, Any]:
     """Reconstructs real-time institutional orderflow without paid CME MDP 3.0 Level 3 feed.
 
@@ -667,6 +756,9 @@ def reconstruct_institutional_orderflow(
         "bvc_buy_pct": 50.0,
         "kyle_lambda_regime": "NORMAL_LIQUIDITY",
         "kyle_lambda_label": "THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG",
+        "flip_integrity_regime": "CONTESTED_FLIP_ZONE",
+        "flip_integrity_label": "⚖️ ĐANG ĐỒNG BỘ DỮ LIỆU TRỤC GAMMA FLIP",
+        "flip_integrity_color": "#38BDF8",
     }
     if df is None or getattr(df, "empty", True) or spot_price <= 0:
         return empty_res
@@ -887,6 +979,14 @@ def reconstruct_institutional_orderflow(
                 kyle_label = "TRƯỢT GIÁ RỖNG SỔ LỆNH (VACUUM MARKET SWEEP)"
 
     bvc_buy_pct = round((bvc_buy_vol / bvc_total_vol) * 100.0, 1) if bvc_total_vol > 0 else 50.0
+    flip_integrity = evaluate_gamma_flip_integrity(
+        spot_price=spot_price,
+        zero_gamma_flip=zero_gamma_flip,
+        dealer_hedge_flow=dealer_hedge_flow,
+        forward_dislocation_usd=delta_f,
+        bvc_buy_pct=bvc_buy_pct,
+        kyle_lambda_regime=kyle_regime,
+    )
 
     return {
         "implied_forward_price": round(f_opt, 2),
@@ -905,4 +1005,7 @@ def reconstruct_institutional_orderflow(
         "bvc_buy_pct": bvc_buy_pct,
         "kyle_lambda_regime": kyle_regime,
         "kyle_lambda_label": kyle_label,
+        "flip_integrity_regime": flip_integrity["flip_integrity_regime"],
+        "flip_integrity_label": flip_integrity["flip_integrity_label"],
+        "flip_integrity_color": flip_integrity["flip_integrity_color"],
     }

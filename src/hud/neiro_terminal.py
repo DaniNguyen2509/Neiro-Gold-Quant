@@ -58,6 +58,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
     bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
     kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+    flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
+    flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
     disloc_color = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
     hedge_color = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
     cvd_color = "#4ADE80" if bvc_cvd_val >= 0 else "#F87171"
@@ -252,6 +254,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     <div id="hud-bvc-bar" style="width:{bvc_buy_pct:.1f}%; height:100%; background:#22C55E; transition:width 0.12s linear;"></div>
                 </div>
                 <div class="hud-item"><span class="hud-label">KYLE'S LAMBDA (&lambda;):</span> <b id="hud-kyle-val" style="color:#38BDF8; font-size:10px;">{kyle_label}</b></div>
+                <div id="hud-flip-verdict-box" style="margin-top:3px; padding:4px 7px; border-radius:4px; background:rgba(15,23,42,0.95); border:1px solid {flip_verdict_col}; border-left:3px solid {flip_verdict_col};">
+                    <div style="font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;">BỘ LỌC GAMMA FLIP (THẬT vs. FAKEOUT TRAP):</div>
+                    <b id="hud-flip-verdict" style="color:{flip_verdict_col}; font-size:10.5px;">{flip_verdict_lbl}</b>
+                </div>
             </div>
             <div id="neiro-tv-chart"></div>
             <canvas id="neiro-canvas"></canvas>
@@ -344,6 +350,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "bvc_cvd_contracts": bvc_cvd_val,
         "bvc_buy_pct": bvc_buy_pct,
         "kyle_lambda_label": kyle_label,
+        "flip_integrity_label": flip_verdict_lbl,
+        "flip_integrity_color": flip_verdict_col,
     })
 
     m5_tape = meta.get("m5_tape") or {}
@@ -499,7 +507,68 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     let liveImpliedForward = window.INITIAL_META.implied_forward_price || window.INITIAL_META.spot;
     let liveForwardDisloc = window.INITIAL_META.forward_dislocation_usd || 0;
     let liveKyleLabel = window.INITIAL_META.kyle_lambda_label || 'THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG';
+    let liveFlipVerdict = window.INITIAL_META.flip_integrity_label || '⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP';
+    let liveFlipColor = window.INITIAL_META.flip_integrity_color || '#FACC15';
     let liveCandleDelta = 0;
+
+    function computeLiveFlipVerdict(price, zFlip, hedgeGC, dislocUsd, buyPct, kyleLbl) {{
+        const dist = price - (zFlip || price);
+        const isIceberg = kyleLbl.indexOf('ICEBERG') !== -1;
+        if (dist >= 0) {{
+            if (hedgeGC >= 35.0 && dislocUsd >= -0.60 && buyPct >= 52.0 && !isIceberg) {{
+                return {{
+                    txt: '🟢 FLIP THẬT (TRUE BREAKOUT): OPTIONS + MM ĐỒNG THUẬN MUA ĐUỔI',
+                    shortTxt: '🟢 FLIP THẬT',
+                    col: '#4ADE80'
+                }};
+            }}
+            return {{
+                txt: '🚨 BẪY FAKEOUT (BULL TRAP): VƯỢT GAMMA NHƯNG MM ĐANG XẢ ĐÈ (DỄ BỊ ĐẠP SẬP)',
+                shortTxt: '🚨 BẪY FAKEOUT',
+                col: '#F87171'
+            }};
+        }}
+        if (dist >= -15.0) {{
+            if (hedgeGC >= 45.0 && dislocUsd >= 0.25 && buyPct >= 55.0 && !isIceberg) {{
+                return {{
+                    txt: '🟢 XUNG LỰC THẬT: DÒNG TIỀN OPTIONS ÉP VƯỢT TRỤC GAMMA FLIP',
+                    shortTxt: '🟢 XUNG LỰC VƯỢT FLIP',
+                    col: '#4ADE80'
+                }};
+            }}
+            if (hedgeGC < 20.0 || dislocUsd < -0.50 || buyPct < 50.0 || isIceberg) {{
+                return {{
+                    txt: '🚨 RƯỚN GIẢ (FAKE FLIP): THIẾU LỰC OPTIONS — CẨN TRỌNG BỊ ĐẠP TẠI GAMMA FLIP',
+                    shortTxt: '🚨 RƯỚN GIẢ (DỄ ĐẠP)',
+                    col: '#FACC15'
+                }};
+            }}
+            return {{
+                txt: '⚖️ TRANH CHẤP SÁT GAMMA FLIP: CHỜ XÁC NHẬN DÒNG TIỀN QUYỀN CHỌN',
+                shortTxt: '⚖️ TRANH CHẤP FLIP',
+                col: '#38BDF8'
+            }};
+        }}
+        if (hedgeGC <= -40.0 && buyPct <= 46.0) {{
+            return {{
+                txt: '🔴 SẬP THẬT (SHORT GAMMA): MM BÁN ĐUỔI THUẬN XU HƯỚNG',
+                shortTxt: '🔴 SẬP THẬT (MM BÁN)',
+                col: '#F87171'
+            }};
+        }}
+        if (hedgeGC >= 40.0 && buyPct >= 54.0 && dislocUsd >= -0.40) {{
+            return {{
+                txt: '🟢 HẤP THỤ ĐÁY (BEAR TRAP): CÁ MẬP GOM CALL ÉP MM MUA ĐỠ GIÁ',
+                shortTxt: '🟢 HẤP THỤ ĐÁY (MM ĐỠ)',
+                col: '#4ADE80'
+            }};
+        }}
+        return {{
+            txt: '⚡ VÙNG ÂM GAMMA (DƯỚI FLIP): MM KHUẾCH ĐẠI BIẾN ĐỘNG — CHỜ ĐỒNG THUẬN',
+            shortTxt: '⚡ ÂM GAMMA (CHỜ FLOW)',
+            col: '#FACC15'
+        }};
+    }}
 
     function normCdf(x) {{
         const t = 1 / (1 + 0.2316419 * Math.abs(x));
@@ -637,6 +706,34 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (microBar) microBar.style.width = liveBuyPct.toFixed(1) + '%';
         const microKyle = document.getElementById('micro-kyle-val');
         if (microKyle) microKyle.innerText = liveKyleLabel;
+
+        // 4b. Compute & Update Gamma Flip Integrity Verdict (True Flip vs. Fakeout Trap) in <0.1ms
+        const fv = computeLiveFlipVerdict(
+            currentGoldPrice,
+            window.INITIAL_META.zero_gamma_flip,
+            liveDealerHedgeGC,
+            liveForwardDisloc,
+            liveBuyPct,
+            liveKyleLabel
+        );
+        liveFlipVerdict = fv.txt;
+        liveFlipColor = fv.col;
+
+        const hudFv = document.getElementById('hud-flip-verdict');
+        const hudFvBox = document.getElementById('hud-flip-verdict-box');
+        if (hudFv) {{
+            hudFv.innerText = liveFlipVerdict;
+            hudFv.style.color = liveFlipColor;
+        }}
+        if (hudFvBox) {{
+            hudFvBox.style.borderColor = liveFlipColor;
+            hudFvBox.style.borderLeftColor = liveFlipColor;
+        }}
+        const microFv = document.getElementById('micro-flip-verdict');
+        if (microFv) {{
+            microFv.innerText = liveFlipVerdict;
+            microFv.style.color = liveFlipColor;
+        }}
 
         // 5. Repaint 60FPS Canvas immediately with zero lag
         requestAnimationFrame(drawNeiroOverlay);
@@ -946,7 +1043,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
             {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA SQUEEZE ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
-            {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], txt: 'GAMMA FLIP (Trục cân đối) $' + Math.round(m.zero_gamma_flip) }},
+            {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], txt: 'GAMMA FLIP (Trục cân đối) $' + Math.round(m.zero_gamma_flip) + ' · [' + (liveFlipVerdict.split(':')[0] || 'KIỂM ĐỊNH') + ']' }},
             {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: 'CHARM (CHEX) · GHÌM GIÁ ĐÊM ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
             {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], txt: 'VANNA (VEX) · V-REBOUND ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }},
         ];

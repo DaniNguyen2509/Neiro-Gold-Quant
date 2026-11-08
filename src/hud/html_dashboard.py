@@ -555,14 +555,19 @@ def load_and_preprocess_options(
     call_wall_siege = compute_wall_siege_ratio(call_wall_vol, call_wall_oi)
     put_wall_siege = compute_wall_siege_ratio(put_wall_vol, put_wall_oi)
 
-    from src.quant_engine.dealer import reconstruct_institutional_orderflow
-    inst_orderflow = reconstruct_institutional_orderflow(
-        df, spot_price=spot_price, r=r, dte_days=dte_days, m5_tape=m5_tape
-    )
-
     snap = to_options_snapshot(df)
     exact_gamma_flip = compute_exact_gamma_flip(
         snap, spot_price=spot_price, r=r, dte_days=dte_days, default_iv=sigma_atm
+    )
+
+    from src.quant_engine.dealer import reconstruct_institutional_orderflow
+    inst_orderflow = reconstruct_institutional_orderflow(
+        df,
+        spot_price=spot_price,
+        r=r,
+        dte_days=dte_days,
+        m5_tape=m5_tape,
+        zero_gamma_flip=exact_gamma_flip,
     )
 
     meta = {
@@ -1347,6 +1352,8 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
     bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
     kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+    flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
+    flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
 
     disloc_col = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
     hedge_col = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
@@ -1454,6 +1461,10 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
                 <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">4. Vi Cấu Trúc Sổ Lệnh (Kyle's Lambda &lambda;)</div>
                 <div id="micro-kyle-val" style="font-size:12px; font-weight:800; color:#38BDF8; margin-top:2px;">{kyle_label}</div>
                 <div style="font-size:10px; color:#94A3B8;">Cập nhật 0ms theo từng nhịp giá CME</div>
+            </div>
+            <div style="background:rgba(15,23,42,0.92); border:1px solid {flip_verdict_col}; border-left:4px solid {flip_verdict_col}; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
+                <div style="font-size:10px; color:#FACC15; font-weight:800; text-transform:uppercase;">5. Bộ Lọc Gamma Flip (Thật vs. Fakeout Trap)</div>
+                <div id="micro-flip-verdict" style="font-size:11.5px; font-weight:800; color:{flip_verdict_col}; margin-top:3px; line-height:1.35;">{flip_verdict_lbl}</div>
             </div>
         </div>
         <div style="max-height: 520px; overflow-y: auto; overflow-x: auto; border: 1px solid #1E293B; border-radius: 6px; background:#070B12;">
@@ -1710,6 +1721,8 @@ def generate_html_terminal(
     bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
     bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
     kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+    flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
+    flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
     whale_inits = inst_flow.get("whale_initiations") or []
     top_flow_strikes = inst_flow.get("top_flow_strikes") or []
 
@@ -2243,6 +2256,8 @@ def run_pipeline(
         "dealer_hedge_futures_flow": float((meta.get("institutional_orderflow") or {}).get("dealer_hedge_futures_flow", 0.0)),
         "bvc_cvd_contracts": float((meta.get("institutional_orderflow") or {}).get("bvc_cvd_contracts", 0.0)),
         "bvc_buy_pct": float((meta.get("institutional_orderflow") or {}).get("bvc_buy_pct", 50.0)),
+        "flip_integrity_label": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_label", "")),
+        "flip_integrity_color": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_color", "#FACC15")),
     }
     version_json_str = json.dumps(version_data, indent=2)
     for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:
