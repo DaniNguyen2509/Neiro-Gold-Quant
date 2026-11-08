@@ -113,3 +113,57 @@ def test_detect_cta_confluence_independent():
     assert cta.is_call_wall_confluent is False
     assert cta.is_put_wall_confluent is False
     assert "INDEPENDENT DEALER WALLS" in cta.confluence_badge
+
+
+def test_reconstruct_institutional_orderflow_lee_ready_bvc_and_whales():
+    """Verify Lee-Ready Signed Flow, Put-Call Parity Dislocation, Whale Initiation (Vol > OI), and BVC/Kyle Lambda."""
+    from src.quant_engine.dealer import reconstruct_institutional_orderflow
+
+    df = pd.DataFrame([
+        {
+            "strike": 4075.0,
+            "callBid": 64.0, "callAsk": 66.0, "callMid": 65.0, "callLatest": 65.8,
+            "putBid": 60.0, "putAsk": 62.0, "putMid": 61.0, "putLatest": 60.2,
+            "callVolume": 450, "callOpenInterest": 200,  # Whale Initiation: 450 > 200 (+250 new contracts)
+            "putVolume": 80, "putOpenInterest": 500,
+            "callIV": 0.225, "putIV": 0.225,
+        },
+        {
+            "strike": 4100.0,
+            "callBid": 52.0, "callAsk": 54.0, "callMid": 53.0, "callLatest": 53.9,
+            "putBid": 73.0, "putAsk": 75.0, "putMid": 74.0, "putLatest": 73.2,
+            "callVolume": 600, "callOpenInterest": 1200,
+            "putVolume": 50, "putOpenInterest": 800,
+            "callIV": 0.228, "putIV": 0.224,
+        },
+    ])
+    m5_tape = {
+        "chart_candles": [
+            {"open": 4070.0, "close": 4072.0, "volume": 500},
+            {"open": 4072.0, "close": 4074.5, "volume": 650},
+            {"open": 4074.5, "close": 4074.7, "volume": 1200},  # High volume, tiny body -> Iceberg absorption
+        ]
+    }
+    res = reconstruct_institutional_orderflow(df, spot_price=4075.0, r=0.045, dte_days=17.0, m5_tape=m5_tape)
+
+    # 1. Implied forward F_opt = 4075 + exp(rT)*(65 - 61) ~= 4079.01 -> +4.01 USD > +1.50 USD bullish lead
+    assert res["forward_dislocation_usd"] > 1.50
+    assert res["dislocation_regime"] == "OPTIONS_LEADING_BULLISH"
+
+    # 2. Aggressive Call buying at Ask + Put hitting Bid -> positive Dealer Forced Futures Buying
+    assert res["signed_call_flow"] > 0
+    assert res["dealer_hedge_futures_flow"] > 50.0
+    assert res["options_flow_regime"] == "DEALER_FORCED_BUYING"
+
+    # 3. Guaranteed New Whale Initiation detected at Strike 4075 Call (Vol 450 > OI 200)
+    assert len(res["whale_initiations"]) >= 1
+    w0 = res["whale_initiations"][0]
+    assert w0["strike"] == 4075.0
+    assert w0["side"] == "CALL"
+    assert w0["new_contracts_min"] == 250
+
+    # 4. BVC Cumulative Volume Delta > 0 and Kyle's Lambda detects ICEBERG_ABSORPTION on final bar
+    assert res["bvc_cvd_contracts"] > 0
+    assert res["bvc_buy_pct"] > 50.0
+    assert res["kyle_lambda_regime"] == "ICEBERG_ABSORPTION"
+

@@ -555,6 +555,11 @@ def load_and_preprocess_options(
     call_wall_siege = compute_wall_siege_ratio(call_wall_vol, call_wall_oi)
     put_wall_siege = compute_wall_siege_ratio(put_wall_vol, put_wall_oi)
 
+    from src.quant_engine.dealer import reconstruct_institutional_orderflow
+    inst_orderflow = reconstruct_institutional_orderflow(
+        df, spot_price=spot_price, r=r, dte_days=dte_days, m5_tape=m5_tape
+    )
+
     snap = to_options_snapshot(df)
     exact_gamma_flip = compute_exact_gamma_flip(
         snap, spot_price=spot_price, r=r, dte_days=dte_days, default_iv=sigma_atm
@@ -564,6 +569,7 @@ def load_and_preprocess_options(
         "spot_price": spot_price,
         "futures_feed": futures_feed,
         "m5_tape": m5_tape,
+        "institutional_orderflow": inst_orderflow,
         "atm_strike": atm_strike,
         "atm_straddle": atm_straddle,
         "sigma_atm": sigma_atm,
@@ -1628,6 +1634,53 @@ def generate_html_terminal(
 
     m5_table_rows_html = "".join(m5_rows) if m5_rows else "<tr><td colspan='8' style='text-align:center; color:#64748B; padding:16px;'>Dữ liệu Orderflow M5 đang cập nhật từ COMEX...</td></tr>"
 
+    # Prepare Institutional Orderflow Reconstruction Strip & Active Strike Flow Rows
+    inst_flow = meta.get("institutional_orderflow") or {}
+    f_opt_val = float(inst_flow.get("implied_forward_price", spot))
+    delta_f_val = float(inst_flow.get("forward_dislocation_usd", 0.0))
+    disloc_label = str(inst_flow.get("dislocation_label", "CÂN BẰNG PARITY"))
+    dealer_hedge_val = float(inst_flow.get("dealer_hedge_futures_flow", 0.0))
+    opt_flow_label = str(inst_flow.get("options_flow_label", "CÂN BẰNG HEDGING"))
+    bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
+    bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
+    kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+    whale_inits = inst_flow.get("whale_initiations") or []
+    top_flow_strikes = inst_flow.get("top_flow_strikes") or []
+
+    disloc_color = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
+    hedge_color = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
+    cvd_color = "#4ADE80" if bvc_cvd_val >= 0 else "#F87171"
+
+    whale_badges = []
+    for w in whale_inits[:4]:
+        w_col = "#4ADE80" if w["side"] == "CALL" else "#F87171"
+        whale_badges.append(
+            f"<span class='badge' style='background:rgba(15,23,42,0.9); color:{w_col}; border:1px solid {w_col}; margin-right:6px;'>"
+            f"WHALE NEW OI: ${w['strike']:,.0f} {w['side']} (Vol {w['volume']:,} > OI {w['oi']:,} | +{w['new_contracts_min']:,} HĐ mở mới | {w['aggressor']})"
+            f"</span>"
+        )
+    whale_html_bar = (
+        f"<div style='margin-top:8px; padding:6px 10px; background:rgba(30,41,59,0.55); border-radius:6px; font-size:11px; font-family:JetBrains Mono,monospace;'>"
+        f"<b style='color:#FACC15; margin-right:8px;'>[PHÁT HIỆN VỊ THẾ MỞ MỚI TRONG NGÀY (VOL > OI)]:</b> {''.join(whale_badges)}</div>"
+        if whale_badges else ""
+    )
+
+    opt_tape_rows = []
+    for tf in top_flow_strikes[:5]:
+        dh_col = "#4ADE80" if tf["dealer_hedge_gc"] > 15.0 else ("#F87171" if tf["dealer_hedge_gc"] < -15.0 else "#94A3B8")
+        opt_tape_rows.append(
+            f"<tr>"
+            f"<td style='font-family:JetBrains Mono,monospace; font-weight:700; color:#FACC15;'>${tf['strike']:,.0f}</td>"
+            f"<td style='text-align:right; font-family:JetBrains Mono,monospace;'>{tf['call_vol']:,} / {tf['call_oi']:,}</td>"
+            f"<td style='text-align:right; font-family:JetBrains Mono,monospace;'>{tf['put_vol']:,} / {tf['put_oi']:,}</td>"
+            f"<td style='text-align:right; font-family:JetBrains Mono,monospace; color:#38BDF8;'>{tf['signed_call']:+,.1f}</td>"
+            f"<td style='text-align:right; font-family:JetBrains Mono,monospace; color:#F59E0B;'>{tf['signed_put']:+,.1f}</td>"
+            f"<td style='text-align:right; font-family:JetBrains Mono,monospace; font-weight:700; color:{dh_col};'>{tf['dealer_hedge_gc']:+,.1f} HĐ GC</td>"
+            f"<td style='color:{dh_col}; font-weight:700; font-size:11px;'>{tf['dominant_flow']}</td>"
+            f"</tr>"
+        )
+    opt_tape_rows_html = "".join(opt_tape_rows) if opt_tape_rows else "<tr><td colspan='7' style='text-align:center; color:#64748B;'>Chưa ghi nhận đột biến Volume Options trong vùng tác chiến</td></tr>"
+
     smile_plotly_div = fig_smile.to_html(
         full_html=False,
         include_plotlyjs="cdn",
@@ -1852,16 +1905,58 @@ def generate_html_terminal(
         </div>
     </div>
 
-    <!-- KHỐI 5: BĂNG GIÁ & XUNG LỰC VOLUME M5 THỜI GIAN THỰC (ORDERFLOW & VOLUME PULSE) -->
+    <!-- KHỐI 5: BĂNG GIÁ & XUNG LỰC VOLUME M5 THỜI GIAN THỰC + BÓC TÁCH ORDERFLOW TỔ CHỨC (LEE-READY / BVC / PARITY BASIS) -->
     <div class="table-box" style="margin-bottom: 16px; border: 1px solid #334155; background:#0B1120;">
         <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span class="badge badge-gold">ORDERFLOW PULSE</span>
-                <span style="font-size:13.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">BĂNG GIÁ & XUNG LỰC VOLUME M5 REALTIME (COMEX GC=F)</span>
+                <span class="badge badge-gold">INSTITUTIONAL ORDERFLOW RECONSTRUCTION</span>
+                <span style="font-size:13.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.5px;">GIẢI MÃ ORDERFLOW THỰC TẾ (LEE-READY QUOTE SIGN • PUT-CALL PARITY LEAD-LAG • BVC &amp; KYLE'S LAMBDA)</span>
             </div>
             <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
                 {m5_header_summary}
             </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; margin-bottom:12px;">
+            <div style="background:#0F172A; border:1px solid #1E293B; border-radius:6px; padding:10px 12px;">
+                <div style="font-size:10.5px; color:#94A3B8; text-transform:uppercase;">Options Implied Forward (F_opt vs GC=F)</div>
+                <div style="font-size:16px; font-weight:800; color:{disloc_color}; font-family:'JetBrains Mono', monospace; margin-top:2px;">
+                    ${f_opt_val:,.2f} <span style="font-size:12px;">({delta_f_val:+.2f}$)</span>
+                </div>
+                <div style="font-size:10.5px; color:{disloc_color}; margin-top:2px; font-weight:700;">{disloc_label}</div>
+            </div>
+            <div style="background:#0F172A; border:1px solid #1E293B; border-radius:6px; padding:10px 12px;">
+                <div style="font-size:10.5px; color:#94A3B8; text-transform:uppercase;">Lee-Ready Signed Options Hedging Pressure</div>
+                <div style="font-size:16px; font-weight:800; color:{hedge_color}; font-family:'JetBrains Mono', monospace; margin-top:2px;">
+                    {dealer_hedge_val:+,.1f} HĐ GC
+                </div>
+                <div style="font-size:10.5px; color:{hedge_color}; margin-top:2px; font-weight:700;">{opt_flow_label}</div>
+            </div>
+            <div style="background:#0F172A; border:1px solid #1E293B; border-radius:6px; padding:10px 12px;">
+                <div style="font-size:10.5px; color:#94A3B8; text-transform:uppercase;">BVC Cumulative Volume Delta &amp; Kyle's λ</div>
+                <div style="font-size:16px; font-weight:800; color:{cvd_color}; font-family:'JetBrains Mono', monospace; margin-top:2px;">
+                    CVD: {bvc_cvd_val:+,.0f} HĐ <span style="font-size:12px; color:#94A3B8;">(Buy: {bvc_buy_pct:.1f}%)</span>
+                </div>
+                <div style="font-size:10.5px; color:#38BDF8; margin-top:2px; font-weight:700;">{kyle_label}</div>
+            </div>
+        </div>
+        {whale_html_bar}
+        <div style="overflow-x:auto; margin-top:10px; margin-bottom:12px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Strike Đột Biến</th>
+                        <th style="text-align:right;">Call Vol / OI</th>
+                        <th style="text-align:right;">Put Vol / OI</th>
+                        <th style="text-align:right;">Signed Call (Lee-Ready)</th>
+                        <th style="text-align:right;">Signed Put (Lee-Ready)</th>
+                        <th style="text-align:right;">Ép Dealer Hedge (GC)</th>
+                        <th style="text-align:left;">Giải Mã Hành Vi Chủ Động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {opt_tape_rows_html}
+                </tbody>
+            </table>
         </div>
         <div style="overflow-x:auto;">
             <table>
@@ -2077,6 +2172,11 @@ def run_pipeline(
         "strike_above": float(meta.get("strike_above", 0.0)),
         "strike_below": float(meta.get("strike_below", 0.0)),
         "expected_move_1s": float(meta.get("expected_move_1s", 0.0)),
+        "implied_forward_price": float((meta.get("institutional_orderflow") or {}).get("implied_forward_price", meta.get("spot_price", 0.0))),
+        "forward_dislocation_usd": float((meta.get("institutional_orderflow") or {}).get("forward_dislocation_usd", 0.0)),
+        "dealer_hedge_futures_flow": float((meta.get("institutional_orderflow") or {}).get("dealer_hedge_futures_flow", 0.0)),
+        "bvc_cvd_contracts": float((meta.get("institutional_orderflow") or {}).get("bvc_cvd_contracts", 0.0)),
+        "bvc_buy_pct": float((meta.get("institutional_orderflow") or {}).get("bvc_buy_pct", 50.0)),
     }
     version_json_str = json.dumps(version_data, indent=2)
     for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:

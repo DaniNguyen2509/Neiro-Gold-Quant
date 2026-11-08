@@ -1,16 +1,21 @@
 {
-  "timestamp_utc": "2026-11-08T10:26:33.978861+00:00",
-  "synced_at_vn": "08/11/2026 17:26:33 VN",
+  "timestamp_utc": "2026-11-08T10:52:51.949502+00:00",
+  "synced_at_vn": "08/11/2026 17:52:51 VN",
   "spot_price": 4074.9,
   "atm_strike": 4075.0,
   "call_wall": 4200.0,
   "put_wall": 4000.0,
-  "zero_gamma_flip": 4089.9,
+  "zero_gamma_flip": 4089.93,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -17.33300632825072,
-  "total_net_vex": 299.09519454870895,
-  "total_net_chex": -197.31664257093834,
+  "total_net_gex": -17.332532735331796,
+  "total_net_vex": 298.8853670860217,
+  "total_net_chex": -197.38398923573465,
   "strike_above": 4075.0,
   "strike_below": 4070.0,
-  "expected_move_1s": 200.85334906000628
+  "expected_move_1s": 200.74789221903336,
+  "implied_forward_price": 4074.91,
+  "forward_dislocation_usd": 0.01,
+  "dealer_hedge_futures_flow": -0.0,
+  "bvc_cvd_contracts": 365.6,
+  "bvc_buy_pct": 71.0
 }

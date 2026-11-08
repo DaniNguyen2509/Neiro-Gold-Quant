@@ -633,3 +633,262 @@ def compute_net_delta_positions(
         "regime_label": regime_label,
         "total_dex_usd": round(total_net * 100.0 * spot_price, 2),
     }
+
+
+def reconstruct_institutional_orderflow(
+    df: Any,
+    spot_price: float,
+    r: float = 0.045,
+    dte_days: float = 15.0,
+    m5_tape: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Reconstructs real-time institutional orderflow without paid CME MDP 3.0 Level 3 feed.
+
+    Combines 4 market microstructure proxies:
+    1. Lee-Ready Quote Location-in-Spread + Local IV Skew Signed Options Flow
+    2. Put-Call Parity Implied Forward Dislocation (delta_F = F_opt - F_GC)
+    3. Guaranteed New Intraday Whale Position Initiation (Volume_K > OI_K)
+    4. Bulk Volume Classification (BVC - Easley, Lopez de Prado & O'Hara) + Kyle's Lambda on GC Tape
+    """
+    empty_res: dict[str, Any] = {
+        "implied_forward_price": round(float(spot_price or 0.0), 2),
+        "forward_dislocation_usd": 0.0,
+        "dislocation_regime": "SYNCHRONIZED_PARITY",
+        "dislocation_label": "CÂN BẰNG PARITY (ARB LOCKED)",
+        "signed_call_flow": 0.0,
+        "signed_put_flow": 0.0,
+        "dealer_hedge_futures_flow": 0.0,
+        "options_flow_regime": "NEUTRAL_FLOW",
+        "options_flow_label": "DÒNG LỆNH QUYỀN CHỌN CÂN BẰNG",
+        "whale_initiations": [],
+        "top_flow_strikes": [],
+        "bvc_cvd_contracts": 0.0,
+        "bvc_buy_pct": 50.0,
+        "kyle_lambda_regime": "NORMAL_LIQUIDITY",
+        "kyle_lambda_label": "THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG",
+    }
+    if df is None or getattr(df, "empty", True) or spot_price <= 0:
+        return empty_res
+
+    t_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
+    sqrt_t = math.sqrt(t_years)
+    df_disc = math.exp(-r * t_years)
+    exp_rt = math.exp(r * t_years)
+
+    # 1. Put-Call Parity Implied Forward Dislocation (delta_F = F_opt - F_GC)
+    near_mask = (df["strike"].astype(float) - spot_price).abs() <= 60.0
+    near_df = df[near_mask] if near_mask.any() else df
+    implied_forwards: list[tuple[float, float]] = []
+    for _, row in near_df.iterrows():
+        k = float(row.get("strike", 0.0))
+        c_mid = float(row.get("callMid", 0.0))
+        p_mid = float(row.get("putMid", 0.0))
+        c_bid = float(row.get("callBid", 0.0))
+        p_bid = float(row.get("putBid", 0.0))
+        if k > 0 and c_mid > 0 and p_mid > 0 and (c_bid > 0 or p_bid > 0):
+            f_k = k + exp_rt * (c_mid - p_mid)
+            if abs(f_k - spot_price) <= 80.0:
+                weight = max(1.0, float(row.get("callVolume", 0) + row.get("putVolume", 0) + 10)) / (1.0 + abs(k - spot_price))
+                implied_forwards.append((f_k, weight))
+
+    if implied_forwards:
+        w_sum = sum(w for _, w in implied_forwards)
+        f_opt = sum(f * w for f, w in implied_forwards) / max(1e-9, w_sum)
+    else:
+        f_opt = float(spot_price)
+
+    delta_f = round(f_opt - spot_price, 2)
+    if delta_f >= 1.50:
+        disloc_regime = "OPTIONS_LEADING_BULLISH"
+        disloc_label = f"OPTIONS DẪN SÓNG MUA (+${delta_f:.2f} vs GC)"
+    elif delta_f <= -1.50:
+        disloc_regime = "OPTIONS_LEADING_BEARISH"
+        disloc_label = f"OPTIONS DẪN SÓNG BÁN (${delta_f:.2f} vs GC)"
+    else:
+        disloc_regime = "SYNCHRONIZED_PARITY"
+        disloc_label = f"CÂN BẰNG PARITY ({delta_f:+.2f}$)"
+
+    # 2. Lee-Ready Quote Rule + Volatility-Signed Options Flow & Whale Initiation
+    atm_idx = (df["strike"].astype(float) - spot_price).abs().idxmin()
+    atm_c_iv = float(df.loc[atm_idx, "callIV"]) if "callIV" in df.columns else 0.20
+    atm_p_iv = float(df.loc[atm_idx, "putIV"]) if "putIV" in df.columns else 0.20
+    if atm_c_iv > 2.0:
+        atm_c_iv /= 100.0
+    if atm_p_iv > 2.0:
+        atm_p_iv /= 100.0
+
+    signed_call_flow = 0.0
+    signed_put_flow = 0.0
+    dealer_hedge_flow = 0.0
+    whale_initiations: list[dict[str, Any]] = []
+    flow_candidates: list[dict[str, Any]] = []
+
+    band_df = df[(df["strike"].astype(float) >= spot_price - 400.0) & (df["strike"].astype(float) <= spot_price + 400.0)]
+    for _, row in band_df.iterrows():
+        k = float(row.get("strike", 0.0))
+        if k <= 0:
+            continue
+        c_vol = int(float(row.get("callVolume", 0)))
+        p_vol = int(float(row.get("putVolume", 0)))
+        c_oi = int(float(row.get("callOpenInterest", 0)))
+        p_oi = int(float(row.get("putOpenInterest", 0)))
+        if c_vol <= 0 and p_vol <= 0:
+            continue
+
+        c_bid = float(row.get("callBid", 0.0))
+        c_ask = float(row.get("callAsk", 0.0))
+        c_last = float(row.get("callLatest", row.get("callMid", 0.0)))
+        c_iv = float(row.get("callIV", atm_c_iv))
+        if c_iv > 2.0:
+            c_iv /= 100.0
+        c_iv = max(0.05, min(1.50, c_iv))
+
+        p_bid = float(row.get("putBid", 0.0))
+        p_ask = float(row.get("putAsk", 0.0))
+        p_last = float(row.get("putLatest", row.get("putMid", 0.0)))
+        p_iv = float(row.get("putIV", atm_p_iv))
+        if p_iv > 2.0:
+            p_iv /= 100.0
+        p_iv = max(0.05, min(1.50, p_iv))
+
+        # Lee-Ready Location-in-Spread [-1, +1] for Call
+        if c_bid > 0 and c_ask > c_bid and c_last > 0:
+            w_c = max(-1.0, min(1.0, (2.0 * c_last - (c_bid + c_ask)) / (c_ask - c_bid)))
+        else:
+            # Volatility Skew expansion fallback sign
+            iv_diff_c = c_iv - atm_c_iv
+            w_c = 0.65 if iv_diff_c > 0.003 else (-0.45 if iv_diff_c < -0.003 else 0.25)
+
+        # Lee-Ready Location-in-Spread [-1, +1] for Put
+        if p_bid > 0 and p_ask > p_bid and p_last > 0:
+            w_p = max(-1.0, min(1.0, (2.0 * p_last - (p_bid + p_ask)) / (p_ask - p_bid)))
+        else:
+            iv_diff_p = p_iv - atm_p_iv
+            w_p = 0.65 if iv_diff_p > 0.003 else (-0.45 if iv_diff_p < -0.003 else 0.25)
+
+        d1_c = (math.log(spot_price / k) + 0.5 * (c_iv ** 2) * t_years) / max(1e-5, c_iv * sqrt_t)
+        d1_p = (math.log(spot_price / k) + 0.5 * (p_iv ** 2) * t_years) / max(1e-5, p_iv * sqrt_t)
+        delta_c = df_disc * 0.5 * (1.0 + math.erf(d1_c / math.sqrt(2.0)))
+        delta_p = abs(df_disc * (0.5 * (1.0 + math.erf(d1_p / math.sqrt(2.0))) - 1.0))
+
+        s_c = c_vol * w_c
+        s_p = p_vol * w_p
+        signed_call_flow += s_c
+        signed_put_flow += s_p
+        # Customer buys Call (+s_c) -> Dealer short Call -> Dealer MUST BUY Futures (+s_c * delta_c)
+        # Customer buys Put (+s_p)  -> Dealer short Put  -> Dealer MUST SELL Futures (-s_p * delta_p)
+        strike_hedge = (s_c * delta_c) - (s_p * delta_p)
+        dealer_hedge_flow += strike_hedge
+
+        # Guaranteed New Intraday Whale Initiation: Volume > Open Interest
+        if c_vol > c_oi and c_vol >= 30:
+            whale_initiations.append({
+                "strike": k,
+                "side": "CALL",
+                "volume": c_vol,
+                "oi": c_oi,
+                "new_contracts_min": c_vol - c_oi,
+                "siege_ratio": round(c_vol / max(1, c_oi), 2),
+                "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_c >= 0 else "SELL_TO_OPEN (HIT BID)",
+            })
+        if p_vol > p_oi and p_vol >= 30:
+            whale_initiations.append({
+                "strike": k,
+                "side": "PUT",
+                "volume": p_vol,
+                "oi": p_oi,
+                "new_contracts_min": p_vol - p_oi,
+                "siege_ratio": round(p_vol / max(1, p_oi), 2),
+                "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_p >= 0 else "SELL_TO_OPEN (HIT BID)",
+            })
+
+        flow_candidates.append({
+            "strike": k,
+            "call_vol": c_vol,
+            "put_vol": p_vol,
+            "total_vol": c_vol + p_vol,
+            "call_oi": c_oi,
+            "put_oi": p_oi,
+            "signed_call": round(s_c, 1),
+            "signed_put": round(s_p, 1),
+            "dealer_hedge_gc": round(strike_hedge, 1),
+            "dominant_flow": (
+                "MUA CALL CHỦ ĐỘNG (MM Mua GC)" if strike_hedge > 15.0
+                else ("MUA PUT / XẢ CALL (MM Bán GC)" if strike_hedge < -15.0 else "CÂN BẰNG / HAI CHIỀU")
+            ),
+        })
+
+    whale_initiations.sort(key=lambda x: x["new_contracts_min"], reverse=True)
+    flow_candidates.sort(key=lambda x: x["total_vol"], reverse=True)
+
+    if dealer_hedge_flow > 50.0:
+        opt_regime = "DEALER_FORCED_BUYING"
+        opt_label = f"ÉP DEALER MUA FUTURES (+{dealer_hedge_flow:,.0f} HĐ GC)"
+    elif dealer_hedge_flow < -50.0:
+        opt_regime = "DEALER_FORCED_SELLING"
+        opt_label = f"ÉP DEALER BÁN FUTURES ({dealer_hedge_flow:,.0f} HĐ GC)"
+    else:
+        opt_regime = "NEUTRAL_FLOW"
+        opt_label = f"CÂN BẰNG HEDGING ({dealer_hedge_flow:+,.0f} HĐ GC)"
+
+    # 3. Bulk Volume Classification (BVC) & Kyle's Lambda on M5/M1 Futures Tape
+    bvc_cvd = 0.0
+    bvc_buy_vol = 0.0
+    bvc_total_vol = 0.0
+    kyle_regime = "NORMAL_LIQUIDITY"
+    kyle_label = "THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG"
+
+    candles = (m5_tape or {}).get("chart_candles") or (m5_tape or {}).get("candles") or []
+    if len(candles) >= 3:
+        recent_c = candles[-24:]
+        dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
+        std_dp = float(np.std(dp_list)) if len(dp_list) > 1 else 1.0
+        std_dp = max(0.25, std_dp)
+
+        lambdas: list[float] = []
+        for c in recent_c:
+            vol = float(c.get("volume", 0.0))
+            if vol <= 0:
+                continue
+            dp = float(c.get("close", 0.0)) - float(c.get("open", 0.0))
+            z = dp / std_dp
+            # Standard Normal CDF Phi(z) for BVC
+            buy_frac = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+            v_buy = vol * buy_frac
+            v_sell = vol - v_buy
+            bvc_cvd += (v_buy - v_sell)
+            bvc_buy_vol += v_buy
+            bvc_total_vol += vol
+            lambdas.append(abs(dp) / vol * 1000.0)
+
+        if lambdas and bvc_total_vol > 0:
+            avg_lam = float(np.mean(lambdas))
+            last_lam = lambdas[-1]
+            last_vol = float(recent_c[-1].get("volume", 0.0))
+            avg_v = bvc_total_vol / len(lambdas)
+            if last_vol >= 1.3 * avg_v and last_lam <= 0.55 * max(1e-6, avg_lam):
+                kyle_regime = "ICEBERG_ABSORPTION"
+                kyle_label = "HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)"
+            elif last_lam >= 1.75 * max(1e-6, avg_lam):
+                kyle_regime = "LIQUIDITY_VACUUM_SWEEP"
+                kyle_label = "TRƯỢT GIÁ RỖNG SỔ LỆNH (VACUUM MARKET SWEEP)"
+
+    bvc_buy_pct = round((bvc_buy_vol / bvc_total_vol) * 100.0, 1) if bvc_total_vol > 0 else 50.0
+
+    return {
+        "implied_forward_price": round(f_opt, 2),
+        "forward_dislocation_usd": delta_f,
+        "dislocation_regime": disloc_regime,
+        "dislocation_label": disloc_label,
+        "signed_call_flow": round(signed_call_flow, 1),
+        "signed_put_flow": round(signed_put_flow, 1),
+        "dealer_hedge_futures_flow": round(dealer_hedge_flow, 1),
+        "options_flow_regime": opt_regime,
+        "options_flow_label": opt_label,
+        "whale_initiations": whale_initiations[:5],
+        "top_flow_strikes": flow_candidates[:6],
+        "bvc_cvd_contracts": round(bvc_cvd, 1),
+        "bvc_buy_pct": bvc_buy_pct,
+        "kyle_lambda_regime": kyle_regime,
+        "kyle_lambda_label": kyle_label,
+    }

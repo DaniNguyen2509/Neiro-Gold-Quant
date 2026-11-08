@@ -311,3 +311,11 @@ on:
      * **Tầng 2 (`MONTHLY`):** Kỳ hạn Tháng hiện hành (`OG{Month}{YY}`), tự động chuyển tiếp hợp đồng cơ sở (`GCZ26` $\to$ `GCG27` $\to$ `GCJ27`...) ngay sau giờ chốt sổ `13:30 America/Chicago`.
      * **Tầng 3 (`QUARTERLY`):** Tự động phát hiện và thu thập kỳ hạn Chủ lực / Quý kế tiếp thuộc chu kỳ vàng tổ chức (`G-Feb, J-Apr, M-Jun, Q-Aug, Z-Dec`), bảo đảm không bao giờ bỏ sót bức tường Open Interest (OI) tổ chức lớn nhất khi kỳ Front-Month rơi vào các tháng phụ (Serial Months).
    - Khi thu thập thực tế từ Barchart (`scrape_multi_expiry_and_save`), hệ thống ưu tiên đọc trực tiếp trường `expirationDate` chính thức từ JSON của Barchart trả về cho từng kỳ hạn con để hiệu chỉnh `DTE` chính xác tuyệt đối trước khi giải nghiệm Black-76 IV và gộp đa kỳ hạn theo Volatility Skew từng Strike (`callIV` / `putIV`).
+
+
+5. **Động Cơ Giải Mã Orderflow Thực Tế Không Cần Level 3 MDP 3.0 (`reconstruct_institutional_orderflow`):**
+   - Trong `src/quant_engine/dealer.py`, hàm `reconstruct_institutional_orderflow()` tái tạo trực tiếp dòng lệnh tổ chức qua 4 thước đo vi cấu trúc:
+     * **Lee-Ready Quote Location-in-Spread + Local IV Skew:** Định dấu chủ động Mua/Bán (`SignedCallFlow`, `SignedPutFlow`) từ vị trí giá khớp `LastPrice` trong khoảng `[Bid, Ask]` kết hợp độ bung `IV` cục bộ để tính chính xác số lượng hợp đồng tương lai `GC` mà Dealer bị ép phải mua/bán phòng hộ (`dealer_hedge_futures_flow`).
+     * **Put-Call Parity Implied Forward Lead-Lag ($\delta F = F_{\text{opt}} - F_{\text{GC}}$):** Đo độ lệch giữa giá tương lai ngầm định trên sổ lệnh Options ($F_{\text{opt}} = K + e^{rT}(C_{\text{mid}} - P_{\text{mid}})$) và giá khớp lệnh `GC=F` để phát hiện dòng tiền tổ chức dẫn sóng từ bàn Options sang bàn Futures.
+     * **Guaranteed New Intraday Whale Initiation ($\text{Volume}_K > \text{OI}_K$):** Phát hiện 100% vị thế mở mới trong ngày khi khối lượng khớp vượt trần Open Interest đầu ngày ($\text{new\_contracts\_min} = \text{Volume}_K - \text{OI}_K$).
+     * **Bulk Volume Classification (BVC - Easley, López de Prado & O'Hara) & Kyle's Lambda ($\lambda$):** Phân rã `CVD` (Cumulative Volume Delta) và đo hệ số cản giá $\lambda = |\Delta P| / V$ để nhận diện **True Iceberg Absorption** (khối lượng lớn nhưng biên độ nén chặt) so với **Liquidity Vacuum Sweep** (trượt giá qua sổ lệnh rỗng).
