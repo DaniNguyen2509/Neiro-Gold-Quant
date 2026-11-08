@@ -254,13 +254,20 @@ def scrape_and_save(
         return ""
 
     if df is not None and len(df) > 0:
-        max_strike = float(df["strike"].max())
-        min_strike = float(df["strike"].min())
-        if (max_strike < 2600.0 or min_strike > 2800.0) and out_file.exists():
+        from src.collector.validator import validate_options_frame
+        ref_price = 4000.0
+        try:
+            from src.quant_engine.basis import fetch_live_cme_futures_price
+            lp = fetch_live_cme_futures_price()
+            if lp and lp > 500.0:
+                ref_price = lp
+        except Exception:
+            pass
+        val = validate_options_frame(df, reference_price=ref_price)
+        if not val.ok and out_file.exists():
             logger.warning(
-                "Scraped strikes [%.1f, %.1f] do not cover active gold market (2600-2800). Preserving existing active dataset at %s",
-                min_strike,
-                max_strike,
+                "Scraped options chain failed validation (%s). Preserving existing active dataset at %s",
+                val.errors,
                 out_file,
             )
             return str(out_file)
@@ -321,6 +328,7 @@ def scrape_multi_expiry_and_save(
                         min_k, max_k, exp["name"], sym
                     )
                     continue
+                df = _enrich_options_iv_and_greeks(df, dte_days=float(exp.get("dte", 23.0)))
                 df.attrs["expiration_date"] = exp["expiration_date"]
                 df.attrs["dte_days"] = exp["dte"]
                 df.attrs["option_symbol"] = sym

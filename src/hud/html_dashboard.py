@@ -418,6 +418,10 @@ def load_and_preprocess_options(
         gamma_p = np.where(df["putGamma"] > 0, df["putGamma"], gamma_b76)
     df["callGamma"] = gamma_c
     df["putGamma"] = gamma_p
+    if raw_unphysical or "callGammaPower" not in df.columns:
+        df["callGammaPower"] = gamma_c * df["callOpenInterest"]
+    if raw_unphysical or "putGammaPower" not in df.columns:
+        df["putGammaPower"] = gamma_p * df["putOpenInterest"]
 
     # 3. GEX Calculation ($M / 1% move)
     df["callGEX"] = gamma_c * df["callOpenInterest"] * MULT * scale

@@ -66,15 +66,16 @@ jobs:
         run: |
           python -c "
           import pandas as pd, sys, subprocess
+          from src.collector.validator import validate_options_frame
+          from src.quant_engine.basis import fetch_live_cme_futures_price
           try:
               df = pd.read_csv('data/options_prices_GCZ26.csv')
+              ref_p = fetch_live_cme_futures_price() or 4000.0
+              res = validate_options_frame(df, reference_price=ref_p)
+              assert res.ok, '; '.join(res.errors)
               strikes = df['strike'].dropna()
-              assert len(strikes) >= 10, f'Strike count {len(strikes)} is below minimum 10'
-              assert strikes.min() <= 2800.0, f'Min strike {strikes.min()} is above active trading band'
-              assert strikes.max() >= 2600.0, f'Max strike {strikes.max()} is below active trading band'
               total_oi = float(df['callOpenInterest'].sum() + df['putOpenInterest'].sum())
-              assert total_oi > 0, 'Total Open Interest is zero'
-              print(f'[VERIFIED] Data integrity passed: {len(strikes)} strikes ({strikes.min()} to {strikes.max()}), Total OI: {total_oi}')
+              print(f'[VERIFIED] Data integrity passed: {len(strikes)} strikes ({strikes.min()} to {strikes.max()}), Ref GC: {ref_p}, Total OI: {total_oi}')
           except Exception as e:
               print(f'::warning title=Options Scrape Verification Failed::Scraped file verification failed: {e}. Reverting data/options_prices_GCZ26.csv to repository valid state...')
               subprocess.run(['git', 'checkout', 'data/options_prices_GCZ26.csv'], check=False)

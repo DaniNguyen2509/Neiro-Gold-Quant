@@ -256,3 +256,28 @@ def test_short_put_dynamic_hedging_math():
     assert 150.0 <= abs(delta_change) <= 160.0
     assert 60.0 <= notional_mil <= 66.0
 
+
+def test_unphysical_flat_gamma_healed_by_black76_in_wall_scoring():
+    """Regression guard: uniform dummy 0.0037 gamma or stale callGammaPower at deep OTM ($5500)
+    must be healed with true Black-76 gamma so $4200 wins over $5500."""
+    strikes = [3700.0, 3900.0, 4000.0, 4075.0, 4100.0, 4200.0, 4500.0, 5000.0, 5500.0]
+    call_oi = [10, 50, 500, 1000, 4076, 6193, 3000, 5000, 15000]
+    put_oi = [12000, 6600, 5163, 1200, 400, 200, 50, 10, 5]
+
+    df = pd.DataFrame({
+        "strike": strikes,
+        "callOpenInterest": call_oi,
+        "putOpenInterest": put_oi,
+        "callVolume": [10] * len(strikes),
+        "putVolume": [10] * len(strikes),
+        "callGamma": [0.0037] * len(strikes),
+        "putGamma": [0.0037] * len(strikes),
+        "callGammaPower": [oi * 0.0037 for oi in call_oi],
+        "putGammaPower": [oi * 0.0037 for oi in put_oi],
+    })
+
+    cw, pw = find_gamma_weighted_walls(df, top_n=2, spot_price=4075.0, dte_days=17.0, default_iv=0.20)
+    assert cw[0].strike == 4200.0, f"Expected Call Wall 4200.0, got {cw[0].strike}"
+    assert pw[0].strike == 4000.0, f"Expected Put Wall 4000.0, got {pw[0].strike}"
+
+

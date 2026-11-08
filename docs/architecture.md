@@ -298,3 +298,8 @@ on:
      * Tự động sửa lỗi chào giá chéo (Crossed quotes: tự động hoán đổi khi $\text{Ask} < \text{Bid}$).
      * Làm sạch các ký tự lạ, tiền tệ, công thức lỗi (#N/A, unch, $).
      * Khóa cận không âm cho OI, Volume và IV.
+
+
+3. **Bất biến Tự Chữa Lành Gamma Power Black-76 & Làm giàu IV Đa Kỳ Hạn (Black-76 Gamma Power Self-Healing):**
+   - Khi dữ liệu thô trả về `gamma = 0.0` và bị gán mặc định đồng loạt `0.0037` (unphysical flat gamma), toàn bộ chuỗi xử lý (`aggregate_options_dataframes`, `compute_tactical_matrix`, `find_gamma_weighted_walls`, `load_and_preprocess_options`) tự động phát hiện qua cờ `raw_unphys` (kiểm tra cả `callGamma` và tỷ lệ `callGammaPower / callOpenInterest` tại vùng Deep OTM `strike > spot + 800`) và ép tính lại `callGamma`, `putGamma`, `callGammaPower = callOI * gamma_b76`, `putGammaPower = putOI * gamma_b76` cùng `GEX/VEX/CHEX` theo giải tích Black-76 chuẩn xác.
+   - Tại `scrape_multi_expiry_and_save()`, mỗi kỳ hạn con (Nearest Weekly, End-of-Month, Quarterly Anchor) bắt buộc được làm giàu Black-76 IV và Greeks theo đúng `dte` riêng trước khi gộp tỷ trọng Gamma Power (`aggregate_options_dataframes`), ngăn chặn triệt để hiện tượng tường ảo ở các strike Deep OTM ($5,500 hay $3,700).

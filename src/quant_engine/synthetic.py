@@ -213,12 +213,12 @@ def compute_dynamic_dte(
         if isinstance(expiry, datetime.datetime):
             exp_dt = expiry
         elif isinstance(expiry, datetime.date):
-            exp_dt = datetime.datetime.combine(expiry, datetime.time(18, 30))
+            exp_dt = get_cme_cutoff_dt(expiry)
         else:
             s = str(expiry).strip()
             if len(s) == 10 and s[4] == "-" and s[7] == "-":
                 parts = [int(p) for p in s.split("-")]
-                exp_dt = datetime.datetime(parts[0], parts[1], parts[2], 18, 30)
+                exp_dt = get_cme_cutoff_dt(datetime.date(parts[0], parts[1], parts[2]))
             else:
                 exp_dt = datetime.datetime.fromisoformat(s)
 

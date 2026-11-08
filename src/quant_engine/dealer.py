@@ -334,6 +334,22 @@ def find_gamma_weighted_walls(
         mult = 100.0
         scale = (spot ** 2) * 0.01 / 1e6
 
+        raw_unphys = (
+            ("callGamma" in df.columns and len(df) > 5 and df["callGamma"].nunique() <= 3)
+            or ("callGamma" in df.columns and bool(((df["strike"] > (spot + 800.0)) & (df["callGamma"] > 0.001)).any()))
+            or (
+                "callGammaPower" in df.columns
+                and "callOpenInterest" in df.columns
+                and bool(
+                    (
+                        (df["strike"] > (spot + 800.0))
+                        & (df["callOpenInterest"] > 0)
+                        & ((df["callGammaPower"] / np.maximum(1, df["callOpenInterest"])) > 0.001)
+                    ).any()
+                )
+            )
+        )
+
         for _, row in df.iterrows():
             k = float(row.get("strike", 0.0))
             if k <= 0:
@@ -344,8 +360,8 @@ def find_gamma_weighted_walls(
             p_vol = int(row.get("putVolume", 0))
 
             # Gamma resolution: use pre-existing or compute Black-76
-            c_gamma = float(row.get("callGamma", 0.0))
-            p_gamma = float(row.get("putGamma", 0.0))
+            c_gamma = 0.0 if raw_unphys else float(row.get("callGamma", 0.0))
+            p_gamma = 0.0 if raw_unphys else float(row.get("putGamma", 0.0))
             if c_gamma <= 0.0 or p_gamma <= 0.0:
                 d1 = (math.log(max(1e-4, spot / k)) + half_sig2_t) / denom
                 pdf = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * (d1 ** 2))
@@ -355,12 +371,12 @@ def find_gamma_weighted_walls(
                 if p_gamma <= 0.0:
                     p_gamma = b76_gamma
 
-            c_power = float(row.get("callGammaPower", c_oi * c_gamma))
-            p_power = float(row.get("putGammaPower", p_oi * p_gamma))
+            c_power = (c_oi * c_gamma) if raw_unphys else float(row.get("callGammaPower", c_oi * c_gamma))
+            p_power = (p_oi * p_gamma) if raw_unphys else float(row.get("putGammaPower", p_oi * p_gamma))
 
-            c_gex = float(row.get("callGEX", c_gamma * c_oi * mult * scale))
-            p_gex = float(row.get("putGEX", - (p_gamma * p_oi * mult * scale)))
-            net_gex = float(row.get("netGEX", c_gex + p_gex))
+            c_gex = (c_gamma * c_oi * mult * scale) if raw_unphys else float(row.get("callGEX", c_gamma * c_oi * mult * scale))
+            p_gex = (-(p_gamma * p_oi * mult * scale)) if raw_unphys else float(row.get("putGEX", - (p_gamma * p_oi * mult * scale)))
+            net_gex = (c_gex + p_gex) if raw_unphys else float(row.get("netGEX", c_gex + p_gex))
             total_net_gex += net_gex
 
             records.append({

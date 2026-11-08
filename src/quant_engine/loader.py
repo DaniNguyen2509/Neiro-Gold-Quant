@@ -769,9 +769,19 @@ def aggregate_options_dataframes(
         pdf_d1 = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1 ** 2))
         b76_gamma = (df_disc * pdf_d1) / np.maximum(1e-4, spot * denom)
 
-        # Fill gamma if missing / zero
-        d_copy["callGamma"] = np.where(d_copy["callGamma"] > 0, d_copy["callGamma"], b76_gamma)
-        d_copy["putGamma"] = np.where(d_copy["putGamma"] > 0, d_copy["putGamma"], b76_gamma)
+        # Fill gamma if missing, zero, or uniform dummy fallback (0.0037)
+        c_unphys = (
+            (d_copy["callGamma"] <= 0).all()
+            or (len(d_copy) > 5 and d_copy["callGamma"].nunique() <= 3)
+            or bool(((d_copy["strike"] > (spot + 800.0)) & (d_copy["callGamma"] > 0.001)).any())
+        )
+        p_unphys = (
+            (d_copy["putGamma"] <= 0).all()
+            or (len(d_copy) > 5 and d_copy["putGamma"].nunique() <= 3)
+            or bool(((d_copy["strike"] > (spot + 800.0)) & (d_copy["putGamma"] > 0.001)).any())
+        )
+        d_copy["callGamma"] = b76_gamma if c_unphys else np.where(d_copy["callGamma"] > 0, d_copy["callGamma"], b76_gamma)
+        d_copy["putGamma"] = b76_gamma if p_unphys else np.where(d_copy["putGamma"] > 0, d_copy["putGamma"], b76_gamma)
 
         d_copy["callGammaPower"] = d_copy["callOpenInterest"] * d_copy["callGamma"]
         d_copy["putGammaPower"] = d_copy["putOpenInterest"] * d_copy["putGamma"]
@@ -968,20 +978,11 @@ def compute_tactical_matrix(
         if implied > 500.0:
             spot_price = implied
 
-    # 2. Net GEX & Delta Flow Calculation
+    # 2. Net GEX, Second-Order Greeks & Delta Flow Calculation (Black-76)
     # MULT = 100 troy oz per CME Gold contract
     MULT = 100.0
     scale = (spot_price ** 2) * 0.01 / 1e6
 
-    df['callGEX'] = df['callGamma'] * df['callOpenInterest'] * MULT * scale
-    df['putGEX'] = - (df['putGamma'] * df['putOpenInterest'] * MULT * scale)
-    df['netGEX'] = df['callGEX'] + df['putGEX']
-
-    df['callDeltaFlow'] = df['callVolume'] * MULT * scale
-    df['putDeltaFlow'] = - (df['putVolume'] * MULT * scale)
-    df['netDeltaFlow'] = df['callDeltaFlow'] + df['putDeltaFlow']
-
-    # 2.2 Second-Order Greeks: Vanna (VEX) & Charm (CHEX) Calculation (Black-76)
     T_years = max(float(effective_dte) / 365.0, 1.0 / 365.0)
     atm_straddle = c_mid_atm + p_mid_atm
     if spot_price > 0 and T_years > 0:
@@ -998,6 +999,25 @@ def compute_tactical_matrix(
     pdf_d1 = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1 ** 2))
     cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
     df_discount = np.exp(-r * T_years)
+    gamma_b76 = (df_discount * pdf_d1) / np.maximum(1e-4, spot_price * denom)
+
+    raw_unphys = (
+        (len(df) > 5 and df['callGamma'].nunique() <= 3)
+        or bool(((df['strike'] > (spot_price + 800.0)) & (df['callGamma'] > 0.001)).any())
+    )
+    if raw_unphys:
+        df['callGamma'] = gamma_b76
+        df['putGamma'] = gamma_b76
+        df['callGammaPower'] = gamma_b76 * df['callOpenInterest']
+        df['putGammaPower'] = gamma_b76 * df['putOpenInterest']
+
+    df['callGEX'] = df['callGamma'] * df['callOpenInterest'] * MULT * scale
+    df['putGEX'] = - (df['putGamma'] * df['putOpenInterest'] * MULT * scale)
+    df['netGEX'] = df['callGEX'] + df['putGEX']
+
+    df['callDeltaFlow'] = df['callVolume'] * MULT * scale
+    df['putDeltaFlow'] = - (df['putVolume'] * MULT * scale)
+    df['netDeltaFlow'] = df['callDeltaFlow'] + df['putDeltaFlow']
 
     # Vanna = -df * n(d1) * (d2 / sigma)
     vanna = - df_discount * pdf_d1 * (d2 / sigma_atm)
