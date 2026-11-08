@@ -662,6 +662,7 @@ def reconstruct_institutional_orderflow(
         "options_flow_label": "DÒNG LỆNH QUYỀN CHỌN CÂN BẰNG",
         "whale_initiations": [],
         "top_flow_strikes": [],
+        "per_strike_flow": {},
         "bvc_cvd_contracts": 0.0,
         "bvc_buy_pct": 50.0,
         "kyle_lambda_regime": "NORMAL_LIQUIDITY",
@@ -722,12 +723,13 @@ def reconstruct_institutional_orderflow(
     dealer_hedge_flow = 0.0
     whale_initiations: list[dict[str, Any]] = []
     flow_candidates: list[dict[str, Any]] = []
+    per_strike_flow: dict[float, dict[str, Any]] = {}
 
-    band_df = df[(df["strike"].astype(float) >= spot_price - 400.0) & (df["strike"].astype(float) <= spot_price + 400.0)]
-    for _, row in band_df.iterrows():
+    for _, row in df.iterrows():
         k = float(row.get("strike", 0.0))
         if k <= 0:
             continue
+        in_band = abs(k - spot_price) <= 400.0
         c_vol = int(float(row.get("callVolume", 0)))
         p_vol = int(float(row.get("putVolume", 0)))
         c_oi = int(float(row.get("callOpenInterest", 0)))
@@ -773,15 +775,19 @@ def reconstruct_institutional_orderflow(
 
         s_c = c_vol * w_c
         s_p = p_vol * w_p
-        signed_call_flow += s_c
-        signed_put_flow += s_p
         # Customer buys Call (+s_c) -> Dealer short Call -> Dealer MUST BUY Futures (+s_c * delta_c)
         # Customer buys Put (+s_p)  -> Dealer short Put  -> Dealer MUST SELL Futures (-s_p * delta_p)
         strike_hedge = (s_c * delta_c) - (s_p * delta_p)
-        dealer_hedge_flow += strike_hedge
+        if in_band:
+            signed_call_flow += s_c
+            signed_put_flow += s_p
+            dealer_hedge_flow += strike_hedge
+
+        is_whale_call = c_vol > c_oi and c_vol >= 30
+        is_whale_put = p_vol > p_oi and p_vol >= 30
 
         # Guaranteed New Intraday Whale Initiation: Volume > Open Interest
-        if c_vol > c_oi and c_vol >= 30:
+        if in_band and is_whale_call:
             whale_initiations.append({
                 "strike": k,
                 "side": "CALL",
@@ -791,7 +797,7 @@ def reconstruct_institutional_orderflow(
                 "siege_ratio": round(c_vol / max(1, c_oi), 2),
                 "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_c >= 0 else "SELL_TO_OPEN (HIT BID)",
             })
-        if p_vol > p_oi and p_vol >= 30:
+        if in_band and is_whale_put:
             whale_initiations.append({
                 "strike": k,
                 "side": "PUT",
@@ -802,7 +808,7 @@ def reconstruct_institutional_orderflow(
                 "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_p >= 0 else "SELL_TO_OPEN (HIT BID)",
             })
 
-        flow_candidates.append({
+        item_dict = {
             "strike": k,
             "call_vol": c_vol,
             "put_vol": p_vol,
@@ -812,11 +818,18 @@ def reconstruct_institutional_orderflow(
             "signed_call": round(s_c, 1),
             "signed_put": round(s_p, 1),
             "dealer_hedge_gc": round(strike_hedge, 1),
+            "is_whale_new_oi": bool(is_whale_call or is_whale_put),
+            "whale_side": "CALL" if is_whale_call else ("PUT" if is_whale_put else ""),
             "dominant_flow": (
-                "MUA CALL CHỦ ĐỘNG (MM Mua GC)" if strike_hedge > 15.0
-                else ("MUA PUT / XẢ CALL (MM Bán GC)" if strike_hedge < -15.0 else "CÂN BẰNG / HAI CHIỀU")
+                "MUA CALL CHỦ ĐỘNG (Ép MM Mua GC)" if strike_hedge > 15.0
+                else ("MUA PUT / XẢ CALL (Ép MM Bán GC)" if strike_hedge < -15.0
+                      else ("MUA NHẸ (MM Mua GC)" if strike_hedge > 2.0
+                            else ("BÁN NHẸ (MM Bán GC)" if strike_hedge < -2.0 else "CÂN BẰNG / HAI CHIỀU")))
             ),
-        })
+        }
+        per_strike_flow[round(k, 1)] = item_dict
+        if in_band:
+            flow_candidates.append(item_dict)
 
     whale_initiations.sort(key=lambda x: x["new_contracts_min"], reverse=True)
     flow_candidates.sort(key=lambda x: x["total_vol"], reverse=True)
@@ -887,6 +900,7 @@ def reconstruct_institutional_orderflow(
         "options_flow_label": opt_label,
         "whale_initiations": whale_initiations[:5],
         "top_flow_strikes": flow_candidates[:6],
+        "per_strike_flow": per_strike_flow,
         "bvc_cvd_contracts": round(bvc_cvd, 1),
         "bvc_buy_pct": bvc_buy_pct,
         "kyle_lambda_regime": kyle_regime,

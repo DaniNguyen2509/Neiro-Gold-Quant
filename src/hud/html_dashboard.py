@@ -1337,6 +1337,21 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     # Identify nearest strike to spot
     min_dist_strike = min(df_sorted["strike"], key=lambda k: abs(k - spot))
 
+    inst_flow = meta.get("institutional_orderflow") or {}
+    per_strike_flow = inst_flow.get("per_strike_flow") or {}
+    f_opt_val = float(inst_flow.get("implied_forward_price", spot))
+    delta_f_val = float(inst_flow.get("forward_dislocation_usd", 0.0))
+    disloc_label = str(inst_flow.get("dislocation_label", "CÂN BẰNG PARITY"))
+    dealer_hedge_val = float(inst_flow.get("dealer_hedge_futures_flow", 0.0))
+    opt_flow_label = str(inst_flow.get("options_flow_label", "CÂN BẰNG HEDGING"))
+    bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
+    bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
+    kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+
+    disloc_col = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
+    hedge_col = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
+    cvd_col = "#4ADE80" if bvc_cvd_val >= 0 else "#F87171"
+
     table_rows_html = []
     for _, row in df_sorted.iterrows():
         stk_val = float(row["strike"])
@@ -1347,6 +1362,28 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
         p_vol_val = int(row.get("putVolume", 0))
         vex_val = float(row.get("netVEX", 0.0))
         chex_val = float(row.get("netCHEX", 0.0))
+
+        sf = per_strike_flow.get(round(stk_val, 1)) or {}
+        s_call = float(sf.get("signed_call", 0.0))
+        s_put = float(sf.get("signed_put", 0.0))
+        dh_gc = float(sf.get("dealer_hedge_gc", 0.0))
+        dom_flow = str(sf.get("dominant_flow", "—"))
+        is_whale = bool(sf.get("is_whale_new_oi", False))
+        whale_side = str(sf.get("whale_side", ""))
+
+        if c_vol_val == 0 and p_vol_val == 0:
+            signed_cp_str = '<span style="color:#475569;">0 / 0</span>'
+            hedge_flow_str = '<span style="color:#475569;">0.0 HĐ GC</span>'
+        else:
+            sc_col = "#4ADE80" if s_call >= 0 else "#F87171"
+            sp_col = "#F87171" if s_put >= 0 else "#4ADE80"
+            dh_col = "#4ADE80" if dh_gc > 5.0 else ("#F87171" if dh_gc < -5.0 else "#94A3B8")
+            signed_cp_str = f'<span style="color:{sc_col};">C:{s_call:+.0f}</span> <span style="color:#475569;">|</span> <span style="color:{sp_col};">P:{s_put:+.0f}</span>'
+            whale_tag = (
+                f' <span class="badge" style="background:#FACC15; color:#020617; font-weight:800; font-size:9.5px; padding:1px 4px; border-radius:3px;">⚡WHALE MỚI ({whale_side} VOL&gt;OI)</span>'
+                if is_whale else ""
+            )
+            hedge_flow_str = f'<b style="color:{dh_col};">{dh_gc:+.1f} HĐ GC</b> <span style="font-size:10.5px; color:{dh_col};">[{dom_flow}]</span>{whale_tag}'
 
         gex_color = "#4ADE80" if gex_val >= 0 else "#F87171"
         is_spot_nearest = (stk_val == min_dist_strike)
@@ -1374,6 +1411,8 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
             <td style="padding:7px 12px; color:#FCA5A5;">{p_oi_val:,}</td>
             <td style="padding:7px 12px; color:#16A34A;">{c_vol_val:,}</td>
             <td style="padding:7px 12px; color:#DC2626;">{p_vol_val:,}</td>
+            <td style="padding:7px 12px; white-space:nowrap;">{signed_cp_str}</td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;">{hedge_flow_str}</td>
             <td style="padding:7px 12px; color:#FB923C;">${vex_val:+.2f}M</td>
             <td style="padding:7px 12px; color:#22D3EE;">${chex_val:+.2f}M</td>
         </tr>""")
@@ -1383,13 +1422,38 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     return f"""
     <!-- KHỐI 6: BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE TỪNG STRIKE (E-MINI NQ / COMEX GOLD FUTURES) -->
     <div class="table-box" style="margin-bottom: 20px; border: 1px solid #1E293B; background:#0B132B; border-radius:8px; padding:14px 16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1px solid #1E293B; padding-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; border-bottom:1px solid #1E293B; padding-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span class="badge" style="background:#FACC15; color:#020617; font-weight:800; font-size:11px; padding:2px 8px; border-radius:4px;">QUANT MICROSTRUCTURE</span>
-                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace;">📊 BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE TỪNG STRIKE (COMEX GOLD FUTURES)</span>
+                <span class="badge" style="background:#FACC15; color:#020617; font-weight:800; font-size:11px; padding:2px 8px; border-radius:4px;">QUANT MICROSTRUCTURE &amp; ORDERFLOW</span>
+                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace;">📊 BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE &amp; DÒNG LỆNH TỪNG STRIKE (COMEX GOLD FUTURES)</span>
             </div>
             <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
-                BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING &bull; Bào mòn Theta Bào Mòn: <b style="color:#FACC15;">${max_theta_val:.2f}/HĐ/ngày</b> &bull; Độ nhạy Gamma Black-76 vi mô &bull; Quy mô: <b style="color:#FACC15;">100 oz/HĐ</b>
+                BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING &bull; Theta Bào Mòn: <b style="color:#FACC15;">${max_theta_val:.2f}/HĐ/ngày</b> &bull; Độ nhạy Gamma Black-76 &bull; Orderflow: <b style="color:#38BDF8;">Lee-Ready + BVC + Parity</b> &bull; <b style="color:#FACC15;">100 oz/HĐ</b>
+            </div>
+        </div>
+        <!-- Thanh Trực Quan Hóa Orderflow Tức Thời (Zero-Latency Institutional Orderflow Strip) -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:12px;">
+            <div style="background:rgba(15,23,42,0.85); border:1px solid #1E293B; border-left:3px solid {disloc_col}; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">1. Options Lead-Lag (Put-Call Parity &delta;F)</div>
+                <div id="micro-lead-val" style="font-size:13.5px; font-weight:800; color:{disloc_col}; margin-top:2px;">F_opt ${f_opt_val:,.2f} ({delta_f_val:+.2f}$)</div>
+                <div id="micro-lead-lbl" style="font-size:10.5px; color:#CBD5E1;">{disloc_label}</div>
+            </div>
+            <div style="background:rgba(15,23,42,0.85); border:1px solid #1E293B; border-left:3px solid {hedge_col}; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">2. Ép Dealer Hedge (Lee-Ready Options Flow)</div>
+                <div id="micro-hedge-val" style="font-size:13.5px; font-weight:800; color:{hedge_col}; margin-top:2px;">{dealer_hedge_val:+,.1f} HĐ GC</div>
+                <div id="micro-hedge-lbl" style="font-size:10.5px; color:#CBD5E1;">{opt_flow_label}</div>
+            </div>
+            <div style="background:rgba(15,23,42,0.85); border:1px solid #1E293B; border-left:3px solid {cvd_col}; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">3. Realtime BVC CVD &amp; Áp Lực Mua/Bán</div>
+                <div id="micro-cvd-val" style="font-size:13.5px; font-weight:800; color:{cvd_col}; margin-top:2px;">CVD {bvc_cvd_val:+,.0f} HĐ &bull; Mua {bvc_buy_pct:.1f}%</div>
+                <div style="width:100%; height:5px; background:#EF4444; border-radius:3px; overflow:hidden; margin-top:4px;">
+                    <div id="micro-bvc-bar" style="width:{bvc_buy_pct:.1f}%; height:100%; background:#22C55E; transition:width 0.15s linear;"></div>
+                </div>
+            </div>
+            <div style="background:rgba(15,23,42,0.85); border:1px solid #1E293B; border-left:3px solid #38BDF8; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">4. Vi Cấu Trúc Sổ Lệnh (Kyle's Lambda &lambda;)</div>
+                <div id="micro-kyle-val" style="font-size:12px; font-weight:800; color:#38BDF8; margin-top:2px;">{kyle_label}</div>
+                <div style="font-size:10px; color:#94A3B8;">Cập nhật 0ms theo từng nhịp giá CME</div>
             </div>
         </div>
         <div style="max-height: 520px; overflow-y: auto; overflow-x: auto; border: 1px solid #1E293B; border-radius: 6px; background:#070B12;">
@@ -1402,6 +1466,8 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
                         <th style="padding:9px 12px; color:#FCA5A5;">Put OI</th>
                         <th style="padding:9px 12px; color:#16A34A;">Call Vol</th>
                         <th style="padding:9px 12px; color:#DC2626;">Put Vol</th>
+                        <th style="padding:9px 12px; color:#FACC15;">Signed Flow (C/P)</th>
+                        <th style="padding:9px 12px; text-align:left; color:#38BDF8;">Ép Dealer Hedge &amp; Orderflow</th>
                         <th style="padding:9px 12px; color:#FB923C;">Net VEX ($M)</th>
                         <th style="padding:9px 12px; color:#22D3EE;">Net CHEX ($M/d)</th>
                     </tr>
