@@ -730,14 +730,6 @@ def aggregate_options_dataframes(
     if not valid_dfs:
         return pd.DataFrame()
 
-    if len(valid_dfs) == 1:
-        single_df = valid_dfs[0].copy()
-        if "callGammaPower" not in single_df.columns:
-            single_df["callGammaPower"] = single_df["callOpenInterest"] * single_df["callGamma"]
-        if "putGammaPower" not in single_df.columns:
-            single_df["putGammaPower"] = single_df["putOpenInterest"] * single_df["putGamma"]
-        return single_df
-
     # Sort chains by DTE ascending so that index 0 is nearest to expiration
     def get_dte(df_item: pd.DataFrame) -> float:
         if "dte_days" in df_item.attrs:

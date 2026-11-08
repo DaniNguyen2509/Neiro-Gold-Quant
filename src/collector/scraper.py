@@ -218,6 +218,22 @@ def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = Non
     t_years = max(1.0 / 365.0, float(dte_days) / 365.0)
     r = 0.045
 
+    # Calibrate internal Put-Call Parity Forward price (f_chain) for this specific expiration
+    # to account for cost-of-carry basis on distant Quarterly/Monthly contracts (e.g. GCG27 vs GCZ26)
+    f_chain = ref_p
+    try:
+        atm_idx = (df["strike"].astype(float) - ref_p).abs().idxmin()
+        k_atm = float(df.loc[atm_idx, "strike"])
+        c_atm = float(df.loc[atm_idx, "callMid"]) if "callMid" in df.columns else 0.0
+        p_atm = float(df.loc[atm_idx, "putMid"]) if "putMid" in df.columns else 0.0
+        if c_atm > 0 and p_atm > 0:
+            import math
+            cand_f = k_atm + math.exp(r * t_years) * (c_atm - p_atm)
+            if abs(cand_f - ref_p) <= 150.0:
+                f_chain = cand_f
+    except Exception:
+        pass
+
     if "callIV" in df.columns and (df["callIV"] <= 0.01).all():
         solved_c = []
         for _, row in df.iterrows():
@@ -227,7 +243,7 @@ def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = Non
                 bid = float(row.get("callBid", 0))
                 ask = float(row.get("callAsk", 0))
                 mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get("callLatest", 0))
-            iv = solve_black76_iv(ref_p, k, t_years, mid, is_call=True, r=r) if mid > 0 else 0.20
+            iv = solve_black76_iv(f_chain, k, t_years, mid, is_call=True, r=r) if mid > 0 else 0.20
             solved_c.append(round(iv, 4))
         df["callIV"] = solved_c
 
@@ -240,7 +256,7 @@ def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = Non
                 bid = float(row.get("putBid", 0))
                 ask = float(row.get("putAsk", 0))
                 mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get("putLatest", 0))
-            iv = solve_black76_iv(ref_p, k, t_years, mid, is_call=False, r=r) if mid > 0 else 0.20
+            iv = solve_black76_iv(f_chain, k, t_years, mid, is_call=False, r=r) if mid > 0 else 0.20
             solved_p.append(round(iv, 4))
         df["putIV"] = solved_p
 
