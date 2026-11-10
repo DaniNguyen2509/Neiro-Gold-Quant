@@ -91,7 +91,10 @@ echo ===========================================================================
 echo.
 python -m src.collector.scraper --output data/options_prices_GCZ26.csv
 echo.
-echo [HOAN TAT] Da cap nhat Options Chain GCZ26 thanh cong.
+echo [DANG TAO SNAPSHOT] Dang bien dich lai Tactical Dashboard moi nhat...
+python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html index.html --no-mt5
+echo.
+echo [HOAN TAT] Da cap nhat Options Chain GCZ26 va Dashboard thanh cong.
 pause
 goto MENU
 

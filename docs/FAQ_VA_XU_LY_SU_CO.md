@@ -85,3 +85,12 @@
 * **Nguyên nhân:** Dùng phiên bản Pine Script cũ (v4 hoặc v5).
 * **Cách khắc phục:**  
   Cả 2 indicator của Neiro-Quant đều được viết bằng **Pine Script v6** mới nhất (dòng đầu tiên có `//@version=6`). Anh hãy mở một cửa sổ mới trong Pine Editor của TradingView, xóa trắng toàn bộ nội dung mẫu ban đầu rồi mới dán code vào.
+
+---
+
+### 6. Sự cố: Terminal hiện cảnh báo "⚠️ OPTIONS DATA CŨ (> 6.0h) — CHUỖI OPTIONS CÓ THỂ CHƯA NẠP CÁC STRIKE MỚI"
+* **Nguyên nhân:** Đây là tính năng bảo vệ vi mô (Stale Data Guard - ADR-011). Khi dữ liệu Options Chain của CME Gold (`GCZ26`) được cào cách đây hơn 6 tiếng, hệ thống sẽ cảnh báo trader rằng có thể các Strike Options mới trong phiên hiện tại chưa được cập nhật đầy đủ vào cấu trúc GEX/Walls.
+* **Cách khắc phục:**
+  1. Mở file [Chay_Live_Terminal.bat](file:///c:/Users/Daniel/Documents/My-Projects/Neiro-Gold-Quant/Chay_Live_Terminal.bat).
+  2. Chọn mục **`[4] CAO DU LIEU OPTIONS CHAIN CME THU CONG`** hoặc **`[3] CHAY LIVE TERMINAL NOI BO`**. Hệ thống sẽ tự động bật Playwright cào chuỗi Options mới nhất và tự động biên dịch lại giao diện Dashboard.
+  3. Sau khi hoàn tất, tải lại trang web (ấn `Ctrl + F5`) để xóa cache, cảnh báo sẽ biến mất hoàn toàn.
