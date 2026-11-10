@@ -30,8 +30,9 @@
 
 ### Q3: Khi nào tôi nên dùng "Bảng điều khiển 1-Click" `Chay_Live_Terminal.bat` trên máy tính?
 * **Trả lời:**  
-  * Dùng khi anh đang ngồi trực tiếp trước màn hình máy tính trong phiên giao dịch sôi động và muốn **bảng điện tự động làm mới liên tục 15 giây/lần** với luồng nến M5 realtime từ COMEX.
+  * Dùng khi anh đang ngồi trực tiếp trước màn hình máy tính trong phiên giao dịch sôi động và muốn **bảng điện tự động làm mới liên tục 15 giây/lần** với luồng nến M5 realtime từ COMEX (chọn `[3]`).
   * File `Chay_Live_Terminal.bat` được trang bị kiến trúc tự động thu hồi bộ nhớ `gc.collect()`, giữ mức sử dụng RAM cố định ~90MB, hoàn toàn không gây nóng máy hay đơ trình duyệt.
+  * **Đặc biệt (Lựa chọn `[4]`):** Khi anh bấm `[4] CAO & DONG BO DU LIEU LEN CLOUD`, hệ thống sẽ kích hoạt Chromium Playwright cào Options mới nhất, tự động biên dịch toàn bộ Dashboard HTML/JSON và tự động chạy `git push` đẩy đồng bộ 100% lên GitHub Cloud và website GitHub Pages mà anh không cần gõ bất kỳ dòng lệnh nào.
 
 ---
 

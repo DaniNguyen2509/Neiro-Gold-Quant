@@ -16,6 +16,7 @@ on:
       - '.github/workflows/daily_options_sync.yml'
       - 'src/**'
       - 'requirements.txt'
+      - 'version.json'
   workflow_dispatch:
     inputs:
       dry_run:

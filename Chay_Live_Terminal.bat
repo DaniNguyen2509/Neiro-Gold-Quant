@@ -13,7 +13,7 @@ echo.
 echo   [1] MO TERMINAL ONLINE 100%% (GitHub Pages Cloud - Khong can Python)
 echo   [2] DONG BO DU LIEU MOI NHAT TU GITHUB CLOUD (git pull origin main)
 echo   [3] CHAY LIVE TERMINAL NOI BO (Cap nhat 15s/lan + Tu dong don RAM)
-echo   [4] CAO DU LIEU OPTIONS CHAIN CME THU CONG (Multi-Expiry Scraper)
+echo   [4] CAO & DONG BO DU LIEU LEN CLOUD (Scrape + Build + Push Cloud)
 echo   [5] DON SACH CACHE & GIAI PHONG BO NHO (Clear Cache & Flush RAM)
 echo   [6] CAP NHAT SNAPSHOT 1 LAN (Generate 1-Shot Dashboard)
 echo   [7] KIEM THU HE THONG TOAN DIEN (Run Pytest Suite)
@@ -94,7 +94,13 @@ echo.
 echo [DANG TAO SNAPSHOT] Dang bien dich lai Tactical Dashboard moi nhat...
 python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html index.html --no-mt5
 echo.
-echo [HOAN TAT] Da cap nhat Options Chain GCZ26 va Dashboard thanh cong.
+echo ===============================================================================
+echo [DONG BO CLOUD] Dang tu dong day du lieu va dashboard len GitHub Cloud...
+echo ===============================================================================
+git add data/options_prices_GCZ26.csv index.html version.json tactical_levels.json
+git diff --staged --quiet || (git commit -m "chore(data): auto-sync options chain from local terminal" && git pull --rebase origin main && git push origin main)
+echo.
+echo [HOAN TAT] Da cap nhat va dong bo 100%% len GitHub Cloud & Trang Online!
 pause
 goto MENU
 
