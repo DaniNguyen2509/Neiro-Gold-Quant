@@ -473,4 +473,68 @@ def test_analyze_efp_spread():
     assert "CÂN BẰNG" in res_fair["label"]
 
 
+def test_is_cme_globex_market_open_schedule():
+    """Verify CME Globex Gold Futures schedule including daily 17:00-18:00 ET maintenance break."""
+    from zoneinfo import ZoneInfo
+    from src.quant_engine.basis import is_cme_globex_market_open
+
+    ny_tz = ZoneInfo("America/New_York")
+    # Wednesday 10:30 ET -> Open
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 11, 10, 30, tzinfo=ny_tz)) is True
+    # Wednesday 17:15 ET (Daily maintenance break) -> Closed
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 11, 17, 15, tzinfo=ny_tz)) is False
+    # Friday 16:50 ET -> Open
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 13, 16, 50, tzinfo=ny_tz)) is True
+    # Friday 17:05 ET -> Closed for weekend
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 13, 17, 5, tzinfo=ny_tz)) is False
+    # Saturday 12:00 ET -> Closed
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 14, 12, 0, tzinfo=ny_tz)) is False
+    # Sunday 17:30 ET -> Closed
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 15, 17, 30, tzinfo=ny_tz)) is False
+    # Sunday 18:05 ET -> Reopened
+    assert is_cme_globex_market_open(datetime.datetime(2026, 11, 15, 18, 5, tzinfo=ny_tz)) is True
+
+
+def test_fetch_live_cme_m5_tape_preserves_real_last_candle_ohlc():
+    """Ensure the last candle's real OHLC is preserved and never overwritten to open + 0.3."""
+    from src.quant_engine.basis import fetch_live_cme_m5_tape
+
+    fake_response = mock.MagicMock()
+    fake_response.status = 200
+    fake_response.read.return_value = json.dumps({
+        "chart": {
+            "result": [{
+                "meta": {
+                    "regularMarketPrice": 3887.60,
+                    "regularMarketDayHigh": 3905.00,
+                    "regularMarketDayLow": 3875.00,
+                },
+                "timestamp": [1794607020, 1794607080, 1794607140],
+                "indicators": {
+                    "quote": [{
+                        "open": [3892.00, 3893.50, 3894.00],
+                        "high": [3894.00, 3895.00, 3896.20],
+                        "low": [3891.00, 3892.50, 3886.80],
+                        "close": [3893.50, 3894.00, 3887.60],
+                        "volume": [120, 145, 410],
+                    }]
+                }
+            }]
+        }
+    }).encode("utf-8")
+    fake_response.__enter__.return_value = fake_response
+
+    with mock.patch("urllib.request.urlopen", return_value=fake_response):
+        tape = fetch_live_cme_m5_tape(limit=4)
+        last_bar = tape["chart_candles"][-1]
+        assert last_bar["open"] == 3894.00
+        assert last_bar["high"] == 3896.20
+        assert last_bar["low"] == 3886.80
+        assert last_bar["close"] == 3887.60
+        assert "tf_candles" in tape
+        assert "5m" in tape["tf_candles"]
+        assert "15m" in tape["tf_candles"]
+
+
+
 

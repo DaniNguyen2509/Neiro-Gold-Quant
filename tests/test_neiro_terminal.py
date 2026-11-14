@@ -55,7 +55,15 @@ def test_render_neiro_orderflow_component():
     assert "switchTerminalView" in comp["neiro_js_script"]
     assert "initNeiroGoldChart" in comp["neiro_js_script"]
     assert "INITIAL_CANDLES" in comp["neiro_js_script"]
+    assert "INITIAL_TF_CANDLES" in comp["neiro_js_script"]
+    assert "isCmeGlobexMarketOpen" in comp["neiro_js_script"]
+    assert "pollLiveYahooChart" in comp["neiro_js_script"]
+    assert "formatVnTimestamp" in comp["neiro_js_script"]
     assert "resampleBars" in comp["neiro_js_script"]
     assert "generateRealisticGoldCandles" in comp["neiro_js_script"]
     assert "drawNeiroOverlay" in comp["neiro_js_script"]
     assert "AIR POCKET VACUUM" in comp["neiro_js_script"]
+    # Ensure artificial random walk and forced page reloads were eliminated
+    assert "Math.random() - 0.498" not in comp["neiro_js_script"]
+    assert "window.location.reload()" not in comp["neiro_js_script"]
+

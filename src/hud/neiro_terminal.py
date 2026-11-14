@@ -290,37 +290,43 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             dom_flow_val = str(sf.get("dominant_flow", ""))
 
             js_options_data.append({
-                "strike": stk_num,
+                "strike": round(stk_num, 1),
                 "c_oi": c_oi_val,
                 "p_oi": p_oi_val,
                 "c_vol": c_vol_val,
                 "p_vol": p_vol_val,
-                "c_iv": float(r.get("callIV", 0.18) or 0.18),
-                "p_iv": float(r.get("putIV", 0.18) or 0.18),
-                "c_delta": c_delta_val,
-                "p_delta": p_delta_val,
-                "c_gamma": float(r.get("callGamma", 0.0) or 0.0),
-                "p_gamma": float(r.get("putGamma", 0.0) or 0.0),
-                "netGEX": gex_val,
-                "netDelta": net_delta_val,
-                "netVEX": vex_val,
-                "netCHEX": chex_val,
-                "currentNetFLOW": dh_gc_val,
-                "signedCall": s_call_val,
-                "signedPut": s_put_val,
+                "c_iv": round(float(r.get("callIV", 0.18) or 0.18), 4),
+                "p_iv": round(float(r.get("putIV", 0.18) or 0.18), 4),
+                "c_delta": round(c_delta_val, 4),
+                "p_delta": round(p_delta_val, 4),
+                "c_gamma": round(float(r.get("callGamma", 0.0) or 0.0), 6),
+                "p_gamma": round(float(r.get("putGamma", 0.0) or 0.0), 6),
+                "netGEX": round(gex_val, 3),
+                "netDelta": round(net_delta_val, 3),
+                "netVEX": round(vex_val, 3),
+                "netCHEX": round(chex_val, 3),
+                "currentNetFLOW": round(dh_gc_val, 3),
+                "signedCall": round(s_call_val, 3),
+                "signedPut": round(s_put_val, 3),
                 "isWhale": is_whale_val,
                 "dominantFlow": dom_flow_val,
-                "currentNetGEX": gex_val,
-                "currentNetVEX": vex_val,
-                "currentNetCHEX": chex_val,
-                "currentNetTEX": theta_val,
+                "currentNetGEX": round(gex_val, 3),
+                "currentNetVEX": round(vex_val, 3),
+                "currentNetCHEX": round(chex_val, 3),
+                "currentNetTEX": round(theta_val, 3),
             })
         except Exception:
             continue
 
+    m5_tape = meta.get("m5_tape") or {}
+    chart_candles = m5_tape.get("chart_candles") or []
+    tf_candles = m5_tape.get("tf_candles") or {}
+    market_open_flag = bool(m5_tape.get("market_open", True))
+
     json_options_str = json.dumps(js_options_data)
     json_meta_str = json.dumps({
         "spot": spot,
+        "market_open": market_open_flag,
         "atm_strike": atm_strike,
         "call_wall": call_wall,
         "call_wall_oi": call_wall_oi,
@@ -354,9 +360,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "flip_integrity_color": flip_verdict_col,
     })
 
-    m5_tape = meta.get("m5_tape") or {}
-    chart_candles = m5_tape.get("chart_candles") or []
     json_candles_str = json.dumps(chart_candles)
+    json_tf_candles_str = json.dumps(tf_candles)
 
     # 5. JavaScript Orderflow & Dual-View Engine (All-in-One Rendering 1:1 Neiro-NQ-Quant)
     neiro_js_script = f"""
@@ -364,34 +369,66 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     window.INITIAL_OPTIONS = {json_options_str};
     window.INITIAL_META = {json_meta_str};
     window.INITIAL_CANDLES = {json_candles_str};
+    window.INITIAL_TF_CANDLES = {json_tf_candles_str};
 
     let neiroChart = null;
     let candleSeries = null;
     let livePriceLine = null;
     let currentGoldPrice = window.INITIAL_META.spot;
+    let yahooAnchorPrice = window.INITIAL_META.spot;
     let currentTf = '1m';
     let currentPeriodSec = 60;
+
+    function isCmeGlobexMarketOpen() {{
+        try {{
+            const fmt = new Intl.DateTimeFormat('en-US', {{
+                timeZone: 'America/New_York',
+                weekday: 'short',
+                hour: 'numeric',
+                hour12: false
+            }});
+            const parts = fmt.formatToParts(new Date());
+            let wd = '';
+            let hr = 0;
+            parts.forEach(p => {{
+                if (p.type === 'weekday') wd = p.value;
+                if (p.type === 'hour') hr = parseInt(p.value, 10) % 24;
+            }});
+            if (wd === 'Sat') return false;
+            if (wd === 'Fri' && hr >= 17) return false;
+            if (wd === 'Sun' && hr < 18) return false;
+            if ((wd === 'Mon' || wd === 'Tue' || wd === 'Wed' || wd === 'Thu') && hr === 17) return false;
+            return true;
+        }} catch (e) {{
+            return Boolean(window.INITIAL_META && window.INITIAL_META.market_open);
+        }}
+    }}
 
     function switchTerminalView(view) {{
         // Seamless zero-reload switcher if needed
     }}
 
     function setTimeframe(tf) {{
-        currentTf = tf;
+        const normTf = (tf === 'd' || tf === '1d') ? '1d' : tf.toLowerCase();
+        currentTf = normTf;
         const allBtns = document.querySelectorAll('.timeframe-pill');
         allBtns.forEach(b => b.classList.remove('active'));
-        const activeBtn = Array.from(document.querySelectorAll('.timeframe-pill')).find(b => b.innerText.trim().toLowerCase() === tf.toLowerCase());
+        const activeBtn = Array.from(document.querySelectorAll('.timeframe-pill')).find(b => {{
+            const t = b.innerText.trim().toLowerCase();
+            return t === normTf || (normTf === '1d' && (t === 'd' || t === '1d'));
+        }});
         if (activeBtn) activeBtn.classList.add('active');
 
         let period = 60;
-        if (tf === '1m') period = 60;
-        else if (tf === '5m') period = 300;
-        else if (tf === '15m') period = 900;
-        else if (tf === '1h') period = 3600;
-        else if (tf === 'd' || tf === '1d') period = 86400;
+        if (normTf === '1m') period = 60;
+        else if (normTf === '5m') period = 300;
+        else if (normTf === '15m') period = 900;
+        else if (normTf === '1h') period = 3600;
+        else if (normTf === '1d') period = 86400;
 
         currentPeriodSec = period;
-        buildHistoricalGoldBars(period);
+        buildHistoricalGoldBars(period, normTf);
+        pollLiveYahooChart(normTf);
     }}
 
     function resampleBars(candles, targetPeriodSec) {{
@@ -402,7 +439,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 open: c.open,
                 high: c.high,
                 low: c.low,
-                close: c.close
+                close: c.close,
+                volume: c.volume || 0
             }}));
         }}
 
@@ -419,12 +457,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     open: c.open,
                     high: c.high,
                     low: c.low,
-                    close: c.close
+                    close: c.close,
+                    volume: c.volume || 0
                 }};
             }} else {{
                 currentBar.high = Math.max(currentBar.high, c.high);
                 currentBar.low = Math.min(currentBar.low, c.low);
                 currentBar.close = c.close;
+                currentBar.volume = (currentBar.volume || 0) + (c.volume || 0);
             }}
         }}
         if (currentBar) resampled.push(currentBar);
@@ -468,10 +508,20 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return bars;
     }}
 
-    function buildHistoricalGoldBars(periodSec = 60) {{
+    function buildHistoricalGoldBars(periodSec = 60, tfKey = null) {{
         if (!candleSeries) return;
+        const key = tfKey || (periodSec === 60 ? '1m' : (periodSec === 300 ? '5m' : (periodSec === 900 ? '15m' : (periodSec === 3600 ? '1h' : '1d'))));
         let bars = [];
-        if (window.INITIAL_CANDLES && window.INITIAL_CANDLES.length > 0) {{
+        if (window.INITIAL_TF_CANDLES && window.INITIAL_TF_CANDLES[key] && window.INITIAL_TF_CANDLES[key].length > 0) {{
+            bars = window.INITIAL_TF_CANDLES[key].map(c => ({{
+                time: c.time,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: c.volume || 0
+            }}));
+        }} else if (window.INITIAL_CANDLES && window.INITIAL_CANDLES.length > 0) {{
             bars = resampleBars(window.INITIAL_CANDLES, periodSec);
         }} else {{
             bars = generateRealisticGoldCandles(currentGoldPrice, 60, periodSec);
@@ -577,10 +627,16 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return x > 0 ? 1 - p : p;
     }}
 
-    function applyLiveTick(newPrice, tickVol = null) {{
+    function applyLiveTick(newPrice, tickVol = null, isAuthoritativeYahoo = false) {{
         if (!newPrice || isNaN(newPrice) || !candleSeries) return;
+        const marketOpen = isCmeGlobexMarketOpen();
+        if (!marketOpen && !isAuthoritativeYahoo) return;
+
         const prevPrice = currentGoldPrice;
         currentGoldPrice = Math.round(newPrice * 100) / 100;
+        if (isAuthoritativeYahoo) {{
+            yahooAnchorPrice = currentGoldPrice;
+        }}
         const dp = currentGoldPrice - prevPrice;
 
         if (livePriceLine) {{
@@ -594,8 +650,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
 
         const nowSec = Math.floor(Date.now() / 1000);
-        const barTime = nowSec - (nowSec % currentPeriodSec);
-        const vTick = tickVol !== null ? tickVol : Math.max(2, Math.round(4 + Math.abs(dp) * 35 + Math.random() * 6));
+        const barTime = marketOpen
+            ? (nowSec - (nowSec % currentPeriodSec))
+            : (activeCandle ? activeCandle.time : (nowSec - (nowSec % currentPeriodSec)));
+        const vTick = tickVol !== null ? tickVol : Math.max(1, Math.round(2 + Math.abs(dp) * 25));
 
         // 1. Zero-Latency (<1ms) BVC Orderflow Classification & Active Candle Update
         const zScore = dp / 0.18;
@@ -604,7 +662,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         liveCvdContracts += tickDelta;
         liveBuyPct = Math.max(5.0, Math.min(95.0, 0.92 * liveBuyPct + 0.08 * (buyFrac * 100.0)));
 
-        if (!activeCandle || activeCandle.time !== barTime) {{
+        if (!activeCandle || (marketOpen && activeCandle.time < barTime)) {{
             activeCandle = {{
                 time: barTime,
                 open: prevPrice,
@@ -741,9 +799,18 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
     window.onLiveTick = function(data) {{
         if (data && data.price) {{
-            applyLiveTick(data.price);
+            applyLiveTick(data.price, data.volume || null, true);
         }}
     }};
+
+    function formatVnTimestamp(unixSec, includeDate = true) {{
+        const vnDate = new Date((Number(unixSec) + 7 * 3600) * 1000);
+        const dd = String(vnDate.getUTCDate()).padStart(2, '0');
+        const mm = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
+        const hh = String(vnDate.getUTCHours()).padStart(2, '0');
+        const mi = String(vnDate.getUTCMinutes()).padStart(2, '0');
+        return includeDate ? (dd + '/' + mm + ' ' + hh + ':' + mi + ' VN') : (hh + ':' + mi);
+    }}
 
     function initNeiroGoldChart() {{
         const container = document.getElementById('neiro-tv-chart');
@@ -758,6 +825,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 textColor: '#94A3B8',
                 fontFamily: 'JetBrains Mono, monospace',
                 fontSize: 11,
+            }},
+            localization: {{
+                timeFormatter: (timestamp) => formatVnTimestamp(timestamp, true),
             }},
             grid: {{
                 vertLines: {{ color: '#0A0F18' }},
@@ -779,6 +849,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 barSpacing: 20,
                 minBarSpacing: 8,
                 rightOffset: 12,
+                tickMarkFormatter: (time) => formatVnTimestamp(time, currentPeriodSec >= 86400),
             }},
         }});
 
@@ -792,7 +863,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             wickDownColor: '#EF4444',
         }});
 
-        buildHistoricalGoldBars(60);
+        buildHistoricalGoldBars(60, '1m');
 
         livePriceLine = candleSeries.createPriceLine({{
             price: currentGoldPrice,
@@ -1242,12 +1313,12 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     async function fetchCloudVersionJson() {{
         const ts = Date.now();
         const urls = [
+            'http://127.0.0.1:8765/version.json?_t=' + ts,
             'version.json?_t=' + ts,
             'https://raw.githubusercontent.com/DaniNguyen2509/Neiro-Gold-Quant/main/version.json?_t=' + ts
         ];
-        // When opened via file://, prioritize GitHub Cloud Raw URL first to avoid file:// CORS block
         if (window.location.protocol === 'file:') {{
-            urls.reverse();
+            urls.splice(1, 1); // Skip relative file:// fetch to avoid CORS error in console
         }}
         for (let i = 0; i < urls.length; i++) {{
             try {{
@@ -1262,9 +1333,76 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return null;
     }}
 
+    function mergeLiveCandles(newCandles, tfKey = '1m') {{
+        if (!Array.isArray(newCandles) || newCandles.length === 0) return;
+        const targetList = (tfKey === '1m')
+            ? (window.INITIAL_CANDLES || [])
+            : ((window.INITIAL_TF_CANDLES && window.INITIAL_TF_CANDLES[tfKey]) || []);
+        const byTime = new Map();
+        for (let i = 0; i < targetList.length; i++) {{
+            const b = targetList[i];
+            if (b && b.time) byTime.set(Number(b.time), b);
+        }}
+        for (let i = 0; i < newCandles.length; i++) {{
+            const b = newCandles[i];
+            if (b && b.time) byTime.set(Number(b.time), b);
+        }}
+        const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time).slice(-320);
+        if (tfKey === '1m') {{
+            window.INITIAL_CANDLES = merged;
+        }}
+        if (window.INITIAL_TF_CANDLES) {{
+            window.INITIAL_TF_CANDLES[tfKey] = merged;
+        }}
+        if (tfKey === currentTfKey && candleSeries && merged.length > 0) {{
+            const lastBar = merged[merged.length - 1];
+            activeCandle = {{
+                time: lastBar.time,
+                open: lastBar.open,
+                high: lastBar.high,
+                low: lastBar.low,
+                close: lastBar.close,
+                volume: lastBar.volume || 120,
+                delta: lastBar.delta || 0,
+            }};
+            candleSeries.update({{
+                time: lastBar.time,
+                open: lastBar.open,
+                high: lastBar.high,
+                low: lastBar.low,
+                close: lastBar.close,
+            }});
+            applyLiveTick(lastBar.close, null, true);
+        }}
+    }}
+
+    async function pollLiveYahooChart(tf = currentTfKey) {{
+        const ts = Date.now();
+        try {{
+            const res = await fetch('http://127.0.0.1:8765/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts, {{ cache: 'no-store' }});
+            if (res && res.ok) {{
+                const payload = await res.json();
+                if (payload && payload.market_open !== undefined && window.INITIAL_META) {{
+                    window.INITIAL_META.market_open = Boolean(payload.market_open);
+                }}
+                if (payload && Array.isArray(payload.candles) && payload.candles.length > 0) {{
+                    mergeLiveCandles(payload.candles, tf);
+                }}
+                if (payload && payload.latest_price) {{
+                    applyLiveTick(Number(payload.latest_price), null, true);
+                }}
+                return true;
+            }}
+        }} catch (e) {{
+            // Local bridge not running; fallback to Cloud/Version JSON sync
+        }}
+        return false;
+    }}
+
     function hotPatchCloudMeta(data) {{
         if (!data || !window.INITIAL_META) return;
         const m = window.INITIAL_META;
+        if (data.market_open !== undefined) m.market_open = Boolean(data.market_open);
         if (data.call_wall) m.call_wall = data.call_wall;
         if (data.put_wall) m.put_wall = data.put_wall;
         if (data.zero_gamma_flip) m.zero_gamma_flip = data.zero_gamma_flip;
@@ -1300,8 +1438,21 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (data.dealer_hedge_futures_flow !== undefined) liveDealerHedgeGC = data.dealer_hedge_futures_flow;
         if (data.bvc_cvd_contracts !== undefined) liveCvdContracts = data.bvc_cvd_contracts;
         if (data.bvc_buy_pct !== undefined) liveBuyPct = data.bvc_buy_pct;
-        if (data.spot_price && Math.abs(data.spot_price - currentGoldPrice) > 0.02) {{
-            applyLiveTick(data.spot_price);
+        if (Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
+            mergeLiveCandles(data.recent_candles, '1m');
+        }}
+        if (data.tf_candles && typeof data.tf_candles === 'object') {{
+            Object.keys(data.tf_candles).forEach((k) => {{
+                mergeLiveCandles(data.tf_candles[k], k);
+            }});
+        }}
+        if (data.spot_price) {{
+            yahooAnchorPrice = Number(data.spot_price);
+            if (Math.abs(data.spot_price - currentGoldPrice) > 0.01) {{
+                applyLiveTick(data.spot_price, null, true);
+            }} else {{
+                requestAnimationFrame(drawNeiroOverlay);
+            }}
         }} else {{
             requestAnimationFrame(drawNeiroOverlay);
         }}
@@ -1311,46 +1462,52 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const badge = document.getElementById('cloud-sync-badge');
         try {{
             if (badge && isManual) badge.innerText = '⟳ SYNCING...';
+            await pollLiveYahooChart(currentTfKey);
             const data = await fetchCloudVersionJson();
             if (data && data.timestamp_utc) {{
-                const isNewSnapshot = lastCloudTimestamp && data.timestamp_utc !== lastCloudTimestamp;
                 lastCloudTimestamp = data.timestamp_utc;
                 buildEpoch = Date.now();
                 updateSyncTimeAgo();
                 hotPatchCloudMeta(data);
 
-                if (isNewSnapshot && window.location.protocol !== 'file:') {{
-                    if (badge) {{
-                        badge.style.background = 'rgba(234, 179, 8, 0.25)';
-                        badge.style.color = '#FACC15';
-                        badge.innerText = '⚡ AUTO-UPDATING...';
-                    }}
-                    setTimeout(() => {{
-                        window.location.reload();
-                    }}, isManual ? 100 : 1500);
-                    return;
-                }}
                 if (badge) {{
-                    badge.style.background = 'rgba(34, 197, 94, 0.15)';
-                    badge.style.color = '#4ADE80';
-                    badge.innerText = '● CLOUD SYNC: 100% AUTO';
+                    if (!isCmeGlobexMarketOpen()) {{
+                        badge.style.background = 'rgba(148, 163, 184, 0.18)';
+                        badge.style.color = '#CBD5E1';
+                        badge.innerText = '● CME GLOBEX: CLOSED (SETTLED)';
+                    }} else {{
+                        badge.style.background = 'rgba(34, 197, 94, 0.15)';
+                        badge.style.color = '#4ADE80';
+                        badge.innerText = '● YAHOO GC=F SYNC: LIVE';
+                    }}
                 }}
                 return;
             }}
         }} catch (e) {{}}
         if (badge) {{
-            badge.style.background = 'rgba(34, 197, 94, 0.15)';
-            badge.style.color = '#4ADE80';
-            badge.innerText = '● STREAM: 100% AUTO';
+            if (!isCmeGlobexMarketOpen()) {{
+                badge.style.background = 'rgba(148, 163, 184, 0.18)';
+                badge.style.color = '#CBD5E1';
+                badge.innerText = '● CME GLOBEX: CLOSED (SETTLED)';
+            }} else {{
+                badge.style.background = 'rgba(34, 197, 94, 0.15)';
+                badge.style.color = '#4ADE80';
+                badge.innerText = '● YAHOO GC=F STREAM: AUTO';
+            }}
         }}
     }}
 
-    // 100% Online Real-Time Gold Trade WebSocket (Basis-Locked to Pure CME Gold Futures GC)
+    // 100% Online Real-Time Gold Trade WebSocket (Basis-Tethered to Pure CME Gold Futures GC=F Anchor)
     function connectLiveGoldOrderflowStream() {{
+        if (!isCmeGlobexMarketOpen()) {{
+            setTimeout(connectLiveGoldOrderflowStream, 30000);
+            return;
+        }}
         try {{
             const ws = new WebSocket('wss://stream.binance.com:9443/ws/paxgusdt@aggTrade');
             ws.onmessage = (event) => {{
                 try {{
+                    if (!isCmeGlobexMarketOpen()) return;
                     const msg = JSON.parse(event.data);
                     const p = parseFloat(msg.p);
                     const q = parseFloat(msg.q) || 0.5;
@@ -1362,13 +1519,16 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     }}
                     const rawDp = p - lastWsRefPrice;
                     lastWsRefPrice = p;
-                    // Clamp micro-delta and apply directly onto 100% Pure CME Gold Futures GC quote
-                    const clampedDp = Math.max(-0.80, Math.min(0.80, rawDp));
+                    const clampedDp = Math.max(-0.30, Math.min(0.30, rawDp));
                     if (Math.abs(clampedDp) < 0.01 && q < 0.2) return;
                     lastWsTickEpoch = Date.now();
                     const syntheticGcVol = Math.max(1, Math.round(q * 12));
-                    const nextGcPrice = Math.round((currentGoldPrice + (clampedDp !== 0 ? clampedDp : (isSellAggressor ? -0.05 : 0.05))) * 100) / 100;
-                    applyLiveTick(nextGcPrice, syntheticGcVol);
+                    const anchor = yahooAnchorPrice || currentGoldPrice;
+                    const rawNext = currentGoldPrice + (clampedDp !== 0 ? clampedDp : (isSellAggressor ? -0.05 : 0.05));
+                    // Strictly tether micro-ticks within +/- $0.50 of authoritative Yahoo GC=F price
+                    const tetheredNext = Math.max(anchor - 0.50, Math.min(anchor + 0.50, rawNext));
+                    const nextGcPrice = Math.round(tetheredNext * 100) / 100;
+                    applyLiveTick(nextGcPrice, syntheticGcVol, false);
                 }} catch (err) {{}}
             }};
             ws.onclose = () => {{
@@ -1380,26 +1540,16 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }} catch (e) {{}}
     }}
 
-    // Tự động kiểm tra Cloud mỗi 12s hoàn toàn tự động (Zero-Touch)
+    // Tự động kiểm tra Yahoo GC=F & Cloud mỗi 10s hoàn toàn tự động (Zero-Touch, Zero-Reload)
     setInterval(updateSyncTimeAgo, 15000);
-    setInterval(() => checkCloudSyncNow(false), 12000);
+    setInterval(() => checkCloudSyncNow(false), 10000);
     window.addEventListener('focus', () => checkCloudSyncNow(false));
-
-    // Sub-Second Zero-Latency Fallback Tick Stream (chạy tự động khi giữa các nhịp khớp lệnh)
-    setInterval(() => {{
-        if (!currentGoldPrice || isNaN(currentGoldPrice)) return;
-        if (Date.now() - lastWsTickEpoch < 1100) return;
-        const parityPull = (liveImpliedForward - currentGoldPrice) * 0.04;
-        const microDelta = (Math.random() - 0.498) * 0.26 + Math.max(-0.08, Math.min(0.08, parityPull));
-        const tickP = Math.round((currentGoldPrice + microDelta) * 100) / 100;
-        applyLiveTick(tickP);
-    }}, 900);
 
     // Auto-init 100% hands-free on load
     window.addEventListener('DOMContentLoaded', () => {{
         setTimeout(initNeiroGoldChart, 60);
         setTimeout(connectLiveGoldOrderflowStream, 300);
-        setTimeout(() => checkCloudSyncNow(false), 800);
+        setTimeout(() => checkCloudSyncNow(false), 600);
     }});
     </script>
     """

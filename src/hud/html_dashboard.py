@@ -545,8 +545,23 @@ def load_and_preprocess_options(
         daily_move_1s=rule16_daily_move,
     )
 
-    # 7. Real-Time M5 Orderflow Tape & Volume Pulse
-    m5_tape = fetch_live_cme_m5_tape(limit=8)
+    # 7. Real-Time M5 Orderflow Tape & Multi-Timeframe Yahoo GC=F Candles
+    m5_tape = fetch_live_cme_m5_tape(limit=8, include_htf=True)
+    if isinstance(m5_tape, dict) and m5_tape.get("available") and m5_tape.get("chart_candles"):
+        tape_price = float(m5_tape.get("latest_price", spot_price))
+        if abs(spot_price - tape_price) <= 25.0:
+            aligned_p = round(float(spot_price), 2)
+            m5_tape["latest_price"] = aligned_p
+            last_1m = m5_tape["chart_candles"][-1]
+            last_1m["close"] = aligned_p
+            last_1m["high"] = max(float(last_1m["high"]), aligned_p)
+            last_1m["low"] = min(float(last_1m["low"]), aligned_p)
+            for _tf_k, _tf_list in (m5_tape.get("tf_candles") or {}).items():
+                if _tf_list:
+                    _last_b = _tf_list[-1]
+                    _last_b["close"] = aligned_p
+                    _last_b["high"] = max(float(_last_b["high"]), aligned_p)
+                    _last_b["low"] = min(float(_last_b["low"]), aligned_p)
 
     call_wall_matches = df.loc[df["strike"] == call_wall, "callVolume"]
     put_wall_matches = df.loc[df["strike"] == put_wall, "putVolume"]
@@ -2258,6 +2273,8 @@ def run_pipeline(
         "bvc_buy_pct": float((meta.get("institutional_orderflow") or {}).get("bvc_buy_pct", 50.0)),
         "flip_integrity_label": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_label", "")),
         "flip_integrity_color": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_color", "#FACC15")),
+        "market_open": bool((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("market_open", True)),
+        "recent_candles": ((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("chart_candles") or [])[-60:],
     }
     version_json_str = json.dumps(version_data, indent=2)
     for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:
@@ -2335,6 +2352,71 @@ def clear_workspace_cache() -> int:
     return removed
 
 
+def start_local_live_bridge_server(port: int = 8765) -> None:
+    """Starts a zero-waste background HTTP JSON bridge with CORS for local file:// and live Yahoo GC=F polling."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
+
+    class _YahooBridgeHandler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass  # Silent zero-waste logging
+
+        def _send_json(self, payload: dict, status: int = 200) -> None:
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            parsed = urlparse(self.path)
+            if parsed.path.endswith("/version.json"):
+                v_path = Path("version.json")
+                if v_path.exists():
+                    try:
+                        data = json.loads(v_path.read_text(encoding="utf-8"))
+                        self._send_json(data)
+                        return
+                    except Exception:
+                        pass
+                self._send_json({"error": "version.json not found"}, status=404)
+                return
+
+            if parsed.path == "/api/yahoo_gc":
+                qs = parse_qs(parsed.query)
+                tf = (qs.get("tf", ["1m"])[0] or "1m").lower()
+                tape = fetch_live_cme_m5_tape(limit=8, include_htf=(tf != "1m"))
+                candles = (
+                    tape.get("chart_candles", [])
+                    if tf == "1m"
+                    else (tape.get("tf_candles") or {}).get(tf, tape.get("chart_candles", []))
+                )
+                self._send_json({
+                    "available": bool(tape.get("available", False)),
+                    "market_open": bool(tape.get("market_open", True)),
+                    "latest_price": float(tape.get("latest_price", 0.0)),
+                    "tf": tf,
+                    "candles": candles[-180:],
+                })
+                return
+
+            self._send_json({"status": "ok", "service": "neiro-yahoo-gc-bridge"})
+
+    def _serve():
+        try:
+            server = HTTPServer(("127.0.0.1", port), _YahooBridgeHandler)
+            server.serve_forever()
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_serve, daemon=True)
+    t.start()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Tactical HTML Dashboard Generator")
     parser.add_argument("--input", default="data/options_prices_GCZ26.csv", help="Input options CSV")
@@ -2359,6 +2441,8 @@ def main():
         print(f"[CACHE CLEANUP] Flushed spot and memory caches. Removed {removed_count} temporary files. Current RAM: {ram_mb:.1f} MB.")
 
     if args.loop > 0:
+        start_local_live_bridge_server(port=8765)
+        print(f"[LIVE RUNNER] Started local Yahoo GC=F CORS bridge at http://127.0.0.1:8765/api/yahoo_gc")
         print(f"[LIVE RUNNER] Starting continuous dashboard update loop (Interval: {args.loop}s)... Press Ctrl+C to stop.")
         iteration = 0
         while True:

@@ -121,6 +121,35 @@ def is_gold_spot_market_open(dt: Optional[datetime] = None) -> bool:
     return True
 
 
+def is_cme_globex_market_open(dt: Optional[datetime] = None) -> bool:
+    """Checks whether COMEX Gold Futures (CME Globex GC=F) is actively trading.
+
+    CME Globex Gold hours (US Eastern Time):
+    - Opens: Sunday 18:00 ET
+    - Closes: Friday 17:00 ET
+    - Daily maintenance break (Mon-Thu): 17:00 ET to 18:00 ET
+    """
+    check_time = dt or datetime.now(timezone.utc)
+    if check_time.tzinfo is None:
+        check_time = check_time.replace(tzinfo=timezone.utc)
+    try:
+        import zoneinfo
+        et_dt = check_time.astimezone(zoneinfo.ZoneInfo("America/New_York"))
+        wd = et_dt.weekday()
+        hr = et_dt.hour
+        if wd == 5:  # Saturday
+            return False
+        if wd == 4 and hr >= 17:  # Friday >= 17:00 ET
+            return False
+        if wd == 6 and hr < 18:  # Sunday < 18:00 ET
+            return False
+        if wd in (0, 1, 2, 3) and hr == 17:  # Daily maintenance 17:00-18:00 ET
+            return False
+        return True
+    except Exception:
+        return is_gold_spot_market_open(check_time)
+
+
 # ---------------------------------------------------------------------------
 # Live Spot Fetching
 # ---------------------------------------------------------------------------
@@ -216,8 +245,127 @@ def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
     return None
 
 
-def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> dict[str, Any]:
-    """Fetches recent 5-minute candles and orderflow volume pulse for COMEX Gold Futures (GC=F).
+def _resample_ohlcv(
+    raw_candles: list[dict[str, Any]],
+    period_sec: int,
+    max_bars: int = 240,
+) -> list[dict[str, Any]]:
+    """Resamples 1-minute OHLCV candles into higher timeframe buckets cleanly."""
+    if not raw_candles:
+        return []
+    if period_sec <= 60:
+        return [
+            {
+                "time": int(rc["t"] if "t" in rc else rc["time"]),
+                "open": rc["open"],
+                "high": rc["high"],
+                "low": rc["low"],
+                "close": rc["close"],
+                "volume": rc.get("volume", 0),
+            }
+            for rc in raw_candles[-max_bars:]
+        ]
+
+    resampled: list[dict[str, Any]] = []
+    cur: Optional[dict[str, Any]] = None
+    for rc in raw_candles:
+        ts = int(rc["t"] if "t" in rc else rc["time"])
+        bucket = ts - (ts % period_sec)
+        if cur is None or cur["time"] != bucket:
+            if cur is not None:
+                resampled.append(cur)
+            cur = {
+                "time": bucket,
+                "open": rc["open"],
+                "high": rc["high"],
+                "low": rc["low"],
+                "close": rc["close"],
+                "volume": int(rc.get("volume", 0)),
+            }
+        else:
+            cur["high"] = round(max(cur["high"], rc["high"]), 2)
+            cur["low"] = round(min(cur["low"], rc["low"]), 2)
+            cur["close"] = rc["close"]
+            cur["volume"] += int(rc.get("volume", 0))
+    if cur is not None:
+        resampled.append(cur)
+    return resampled[-max_bars:]
+
+
+def _fetch_yahoo_tf_bars(
+    interval: str,
+    range_str: str,
+    timeout: float = 4.0,
+    max_bars: int = 180,
+) -> list[dict[str, Any]]:
+    """Fetches authentic higher-timeframe OHLCV bars for GC=F from Yahoo Finance."""
+    urls = [
+        f"https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval={interval}&range={range_str}",
+        f"https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval={interval}&range={range_str}",
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    result = data.get("chart", {}).get("result", [])
+                    if result:
+                        res0 = result[0]
+                        meta = res0.get("meta", {})
+                        timestamps = res0.get("timestamp", [])
+                        quote = res0.get("indicators", {}).get("quote", [{}])[0]
+                        opens = quote.get("open", [])
+                        highs = quote.get("high", [])
+                        lows = quote.get("low", [])
+                        closes = quote.get("close", [])
+                        volumes = quote.get("volume", [])
+
+                        bars: list[dict[str, Any]] = []
+                        seen: set[int] = set()
+                        for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
+                            if None in (t, o, h, l, c) or o <= 0:
+                                continue
+                            ts = int(t)
+                            if ts in seen:
+                                continue
+                            seen.add(ts)
+                            bars.append({
+                                "time": ts,
+                                "open": round(float(o), 2),
+                                "high": round(float(h), 2),
+                                "low": round(float(l), 2),
+                                "close": round(float(c), 2),
+                                "volume": int(v) if v is not None else 0,
+                            })
+                        if len(bars) > 1 and bars[-1]["volume"] <= 0 and (bars[-1]["high"] - bars[-1]["low"]) < 0.05:
+                            bars.pop()
+                        if bars:
+                            reg_p = meta.get("regularMarketPrice")
+                            if reg_p is not None and float(reg_p) > 500.0:
+                                rp = round(float(reg_p), 2)
+                                if abs(rp - bars[-1]["close"]) <= 25.0:
+                                    bars[-1]["close"] = rp
+                                    bars[-1]["high"] = round(max(bars[-1]["high"], rp), 2)
+                                    bars[-1]["low"] = round(min(bars[-1]["low"], rp), 2)
+                            return bars[-max_bars:]
+        except Exception as e:
+            logger.debug("HTF Yahoo fetch (%s) failed: %s", url, e)
+    return []
+
+
+def fetch_live_cme_m5_tape(
+    limit: int = 8,
+    timeout: float = _HTTP_TIMEOUT_S,
+    include_htf: bool = False,
+) -> dict[str, Any]:
+    """Fetches recent candles and orderflow volume pulse for COMEX Gold Futures (GC=F).
 
     Identifies volume spikes (>= 1.4x 20-bar avg) and absorption pin bars.
     Returns:
@@ -225,6 +373,8 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
             'available': bool
             'candles': list of dicts (time_vn, open, high, low, close, volume, ratio, is_spike, note, signal_class)
             'chart_candles': list of dicts (time, open, high, low, close, volume) for Lightweight Charts
+            'tf_candles': dict of {'1m', '5m', '15m', '1h', '1d'} candle arrays
+            'market_open': bool
             'day_high': float
             'day_low': float
             'day_range': float
@@ -278,17 +428,6 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                         if len(raw_candles) > 1 and raw_candles[-1]["volume"] <= 0 and (raw_candles[-1]["high"] - raw_candles[-1]["low"]) < 0.05:
                             raw_candles.pop()
 
-                        # Sanitize artificial settlement spike on closing bar:
-                        # Yahoo Finance often injects the CME Daily Settlement Fix price (e.g. $3,898.90) into the final minute bar,
-                        # creating an artificial 14-dollar spike when the market was trading steadily at ~$3,885.
-                        if len(raw_candles) > 2:
-                            last_bar = raw_candles[-1]
-                            prev_bar = raw_candles[-2]
-                            normal_spread = max(0.8, prev_bar["high"] - prev_bar["low"])
-                            if (last_bar["high"] - last_bar["low"]) > 4.0 * normal_spread and abs(last_bar["open"] - prev_bar["close"]) < 3.5:
-                                last_bar["high"] = round(max(last_bar["open"], last_bar["low"]) + 0.8, 2)
-                                last_bar["close"] = round(last_bar["open"] + 0.3, 2)
-
                         # Ensure strictly ascending unique timestamps for Lightweight Charts
                         deduped = []
                         seen_ts = set()
@@ -299,6 +438,13 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
                         raw_candles = deduped
 
                         if raw_candles:
+                            last_p = round(float(meta.get("regularMarketPrice") or raw_candles[-1]["close"]), 2)
+                            # Align final candle close to live Yahoo regularMarketPrice to prevent spot/candle desync
+                            if last_p > 500.0 and abs(last_p - raw_candles[-1]["close"]) <= 25.0:
+                                raw_candles[-1]["close"] = last_p
+                                raw_candles[-1]["high"] = round(max(raw_candles[-1]["high"], last_p), 2)
+                                raw_candles[-1]["low"] = round(min(raw_candles[-1]["low"], last_p), 2)
+
                             valid_vols = [rc["volume"] for rc in raw_candles if rc["volume"] > 0]
                             window = valid_vols[-20:] if len(valid_vols) >= 5 else valid_vols
                             avg_vol = float(sum(window) / len(window)) if window else 200.0
@@ -354,25 +500,29 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
 
                             day_high = float(meta.get("regularMarketDayHigh") or max(rc["high"] for rc in raw_candles))
                             day_low = float(meta.get("regularMarketDayLow") or min(rc["low"] for rc in raw_candles))
-                            last_p = float(meta.get("regularMarketPrice") or raw_candles[-1]["close"])
 
-                            # Provide real M5 candles (up to 150 bars, ~12.5 hours of continuous trading)
-                            chart_candles = [
-                                {
-                                    "time": rc["t"],
-                                    "open": rc["open"],
-                                    "high": rc["high"],
-                                    "low": rc["low"],
-                                    "close": rc["close"],
-                                    "volume": rc["volume"],
-                                }
-                                for rc in raw_candles[-400:]
-                            ]
+                            chart_candles = _resample_ohlcv(raw_candles, 60, max_bars=360)
+                            tf_candles: dict[str, list[dict[str, Any]]] = {
+                                "1m": chart_candles,
+                                "5m": _resample_ohlcv(raw_candles, 300, max_bars=200),
+                                "15m": _resample_ohlcv(raw_candles, 900, max_bars=150),
+                                "1h": _resample_ohlcv(raw_candles, 3600, max_bars=120),
+                                "1d": _resample_ohlcv(raw_candles, 86400, max_bars=90),
+                            }
+                            if include_htf:
+                                h1_bars = _fetch_yahoo_tf_bars("60m", "1mo", timeout=timeout, max_bars=160)
+                                if h1_bars:
+                                    tf_candles["1h"] = h1_bars
+                                d1_bars = _fetch_yahoo_tf_bars("1d", "6mo", timeout=timeout, max_bars=120)
+                                if d1_bars:
+                                    tf_candles["1d"] = d1_bars
 
                             return {
                                 "available": True,
                                 "candles": processed,
                                 "chart_candles": chart_candles,
+                                "tf_candles": tf_candles,
+                                "market_open": is_cme_globex_market_open(),
                                 "day_high": round(day_high, 2),
                                 "day_low": round(day_low, 2),
                                 "day_range": round(day_high - day_low, 2),
@@ -386,6 +536,8 @@ def fetch_live_cme_m5_tape(limit: int = 8, timeout: float = _HTTP_TIMEOUT_S) -> 
         "available": False,
         "candles": [],
         "chart_candles": [],
+        "tf_candles": {},
+        "market_open": is_cme_globex_market_open(),
         "day_high": 0.0,
         "day_low": 0.0,
         "day_range": 0.0,

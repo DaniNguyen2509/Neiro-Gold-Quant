@@ -29,12 +29,13 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
    - Áp lực tấn công thành trì trong ngày được đo lường bằng tỷ lệ tốc độ dòng tiền:
      $$\text{Wall Siege Ratio} = \frac{\text{Volume}}{\max(\text{Baseline OI}, 1)}$$
      Khi $\text{Siege Ratio} \ge 0.25$, hệ thống phát cảnh báo nguy cơ vỡ trận phòng thủ.
-4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Chuẩn hóa 1:1 Neiro-NQ-Quant):**
-   - **Mặc định Timeframe M1:** Lấy 250 nến 1 phút liên tục gần nhất của COMEX Gold Futures `GC=F`, phản ánh từng biến động vi cấu trúc.
-   - **TradingView Full-bleed Canvas 60 FPS:** Khung chart mở rộng 100% màn hình, topbar chuyên nghiệp với nhãn live badge và multiplier $100.0/oz.
+4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Chuẩn hóa 1:1 Neiro-NQ-Quant & Yahoo `GC=F`):**
+   - **Đồng bộ Nến Đa Khung Thời Gian Yahoo `GC=F` (`1m`, `5m`, `15m`, `1h`, `1d`):** Nạp nến thực tế từ COMEX Gold Futures `GC=F` cho cả khung Intraday và HTF (`window.INITIAL_TF_CANDLES`), bảo toàn 100% giá OHLC thực và đồng bộ tuyệt đối giữa `spot_price` và cây nến cuối.
+   - **Cầu nối Local CORS HTTP (`127.0.0.1:8765`) & Cloud Hot-Patching:** Khi chạy `--loop`, hệ thống khởi chạy luồng HTTP JSON nhẹ phục vụ `/api/yahoo_gc` và `/version.json` (kèm `Access-Control-Allow-Origin: *`), cho phép trình duyệt (kể cả khi mở qua `file://`) cập nhật nến Yahoo `GC=F` trực tiếp mỗi 10 giây mà không bao giờ gọi `window.location.reload()`.
+   - **Kiểm soát Giờ Phiên CME Globex & Neo Giá (`yahooAnchorPrice`):** Khóa biểu đồ tại giá Settlement chính thức khi sàn CME đóng cửa cuối tuần hoặc nghỉ bảo trì hàng ngày (17:00–18:00 ET); trong phiên mở cửa, mọi tick orderflow được neo chặt trong phạm vi `±$0.50` quanh giá chuẩn Yahoo `GC=F`.
+   - **TradingView Full-bleed Canvas 60 FPS (`UTC+7`):** Khung chart mở rộng 100% màn hình, trục thời gian hiển thị chuẩn giờ Việt Nam (`UTC+7`), topbar chuyên nghiệp với nhãn live badge và multiplier $100.0/oz.
    - **Floating Tactical HUD Card:** Góc trên bên trái hiển thị NET GEX, GAMMA SQUEEZE ↑/↓, VANNA, CHARM, THETA, 1-SIGMA.
    - **4 Cột Greeks Profile Cố Định Theo Trục Giá Nến:** GEX | VEX | CHEX | THETA trên Canvas 60 FPS bám sát `candleSeries.priceToCoordinate(k)`.
-   - **Realtime Tick Engine:** Tự động đẩy giá nến M1 và đường giá live `livePriceLine` từng tick mà không cần reload trang (Zero Page Reload), triệt tiêu hiện tượng nhấp nháy chớp trắng.
 5. **Vận hành Tự động Đám mây (Zero-Touch Cloud-Native Automation):**
    - Chạy 100% không người lái trên GitHub Actions theo Lưới Cron Đa Tầng Pre-Session Radar, xuất bản trực tiếp lên GitHub Pages. Không cần cài đặt phần mềm nặng, không phụ thuộc laptop, repo < 15MB.
 
@@ -136,8 +137,8 @@ $$d_1 = \frac{\ln(F/K) + \frac{1}{2}\sigma^2 T}{\sigma \sqrt{T}}, \quad d_2 = d_
 - **Vega ($\nu$):** $\nu = e^{-rT} F \sqrt{T} N'(d_1)$
 - **Vanna ($VEX$):** $\text{Vanna} = -e^{-rT} N'(d_1) \frac{d_2}{\sigma}$
 - **Charm ($CHEX$):**
-  $$\text{Charm}_{\text{Call}} = e^{-rT} \left[ r N(d_1) + N'(d_1) \frac{d_2}{2T} \right]$$
-  $$\text{Charm}_{\text{Put}} = e^{-rT} \left[ -r N(-d_1) + N'(d_1) \frac{d_2}{2T} \right]$$
+  $$\text{Charm}_{\text{Call}} = e^{-rT} \left[ N'(d_1) \frac{d_2}{2T} - r N(d_1) \right]$$
+  $$\text{Charm}_{\text{Put}} = e^{-rT} \left[ N'(d_1) \frac{d_2}{2T} + r N(-d_1) \right]$$
 
 ### 3. Dòng tiền Dealer ($M) với Hệ số nhân Vàng Multiplier = 100.0:
 - **Net GEX ($M / 1% dịch chuyển giá vàng):**
