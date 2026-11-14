@@ -1,4 +1,6 @@
 # AGENTS.md - Quy tac cot loi cho moi AI Coding Agent
+> **HIEN PHAP TOI CAO TOAN WORKSPACE:** Ke thua va tuan thu bat buoc bo quy tac toi thuong tai [`../AGENTS.md`](../AGENTS.md) va [`../Rules/SUPREME-RULES.md`](../Rules/SUPREME-RULES.md) (Quy trinh 8 buoc nhan lenh, Deep Research >= 6 phuong an & Test gia lap dat >= 90%, Xu ly gop y 5 buoc & 2 diem cham, Build san pham 6 giai doan 7 cong duyet, Do bang san pham that cam an gian, Tu ra soat 3 vong theo Use Case, Khoa chu khong xoa & Sao luu DB truoc khi lam).
+> **HIEN PHAP TOI CAO TOAN WORKSPACE:** Ke thua va tuan thu bat buoc bo quy tac toi thuong tai [`../AGENTS.md`](../AGENTS.md) va [`../Rules/SUPREME-RULES.md`](../Rules/SUPREME-RULES.md) (Quy trinh 8 buoc nhan lenh, Deep Research >= 6 phuong an & Test gia lap dat >= 90%, Xu ly gop y 5 buoc & 2 diem cham, Build san pham 6 giai doan 7 cong duyet, Do bang san pham that cam an gian, Tu ra soat 3 vong theo Use Case, Khoa chu khong xoa & Sao luu DB truoc khi lam).
 > Ap dung bat buoc cho: **Gemini, DeepSeek, Claude, Cursor, Copilot, OpenCode, Windsurf** va moi mo hinh AI khi hoat dong trong repository Neiro-Quant.
 
 ---

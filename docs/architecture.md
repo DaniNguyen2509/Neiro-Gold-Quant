@@ -31,7 +31,7 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
      Khi $\text{Siege Ratio} \ge 0.25$, hệ thống phát cảnh báo nguy cơ vỡ trận phòng thủ.
 4. **TradingView Fullscreen Zero-Tabs Realtime Terminal (Chuẩn hóa 1:1 Neiro-NQ-Quant & Yahoo `GC=F`):**
    - **Đồng bộ Nến Đa Khung Thời Gian Yahoo `GC=F` (`1m`, `5m`, `15m`, `1h`, `1d`):** Nạp nến thực tế từ COMEX Gold Futures `GC=F` cho cả khung Intraday và HTF (`window.INITIAL_TF_CANDLES`), bảo toàn 100% giá OHLC thực và đồng bộ tuyệt đối giữa `spot_price` và cây nến cuối.
-   - **Cầu nối Local CORS HTTP (`127.0.0.1:8765`) & Cloud Hot-Patching:** Khi chạy `--loop`, hệ thống khởi chạy luồng HTTP JSON nhẹ phục vụ `/api/yahoo_gc` và `/version.json` (kèm `Access-Control-Allow-Origin: *`), cho phép trình duyệt (kể cả khi mở qua `file://`) cập nhật nến Yahoo `GC=F` trực tiếp mỗi 10 giây mà không bao giờ gọi `window.location.reload()`.
+   - **Cầu nối Local CORS HTTP (`127.0.0.1:8765`, `ThreadingHTTPServer`) & Cloud Hot-Patching:** Khi chạy `--loop`, hệ thống khởi chạy luồng HTTP JSON đa luồng kèm RAM cache (`1.8s` bridge TTL, `3.0s` M5 TTL, `60.0s` HTF TTL) phục vụ `/api/yahoo_gc` và `/version.json` (`Access-Control-Allow-Origin: *`), cho phép trình duyệt (kể cả khi mở qua `file://`) cập nhật nến Yahoo `GC=F` mỗi `2.5s` (local bridge) / `5.0s` (fallback) mà không bao giờ gọi `window.location.reload()`. Chu kỳ `--loop` tách bạch dữ liệu tĩnh theo chữ ký `mtime_ns`/`size` của CSV và cập nhật nhẹ JSON ở các nhịp trung gian.
    - **Kiểm soát Giờ Phiên CME Globex & Chuẩn Zero-BS (`yahooAnchorPrice`):** Khóa biểu đồ tại giá Settlement chính thức khi sàn CME đóng cửa cuối tuần hoặc nghỉ bảo trì hàng ngày (17:00–18:00 ET); gỡ bỏ hoàn toàn WebSocket proxy `paxgusdt@aggTrade`, nến giả lập `Math.random()`, và trọng số Lee-Ready suy đoán khi thiếu `Bid/Ask`. Toàn bộ `H20/L20` của quỹ CTA được lấy từ chuỗi nến `1D` thực tế của `GC=F`, kèm cơ chế tự động đồng bộ `data/options_prices_GCZ26.csv` mới nhất từ GitHub Cloud khi chạy cục bộ.
    - **TradingView Full-bleed Canvas 60 FPS (`UTC+7`):** Khung chart mở rộng 100% màn hình, trục thời gian hiển thị chuẩn giờ Việt Nam (`UTC+7`), topbar chuyên nghiệp với nhãn live badge và multiplier $100.0/oz.
    - **Floating Tactical HUD Card:** Góc trên bên trái hiển thị NET GEX, GAMMA SQUEEZE ↑/↓, VANNA, CHARM, THETA, 1-SIGMA.
@@ -87,9 +87,8 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 │  │ KHỐI 2: UNIFIED GREEKS & ORDERFLOW PINNING MATRIX (FULL-BLEED 100% WIDTH)             │ │
 │  │  - Hợp nhất toàn bộ: Net GEX ($M), Net VEX ($M/1%), Net CHEX ($M/d), Net Delta, OI, Vol│ │
 │  ├───────────────────────────────────────────────────────────────────────────────────────┤ │
-│  │ KHỐI 3: PLOTLY 4-PANEL QUANT LADDER (HIỂN THỊ SONG SONG LIỀN MẠCH)                    │ │
-│  │  - Panel 1: Net GEX ($M) & Mốc Chiến Thuật | Panel 2: Volume, OI & Sổ Sách Net Delta   │ │
-│  │  - Panel 3: Net VEX ($M/1% IV) Flow         | Panel 4: Net CHEX ($M/ngày) Delta Decay │ │
+│  │ KHỐI 3: BỎ QUA RENDER PLOTLY 4-PANEL TRÊN LIVE HTML (ADR-027)                         │ │
+│  │  - Giữ hàm `build_plotly_figure` phục vụ unit tests; live HTML dùng Canvas & Smile    │ │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘ │
 │  - Header KPI Bar: Spot CME, Net GEX Regime, Net Delta Tilt, Zero Gamma Flip, Expected Move│
 │  - Multi-Expiry Term Structure: Xếp chồng tuyến tính Greeks ∑ NetGEX_e, ∑ NetVEX_e        │
@@ -348,4 +347,30 @@ on:
 3. **Đồng Bộ Client JS & Tinh Gọn Kiến Trúc (`src/hud/neiro_terminal.py`, `html_dashboard.py`, `basis.py`):**
    - Loại bỏ `vTick` giả lập trong `applyLiveTick()` khi `tickVol === null` và fallback `volume: 120` trong `mergeLiveCandles()`; bổ sung `evaluateBarOrderflow()` trên nến hoàn tất mang Volume thật và `updateSqueezeHud()` tra cứu nhị phân `squeeze_ladder`.
    - Dọn bỏ 6 file mã chết (`src/main.py`, `src/hud/chart_exporter.py`, `src/quant_engine/scenario_engine.py`, `src/quant_engine/air_pocket.py`, `tests/test_scenario_engine.py`, `tests/test_air_pocket.py`) và đồng bộ nhãn khung thời gian `timeframe_label` (`M1`/`M5`) từ `basis.py`.
+
+---
+
+## XIV. TỐI ƯU HÓA ĐỘ TRỄ TOÀN TRÌNH, LIVE BRIDGE & TINH GỌN COCKPIT (ADR-027)
+
+1. **Vector hóa Nạp Dữ liệu & Lõi Toán (`src/quant_engine/loader.py`, `dealer.py`, `validator.py`, `html_dashboard.py`):**
+   - Cache `preloaded_dfs` trong `load_multi_expiry_options`, vector hóa `normalize_options_df` kèm cờ `attrs["is_normalized"]`, gán `allow_network=False` trong `aggregate_options_dataframes` và dựng `OptionsStrike` bằng NumPy/zip.
+   - Vector hóa `find_gamma_weighted_walls`, `reconstruct_institutional_orderflow`, dùng `_series_clean_val` và chỉ giải Black-76 IV trên các chỉ mục `needs_c_iv` / `needs_p_iv` thực sự thiếu IV.
+2. **Song song hóa Yahoo Feed, HTTP Gzip & Bridge Đa luồng (`src/quant_engine/basis.py`, `html_dashboard.py`, `neiro_terminal.py`):**
+   - Hợp nhất `_read_yahoo_json()` với `"Accept-Encoding": "gzip"`, cache `_M5_TAPE_CACHE` (`3.0s`) và `_HTF_TAPE_CACHE` (`60.0s`) kèm tải song song `1h`/`1d` (`ThreadPoolExecutor`), tái dùng `m5_tape` trong `load_and_preprocess_options`.
+   - `run_pipeline(..., no_mt5=True)` mặc định chạy `CME_ONLY` (`load_and_preprocess_options` giữ mặc định `no_mt5=False`), bỏ gọi `build_plotly_figure` trên đường chạy chính (giữ nguyên hàm cho tests), cache chuỗi CSV tĩnh theo `mtime_ns`/`size` và tách `_run_lightweight_live_tick()` cho `--loop`.
+   - Nâng cấp cầu nối cục bộ sang `ThreadingHTTPServer` (`daemon_threads=True`) + RAM cache `1.8s` và đồng nhất nhịp poll client JS (`YAHOO_POLL_INTERVAL_MS` + chống trùng `checkCloudSyncNow`).
+3. **Tinh gọn DOM/JSON & Giao diện Scalping (`src/hud/neiro_terminal.py`, `html_dashboard.py`):**
+   - Cắt tỉa `window.INITIAL_OPTIONS` và `squeeze_ladder` trong hành lang `±$600` quanh Spot (kèm `±$25` quanh các mốc trụ cột), giới hạn bảng Pinning ở `±35 strikes` quanh Spot (`<= 71` dòng `<tr>` trên dữ liệu thực tế), bỏ 3 thẻ Orderflow đóng băng trùng lặp ở `KHỐI 5` và thu gọn `KHỐI 1` (Smile), `KHỐI 6`, `KHỐI 7` bằng `<details>` giữ nguyên thứ tự các landmark kiểm thử.
+
+---
+
+## XV. HIỆU CHỈNH ĐỘNG CƠ VPIN & MA TRẬN TÁC CHIẾN KHỐI 6 (ADR-028)
+
+1. **Hiệu chỉnh VPIN BVC Không Tự Triệt Tiêu (`src/quant_engine/dealer.py`):**
+   - Với chuỗi nến thực tế (`len >= window + 20`), `compute_vpin_bvc` tính $\sigma_{\Delta P}$ từ phân tán nền `candles[:-6]` (`0.5 * P60(|dp|)/0.8416 + 0.5 * MAD_scaled`) thay vì `np.std` trên chính 24 nến đang bùng nổ, và áp dụng equal-volume bucket splitting trên `12` nến gần nhất để phát hiện chính xác các cú quét có độc tính cao (`>= 65%`) mà vẫn giữ nguyên hành vi đơn vị cho fixture ngắn.
+2. **Hợp nhất Ma trận Entry / SL / TP & Cổng Kích Hoạt `KHỐI 6` (`src/quant_engine/strategy.py`, `src/hud/html_dashboard.py`):**
+   - `compute_m5_equivalent_atr()` ước lượng ATR `M5` từ dữ liệu nến đóng cửa (`[2.0, 6.5]`, fallback `4.0`).
+   - `compute_tactical_intraday_matrix()` nâng khoảng đệm Breakout `Squeeze`/`Breakdown` tối thiểu `±$2.80` (`max(2.80, 0.8 * ATR)`), nâng Hard SL tối thiểu `\$5.00` cho cả Breakout lẫn Mean-Reversion (`Fade`/`Rebound`), giới hạn TP thực tế (`1.5x Risk` cho Breakout, `[\$3.00, \$6.00]` cho `Fade`, `[\$3.00, \$7.50]` cho `Rebound`) và gắn nhãn trạng thái `[KÍCH HOẠT]` / `[CHỜ XÁC NHẬN]` / `[TẠM KHÓA]` dựa trên GEX Regime, Zero Gamma Flip ($S^*$), neo Put Wall, Air Pocket, Wall Siege và VPIN.
+   - `precompute_squeeze_ladder()` được đồng bộ ngưỡng kích hoạt tối thiểu `±2.80` và SL tối thiểu `\$5.00` sau strike, bảo toàn cơ chế mở rộng TP theo Air Pocket cho Live HUD.
+
 

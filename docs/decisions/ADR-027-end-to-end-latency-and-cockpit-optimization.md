@@ -1,7 +1,7 @@
 # ADR-027: Đặc Tả Tối Ưu Hóa Toàn Trình (End-to-End Latency, Live Bridge & Scalping Cockpit Deduplication)
 
 ## Status
-**Proposed — Execution Blueprint Ready** (Đã hoàn tất đo đạc thực nghiệm, phân tích gốc rễ và lập kế hoạch thực thi chi tiết 5 Phase cho AI Agent triển khai)
+**Accepted & Implemented** (Đã hoàn tất triển khai tuần tự Task 1–5 kèm nén HTTP gzip `_read_yahoo_json`, đáp ứng toàn bộ ràng buộc kiểm thử Mục 3 và tiêu chí nghiệm thu Mục 5)
 
 ## Date
 2026-11-14
@@ -314,9 +314,9 @@ AI thực thi sau khi hoàn tất 5 Task trên **BẮT BUỘC** chạy bộ lệ
 ```
 
 ### Tiêu chí Nghiệm thu Đạt (Definition of Done):
-- [ ] `pytest tests/` đạt **100% pass (`258+ passed, 0 failed`)**.
-- [ ] Cold Run giảm từ `14,246 ms` xuống **`< 2,000 ms`**; Warm Run (khi CSV `mtime` không đổi và HTF cache còn hạn) đạt **`< 400 ms`**.
-- [ ] Dung lượng `exports/index.html` giảm từ `1,135.4 KB` xuống **`< 750 KB`**, số dòng `data-strike` trên dữ liệu thực tế `<= 71` dòng.
-- [ ] Tuyệt đối không đụng chạm tới `mt5/Indicators/Neiro-Liquidity-Map-v2.mq5` và `mt5/Indicators/2TC-v10.mq5`.
-- [ ] Cập nhật trạng thái `ADR-027` từ `Proposed` sang `Accepted & Implemented` trong `docs/decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md` và `docs/spec.md` sau khi hoàn thành.
+- [x] `pytest tests/` đạt **100% pass (`258+ passed, 0 failed`)**.
+- [x] Cold Run giảm từ `14,246 ms` xuống **`< 2,000 ms`**; Warm Run (khi CSV `mtime` không đổi và HTF cache còn hạn) đạt **`< 400 ms`**.
+- [x] Dung lượng `exports/index.html` giảm từ `1,135.4 KB` xuống **`< 750 KB`**, số dòng `data-strike` trên dữ liệu thực tế `<= 71` dòng.
+- [x] Tuyệt đối không đụng chạm tới `mt5/Indicators/Neiro-Liquidity-Map-v2.mq5` và `mt5/Indicators/2TC-v10.mq5`.
+- [x] Cập nhật trạng thái `ADR-027` từ `Proposed` sang `Accepted & Implemented` trong `docs/decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md` và `docs/spec.md` sau khi hoàn thành.
 
