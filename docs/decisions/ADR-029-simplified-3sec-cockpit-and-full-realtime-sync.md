@@ -24,6 +24,15 @@
    - Mặc định chế độ `Tinh gọn` chỉ vẽ 3 đường cấu trúc lõi (`CALL WALL`, `PUT WALL`, `GAMMA FLIP`) + các đường `ENTRY / SL / TP` đang `[KÍCH HOẠT]`; Vanna, Charm, Air Pockets, FVG và Squeeze chỉ hiện khi bật `Đầy đủ` (`syncSecondaryPriceLines()`).
    - Hợp nhất `_compute_live_microstructure_payload(tape)` ở backend (tái sử dụng `compute_vpin_bvc` & `compute_rolling_kyle_lambda_ols`) nối vào `/api/yahoo_gc`, `_run_lightweight_live_tick()` và `run_pipeline()` (`version.json`); mở rộng `meta` với `next_above`, `next_below`, `step`, `major_up_wall`, `major_down_wall`, `has_up_air_pocket`, `has_down_air_pocket`, `atr_5m`.
 
+4. **Đơn giản hóa Nhãn Hành Động Theo 4 Kèo Trực Quan (Kiểu 2):**
+   - Quy chuẩn lại tên chiến lược trên `#tactical-3s-command-bar` (`Ô 1`, `Ô 4`), `KHỐI 6` (`k6-row-{sq,fd,rb,bd}`) và đồng bộ `computeTacticalMatrixJs()` thành 4 nhãn hành động gắn điểm vào CME:
+     - `1. THUẬN CHIỀU BUY (Phá cản {strike})` *(trước đây: `BUY MUA ĐUỔI / Squeeze`)*
+     - `2. ĐẢO CHIỀU SELL (Chạm cản {strike})` *(trước đây: `SELL CHẶN TIỀN TUYẾN / Fade`)*
+     - `3. ĐẢO CHIỀU BUY (Chạm sàn {strike})` *(trước đây: `BUY BẮT SÀN ATM / Rebound`)*
+     - `4. THUẬN CHIỀU SELL (Thủng sàn {strike})` *(trước đây: `SELL THỦNG SÀN / Breakdown`)*
+   - Ô chế độ `cmd-regime-val` hiển thị trực diện `ƯU TIÊN ĐÁNH ĐẢO CHIỀU (GEX +)` / `ƯU TIÊN ĐÁNH THUẬN CHIỀU (GEX -)` / `CHỜ XÁC NHẬN (CHUYỂN PHA)`.
+   - Canvas & Tooltip hiển thị nhãn bình dân (`VEX · VÙNG BẬT / GIẬT SÓNG`, `CHEX · HÚT GIÁ VỀ ĐÂY`, cùng dòng gợi ý `-> GEX (+): Đánh ĐẢO CHIỀU` / `-> GEX (-): Đánh THUẬN CHIỀU` khi di chuột qua 5 cột Greeks).
+
 ## Xác minh & Tính Toàn Vẹn (Verification)
 
 - Kiểm thử đối chiếu chéo JS (Node `vm` trên `exports/index.html`) vs Python (`dealer.py` & `strategy.py`):

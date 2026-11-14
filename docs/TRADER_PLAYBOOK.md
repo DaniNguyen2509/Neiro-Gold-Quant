@@ -319,12 +319,16 @@ Bảng điện cập nhật trực tiếp luồng nến M5 từ sàn COMEX, giú
 
 ## 9. QUY TẮC QUẢN TRỊ RỦI RO, ĐI TIỀN (SIZING GC/MGC) & HARD SL ADR-028
 
-### 1. Quy tắc Cắt lỗ (Stop Loss) Hiệu Chỉnh Theo M5 ATR (ADR-028):
+### 1. Quy tắc Cắt lỗ (Stop Loss) Hiệu Chỉnh Theo M5 ATR (ADR-028) & 4 Nhãn Tác Chiến Kiểu 2:
+- **4 Nhãn Hành Động Trực Quan trên Command Bar 3s & `KHỐI 6`:**
+  * `1. THUẬN CHIỀU BUY (Phá cản)`: Đánh thuận xu hướng lên khi phá vỡ cản trên (`SHORT_GAMMA` + Air Pocket + áp lực công thành).
+  * `2. ĐẢO CHIỀU SELL (Chạm cản)`: Đánh đảo chiều xuống khi giá chạm cản trên trong `GEX (+)` / trên Flip (`VPIN < 58%`).
+  * `3. ĐẢO CHIỀU BUY (Chạm sàn)`: Đánh đảo chiều bật lên khi giá chạm sàn dưới trong `GEX (+)` / gần Put Wall (`VPIN < 55%`).
+  * `4. THUẬN CHIỀU SELL (Thủng sàn)`: Đánh thuận xu hướng xuống khi đâm thủng sàn dưới (`SHORT_GAMMA` dưới Flip + Air Pocket + áp lực xả).
 - **Biên độ Hard SL tiêu chuẩn (`KHỐI 6`):**
-  * **Breakout (`Squeeze` / `Breakdown`) & `Fade Reversal`:** Hard SL tối thiểu **`>= $5.00`** (tính tự động theo `M5 ATR` và cấu trúc Strike để tránh bị quét râu M5 trước khi chạy thật).
-  * **Mean-Reversion (`Rebound` tại Put Wall):** Hard SL tối thiểu **`>= $4.50`**.
+  * **Breakout (`Squeeze` / `Breakdown`) & Mean-Reversion (`Fade` / `Rebound`):** Hard SL tối thiểu **`>= $5.00`** (`max(5.00, 1.5 * ATR5m)` cho Breakout và `max(5.00, 1.4 * ATR5m)` cho Mean-Reversion) để tránh bị quét râu M5 trước khi chạy thật.
 - **Tại sao không đặt SL quá chặt ($1.5–$2.5) như cũ?**  
-  Thực chiến phiên COMEX có biên độ râu quét thanh khoản M5 thường đạt `$2.50–$4.00`. Nếu SL quá sát tường sẽ dễ bị dừng lỗ non ngay tại điểm hấp thụ thanh khoản. Khi cấu trúc vượt qua vùng Hard SL hiệu chỉnh (`>= $4.50 / $5.00`), tường phòng thủ đã xác nhận vỡ thật sự.
+  Thực chiến phiên COMEX có biên độ râu quét thanh khoản M5 thường đạt `$2.50–$4.00`. Nếu SL quá sát tường sẽ dễ bị dừng lỗ non ngay tại điểm hấp thụ thanh khoản. Khi cấu trúc vượt qua vùng Hard SL hiệu chỉnh (`>= $5.00`), tường phòng thủ đã xác nhận vỡ thật sự.
 
 ### 2. Định cỡ Vị thế (Position Sizing `GC` / `MGC`) theo Chế độ Gamma & VPIN:
 - **Trong Positive Net GEX (`VPIN < 40%`):** Đi khối lượng tiêu chuẩn `100%` theo quy mô rủi ro tài khoản (`GC = $100/pt`, `MGC = $10/pt`).
@@ -362,7 +366,7 @@ In checklist này ra bàn làm việc hoặc lưu vào ghi chú điện thoại 
 
 [ ] 20:30 - 23:45 VN (Phiên Mỹ Mở Cửa & London Fix 00:00 VN):
     - Giao dịch theo đúng Ma trận 6 kịch bản MM khi thẻ phát sáng.
-    - Tuân thủ nghiêm ngặt Hard SL hiệu chỉnh ADR-028 trên `KHỐI 6` (`>= $5.00` Breakout/Fade, `>= $4.50` Rebound).
+    - Tuân thủ nghiêm ngặt Hard SL hiệu chỉnh ADR-028 trên `KHỐI 6` (`>= $5.00` cho cả Breakout lẫn Mean-Reversion).
     - Chốt lời các lệnh Intraday trước giờ London Fix để tránh giật giá cuối ngày.
 ```
 
