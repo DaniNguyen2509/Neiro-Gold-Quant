@@ -206,7 +206,12 @@ def test_html_dashboard_renders_calibrated_k6_with_status_gates():
     fig = go.Figure()
     fig.add_trace(go.Bar(x=[4140, 4155, 4180], y=[10, 20, 30]))
     html = generate_html_terminal(df, meta, fig)
-    for label in ("BUY MUA ĐUỔI", "SELL CHẶN TIỀN TUYẾN", "BUY BẮT SÀN ATM", "SELL THỦNG SÀN"):
+    for label in (
+        "1. THUẬN CHIỀU BUY (Phá cản",
+        "2. ĐẢO CHIỀU SELL (Chạm cản",
+        "3. ĐẢO CHIỀU BUY (Chạm sàn",
+        "4. THUẬN CHIỀU SELL (Thủng sàn",
+    ):
         assert label in html
     assert "[KÍCH HOẠT]" in html
     assert "[CHỜ XÁC NHẬN]" in html

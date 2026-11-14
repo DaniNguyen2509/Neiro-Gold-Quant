@@ -1957,11 +1957,11 @@ def generate_html_terminal(
     _zg_ref = float(zero_gamma) if (zero_gamma is not None and float(zero_gamma) > 0) else spot
     _dist_flip = spot - _zg_ref
     if total_gex >= 0 and _dist_flip >= 0:
-        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "MM GHÌM ĐẢO CHIỀU (LONG Γ)", "#4ADE80", "#22C55E"
+        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "ƯU TIÊN ĐÁNH ĐẢO CHIỀU (GEX +)", "#4ADE80", "#22C55E"
     elif total_gex < 0 and _dist_flip < 0:
-        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "MM ĐẨY SÓNG MẠNH (SHORT Γ)", "#F87171", "#EF4444"
+        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "ƯU TIÊN ĐÁNH THUẬN CHIỀU (GEX -)", "#F87171", "#EF4444"
     else:
-        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "VÙNG CHUYỂN PHA (TRANH CHẤP)", "#FACC15", "#EAB308"
+        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "CHỜ XÁC NHẬN (CHUYỂN PHA)", "#FACC15", "#EAB308"
     _cmd_reg_sub = f"Flip ${zero_gamma:,.0f} ({_dist_flip:+.1f}$) · NetGEX ${total_gex:+.1f}M" if zero_gamma else f"NetGEX ${total_gex:+.1f}M"
 
     _dist_up = strike_above - spot
@@ -1985,10 +1985,10 @@ def generate_html_terminal(
     _cmd_flow_sub = f"Mua BVC: {_k6_buy_pct:.1f}% · δF {_k6_df:+.2f}$ · CW/PW Siege: {call_wall_siege:.2f}x/{put_wall_siege:.2f}x"
 
     _k6_candidates = [
-        ("1. BUY MUA ĐUỔI", "BUY", _k6_mat["squeeze"], size_squeeze.recommended_lots),
-        ("2. SELL CHẶN TIỀN TUYẾN", "SELL", _k6_mat["fade"], size_fade.recommended_lots),
-        ("3. BUY BẮT SÀN ATM", "BUY", _k6_mat["rebound"], size_rebound.recommended_lots),
-        ("4. SELL THỦNG SÀN", "SELL", _k6_mat["breakdown"], size_breakdown.recommended_lots),
+        ("1. THUẬN CHIỀU BUY (Phá cản)", "BUY", _k6_mat["squeeze"], size_squeeze.recommended_lots),
+        ("2. ĐẢO CHIỀU SELL (Chạm cản)", "SELL", _k6_mat["fade"], size_fade.recommended_lots),
+        ("3. ĐẢO CHIỀU BUY (Chạm sàn)", "BUY", _k6_mat["rebound"], size_rebound.recommended_lots),
+        ("4. THUẬN CHIỀU SELL (Thủng sàn)", "SELL", _k6_mat["breakdown"], size_breakdown.recommended_lots),
     ]
     _k6_active = [c for c in _k6_candidates if c[2]["active"]]
     _sess_open = _k6_sess.upper() != "GLOBEX_CLOSED"
@@ -2468,7 +2468,7 @@ def generate_html_terminal(
             </thead>
             <tbody>
                 <tr id="k6-row-sq" class="{'k6-row-active' if _k6_mat['squeeze']['active'] else 'k6-row-locked'}">
-                    <td class="tag-buy"><span id="k6-sq-label">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</span><span id="k6-sq-gate">{sq_gate_html}</span></td>
+                    <td class="tag-buy"><span id="k6-sq-label">1. THUẬN CHIỀU BUY (Phá cản {strike_above:.0f})</span><span id="k6-sq-gate">{sq_gate_html}</span></td>
                     <td id="k6-sq-trig">Vượt &gt; {entry_squeeze - 0.50:.2f}</td>
                     <td id="k6-sq-entry">{entry_squeeze:.2f}</td>
                     <td id="k6-sq-sl" style="color:#F87171;">{sl_squeeze:.2f} (${sl_dist_squeeze:.1f})</td>
@@ -2477,7 +2477,7 @@ def generate_html_terminal(
                     <td>MM vỡ trần Short -> Buộc mua Futures cover đẩy giá phóng lên trạm tiếp theo</td>
                 </tr>
                 <tr id="k6-row-fd" class="{'k6-row-active' if _k6_mat['fade']['active'] else 'k6-row-locked'}">
-                    <td class="tag-sell"><span id="k6-fd-label">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</span><span id="k6-fd-gate">{fd_gate_html}</span></td>
+                    <td class="tag-sell"><span id="k6-fd-label">2. ĐẢO CHIỀU SELL (Chạm cản {strike_above:.0f})</span><span id="k6-fd-gate">{fd_gate_html}</span></td>
                     <td id="k6-fd-trig">{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
                     <td id="k6-fd-entry">{entry_fade:.2f}</td>
                     <td id="k6-fd-sl" style="color:#F87171;">{sl_fade:.2f} (${sl_dist_fade:.1f})</td>
@@ -2486,7 +2486,7 @@ def generate_html_terminal(
                     <td>Cản Vol cực đại -> MM tung lệnh bán chặn đầu ghìm giá quay lại ATM</td>
                 </tr>
                 <tr id="k6-row-rb" class="{'k6-row-active' if _k6_mat['rebound']['active'] else 'k6-row-locked'}">
-                    <td class="tag-buy"><span id="k6-rb-label">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</span><span id="k6-rb-gate">{rb_gate_html}</span></td>
+                    <td class="tag-buy"><span id="k6-rb-label">3. ĐẢO CHIỀU BUY (Chạm sàn {strike_below:.0f})</span><span id="k6-rb-gate">{rb_gate_html}</span></td>
                     <td id="k6-rb-trig">{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
                     <td id="k6-rb-entry">{entry_rebound:.2f}</td>
                     <td id="k6-rb-sl" style="color:#F87171;">{sl_rebound:.2f} (${sl_dist_rebound:.1f})</td>
@@ -2495,7 +2495,7 @@ def generate_html_terminal(
                     <td>Đệm Put đỡ kỹ thuật -> MM gom mua đẩy giá phục hồi (vào khi có rút chân)</td>
                 </tr>
                 <tr id="k6-row-bd" class="{'k6-row-active' if _k6_mat['breakdown']['active'] else 'k6-row-locked'}">
-                    <td class="tag-sell"><span id="k6-bd-label">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</span><span id="k6-bd-gate">{bd_gate_html}</span></td>
+                    <td class="tag-sell"><span id="k6-bd-label">4. THUẬN CHIỀU SELL (Thủng sàn {strike_below:.0f})</span><span id="k6-bd-gate">{bd_gate_html}</span></td>
                     <td id="k6-bd-trig">Thủng &lt; {entry_breakdown + 0.50:.2f}</td>
                     <td id="k6-bd-entry">{entry_breakdown:.2f}</td>
                     <td id="k6-bd-sl" style="color:#F87171;">{sl_breakdown:.2f} (${sl_dist_breakdown:.1f})</td>

@@ -133,16 +133,24 @@ console.log(JSON.stringify(sandbox.__out));
     raw_out = subprocess.check_output(
         ["node", "-e", driver],
         input=json.dumps({"script": script_body, "jsParams": js_params}).encode("utf-8"),
+        stderr=subprocess.PIPE,
     ).decode("utf-8")
     out = json.loads(raw_out)
 
     # Half-cent parity check against 0.825 -> 0.82 and 4019.825 -> 4019.82
     assert out["r2_edges"] == [0.82, 2.82, 3.82, 4019.82, 4019.84]
+    expected_titles = {
+        "squeeze": "1. THUẬN CHIỀU BUY (Phá cản)",
+        "fade": "2. ĐẢO CHIỀU SELL (Chạm cản)",
+        "rebound": "3. ĐẢO CHIỀU BUY (Chạm sàn)",
+        "breakdown": "4. THUẬN CHIỀU SELL (Thủng sàn)",
+    }
     for key in ("squeeze", "fade", "rebound", "breakdown"):
         assert out["matrix"][key]["entry"] == py_mat[key]["entry"], f"Entry mismatch for {key}"
         assert out["matrix"][key]["sl"] == py_mat[key]["sl"], f"SL mismatch for {key}"
         assert out["matrix"][key]["tp"] == py_mat[key]["tp"], f"TP mismatch for {key}"
         assert out["matrix"][key]["active"] == py_mat[key]["active"], f"Active mismatch for {key}"
+        assert out["matrix"][key]["title"] == expected_titles[key]
 
 
 def test_vpin_toxic_label_matches_threshold_in_python_and_js() -> None:

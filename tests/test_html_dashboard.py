@@ -149,11 +149,15 @@ def test_generate_html_terminal_content():
     assert "Sổ Sách Dealer (Net Delta / DEX)" in html
     assert "Net Delta / DEX (Sổ Sách Dealer)" in html
     assert "Lot Size ($10K, R: 1%)" in html
-    # Check strategic tables (pure CME)
-    assert "BUY MUA ĐUỔI" in html
-    assert "SELL CHẶN TIỀN TUYẾN" in html
-    assert "BUY BẮT SÀN ATM" in html
-    assert "SELL THỦNG SÀN" in html
+    # Check strategic tables (pure CME - simplified Type 2 labels)
+    assert "THUẬN CHIỀU BUY (Phá cản" in html
+    assert "ĐẢO CHIỀU SELL (Chạm cản" in html
+    assert "ĐẢO CHIỀU BUY (Chạm sàn" in html
+    assert "THUẬN CHIỀU SELL (Thủng sàn" in html
+    assert "ƯU TIÊN ĐÁNH ĐẢO CHIỀU (GEX +)" in html
+    assert "GEX (+): Đánh ĐẢO CHIỀU" in html
+    assert "CHEX · HÚT GIÁ VỀ ĐÂY" in html
+    assert "VEX · VÙNG BẬT / GIẬT SÓNG" in html
     assert "PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ" not in html
     assert "refreshWithCacheBuster()" in html
     # Check Microstructure Greeks & Pinning Table

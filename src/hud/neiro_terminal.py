@@ -531,7 +531,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     lineWidth: 1.5,
                     lineStyle: LightweightCharts.LineStyle.Dashed,
                     axisLabelVisible: true,
-                    title: 'VANNA (VEX)',
+                    title: 'VEX · VÙNG BẬT',
                 }});
             }}
             if (!charmPriceLine && m.charm_peak_strike) {{
@@ -541,7 +541,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     lineWidth: 1.5,
                     lineStyle: LightweightCharts.LineStyle.Dashed,
                     axisLabelVisible: true,
-                    title: 'CHARM (CHEX)',
+                    title: 'CHEX · HÚT GIÁ',
                 }});
             }}
         }} else {{
@@ -1031,10 +1031,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             strikeAbove: params.strikeAbove,
             strikeBelow: params.strikeBelow,
             isMicroGuarded: params.isMicroGuarded,
-            squeeze: {{ key: 'sq', side: 'BUY', title: '1. BUY MUA ĐUỔI', label: '1. BUY MUA ĐUỔI (Squeeze ' + Math.round(params.strikeAbove) + ')', trig: 'Vượt > ' + r2(entrySq - 0.50).toFixed(2), entry: entrySq, sl: slSq, slDist: r2(entrySq - slSq), tp: tpSq, active: sqActive, badge: sqActive ? '[KÍCH HOẠT]' : '[CHỜ XÁC NHẬN]', reason: sqReason, lots: sizeXauusdJs(r2(entrySq - slSq), normReg) }},
-            fade:    {{ key: 'fd', side: 'SELL', title: '2. SELL CHẶN TIỀN TUYẾN', label: '2. SELL CHẶN TIỀN TUYẾN (Fade ' + Math.round(params.strikeAbove) + ')', trig: (params.strikeAbove - 1.50).toFixed(2) + ' - ' + params.strikeAbove.toFixed(2), entry: entryFd, sl: slFd, slDist: r2(slFd - entryFd), tp: tpFd, active: fdActive, badge: fdActive ? '[KÍCH HOẠT]' : '[TẠM KHÓA]', reason: fdReason, lots: sizeXauusdJs(r2(slFd - entryFd), normReg) }},
-            rebound: {{ key: 'rb', side: 'BUY', title: '3. BUY BẮT SÀN ATM', label: '3. BUY BẮT SÀN ATM (Rebound ' + Math.round(params.strikeBelow) + ')', trig: params.strikeBelow.toFixed(2) + ' - ' + (params.strikeBelow + 1.50).toFixed(2), entry: entryRb, sl: slRb, slDist: r2(entryRb - slRb), tp: tpRb, active: rbActive, badge: rbActive ? '[KÍCH HOẠT]' : '[TẠM KHÓA]', reason: rbReason, lots: sizeXauusdJs(r2(entryRb - slRb), normReg) }},
-            breakdown: {{ key: 'bd', side: 'SELL', title: '4. SELL THỦNG SÀN', label: '4. SELL THỦNG SÀN & VACUUM RUN (Breakdown ' + Math.round(params.strikeBelow) + ')', trig: 'Thủng < ' + r2(entryBd + 0.50).toFixed(2), entry: entryBd, sl: slBd, slDist: r2(slBd - entryBd), tp: tpBd, active: bdActive, badge: bdActive ? '[KÍCH HOẠT]' : '[CHỜ XÁC NHẬN]', reason: bdReason, lots: sizeXauusdJs(r2(slBd - entryBd), normReg) }},
+            squeeze: {{ key: 'sq', side: 'BUY', title: '1. THUẬN CHIỀU BUY (Phá cản)', label: '1. THUẬN CHIỀU BUY (Phá cản ' + Math.round(params.strikeAbove) + ')', trig: 'Vượt > ' + r2(entrySq - 0.50).toFixed(2), entry: entrySq, sl: slSq, slDist: r2(entrySq - slSq), tp: tpSq, active: sqActive, badge: sqActive ? '[KÍCH HOẠT]' : '[CHỜ XÁC NHẬN]', reason: sqReason, lots: sizeXauusdJs(r2(entrySq - slSq), normReg) }},
+            fade:    {{ key: 'fd', side: 'SELL', title: '2. ĐẢO CHIỀU SELL (Chạm cản)', label: '2. ĐẢO CHIỀU SELL (Chạm cản ' + Math.round(params.strikeAbove) + ')', trig: (params.strikeAbove - 1.50).toFixed(2) + ' - ' + params.strikeAbove.toFixed(2), entry: entryFd, sl: slFd, slDist: r2(slFd - entryFd), tp: tpFd, active: fdActive, badge: fdActive ? '[KÍCH HOẠT]' : '[TẠM KHÓA]', reason: fdReason, lots: sizeXauusdJs(r2(slFd - entryFd), normReg) }},
+            rebound: {{ key: 'rb', side: 'BUY', title: '3. ĐẢO CHIỀU BUY (Chạm sàn)', label: '3. ĐẢO CHIỀU BUY (Chạm sàn ' + Math.round(params.strikeBelow) + ')', trig: params.strikeBelow.toFixed(2) + ' - ' + (params.strikeBelow + 1.50).toFixed(2), entry: entryRb, sl: slRb, slDist: r2(entryRb - slRb), tp: tpRb, active: rbActive, badge: rbActive ? '[KÍCH HOẠT]' : '[TẠM KHÓA]', reason: rbReason, lots: sizeXauusdJs(r2(entryRb - slRb), normReg) }},
+            breakdown: {{ key: 'bd', side: 'SELL', title: '4. THUẬN CHIỀU SELL (Thủng sàn)', label: '4. THUẬN CHIỀU SELL (Thủng sàn ' + Math.round(params.strikeBelow) + ')', trig: 'Thủng < ' + r2(entryBd + 0.50).toFixed(2), entry: entryBd, sl: slBd, slDist: r2(slBd - entryBd), tp: tpBd, active: bdActive, badge: bdActive ? '[KÍCH HOẠT]' : '[CHỜ XÁC NHẬN]', reason: bdReason, lots: sizeXauusdJs(r2(slBd - entryBd), normReg) }},
         }};
     }}
 
@@ -1143,15 +1143,15 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const regCard = document.getElementById('cmd-regime-card');
         if (regVal && regSub) {{
             if (netGex >= 0 && distFlip >= 0) {{
-                regVal.innerText = 'MM GHÌM ĐẢO CHIỀU (LONG Γ)';
+                regVal.innerText = 'ƯU TIÊN ĐÁNH ĐẢO CHIỀU (GEX +)';
                 regVal.style.color = '#4ADE80';
                 if (regCard) regCard.style.borderLeftColor = '#22C55E';
             }} else if (netGex < 0 && distFlip < 0) {{
-                regVal.innerText = 'MM ĐẨY SÓNG MẠNH (SHORT Γ)';
+                regVal.innerText = 'ƯU TIÊN ĐÁNH THUẬN CHIỀU (GEX -)';
                 regVal.style.color = '#F87171';
                 if (regCard) regCard.style.borderLeftColor = '#EF4444';
             }} else {{
-                regVal.innerText = 'VÙNG CHUYỂN PHA (TRANH CHẤP)';
+                regVal.innerText = 'CHỜ XÁC NHẬN (CHUYỂN PHA)';
                 regVal.style.color = '#FACC15';
                 if (regCard) regCard.style.borderLeftColor = '#EAB308';
             }}
@@ -1846,8 +1846,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             keyLevels.push(
                 {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
                 {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA SQUEEZE ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
-                {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: 'CHARM (CHEX) · GHÌM GIÁ ĐÊM ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
-                {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], txt: 'VANNA (VEX) · V-REBOUND ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }}
+                {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: 'CHEX · HÚT GIÁ VỀ ĐÂY ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
+                {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], txt: 'VEX · VÙNG BẬT / GIẬT SÓNG ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }}
             );
         }}
         if (liveTacticalMatrix) {{
@@ -1997,6 +1997,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             ctx.setLineDash([]);
 
             const flowVal = hoveredOption.currentNetFLOW || 0;
+            const gexHint = hoveredOption.currentNetGEX >= 0 ? '-> GEX (+): Đánh ĐẢO CHIỀU' : '-> GEX (-): Đánh THUẬN CHIỀU';
             const ttLines = [
                 'Strike $' + hoveredOption.strike.toFixed(0) + (hoveredOption.isWhale ? ' ⚡WHALE' : ''),
                 'FLOW: ' + (flowVal >= 0 ? '+' : '') + flowVal.toFixed(1) + ' HĐ GC',
@@ -2004,9 +2005,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 'GEX: ' + (hoveredOption.currentNetGEX >= 0 ? '+' : '') + hoveredOption.currentNetGEX.toFixed(1) + 'M',
                 'VEX: ' + (hoveredOption.currentNetVEX >= 0 ? '+' : '') + hoveredOption.currentNetVEX.toFixed(2) + 'M',
                 'CHEX: ' + (hoveredOption.currentNetCHEX >= 0 ? '+' : '') + hoveredOption.currentNetCHEX.toFixed(2) + 'M/d',
+                gexHint,
             ];
-            const ttW = 148;
-            const ttH = 88;
+            const ttW = 172;
+            const ttH = 102;
             const ttX = Math.max(10, panelX - ttW - 8);
             const ttY = Math.min(h - ttH - 10, Math.max(10, hoveredY - ttH / 2));
             ctx.fillStyle = 'rgba(15, 23, 42, 0.96)';
@@ -2030,6 +2032,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             ctx.fillText(ttLines[4], ttX + 6, ttY + 65);
             ctx.fillStyle = '#C084FC';
             ctx.fillText(ttLines[5], ttX + 6, ttY + 78);
+            ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
+            ctx.fillStyle = hoveredOption.currentNetGEX >= 0 ? '#4ADE80' : '#F87171';
+            ctx.fillText(ttLines[6], ttX + 6, ttY + 92);
         }}
     }}
 
