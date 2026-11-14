@@ -15,7 +15,9 @@ on:
     paths:
       - '.github/workflows/daily_options_sync.yml'
       - 'src/**'
+      - 'tests/**'
       - 'requirements.txt'
+      - 'pyproject.toml'
       - 'version.json'
   workflow_dispatch:
     inputs:
@@ -52,8 +54,12 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright pandas plotly yfinance
+          pip install -r requirements.txt pytest
           python -m playwright install chromium --with-deps
+
+      - name: Run Automated Test Suite
+        run: |
+          python -m pytest tests/ -v --tb=short
 
       - name: Scrape Options Chain from Barchart
         run: |
@@ -78,8 +84,9 @@ jobs:
               total_oi = float(df['callOpenInterest'].sum() + df['putOpenInterest'].sum())
               print(f'[VERIFIED] Data integrity passed: {len(strikes)} strikes ({strikes.min()} to {strikes.max()}), Ref GC: {ref_p}, Total OI: {total_oi}')
           except Exception as e:
-              print(f'::warning title=Options Scrape Verification Failed::Scraped file verification failed: {e}. Reverting data/options_prices_GCZ26.csv to repository valid state...')
-              subprocess.run(['git', 'checkout', 'data/options_prices_GCZ26.csv'], check=False)
+              print(f'::error title=Options Scrape Verification Failed::Scraped file verification failed: {e}. Reverting data/options_prices_GCZ26.csv and halting deploy...')
+              subprocess.run(['git', 'checkout', '--', 'data/options_prices_GCZ26.csv'], check=False)
+              sys.exit(1)
           "
 
       - name: Generate Plotly Tactical HTML Dashboard
