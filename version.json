@@ -1,25 +1,25 @@
 {
-  "timestamp_utc": "2026-11-14T03:20:14.411623+00:00",
-  "synced_at_vn": "14/11/2026 10:20:14 VN",
+  "timestamp_utc": "2026-11-14T03:33:31.874103+00:00",
+  "synced_at_vn": "14/11/2026 10:33:31 VN",
   "spot_price": 3887.6,
   "atm_strike": 3890.0,
   "call_wall": 4000.0,
   "put_wall": 3700.0,
-  "zero_gamma_flip": 4076.52,
+  "zero_gamma_flip": 4091.0,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -1063.9102910462755,
-  "total_net_vex": 154.01637607121978,
-  "total_net_chex": -192.10507803438787,
+  "total_net_gex": -1334.655828629269,
+  "total_net_vex": 134.5673650143787,
+  "total_net_chex": -193.3178649101219,
   "strike_above": 3890.0,
   "strike_below": 3885.0,
-  "expected_move_1s": 151.94475342966714,
-  "implied_forward_price": 3886.29,
-  "forward_dislocation_usd": -1.31,
-  "dealer_hedge_futures_flow": 0.0,
-  "bvc_cvd_contracts": 510.1,
-  "bvc_buy_pct": 65.7,
-  "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
-  "flip_integrity_color": "#FACC15",
+  "expected_move_1s": 163.8035576304871,
+  "implied_forward_price": 3895.1,
+  "forward_dislocation_usd": 7.5,
+  "dealer_hedge_futures_flow": 1317.6,
+  "bvc_cvd_contracts": 491.7,
+  "bvc_buy_pct": 65.2,
+  "flip_integrity_label": "\ud83d\udfe2 H\u1ea4P TH\u1ee4 \u0110\u00c1Y (BEAR TRAP): C\u00c1 M\u1eacP GOM CALL \u00c9P MM MUA \u0110\u1ee0 GI\u00c1",
+  "flip_integrity_color": "#4ADE80",
   "market_open": false,
   "recent_candles": [
     {
@@ -28,11 +28,11 @@
       "high": 3882.0,
       "low": 3878.6,
       "close": 3878.9,
-      "volume": 165
+      "volume": 163
     },
     {
       "time": 1794603660,
-      "open": 3879.3,
+      "open": 3879.2,
       "high": 3879.3,
       "low": 3877.4,
       "close": 3877.8,
@@ -44,7 +44,7 @@
       "high": 3878.2,
       "low": 3876.2,
       "close": 3876.8,
-      "volume": 181
+      "volume": 186
     },
     {
       "time": 1794603780,
@@ -52,15 +52,15 @@
       "high": 3878.4,
       "low": 3876.9,
       "close": 3877.2,
-      "volume": 116
+      "volume": 113
     },
     {
       "time": 1794603840,
-      "open": 3877.2,
+      "open": 3877.3,
       "high": 3879.8,
       "low": 3877.0,
       "close": 3879.6,
-      "volume": 100
+      "volume": 98
     },
     {
       "time": 1794603900,
@@ -72,7 +72,7 @@
     },
     {
       "time": 1794603960,
-      "open": 3879.0,
+      "open": 3879.2,
       "high": 3879.8,
       "low": 3877.7,
       "close": 3878.1,
@@ -80,7 +80,7 @@
     },
     {
       "time": 1794604020,
-      "open": 3878.5,
+      "open": 3878.1,
       "high": 3878.7,
       "low": 3876.1,
       "close": 3876.3,
@@ -184,7 +184,7 @@
     },
     {
       "time": 1794604800,
-      "open": 3878.5,
+      "open": 3878.9,
       "high": 3879.5,
       "low": 3878.2,
       "close": 3879.5,
@@ -232,7 +232,7 @@
     },
     {
       "time": 1794605160,
-      "open": 3881.9,
+      "open": 3882.0,
       "high": 3882.2,
       "low": 3881.2,
       "close": 3881.2,
@@ -240,7 +240,7 @@
     },
     {
       "time": 1794605220,
-      "open": 3881.0,
+      "open": 3881.4,
       "high": 3881.4,
       "low": 3879.9,
       "close": 3879.9,
@@ -320,7 +320,7 @@
     },
     {
       "time": 1794605820,
-      "open": 3877.4,
+      "open": 3877.6,
       "high": 3877.7,
       "low": 3877.3,
       "close": 3877.3,
@@ -363,16 +363,16 @@
       "open": 3878.2,
       "high": 3879.1,
       "low": 3877.1,
-      "close": 3877.1,
-      "volume": 72
+      "close": 3877.4,
+      "volume": 77
     },
     {
       "time": 1794606180,
-      "open": 3877.5,
+      "open": 3877.3,
       "high": 3879.2,
       "low": 3877.0,
       "close": 3879.1,
-      "volume": 60
+      "volume": 55
     },
     {
       "time": 1794606240,
@@ -400,7 +400,7 @@
     },
     {
       "time": 1794606420,
-      "open": 3882.4,
+      "open": 3882.9,
       "high": 3884.7,
       "low": 3882.1,
       "close": 3884.0,
@@ -449,18 +449,18 @@
     {
       "time": 1794606780,
       "open": 3882.8,
-      "high": 3884.6,
+      "high": 3884.7,
       "low": 3882.8,
-      "close": 3884.5,
-      "volume": 47
+      "close": 3884.7,
+      "volume": 48
     },
     {
       "time": 1794606840,
-      "open": 3884.2,
+      "open": 3884.6,
       "high": 3884.7,
       "low": 3883.3,
       "close": 3883.5,
-      "volume": 53
+      "volume": 52
     },
     {
       "time": 1794606900,
@@ -488,7 +488,7 @@
     },
     {
       "time": 1794607080,
-      "open": 3886.1,
+      "open": 3886.2,
       "high": 3888.3,
       "low": 3885.8,
       "close": 3888.3,

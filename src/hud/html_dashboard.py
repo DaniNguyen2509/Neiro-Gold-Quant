@@ -594,16 +594,7 @@ def load_and_preprocess_options(
     else:
         basis_source = "MANUAL"
 
-    # 6. Institutional Skew & CTA Confluence
-    skew_metrics = extract_rr_bf(df, atm_strike=atm_strike)
-    cta_conf = detect_cta_confluence(
-        spot=spot_price,
-        call_wall=call_wall,
-        put_wall=put_wall,
-        daily_move_1s=rule16_daily_move,
-    )
-
-    # 7. Real-Time M5 Orderflow Tape & Multi-Timeframe Yahoo GC=F Candles
+    # 6. Real-Time M5 Orderflow Tape & Multi-Timeframe Yahoo GC=F Candles
     m5_tape = fetch_live_cme_m5_tape(limit=8, include_htf=True)
     if isinstance(m5_tape, dict) and m5_tape.get("available") and m5_tape.get("chart_candles"):
         tape_price = float(m5_tape.get("latest_price", spot_price))
@@ -620,6 +611,17 @@ def load_and_preprocess_options(
                     _last_b["close"] = aligned_p
                     _last_b["high"] = max(float(_last_b["high"]), aligned_p)
                     _last_b["low"] = min(float(_last_b["low"]), aligned_p)
+
+    # 7. Institutional Skew & CTA Confluence (wired to real 1D GC=F candles when available)
+    skew_metrics = extract_rr_bf(df, atm_strike=atm_strike)
+    daily_1d_candles = (m5_tape.get("tf_candles") or {}).get("1d", []) if isinstance(m5_tape, dict) else None
+    cta_conf = detect_cta_confluence(
+        spot=spot_price,
+        call_wall=call_wall,
+        put_wall=put_wall,
+        daily_move_1s=rule16_daily_move,
+        daily_candles=daily_1d_candles,
+    )
 
     call_wall_matches = df.loc[df["strike"] == call_wall, "callVolume"]
     put_wall_matches = df.loc[df["strike"] == put_wall, "putVolume"]
@@ -2287,6 +2289,31 @@ def generate_html_terminal(
     return html
 
 
+def sync_latest_cloud_options_csv(csv_path: str = "data/options_prices_GCZ26.csv", max_age_hours: float = 2.0) -> bool:
+    """Pulls the latest GitHub Actions scraped options CSV if the local file is stale (> max_age_hours)."""
+    p = Path(csv_path)
+    if p.name != "options_prices_GCZ26.csv":
+        return False
+    try:
+        if p.exists():
+            age_h = (time.time() - p.stat().st_mtime) / 3600.0
+            if age_h <= max_age_hours:
+                return False
+        import urllib.request
+        url = f"https://raw.githubusercontent.com/DaniNguyen2509/Neiro-Gold-Quant/main/data/options_prices_GCZ26.csv?t={int(time.time())}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Neiro-Gold-Quant/1.0"})
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            if resp.status == 200:
+                text = resp.read().decode("utf-8", errors="replace")
+                if "strike" in text and len(text.splitlines()) >= 10:
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(text, encoding="utf-8")
+                    return True
+    except Exception:
+        pass
+    return False
+
+
 def run_pipeline(
     input_csv: str = "data/options_prices_GCZ26.csv",
     output_files: list[str] | None = None,
@@ -2299,6 +2326,7 @@ def run_pipeline(
             "exports/index.html",
         ]
 
+    sync_latest_cloud_options_csv(input_csv, max_age_hours=2.0)
     df_raw, meta = load_and_preprocess_options(input_csv, basis=basis, no_mt5=no_mt5)
     fig = build_plotly_figure(df_raw, meta)
     fig_smile = build_volatility_smile_figure(df_raw, meta)

@@ -63,7 +63,8 @@ def test_render_neiro_orderflow_component():
     assert "generateRealisticGoldCandles" in comp["neiro_js_script"]
     assert "drawNeiroOverlay" in comp["neiro_js_script"]
     assert "AIR POCKET VACUUM" in comp["neiro_js_script"]
-    # Ensure artificial random walk and forced page reloads were eliminated
-    assert "Math.random() - 0.498" not in comp["neiro_js_script"]
+    # Ensure artificial random walk, Binance PAXG proxy, and forced page reloads were eliminated
+    assert "Math.random()" not in comp["neiro_js_script"]
+    assert "paxgusdt@aggTrade" not in comp["neiro_js_script"]
     assert "window.location.reload()" not in comp["neiro_js_script"]
 

@@ -253,13 +253,24 @@ def detect_cta_confluence(
     put_wall: float,
     daily_move_1s: float = 35.0,
     price_series: Optional[pd.Series] = None,
+    daily_candles: Optional[list[dict]] = None,
 ) -> CTAConfluence:
     """Evaluates whether Call/Put Walls coincide with 20-period CTA Momentum Breakouts."""
-    if price_series is not None and len(price_series) >= 20:
+    if daily_candles and len(daily_candles) >= 5:
+        window_1d = daily_candles[-20:]
+        highs = [float(c.get("high", spot)) for c in window_1d if float(c.get("high", 0.0)) > 0]
+        lows = [float(c.get("low", spot)) for c in window_1d if float(c.get("low", 0.0)) > 0]
+        if highs and lows:
+            h20 = max(highs)
+            l20 = min(lows)
+        else:
+            h20 = spot + daily_move_1s * 1.5
+            l20 = spot - daily_move_1s * 1.5
+    elif price_series is not None and len(price_series) >= 5:
         h20 = float(price_series.iloc[-20:].max())
         l20 = float(price_series.iloc[-20:].min())
     else:
-        # Approximate 20-day high/low boundaries using 1-sigma expected move
+        # Approximate 20-day high/low boundaries using 1-sigma expected move when 1D history is unavailable
         h20 = spot + daily_move_1s * 1.5
         l20 = spot - daily_move_1s * 1.5
 

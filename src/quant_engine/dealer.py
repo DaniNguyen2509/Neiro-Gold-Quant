@@ -845,20 +845,17 @@ def reconstruct_institutional_orderflow(
             p_iv /= 100.0
         p_iv = max(0.05, min(1.50, p_iv))
 
-        # Lee-Ready Location-in-Spread [-1, +1] for Call
+        # Lee-Ready Location-in-Spread [-1, +1] for Call (Zero-BS: require real two-sided Bid/Ask quote)
         if c_bid > 0 and c_ask > c_bid and c_last > 0:
             w_c = max(-1.0, min(1.0, (2.0 * c_last - (c_bid + c_ask)) / (c_ask - c_bid)))
         else:
-            # Volatility Skew expansion fallback sign
-            iv_diff_c = c_iv - atm_c_iv
-            w_c = 0.65 if iv_diff_c > 0.003 else (-0.45 if iv_diff_c < -0.003 else 0.25)
+            w_c = 0.0
 
-        # Lee-Ready Location-in-Spread [-1, +1] for Put
+        # Lee-Ready Location-in-Spread [-1, +1] for Put (Zero-BS: require real two-sided Bid/Ask quote)
         if p_bid > 0 and p_ask > p_bid and p_last > 0:
             w_p = max(-1.0, min(1.0, (2.0 * p_last - (p_bid + p_ask)) / (p_ask - p_bid)))
         else:
-            iv_diff_p = p_iv - atm_p_iv
-            w_p = 0.65 if iv_diff_p > 0.003 else (-0.45 if iv_diff_p < -0.003 else 0.25)
+            w_p = 0.0
 
         d1_c = (math.log(spot_price / k) + 0.5 * (c_iv ** 2) * t_years) / max(1e-5, c_iv * sqrt_t)
         d1_p = (math.log(spot_price / k) + 0.5 * (p_iv ** 2) * t_years) / max(1e-5, p_iv * sqrt_t)

@@ -475,40 +475,18 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     }}
 
     function generateRealisticGoldCandles(currentP, numBars = 60, periodSec = 60) {{
-        const bars = [];
+        // Zero-BS Policy: Never fabricate synthetic random-walk candles.
+        // Return a single deterministic flat anchor bar at the authoritative CME GC=F price.
         const nowSec = Math.floor(Date.now() / 1000);
-        const startSec = nowSec - (numBars * periodSec);
-
-        const vol = 1.25 * Math.sqrt(periodSec / 60);
-        const increments = [];
-        let sum = 0;
-        for (let i = 0; i < numBars; i++) {{
-            const r = (Math.random() - 0.495) * 2.0 * vol;
-            increments.push(r);
-            sum += r;
-        }}
-
-        const targetDrift = (Math.random() - 0.5) * 4.0;
-        const startP = currentP - targetDrift;
-        const correction = (targetDrift - sum) / numBars;
-
-        let p = startP;
-        for (let i = 0; i < numBars; i++) {{
-            const t = startSec + i * periodSec;
-            const change = increments[i] + correction;
-            const open = Math.round(p * 10) / 10;
-            const close = Math.round((p + change) * 10) / 10;
-            const high = Math.round((Math.max(open, close) + Math.random() * vol * 0.8 + 0.3) * 10) / 10;
-            const low = Math.round((Math.min(open, close) - Math.random() * vol * 0.8 - 0.3) * 10) / 10;
-            p = close;
-            const barTime = t - (t % periodSec);
-            bars.push({{ time: barTime, open, high, low, close }});
-        }}
-
-        bars[bars.length - 1].close = currentP;
-        bars[bars.length - 1].high = Math.max(bars[bars.length - 1].high, currentP);
-        bars[bars.length - 1].low = Math.min(bars[bars.length - 1].low, currentP);
-        return bars;
+        const barTime = nowSec - (nowSec % periodSec);
+        return [{{
+            time: barTime,
+            open: currentP,
+            high: currentP,
+            low: currentP,
+            close: currentP,
+            volume: 0
+        }}];
     }}
 
     function buildHistoricalGoldBars(periodSec = 60, tfKey = null) {{
@@ -1500,47 +1478,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
     }}
 
-    // 100% Online Real-Time Gold Trade WebSocket (Basis-Tethered to Pure CME Gold Futures GC=F Anchor)
+    // 100% Pure CME Gold Futures (GC=F) Real-Time Stream (No Crypto PAXG Proxy Contamination)
     function connectLiveGoldOrderflowStream() {{
         if (!isCmeGlobexMarketOpen()) {{
             setTimeout(connectLiveGoldOrderflowStream, 30000);
             return;
         }}
-        try {{
-            const ws = new WebSocket('wss://stream.binance.com:9443/ws/paxgusdt@aggTrade');
-            ws.onmessage = (event) => {{
-                try {{
-                    if (!isCmeGlobexMarketOpen()) return;
-                    const msg = JSON.parse(event.data);
-                    const p = parseFloat(msg.p);
-                    const q = parseFloat(msg.q) || 0.5;
-                    const isSellAggressor = Boolean(msg.m); // m=true: buyer is maker => sell market order hit bid
-                    if (!p || isNaN(p)) return;
-                    if (lastWsRefPrice === null) {{
-                        lastWsRefPrice = p;
-                        return;
-                    }}
-                    const rawDp = p - lastWsRefPrice;
-                    lastWsRefPrice = p;
-                    const clampedDp = Math.max(-0.30, Math.min(0.30, rawDp));
-                    if (Math.abs(clampedDp) < 0.01 && q < 0.2) return;
-                    lastWsTickEpoch = Date.now();
-                    const syntheticGcVol = Math.max(1, Math.round(q * 12));
-                    const anchor = yahooAnchorPrice || currentGoldPrice;
-                    const rawNext = currentGoldPrice + (clampedDp !== 0 ? clampedDp : (isSellAggressor ? -0.05 : 0.05));
-                    // Strictly tether micro-ticks within +/- $0.50 of authoritative Yahoo GC=F price
-                    const tetheredNext = Math.max(anchor - 0.50, Math.min(anchor + 0.50, rawNext));
-                    const nextGcPrice = Math.round(tetheredNext * 100) / 100;
-                    applyLiveTick(nextGcPrice, syntheticGcVol, false);
-                }} catch (err) {{}}
-            }};
-            ws.onclose = () => {{
-                setTimeout(connectLiveGoldOrderflowStream, 5000);
-            }};
-            ws.onerror = () => {{
-                try {{ ws.close(); }} catch (e) {{}}
-            }};
-        }} catch (e) {{}}
+        pollLiveYahooChart(currentTfKey);
+        setTimeout(connectLiveGoldOrderflowStream, 5000);
     }}
 
     // Tự động kiểm tra Yahoo GC=F & Cloud mỗi 10s hoàn toàn tự động (Zero-Touch, Zero-Reload)

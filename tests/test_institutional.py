@@ -115,6 +115,46 @@ def test_detect_cta_confluence_independent():
     assert "INDEPENDENT DEALER WALLS" in cta.confluence_badge
 
 
+def test_detect_cta_confluence_with_real_daily_candles():
+    """When real 1D candles are passed, H20 and L20 use the exact 20-day Donchian High/Low."""
+    daily_candles = [
+        {"high": 4650.0 + i * 10.0, "low": 4600.0 - i * 5.0}
+        for i in range(10)
+    ]
+    cta = detect_cta_confluence(
+        spot=4700.0,
+        call_wall=4742.0,
+        put_wall=4553.0,
+        daily_move_1s=30.0,
+        daily_candles=daily_candles,
+    )
+    assert cta.h20 == 4740.0
+    assert cta.l20 == 4555.0
+    assert cta.is_call_wall_confluent is True
+    assert cta.is_put_wall_confluent is True
+    assert "DUAL CTA BREAKOUT CONFLUENCE" in cta.confluence_badge
+
+
+def test_reconstruct_institutional_orderflow_zero_bs_missing_quotes():
+    """Verify that strikes without valid two-sided Bid/Ask quotes get w_c=0 and w_p=0 (no arbitrary fallback weights)."""
+    from src.quant_engine.dealer import reconstruct_institutional_orderflow
+
+    df = pd.DataFrame([
+        {
+            "strike": 4700.0,
+            "callBid": 0.0, "callAsk": 0.0, "callMid": 45.0, "callLatest": 45.0,
+            "putBid": 0.0, "putAsk": 0.0, "putMid": 42.0, "putLatest": 42.0,
+            "callVolume": 500, "callOpenInterest": 1000,
+            "putVolume": 500, "putOpenInterest": 1000,
+            "callIV": 0.35, "putIV": 0.15,
+        }
+    ])
+    res = reconstruct_institutional_orderflow(df, spot_price=4700.0, r=0.045, dte_days=10.0)
+    assert res["signed_call_flow"] == 0.0
+    assert res["signed_put_flow"] == 0.0
+    assert res["dealer_hedge_futures_flow"] == 0.0
+
+
 def test_reconstruct_institutional_orderflow_lee_ready_bvc_and_whales():
     """Verify Lee-Ready Signed Flow, Put-Call Parity Dislocation, Whale Initiation (Vol > OI), and BVC/Kyle Lambda."""
     from src.quant_engine.dealer import reconstruct_institutional_orderflow
