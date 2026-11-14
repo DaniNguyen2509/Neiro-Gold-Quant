@@ -237,3 +237,84 @@ def test_evaluate_gamma_flip_integrity_true_vs_fake_bull_trap():
     assert "BẪY FAKEOUT" in fake_flip["flip_integrity_label"]
 
 
+def test_kyle_ols_lambda_and_vpin_toxicity():
+    """Verify Kyle (1985) Rolling OLS Lambda and Easley et al. (2012) VPIN Toxicity (<40% safe vs >=65% toxic)."""
+    from src.quant_engine.dealer import compute_rolling_kyle_lambda_ols, compute_vpin_bvc
+
+    # 1. Balanced two-way noise flow -> low VPIN (< 40%)
+    balanced_candles = [
+        {"open": 4700.0, "close": 4700.4, "volume": 300},
+        {"open": 4700.4, "close": 4700.0, "volume": 300},
+        {"open": 4700.0, "close": 4700.3, "volume": 300},
+        {"open": 4700.3, "close": 4700.1, "volume": 300},
+        {"open": 4700.1, "close": 4700.2, "volume": 300},
+        {"open": 4700.2, "close": 4700.0, "volume": 300},
+    ]
+    vpin_bal = compute_vpin_bvc(balanced_candles)
+    assert 0.0 <= vpin_bal["vpin_pct"] < 40.0
+    assert vpin_bal["vpin_regime"] == "SAFE_MEAN_REVERSION"
+
+    # 2. Directional one-sided institutional sweep -> high VPIN (>= 65%) and positive OLS Kyle's Lambda
+    toxic_candles = [
+        {"open": 4700.0 + i * 2.5, "close": 4702.5 + i * 2.5, "volume": 400 + i * 50}
+        for i in range(8)
+    ]
+    vpin_tox = compute_vpin_bvc(toxic_candles)
+    assert vpin_tox["vpin_pct"] >= 65.0
+    assert vpin_tox["vpin_regime"] == "TOXIC_INFORMED_FLOW"
+
+    ols_res = compute_rolling_kyle_lambda_ols(toxic_candles)
+    assert ols_res["kyle_lambda_ols"] > 0.0
+
+
+def test_vrp_metrics_and_informed_trader_regime():
+    """Verify Carr & Wu (2009) VRP and 5-state Informed Trader Action Matrix + Fractional Kelly."""
+    from src.quant_engine.institutional import compute_vrp_metrics, evaluate_informed_trader_regime
+
+    # 1. Overpriced IV (26% ATM IV vs ~12% RV) -> OVERPRICED_VEGA_CRUSH
+    calm_1d_candles = [
+        {"open": 4700.0, "high": 4712.0, "low": 4692.0, "close": 4705.0}
+        for _ in range(15)
+    ]
+    vrp = compute_vrp_metrics(sigma_atm=0.26, daily_candles=calm_1d_candles, spot=4705.0)
+    assert vrp.iv_atm_pct == 26.0
+    assert vrp.vrp_vol_spread_pct >= 4.0
+    assert vrp.regime == "OVERPRICED_VEGA_CRUSH"
+
+    # 2. Wall touch + Low VPIN (<40%) + Deep Liquidity -> WALL_MEAN_REVERSION with Kelly 1.0x
+    reg_rev = evaluate_informed_trader_regime(
+        spot=4749.0,
+        call_wall=4750.0,
+        put_wall=4650.0,
+        total_net_gex=45.0,
+        vpin_pct=31.5,
+        kyle_lambda_ols=0.85,
+        kyle_regime="NORMAL_LIQUIDITY",
+        parity_z_score=-0.5,
+        dealer_hedge_flow=-35.0,
+        vrp_spread_pct=2.0,
+        session_tag="NY_COMEX_DEEP",
+    )
+    assert reg_rev.regime_code == "WALL_MEAN_REVERSION"
+    assert reg_rev.kelly_fraction_mult == 1.0
+    assert 0.0 < reg_rev.bayesian_conviction_rho <= 1.0
+
+    # 3. Wall touch + Toxic VPIN (>=65%) -> TOXIC_SQUEEZE_HUNT (abort fade limit orders)
+    reg_tox = evaluate_informed_trader_regime(
+        spot=4749.0,
+        call_wall=4750.0,
+        put_wall=4650.0,
+        total_net_gex=-35.0,
+        vpin_pct=72.4,
+        kyle_lambda_ols=3.40,
+        kyle_regime="LIQUIDITY_VACUUM_SWEEP",
+        parity_z_score=2.45,
+        dealer_hedge_flow=140.0,
+        vrp_spread_pct=1.5,
+        session_tag="NY_COMEX_DEEP",
+    )
+    assert reg_tox.regime_code == "TOXIC_SQUEEZE_HUNT"
+    assert reg_tox.kelly_fraction_mult == 0.50
+
+
+

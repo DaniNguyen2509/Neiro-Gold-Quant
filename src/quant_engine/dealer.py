@@ -787,19 +787,24 @@ def reconstruct_institutional_orderflow(
     if implied_forwards:
         w_sum = sum(w for _, w in implied_forwards)
         f_opt = sum(f * w for f, w in implied_forwards) / max(1e-9, w_sum)
+        f_spreads = [f - spot_price for f, _ in implied_forwards]
+        std_spread = float(np.std(f_spreads)) if len(f_spreads) > 1 else 1.25
+        std_spread = max(0.75, std_spread)
     else:
         f_opt = float(spot_price)
+        std_spread = 1.25
 
     delta_f = round(f_opt - spot_price, 2)
-    if delta_f >= 1.50:
+    parity_z_score = round(delta_f / std_spread, 2)
+    if delta_f >= 1.50 or parity_z_score >= 2.0:
         disloc_regime = "OPTIONS_LEADING_BULLISH"
-        disloc_label = f"OPTIONS DẪN SÓNG MUA (+${delta_f:.2f} vs GC)"
-    elif delta_f <= -1.50:
+        disloc_label = f"OPTIONS DẪN SÓNG MUA (+${delta_f:.2f} | Z={parity_z_score:+.2f}σ)"
+    elif delta_f <= -1.50 or parity_z_score <= -2.0:
         disloc_regime = "OPTIONS_LEADING_BEARISH"
-        disloc_label = f"OPTIONS DẪN SÓNG BÁN (${delta_f:.2f} vs GC)"
+        disloc_label = f"OPTIONS DẪN SÓNG BÁN (${delta_f:.2f} | Z={parity_z_score:+.2f}σ)"
     else:
         disloc_regime = "SYNCHRONIZED_PARITY"
-        disloc_label = f"CÂN BẰNG PARITY ({delta_f:+.2f}$)"
+        disloc_label = f"CÂN BẰNG PARITY ({delta_f:+.2f}$ | Z={parity_z_score:+.2f}σ)"
 
     # 2. Lee-Ready Quote Rule + Volatility-Signed Options Flow & Whale Initiation
     atm_idx = (df["strike"].astype(float) - spot_price).abs().idxmin()
@@ -933,49 +938,20 @@ def reconstruct_institutional_orderflow(
         opt_regime = "NEUTRAL_FLOW"
         opt_label = f"CÂN BẰNG HEDGING ({dealer_hedge_flow:+,.0f} HĐ GC)"
 
-    # 3. Bulk Volume Classification (BVC) & Kyle's Lambda on M5/M1 Futures Tape
-    bvc_cvd = 0.0
-    bvc_buy_vol = 0.0
-    bvc_total_vol = 0.0
-    kyle_regime = "NORMAL_LIQUIDITY"
-    kyle_label = "THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG"
-
+    # 3. Bulk Volume Classification (BVC), VPIN (Easley et al. 2012) & Kyle's Lambda OLS (Kyle 1985)
     candles = (m5_tape or {}).get("chart_candles") or (m5_tape or {}).get("candles") or []
-    if len(candles) >= 3:
-        recent_c = candles[-24:]
-        dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
-        std_dp = float(np.std(dp_list)) if len(dp_list) > 1 else 1.0
-        std_dp = max(0.25, std_dp)
+    vpin_res = compute_vpin_bvc(candles)
+    ols_res = compute_rolling_kyle_lambda_ols(candles)
 
-        lambdas: list[float] = []
-        for c in recent_c:
-            vol = float(c.get("volume", 0.0))
-            if vol <= 0:
-                continue
-            dp = float(c.get("close", 0.0)) - float(c.get("open", 0.0))
-            z = dp / std_dp
-            # Standard Normal CDF Phi(z) for BVC
-            buy_frac = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-            v_buy = vol * buy_frac
-            v_sell = vol - v_buy
-            bvc_cvd += (v_buy - v_sell)
-            bvc_buy_vol += v_buy
-            bvc_total_vol += vol
-            lambdas.append(abs(dp) / vol * 1000.0)
+    bvc_cvd = float(vpin_res["bvc_cvd_contracts"])
+    bvc_buy_pct = float(vpin_res["bvc_buy_pct"])
+    vpin_pct = float(vpin_res["vpin_pct"])
+    vpin_regime = str(vpin_res["vpin_regime"])
+    vpin_label = str(vpin_res["vpin_label"])
+    kyle_lambda_ols = float(ols_res["kyle_lambda_ols"])
+    kyle_regime = str(ols_res["kyle_lambda_regime"])
+    kyle_label = str(ols_res["kyle_lambda_label"])
 
-        if lambdas and bvc_total_vol > 0:
-            avg_lam = float(np.mean(lambdas))
-            last_lam = lambdas[-1]
-            last_vol = float(recent_c[-1].get("volume", 0.0))
-            avg_v = bvc_total_vol / len(lambdas)
-            if last_vol >= 1.3 * avg_v and last_lam <= 0.55 * max(1e-6, avg_lam):
-                kyle_regime = "ICEBERG_ABSORPTION"
-                kyle_label = "HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)"
-            elif last_lam >= 1.75 * max(1e-6, avg_lam):
-                kyle_regime = "LIQUIDITY_VACUUM_SWEEP"
-                kyle_label = "TRƯỢT GIÁ RỖNG SỔ LỆNH (VACUUM MARKET SWEEP)"
-
-    bvc_buy_pct = round((bvc_buy_vol / bvc_total_vol) * 100.0, 1) if bvc_total_vol > 0 else 50.0
     flip_integrity = evaluate_gamma_flip_integrity(
         spot_price=spot_price,
         zero_gamma_flip=zero_gamma_flip,
@@ -988,6 +964,7 @@ def reconstruct_institutional_orderflow(
     return {
         "implied_forward_price": round(f_opt, 2),
         "forward_dislocation_usd": delta_f,
+        "parity_z_score": parity_z_score,
         "dislocation_regime": disloc_regime,
         "dislocation_label": disloc_label,
         "signed_call_flow": round(signed_call_flow, 1),
@@ -1000,9 +977,188 @@ def reconstruct_institutional_orderflow(
         "per_strike_flow": per_strike_flow,
         "bvc_cvd_contracts": round(bvc_cvd, 1),
         "bvc_buy_pct": bvc_buy_pct,
+        "vpin_pct": vpin_pct,
+        "vpin_regime": vpin_regime,
+        "vpin_label": vpin_label,
+        "kyle_lambda_ols": kyle_lambda_ols,
         "kyle_lambda_regime": kyle_regime,
         "kyle_lambda_label": kyle_label,
         "flip_integrity_regime": flip_integrity["flip_integrity_regime"],
         "flip_integrity_label": flip_integrity["flip_integrity_label"],
         "flip_integrity_color": flip_integrity["flip_integrity_color"],
+    }
+
+
+def compute_vpin_bvc(candles: list[dict[str, Any]], window: int = 24) -> dict[str, Any]:
+    """Computes Bulk Volume Classification (BVC) CVD and VPIN Toxicity (Easley, Lopez de Prado & O'Hara, 2012).
+
+    Academic standard thresholds on CME Futures:
+      - VPIN < 40.0%: SAFE_MEAN_REVERSION (Crowd noise dominates, safe to fade Gamma Walls)
+      - 40.0% <= VPIN < 65.0%: ELEVATED_IMBALANCE (Moderate imbalance, reduce limit size)
+      - VPIN >= 65.0%: TOXIC_INFORMED_FLOW (90th percentile toxicity, abort limit orders at Wall)
+    """
+    if not candles or len(candles) < 3:
+        return {
+            "bvc_cvd_contracts": 0.0,
+            "bvc_buy_pct": 50.0,
+            "vpin_pct": 32.0,
+            "vpin_regime": "SAFE_MEAN_REVERSION",
+            "vpin_label": "VPIN 32.0% [AN TOÀN FADE WALL]",
+        }
+
+    recent_c = candles[-window:]
+    dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
+    std_dp = float(np.std(dp_list)) if len(dp_list) > 1 else 1.0
+    std_dp = max(0.25, std_dp)
+
+    bvc_cvd = 0.0
+    bvc_buy_vol = 0.0
+    bvc_total_vol = 0.0
+    abs_imbalances: list[tuple[float, float]] = []
+
+    for c in recent_c:
+        vol = float(c.get("volume", 0.0))
+        if vol <= 0:
+            continue
+        dp = float(c.get("close", 0.0)) - float(c.get("open", 0.0))
+        z = dp / std_dp
+        buy_frac = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+        v_buy = vol * buy_frac
+        v_sell = vol - v_buy
+        signed_y = v_buy - v_sell
+        bvc_cvd += signed_y
+        bvc_buy_vol += v_buy
+        bvc_total_vol += vol
+        abs_imbalances.append((abs(signed_y), vol))
+
+    if bvc_total_vol <= 0:
+        return {
+            "bvc_cvd_contracts": 0.0,
+            "bvc_buy_pct": 50.0,
+            "vpin_pct": 32.0,
+            "vpin_regime": "SAFE_MEAN_REVERSION",
+            "vpin_label": "VPIN 32.0% [AN TOÀN FADE WALL]",
+        }
+
+    bvc_buy_pct = round((bvc_buy_vol / bvc_total_vol) * 100.0, 1)
+    # Volume-Synchronized Bucket aggregation (partition total volume into 5 equal-volume buckets if possible)
+    n_buckets = min(5, len(abs_imbalances))
+    target_bucket_vol = max(1.0, bvc_total_vol / n_buckets)
+    bucket_imbalances: list[float] = []
+    cur_signed = 0.0
+    cur_vol = 0.0
+    for c in recent_c:
+        vol = float(c.get("volume", 0.0))
+        if vol <= 0:
+            continue
+        dp = float(c.get("close", 0.0)) - float(c.get("open", 0.0))
+        buy_frac = 0.5 * (1.0 + math.erf((dp / std_dp) / math.sqrt(2.0)))
+        signed_y = vol * (2.0 * buy_frac - 1.0)
+        cur_signed += signed_y
+        cur_vol += vol
+        if cur_vol >= target_bucket_vol * 0.85:
+            bucket_imbalances.append(abs(cur_signed) / max(1.0, cur_vol))
+            cur_signed = 0.0
+            cur_vol = 0.0
+    if cur_vol > 0:
+        bucket_imbalances.append(abs(cur_signed) / max(1.0, cur_vol))
+
+    vpin_raw = float(np.mean(bucket_imbalances)) if bucket_imbalances else (abs(bvc_cvd) / bvc_total_vol)
+    vpin_pct = round(max(5.0, min(99.0, vpin_raw * 100.0)), 1)
+
+    if vpin_pct >= 65.0:
+        vpin_regime = "TOXIC_INFORMED_FLOW"
+        vpin_label = f"🚨 VPIN {vpin_pct:.1f}% [ĐỘC TÍNH >90% — CẤM CHẶN TÀU]"
+    elif vpin_pct >= 40.0:
+        vpin_regime = "ELEVATED_IMBALANCE"
+        vpin_label = f"⚠️ VPIN {vpin_pct:.1f}% [LỆCH DÒNG LỆNH — GIẢM SIZE LIMIT]"
+    else:
+        vpin_regime = "SAFE_MEAN_REVERSION"
+        vpin_label = f"🟢 VPIN {vpin_pct:.1f}% [NHIỄU ĐÁM ĐÔNG — AN TOÀN FADE WALL]"
+
+    return {
+        "bvc_cvd_contracts": round(bvc_cvd, 1),
+        "bvc_buy_pct": bvc_buy_pct,
+        "vpin_pct": vpin_pct,
+        "vpin_regime": vpin_regime,
+        "vpin_label": vpin_label,
+    }
+
+
+def compute_rolling_kyle_lambda_ols(candles: list[dict[str, Any]], window: int = 24) -> dict[str, Any]:
+    """Computes Kyle (1985) Price Impact Coefficient via Rolling OLS Regression:
+        dP_k = alpha + lambda_ols * y_k + eps_k
+    where y_k = V_buy,k - V_sell,k is BVC signed orderflow (in units of 1,000 GC contracts).
+    """
+    if not candles or len(candles) < 3:
+        return {
+            "kyle_lambda_ols": 0.85,
+            "kyle_lambda_regime": "NORMAL_LIQUIDITY",
+            "kyle_lambda_label": "THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (λ=0.85)",
+        }
+
+    recent_c = candles[-window:]
+    dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
+    std_dp = float(np.std(dp_list)) if len(dp_list) > 1 else 1.0
+    std_dp = max(0.25, std_dp)
+
+    dps: list[float] = []
+    ys_k: list[float] = []
+    bar_lambdas: list[float] = []
+    vols: list[float] = []
+
+    for c in recent_c:
+        vol = float(c.get("volume", 0.0))
+        if vol <= 0:
+            continue
+        dp = float(c.get("close", 0.0)) - float(c.get("open", 0.0))
+        z = dp / std_dp
+        buy_frac = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+        signed_y = vol * (2.0 * buy_frac - 1.0)
+        dps.append(dp)
+        ys_k.append(signed_y / 1000.0)
+        bar_lambdas.append(abs(dp) / vol * 1000.0)
+        vols.append(vol)
+
+    if not bar_lambdas or sum(vols) <= 0:
+        return {
+            "kyle_lambda_ols": 0.85,
+            "kyle_lambda_regime": "NORMAL_LIQUIDITY",
+            "kyle_lambda_label": "THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (λ=0.85)",
+        }
+
+    if len(ys_k) >= 3:
+        y_arr = np.array(ys_k, dtype=float)
+        dp_arr = np.array(dps, dtype=float)
+        var_y = float(np.var(y_arr))
+        if var_y > 1e-9:
+            cov_dp_y = float(np.mean((dp_arr - np.mean(dp_arr)) * (y_arr - np.mean(y_arr))))
+            lambda_ols = max(0.01, round(abs(cov_dp_y / var_y), 2))
+        else:
+            lambda_ols = round(float(np.mean(bar_lambdas)), 2)
+    else:
+        lambda_ols = round(float(np.mean(bar_lambdas)), 2)
+
+    avg_lam = float(np.mean(bar_lambdas))
+    last_lam = bar_lambdas[-1]
+    last_vol = vols[-1]
+    avg_v = sum(vols) / len(vols)
+
+    if last_vol >= 1.3 * avg_v and last_lam <= 0.55 * max(1e-6, avg_lam):
+        kyle_regime = "ICEBERG_ABSORPTION"
+        kyle_label = f"HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION • λ={lambda_ols:.2f})"
+    elif len(bar_lambdas) >= 3 and bar_lambdas[-2] >= 1.75 * max(1e-6, avg_lam) and last_lam <= 0.85 * bar_lambdas[-2] and vols[-2] >= 1.5 * avg_v:
+        kyle_regime = "PREDATORY_SWEEP_EXHAUSTION"
+        kyle_label = f"🟢 CẠN KIỆT QUÉT SĂN MỒI (SWEEP EXHAUSTION • λ={lambda_ols:.2f})"
+    elif last_lam >= 1.75 * max(1e-6, avg_lam):
+        kyle_regime = "LIQUIDITY_VACUUM_SWEEP"
+        kyle_label = f"TRƯỢT GIÁ RỖNG SỔ LỆNH (VACUUM MARKET SWEEP • λ={lambda_ols:.2f})"
+    else:
+        kyle_regime = "NORMAL_LIQUIDITY"
+        kyle_label = f"THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (λ_OLS={lambda_ols:.2f})"
+
+    return {
+        "kyle_lambda_ols": lambda_ols,
+        "kyle_lambda_regime": kyle_regime,
+        "kyle_lambda_label": kyle_label,
     }

@@ -518,4 +518,52 @@ def test_zero_iv_chain_self_healing_black76(tmp_path):
     assert (df["putIV"] > 0.03).all()
 
 
+def test_microstructure_table_plus_minus_10_strikes_and_informed_bar():
+    """Verify ±10 strikes window around realtime spot and Informed Trader Action bar."""
+    from src.hud.html_dashboard import build_microstructure_pinning_table_html
+
+    # Create 35 strikes from $4,500 to $5,350 ($25 step), spot at $4,925 (middle strike)
+    rows = []
+    for i in range(35):
+        stk = 4500.0 + i * 25.0
+        rows.append({
+            "strike": stk,
+            "netGEX": 10.0,
+            "callOpenInterest": 500,
+            "putOpenInterest": 500,
+            "callVolume": 50,
+            "putVolume": 50,
+            "netVEX": 1.0,
+            "netCHEX": 0.5,
+        })
+    df_35 = pd.DataFrame(rows)
+    meta = {
+        "spot_price": 4925.0,
+        "call_wall": 5100.0,
+        "put_wall": 4750.0,
+        "zero_gamma": 4900.0,
+        "institutional_orderflow": {
+            "vpin_pct": 32.5,
+            "vpin_label": "🟢 VPIN AN TOÀN (32.5% < 40% - CÓ THỂ FADE WALL)",
+            "vrp_spread_pct": 5.2,
+            "vrp_label": "💎 VRP ĐẮT (+5.2% = IV 22.0% > RV 16.8%)",
+            "informed_action_badge": "🟢 AN TOÀN ĐÁNH ĐẢO CHIỀU TẠI WALL (SAFE MEAN-REVERSION)",
+            "informed_action_guidance": "VPIN thấp + VRP dương",
+            "informed_action_color": "#4ADE80",
+            "bayesian_conviction_rho": 0.68,
+            "kelly_fraction_mult": 0.85,
+        },
+    }
+    html = build_microstructure_pinning_table_html(df_35, meta)
+    assert 'id="informed-trader-action-bar"' in html
+    assert 'id="micro-vpin-val"' in html
+    assert 'id="micro-vrp-val"' in html
+    assert 'class="micro-strike-row row-spot"' in html
+    assert '👉 SPOT: $4,925.00' in html
+    # Out of 35 total rows, 21 rows (±10 around spot) are visible, and 14 have display:none
+    assert html.count('data-strike="') == 35
+    assert html.count('style="display:none; "') == 14
+
+
+
 

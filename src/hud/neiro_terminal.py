@@ -61,6 +61,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
     bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
     kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+    vpin_pct = float(inst_flow.get("vpin_pct", 35.0))
+    vpin_label = str(inst_flow.get("vpin_label", f"🟢 VPIN AN TOÀN ({vpin_pct:.1f}% < 40%)"))
+    vrp_label = str(inst_flow.get("vrp_label", "⚖️ VRP CÂN BẰNG"))
+    informed_badge = str(inst_flow.get("informed_action_badge", "🟢 AN TOÀN ĐÁNH ĐẢO CHIỀU TẠI WALL"))
+    informed_col = str(inst_flow.get("informed_action_color", "#4ADE80"))
+    rho_vs = float(inst_flow.get("bayesian_conviction_rho", 0.50))
+    kelly_mult = float(inst_flow.get("kelly_fraction_mult", 0.75))
+    vpin_col = "#F87171" if vpin_pct >= 65.0 else ("#FACC15" if vpin_pct >= 40.0 else "#4ADE80")
     flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
     flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
     disloc_color = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
@@ -257,6 +265,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     <div id="hud-bvc-bar" style="width:{bvc_buy_pct:.1f}%; height:100%; background:#22C55E; transition:width 0.12s linear;"></div>
                 </div>
                 <div class="hud-item"><span class="hud-label">KYLE'S LAMBDA (&lambda;):</span> <b id="hud-kyle-val" style="color:#38BDF8; font-size:10px;">{kyle_label}</b></div>
+                <div class="hud-item"><span class="hud-label">VPIN TOXICITY:</span> <b id="hud-vpin-val" style="color:{vpin_col}; font-size:10px;">{vpin_label}</b></div>
+                <div class="hud-item"><span class="hud-label">INFORMED ACTION:</span> <b id="hud-informed-val" style="color:{informed_col}; font-size:10px;">{informed_badge} (&rho;={rho_vs:.2f}, Kelly {kelly_mult:.2f}x)</b></div>
                 <div id="hud-flip-verdict-box" style="margin-top:3px; padding:4px 7px; border-radius:4px; background:rgba(15,23,42,0.95); border:1px solid {flip_verdict_col}; border-left:3px solid {flip_verdict_col};">
                     <div style="font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;">BỘ LỌC GAMMA FLIP (THẬT vs. FAKEOUT TRAP):</div>
                     <b id="hud-flip-verdict" style="color:{flip_verdict_col}; font-size:10.5px;">{flip_verdict_lbl}</b>
@@ -359,6 +369,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "bvc_cvd_contracts": bvc_cvd_val,
         "bvc_buy_pct": bvc_buy_pct,
         "kyle_lambda_label": kyle_label,
+        "vpin_pct": vpin_pct,
+        "vpin_label": vpin_label,
+        "vrp_label": vrp_label,
+        "informed_action_badge": informed_badge,
+        "informed_action_color": informed_col,
         "flip_integrity_label": flip_verdict_lbl,
         "flip_integrity_color": flip_verdict_col,
     })
@@ -772,6 +787,50 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (microFv) {{
             microFv.innerText = liveFlipVerdict;
             microFv.style.color = liveFlipColor;
+        }}
+
+        // 4c. Real-time sync of KPI CME price, Spine price, and ±10 Strikes window in Microstructure Table
+        const fmtSpot = '$' + currentGoldPrice.toLocaleString('en-US', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+        const kpiCmeEl = document.getElementById('kpi-cme-price');
+        if (kpiCmeEl) kpiCmeEl.innerText = fmtSpot;
+        const spinePriceEl = document.getElementById('spine-current-price');
+        if (spinePriceEl) spinePriceEl.innerText = fmtSpot;
+
+        const strikeRows = document.querySelectorAll('tr.micro-strike-row');
+        if (strikeRows && strikeRows.length > 0) {{
+            let bestStrikeIdx = 0;
+            let bestDist = Infinity;
+            strikeRows.forEach((row, idx) => {{
+                const stk = parseFloat(row.getAttribute('data-strike') || '0');
+                const dist = Math.abs(stk - currentGoldPrice);
+                if (dist < bestDist) {{
+                    bestDist = dist;
+                    bestStrikeIdx = idx;
+                }}
+            }});
+            strikeRows.forEach((row, idx) => {{
+                const inWindow = Math.abs(idx - bestStrikeIdx) <= 10;
+                const isSpotRow = (idx === bestStrikeIdx);
+                row.style.display = inWindow ? '' : 'none';
+                if (isSpotRow) {{
+                    row.classList.add('row-spot');
+                    row.style.background = 'rgba(56, 189, 248, 0.12)';
+                    row.style.boxShadow = 'inset 3px 0 0 #38BDF8';
+                }} else {{
+                    row.classList.remove('row-spot');
+                    row.style.background = '';
+                    row.style.boxShadow = '';
+                }}
+                const spotBadge = row.querySelector('.micro-spot-badge');
+                if (spotBadge) {{
+                    if (isSpotRow) {{
+                        spotBadge.style.display = '';
+                        spotBadge.innerText = '👉 SPOT: ' + fmtSpot;
+                    }} else {{
+                        spotBadge.style.display = 'none';
+                    }}
+                }}
+            }});
         }}
 
         // 5. Repaint 60FPS Canvas immediately with zero lag

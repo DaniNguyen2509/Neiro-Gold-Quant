@@ -251,12 +251,12 @@
     
 
     
-    <!-- KHỐI 6: BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE TỪNG STRIKE (E-MINI NQ / COMEX GOLD FUTURES) -->
+    <!-- KHỐI 6: BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE TỪNG STRIKE (BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING) -->
     <div class="table-box" style="margin-bottom: 20px; border: 1px solid #1E293B; background:#0B132B; border-radius:8px; padding:14px 16px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; border-bottom:1px solid #1E293B; padding-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span class="badge" style="background:#FACC15; color:#020617; font-weight:800; font-size:11px; padding:2px 8px; border-radius:4px;">QUANT MICROSTRUCTURE &amp; ORDERFLOW</span>
-                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace;">📊 BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE &amp; DÒNG LỆNH TỪNG STRIKE (COMEX GOLD FUTURES)</span>
+                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace;">📊 BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE &amp; DÒNG LỆNH TỪNG STRIKE (±10 STRIKES QUANH GIÁ REALTIME)</span>
             </div>
             <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
                 BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING &bull; Theta Bào Mòn: <b style="color:#FACC15;">$259.49/HĐ/ngày</b> &bull; Độ nhạy Gamma Black-76 &bull; Orderflow: <b style="color:#38BDF8;">Lee-Ready + BVC + Parity</b> &bull; <b style="color:#FACC15;">100 oz/HĐ</b>
@@ -282,9 +282,9 @@
                 </div>
             </div>
             <div style="background:rgba(15,23,42,0.85); border:1px solid #1E293B; border-left:3px solid #38BDF8; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
-                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">4. Vi Cấu Trúc Sổ Lệnh (Kyle's Lambda &lambda;)</div>
-                <div id="micro-kyle-val" style="font-size:12px; font-weight:800; color:#38BDF8; margin-top:2px;">HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)</div>
-                <div style="font-size:10px; color:#94A3B8;">Cập nhật 0ms theo từng nhịp giá CME</div>
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">4. Vi Cấu Trúc Sổ Lệnh (Kyle's Lambda &lambda;_OLS)</div>
+                <div id="micro-kyle-val" style="font-size:12px; font-weight:800; color:#38BDF8; margin-top:2px;">HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION • λ=19.34)</div>
+                <div style="font-size:10px; color:#94A3B8;">Hồi quy OLS trượt theo dòng lệnh BVC CME</div>
             </div>
             <div style="background:rgba(15,23,42,0.92); border:1px solid #FACC15; border-left:4px solid #FACC15; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
                 <div style="font-size:10px; color:#FACC15; font-weight:800; text-transform:uppercase;">5. Bộ Lọc Gamma Flip (Thật vs. Fakeout Trap)</div>
@@ -1509,6 +1509,1326 @@
             <td style="padding:7px 12px; color:#FB923C;">$+0.29M</td>
             <td style="padding:7px 12px; color:#22D3EE;">$-0.33M</td>
         </tr>
+        <tr class="micro-strike-row" data-strike="3635.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,635</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-1.59M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">129</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.37M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.45M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3630.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,630</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.63M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">53</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.15M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.18M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3625.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,625</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-2.22M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">202</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">7</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-7</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.6 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.54M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.65M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3620.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,620</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.42M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">39</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">7</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-7</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.6 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.10M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.13M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3615.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,615</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.51M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">47</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.1 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.12M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.16M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3610.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,610</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.47M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">45</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">10</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-10</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.7 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.12M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.15M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3605.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,605</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.68M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">68</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">8</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-8</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.6 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.17M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.22M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3600.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,600</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-23.83M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">6</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">2,478</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">53</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#F87171;">P:+53</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">-3.6 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[BÁN NHẸ (MM Bán GC)]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+6.12M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-7.74M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3595.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,595</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-1.21M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">2</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">131</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.32M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.40M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3590.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,590</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.55M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">61</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">5</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-2</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.1 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.14M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.18M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3585.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,585</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-3.31M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">377</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">11</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-11</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.7 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.88M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-1.13M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3580.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,580</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.47M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">55</td>
+            <td style="padding:7px 12px; color:#16A34A;">1</td>
+            <td style="padding:7px 12px; color:#DC2626;">5</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+1</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-2</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+1.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.13M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.16M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3575.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,575</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.75M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">110</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">46</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-46</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+2.6 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[MUA NHẸ (MM Mua GC)]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.21M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.27M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3570.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,570</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.43M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">2</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">56</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.12M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.15M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3565.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,565</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.70M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">92</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">8</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-8</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.4 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.20M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.26M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3560.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,560</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.85M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">115</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.24M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.32M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3555.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,555</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.55M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">78</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.16M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.21M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3550.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,550</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-16.46M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">2</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">2,416</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">147</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#F87171;">P:-0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+4.78M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-6.33M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3545.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,545</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.13M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">19</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.04M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.05M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3540.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,540</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.70M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">109</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.21M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.28M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3535.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,535</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.24M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">38</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.07M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.09M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3530.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,530</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.44M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">74</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.13M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.18M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3525.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,525</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-1.67M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">291</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">12</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-12</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.5 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.51M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.69M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3520.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,520</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.33M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">60</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">10</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#F87171;">P:-0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.10M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.14M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3515.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,515</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.83M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">156</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.26M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.36M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3510.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,510</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-1.40M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">270</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.44M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.61M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3505.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,505</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.43M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">85</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.14M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.19M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3500.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,500</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-32.23M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">17</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">6,731</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">125</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-125</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+4.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[MUA NHẸ (MM Mua GC)]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+10.33M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-14.33M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3495.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,495</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.22M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">46</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.07M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.10M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3490.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,490</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.24M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">54</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.08M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.11M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3485.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,485</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.65M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">149</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.21M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.30M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3480.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,480</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-5.51M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">1,305</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+1.82M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-2.58M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3475.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,475</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-1.04M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">256</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.35M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.49M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3470.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,470</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.12M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">31</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.04M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.06M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3465.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,465</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.89M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">236</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.30M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.43M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3460.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,460</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.33M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">89</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">2</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-2</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.11M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.16M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3455.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,455</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.18M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">50</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">3</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-3</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.1 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.06M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.09M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3450.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,450</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-5.35M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">1,567</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">30</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-30</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.7 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+1.86M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-2.70M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3445.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,445</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">8</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3440.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,440</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.04M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">11</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3435.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,435</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.12M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">39</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.04M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.06M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3430.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,430</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">7</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3425.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,425</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-1.34M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">470</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.49M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.72M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3420.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,420</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">5</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3415.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,415</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">12</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3410.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,410</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.17M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">65</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.06M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.09M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3405.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,405</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">14</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3400.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,400</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-5.38M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">2,540</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">12</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-12</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.2 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+2.04M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-3.06M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3395.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,395</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.28M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">119</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.10M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.16M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3390.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,390</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.26M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">117</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.10M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.15M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3385.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,385</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.07M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">33</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.03M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.04M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3380.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,380</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.05M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">1</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">22</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.03M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3375.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,375</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.94M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">462</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">120</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-120</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+1.6 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.36M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.56M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3370.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,370</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.06M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">29</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.03M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3365.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,365</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">7</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3360.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,360</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.04M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">21</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3355.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,355</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #4ADE80; font-weight:600;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">0</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$+0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3350.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,350</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.10M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">61</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">6</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-2</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.04M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.07M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3345.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,345</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">15</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3340.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,340</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.05M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">31</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.03M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3335.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,335</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">2</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3330.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,330</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.04M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">26</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.03M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3325.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,325</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.24M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">166</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.10M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.16M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3320.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,320</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">17</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3315.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,315</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">11</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3310.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,310</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">22</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3305.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,305</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.07M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">58</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.03M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.05M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3300.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,300</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.75M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">150</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">621</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.32M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.53M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3295.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,295</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">19</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3290.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,290</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">25</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3285.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,285</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">27</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3280.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,280</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">29</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3275.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,275</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">30</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3270.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,270</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">24</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3265.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,265</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.03M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">28</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3260.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,260</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">16</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3255.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,255</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #4ADE80; font-weight:600;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">0</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$+0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3250.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,250</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.49M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">2</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">571</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.21M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.37M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3245.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,245</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">24</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3240.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,240</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">13</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">2</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-2</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3235.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,235</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">12</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3230.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,230</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">27</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.02M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3225.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,225</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">14</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">1</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-1</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3220.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,220</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">13</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3215.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,215</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">20</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3210.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,210</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.02M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">26</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.01M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3205.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,205</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #4ADE80; font-weight:600;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">0</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$+0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3200.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,200</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.12M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">224</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.06M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.10M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3195.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,195</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">4</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3190.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,190</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">4</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3185.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,185</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">7</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3180.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,180</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">16</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3175.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,175</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.04M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">77</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.04M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3170.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,170</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">11</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3165.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,165</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #4ADE80; font-weight:600;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">0</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$+0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3160.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,160</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">21</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3155.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,155</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">4</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3150.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,150</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.05M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">114</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.03M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.05M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3145.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,145</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">18</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3140.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,140</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">17</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3135.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,135</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">1</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3130.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,130</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">17</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3125.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,125</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">2</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3120.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,120</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">3</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3115.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,115</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">6</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3110.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,110</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.01M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">17</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.01M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3105.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,105</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">1</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3100.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,100</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.05M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">140</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">2</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#4ADE80;">C:+0</span> <span style="color:#475569;">|</span> <span style="color:#4ADE80;">P:-2</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><b style="color:#94A3B8;">+0.0 HĐ GC</b> <span style="font-size:10.5px; color:#94A3B8;">[CÂN BẰNG / HAI CHIỀU]</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.02M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.05M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3095.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,095</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">4</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
+        <tr class="micro-strike-row" data-strike="3090.00" style="display:none; ">
+            <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC $3,090</b><span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span></td>
+            <td style="padding:7px 12px; color: #F87171; font-weight:600;">$-0.00M</td>
+            <td style="padding:7px 12px; color:#86EFAC;">0</td>
+            <td style="padding:7px 12px; color:#FCA5A5;">12</td>
+            <td style="padding:7px 12px; color:#16A34A;">0</td>
+            <td style="padding:7px 12px; color:#DC2626;">0</td>
+            <td style="padding:7px 12px; white-space:nowrap;"><span style="color:#475569;">0 / 0</span></td>
+            <td style="padding:7px 12px; text-align:left; white-space:nowrap;"><span style="color:#475569;">0.0 HĐ GC</span></td>
+            <td style="padding:7px 12px; color:#FB923C;">$+0.00M</td>
+            <td style="padding:7px 12px; color:#22D3EE;">$-0.00M</td>
+        </tr>
                 </tbody>
             </table>
         </div>
@@ -1663,7 +2983,7 @@
                 <div style="font-size:16px; font-weight:800; color:#4ADE80; font-family:'JetBrains Mono', monospace; margin-top:2px;">
                     CVD: +499 HĐ <span style="font-size:12px; color:#94A3B8;">(Buy: 65.4%)</span>
                 </div>
-                <div style="font-size:10.5px; color:#38BDF8; margin-top:2px; font-weight:700;">HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)</div>
+                <div style="font-size:10.5px; color:#38BDF8; margin-top:2px; font-weight:700;">HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION • λ=19.34)</div>
             </div>
         </div>
         <div style='margin-top:8px; padding:6px 10px; background:rgba(30,41,59,0.55); border-radius:6px; font-size:11px; font-family:JetBrains Mono,monospace;'><b style='color:#FACC15; margin-right:8px;'>[PHÁT HIỆN VỊ THẾ MỞ MỚI TRONG NGÀY (VOL > OI)]:</b> <span class='badge' style='background:rgba(15,23,42,0.9); color:#F87171; border:1px solid #F87171; margin-right:6px;'>WHALE NEW OI: $3,770 PUT (Vol 168 > OI 79 | +89 HĐ mở mới | BUY_TO_OPEN (LIFT ASK))</span><span class='badge' style='background:rgba(15,23,42,0.9); color:#4ADE80; border:1px solid #4ADE80; margin-right:6px;'>WHALE NEW OI: $3,930 CALL (Vol 189 > OI 184 | +5 HĐ mở mới | BUY_TO_OPEN (LIFT ASK))</span><span class='badge' style='background:rgba(15,23,42,0.9); color:#4ADE80; border:1px solid #4ADE80; margin-right:6px;'>WHALE NEW OI: $3,915 CALL (Vol 36 > OI 33 | +3 HĐ mở mới | BUY_TO_OPEN (LIFT ASK))</span></div>
@@ -2298,6 +3618,50 @@
         if (microFv) {
             microFv.innerText = liveFlipVerdict;
             microFv.style.color = liveFlipColor;
+        }
+
+        // 4c. Real-time sync of KPI CME price, Spine price, and ±10 Strikes window in Microstructure Table
+        const fmtSpot = '$' + currentGoldPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const kpiCmeEl = document.getElementById('kpi-cme-price');
+        if (kpiCmeEl) kpiCmeEl.innerText = fmtSpot;
+        const spinePriceEl = document.getElementById('spine-current-price');
+        if (spinePriceEl) spinePriceEl.innerText = fmtSpot;
+
+        const strikeRows = document.querySelectorAll('tr.micro-strike-row');
+        if (strikeRows && strikeRows.length > 0) {
+            let bestStrikeIdx = 0;
+            let bestDist = Infinity;
+            strikeRows.forEach((row, idx) => {
+                const stk = parseFloat(row.getAttribute('data-strike') || '0');
+                const dist = Math.abs(stk - currentGoldPrice);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestStrikeIdx = idx;
+                }
+            });
+            strikeRows.forEach((row, idx) => {
+                const inWindow = Math.abs(idx - bestStrikeIdx) <= 10;
+                const isSpotRow = (idx === bestStrikeIdx);
+                row.style.display = inWindow ? '' : 'none';
+                if (isSpotRow) {
+                    row.classList.add('row-spot');
+                    row.style.background = 'rgba(56, 189, 248, 0.12)';
+                    row.style.boxShadow = 'inset 3px 0 0 #38BDF8';
+                } else {
+                    row.classList.remove('row-spot');
+                    row.style.background = '';
+                    row.style.boxShadow = '';
+                }
+                const spotBadge = row.querySelector('.micro-spot-badge');
+                if (spotBadge) {
+                    if (isSpotRow) {
+                        spotBadge.style.display = '';
+                        spotBadge.innerText = '👉 SPOT: ' + fmtSpot;
+                    } else {
+                        spotBadge.style.display = 'none';
+                    }
+                }
+            });
         }
 
         // 5. Repaint 60FPS Canvas immediately with zero lag

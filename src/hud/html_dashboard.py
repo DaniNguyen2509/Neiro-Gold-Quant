@@ -40,6 +40,8 @@ from src.quant_engine.institutional import (
     extract_rr_bf,
     size_xauusd,
     detect_cta_confluence,
+    compute_vrp_metrics,
+    evaluate_informed_trader_regime,
 )
 from src.quant_engine.level_state import (
     LevelState,
@@ -644,6 +646,38 @@ def load_and_preprocess_options(
         m5_tape=m5_tape,
         zero_gamma_flip=exact_gamma_flip,
     )
+
+    intraday_candles = (m5_tape.get("chart_candles") or []) if isinstance(m5_tape, dict) else None
+    vrp_metrics = compute_vrp_metrics(
+        sigma_atm=sigma_atm,
+        daily_candles=daily_1d_candles,
+        intraday_candles=intraday_candles,
+        spot=spot_price,
+    )
+    informed_regime = evaluate_informed_trader_regime(
+        spot=spot_price,
+        call_wall=call_wall,
+        put_wall=put_wall,
+        total_net_gex=total_net_gex,
+        vpin_pct=float(inst_orderflow.get("vpin_pct", 32.0)),
+        kyle_lambda_ols=float(inst_orderflow.get("kyle_lambda_ols", 0.85)),
+        kyle_regime=str(inst_orderflow.get("kyle_lambda_regime", "NORMAL_LIQUIDITY")),
+        parity_z_score=float(inst_orderflow.get("parity_z_score", 0.0)),
+        dealer_hedge_flow=float(inst_orderflow.get("dealer_hedge_futures_flow", 0.0)),
+        vrp_spread_pct=vrp_metrics.vrp_vol_spread_pct,
+    )
+    inst_orderflow["vrp_spread_pct"] = vrp_metrics.vrp_vol_spread_pct
+    inst_orderflow["vrp_label"] = vrp_metrics.label_vi
+    inst_orderflow["vrp_advice"] = vrp_metrics.tactical_advice_vi
+    inst_orderflow["iv_atm_pct"] = vrp_metrics.iv_atm_pct
+    inst_orderflow["rv_annual_pct"] = vrp_metrics.rv_annual_pct
+    inst_orderflow["informed_action_badge"] = informed_regime.action_badge_vi
+    inst_orderflow["informed_action_color"] = informed_regime.action_color
+    inst_orderflow["informed_guidance"] = informed_regime.tactical_guidance_vi
+    inst_orderflow["bayesian_conviction_rho"] = informed_regime.bayesian_conviction_rho
+    inst_orderflow["kelly_fraction_mult"] = informed_regime.kelly_fraction_mult
+    inst_orderflow["session_name"] = informed_regime.session_name
+    inst_orderflow["sigma_u_depth_score"] = informed_regime.sigma_u_depth_score
 
     meta = {
         "spot_price": spot_price,
@@ -1408,19 +1442,19 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     pdf_atm = 1.0 / math.sqrt(2.0 * math.pi)
     max_theta_val = (spot * pdf_atm * sigma_atm / (2.0 * math.sqrt(T_years))) * math.exp(-r * T_years) * (MULT / 365.0)
 
-    # Filter to active tactical trading band around spot (+/- 250) or strikes with open interest / volume
-    band_mask = (df["strike"] >= spot - 250.0) & (df["strike"] <= spot + 250.0)
+    # Keep full active chain in DOM (hidden outside ±10 strikes) so JS applyLiveTick() can slide ±10 window dynamically
+    band_mask = (df["strike"] >= spot - 800.0) & (df["strike"] <= spot + 800.0)
     df_band = df[band_mask].copy() if band_mask.any() else df.copy()
-    if len(df_band) < 15:
-        df_band = df.copy()
 
     # Sort strikes descending (matching Neiro-NQ-Quant layout: highest strike to lowest)
-    df_sorted = df_band.sort_values("strike", ascending=False)
+    df_sorted = df_band.sort_values("strike", ascending=False).reset_index(drop=True)
     if df_sorted.empty:
         return ""
 
-    # Identify nearest strike to spot
-    min_dist_strike = min(df_sorted["strike"], key=lambda k: abs(k - spot))
+    # Identify nearest strike index to spot for +/- 10 strikes realtime window
+    strikes_list = df_sorted["strike"].astype(float).tolist()
+    spot_row_idx = min(range(len(strikes_list)), key=lambda i: abs(strikes_list[i] - spot))
+    min_dist_strike = strikes_list[spot_row_idx]
 
     inst_flow = meta.get("institutional_orderflow") or {}
     per_strike_flow = inst_flow.get("per_strike_flow") or {}
@@ -1431,16 +1465,30 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     opt_flow_label = str(inst_flow.get("options_flow_label", "CÂN BẰNG HEDGING"))
     bvc_cvd_val = float(inst_flow.get("bvc_cvd_contracts", 0.0))
     bvc_buy_pct = float(inst_flow.get("bvc_buy_pct", 50.0))
+    vpin_pct = float(inst_flow.get("vpin_pct", 32.0))
+    vpin_label = str(inst_flow.get("vpin_label", "🟢 VPIN 32.0% [AN TOÀN FADE WALL]"))
     kyle_label = str(inst_flow.get("kyle_lambda_label", "THANH KHOẢN BÌNH THƯỜNG"))
+    vrp_label = str(inst_flow.get("vrp_label", "⚖️ VRP CÂN BẰNG"))
+    vrp_advice = str(inst_flow.get("vrp_advice", ""))
+    vrp_spread_pct = float(inst_flow.get("vrp_spread_pct", 0.0))
+    informed_badge = str(inst_flow.get("informed_action_badge", "🎯 THEO DÕI DÒNG TIỀN CẤU TRÚC"))
+    informed_col = str(inst_flow.get("informed_action_color", "#38BDF8"))
+    informed_guidance = str(inst_flow.get("informed_guidance", ""))
+    rho_vs = float(inst_flow.get("bayesian_conviction_rho", 0.65))
+    kelly_mult = float(inst_flow.get("kelly_fraction_mult", 0.75))
+    session_name = str(inst_flow.get("session_name", "LONDON_DEEP"))
+    sigma_u = float(inst_flow.get("sigma_u_depth_score", 0.80))
     flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
     flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
 
     disloc_col = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
     hedge_col = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
     cvd_col = "#4ADE80" if bvc_cvd_val >= 0 else "#F87171"
+    vpin_col = "#F87171" if vpin_pct >= 65.0 else ("#FACC15" if vpin_pct >= 40.0 else "#4ADE80")
+    vrp_col = "#38BDF8" if vrp_spread_pct >= 4.0 else ("#F87171" if vrp_spread_pct <= -2.0 else "#CBD5E1")
 
     table_rows_html = []
-    for _, row in df_sorted.iterrows():
+    for row_idx, row in df_sorted.iterrows():
         stk_val = float(row["strike"])
         gex_val = float(row.get("netGEX", 0.0))
         c_oi_val = int(row.get("callOpenInterest", 0))
@@ -1474,11 +1522,15 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
 
         gex_color = "#4ADE80" if gex_val >= 0 else "#F87171"
         is_spot_nearest = (stk_val == min_dist_strike)
+        in_plus_minus_10 = abs(int(row_idx) - int(spot_row_idx)) <= 10
 
         # Tactical badges
-        badges = []
-        if is_spot_nearest:
-            badges.append(f'<span class="badge" style="background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;">👉 SPOT: ${spot:,.2f}</span>')
+        spot_badge_html = (
+            f'<span class="badge micro-spot-badge" style="background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;">👉 SPOT: ${spot:,.2f}</span>'
+            if is_spot_nearest
+            else '<span class="badge micro-spot-badge" style="display:none; background:#38BDF8; color:#020617; font-weight:800; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;"></span>'
+        )
+        badges = [spot_badge_html]
         if abs(stk_val - call_wall) < 1.0:
             badges.append('<span class="badge" style="background:#EF4444; color:#FFF; font-weight:700; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:4px;">CALL WALL</span>')
         if abs(stk_val - put_wall) < 1.0:
@@ -1487,11 +1539,13 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
             badges.append('<span class="badge" style="background:#FACC15; color:#020617; font-weight:700; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:4px;">ZERO GAMMA</span>')
 
         badge_str = "".join(badges)
-        row_cls = ' class="row-spot"' if is_spot_nearest else ""
-        row_style = 'background: rgba(56, 189, 248, 0.12); box-shadow: inset 3px 0 0 #38BDF8;' if is_spot_nearest else ""
+        row_cls = ' class="micro-strike-row row-spot"' if is_spot_nearest else ' class="micro-strike-row"'
+        vis_style = "" if in_plus_minus_10 else "display:none; "
+        spot_bg_style = "background: rgba(56, 189, 248, 0.12); box-shadow: inset 3px 0 0 #38BDF8;" if is_spot_nearest else ""
+        row_style = f"{vis_style}{spot_bg_style}"
 
         table_rows_html.append(f"""
-        <tr{row_cls} style="{row_style}">
+        <tr{row_cls} data-strike="{stk_val:.2f}" style="{row_style}">
             <td style="padding:7px 12px; text-align:left; font-weight:700; color:#F8FAFC; white-space:nowrap;"><b>GC ${stk_val:,.0f}</b>{badge_str}</td>
             <td style="padding:7px 12px; color: {gex_color}; font-weight:600;">${gex_val:+.2f}M</td>
             <td style="padding:7px 12px; color:#86EFAC;">{c_oi_val:,}</td>
@@ -1507,15 +1561,39 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     tbody = "".join(table_rows_html)
 
     return f"""
-    <!-- KHỐI 6: BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE TỪNG STRIKE (E-MINI NQ / COMEX GOLD FUTURES) -->
+    <!-- KHỐI 6: BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE TỪNG STRIKE (BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING) -->
     <div class="table-box" style="margin-bottom: 20px; border: 1px solid #1E293B; background:#0B132B; border-radius:8px; padding:14px 16px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; border-bottom:1px solid #1E293B; padding-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span class="badge" style="background:#FACC15; color:#020617; font-weight:800; font-size:11px; padding:2px 8px; border-radius:4px;">QUANT MICROSTRUCTURE &amp; ORDERFLOW</span>
-                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace;">📊 BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE &amp; DÒNG LỆNH TỪNG STRIKE (COMEX GOLD FUTURES)</span>
+                <span style="font-size:14px; font-weight:800; color:#F8FAFC; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace;">📊 BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE &amp; DÒNG LỆNH TỪNG STRIKE (±10 STRIKES QUANH GIÁ REALTIME)</span>
             </div>
             <div style="font-size:11.5px; font-family:'JetBrains Mono', monospace; color:#94A3B8;">
-                BẢNG ĐỊNH LƯỢNG VI CẤU TRÚC GREEKS & TÂM BÃO PINNING &bull; Theta Bào Mòn: <b style="color:#FACC15;">${max_theta_val:.2f}/HĐ/ngày</b> &bull; Độ nhạy Gamma Black-76 &bull; Orderflow: <b style="color:#38BDF8;">Lee-Ready + BVC + Parity</b> &bull; <b style="color:#FACC15;">100 oz/HĐ</b>
+                CỬA SỔ ĐỘNG: <b style="color:#4ADE80;">±10 STRIKES QUANH SPOT</b> &bull; Theta Bào Mòn: <b style="color:#FACC15;">${max_theta_val:.2f}/HĐ/ngày</b> &bull; Chuẩn: <b style="color:#38BDF8;">Gamma Black-76 + Kyle OLS + VPIN + VRP</b> &bull; <b style="color:#FACC15;">100 oz/HĐ</b>
+            </div>
+        </div>
+        <!-- Thanh Hành Động Khép Kín Của Informed Trader (Grossman-Stiglitz / Kyle 1985 / Easley VPIN / Carr-Wu VRP) -->
+        <div id="informed-trader-action-bar" style="background:linear-gradient(90deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.90) 100%); border:1px solid {informed_col}; border-left:5px solid {informed_col}; border-radius:6px; padding:9px 14px; margin-bottom:10px; font-family:'JetBrains Mono',monospace; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">
+                    INFORMED TRADER ACTION MATRIX (KYLE 1985 &bull; VPIN TOXICITY &bull; CARR-WU VRP &bull; BAYESIAN SNR)
+                </div>
+                <div id="micro-informed-badge" style="font-size:13px; font-weight:800; color:{informed_col}; margin-top:2px;">{informed_badge}</div>
+                <div id="micro-informed-guidance" style="font-size:11px; color:#CBD5E1; margin-top:2px;">{informed_guidance}</div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <div style="background:rgba(2,6,23,0.75); border:1px solid {vpin_col}; border-radius:5px; padding:5px 10px; text-align:right;">
+                    <div style="font-size:9.5px; color:#94A3B8;">ĐỘC TÍNH DÒNG LỆNH (VPIN)</div>
+                    <div id="micro-vpin-val" style="font-size:12px; font-weight:800; color:{vpin_col};">{vpin_label}</div>
+                </div>
+                <div style="background:rgba(2,6,23,0.75); border:1px solid #334155; border-radius:5px; padding:5px 10px; text-align:right;">
+                    <div style="font-size:9.5px; color:#94A3B8;">PHẦN BÙ BIẾN ĐỘNG (VRP = IV - RV)</div>
+                    <div id="micro-vrp-val" style="font-size:12px; font-weight:800; color:{vrp_col};" title="{vrp_advice}">{vrp_label}</div>
+                </div>
+                <div style="background:rgba(2,6,23,0.75); border:1px solid #334155; border-radius:5px; padding:5px 10px; text-align:right;">
+                    <div style="font-size:9.5px; color:#94A3B8;">BAYESIAN SNR (&rho;) &amp; KELLY SIZE</div>
+                    <div id="micro-kelly-val" style="font-size:12px; font-weight:800; color:#FACC15;">&rho;={rho_vs:.2f} &bull; Kelly {kelly_mult:.2f}x ({session_name} &sigma;_u={sigma_u:.2f})</div>
+                </div>
             </div>
         </div>
         <!-- Thanh Trực Quan Hóa Orderflow Tức Thời (Zero-Latency Institutional Orderflow Strip) -->
@@ -1538,9 +1616,9 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
                 </div>
             </div>
             <div style="background:rgba(15,23,42,0.85); border:1px solid #1E293B; border-left:3px solid #38BDF8; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
-                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">4. Vi Cấu Trúc Sổ Lệnh (Kyle's Lambda &lambda;)</div>
+                <div style="font-size:10px; color:#94A3B8; text-transform:uppercase;">4. Vi Cấu Trúc Sổ Lệnh (Kyle's Lambda &lambda;_OLS)</div>
                 <div id="micro-kyle-val" style="font-size:12px; font-weight:800; color:#38BDF8; margin-top:2px;">{kyle_label}</div>
-                <div style="font-size:10px; color:#94A3B8;">Cập nhật 0ms theo từng nhịp giá CME</div>
+                <div style="font-size:10px; color:#94A3B8;">Hồi quy OLS trượt theo dòng lệnh BVC CME</div>
             </div>
             <div style="background:rgba(15,23,42,0.92); border:1px solid {flip_verdict_col}; border-left:4px solid {flip_verdict_col}; border-radius:6px; padding:8px 12px; font-family:'JetBrains Mono',monospace;">
                 <div style="font-size:10px; color:#FACC15; font-weight:800; text-transform:uppercase;">5. Bộ Lọc Gamma Flip (Thật vs. Fakeout Trap)</div>

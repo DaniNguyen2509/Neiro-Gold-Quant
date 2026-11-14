@@ -321,3 +321,17 @@ on:
      * **Guaranteed New Intraday Whale Initiation ($\text{Volume}_K > \text{OI}_K$):** Phát hiện 100% vị thế mở mới trong ngày khi khối lượng khớp vượt trần Open Interest đầu ngày ($\text{new\_contracts\_min} = \text{Volume}_K - \text{OI}_K$).
      * **Bulk Volume Classification (BVC - Easley, López de Prado & O'Hara) & Kyle's Lambda ($\lambda$):** Phân rã `CVD` (Cumulative Volume Delta) và đo hệ số cản giá $\lambda = |\Delta P| / V$ để nhận diện **True Iceberg Absorption** (khối lượng lớn nhưng biên độ nén chặt) so với **Liquidity Vacuum Sweep** (trượt giá qua sổ lệnh rỗng).
      * **Trực Quan Hóa 60FPS Độ Trễ Bằng Không (`src/hud/neiro_terminal.py` & `QUANT MICROSTRUCTURE`):** Hiển thị trực tiếp ngay trên màn hình chính `NEIRO ORDERFLOW` gồm: (a) cột thứ 5 `FLOW (GC)` ngay cạnh `GEX | VEX | CHEX | THETA` trên `#neiro-canvas` kèm nhãn `⚡W` tại các strike cá mập mở mới (`Vol > OI`), (b) thanh kéo co `MUA BVC % vs BÁN %` và nhãn `Footprint Δ` gắn trực tiếp vào nến M1 hiện hành (`F0 LIVE`), (c) khối `REALTIME ORDERFLOW` trong hộp Floating HUD góc trên trái, và (d) 2 cột `Signed Flow (C/P)` + `Ép Dealer Hedge & Orderflow` ngay trong bảng `QUANT MICROSTRUCTURE` dưới biểu đồ, tự động nội suy `< 1ms` trên mỗi tick mà không cần tải lại trang.
+
+---
+
+## XII. ĐỘNG CƠ "INFORMED QUANT TRADER" KHÉP KÍN & CỬA SỔ REALTIME ±10 STRIKES (ADR-025)
+
+1. **5 Trụ Cột Định Lượng Khép Kín (`src/quant_engine/dealer.py` & `src/quant_engine/institutional.py`):**
+   - **Rolling OLS Kyle's Lambda ($\lambda_{\text{OLS}} = \text{Cov}(\Delta P, y)/\text{Var}(y)$):** Đo độ dốc tác động giá của dòng lệnh có dấu BVC và phát hiện kiệt sức sau quét thanh khoản (`PREDATORY_SWEEP_EXHAUSTION`).
+   - **Chỉ số Độc Tính Dòng Lệnh VPIN (`compute_vpin_bvc` — Easley, López de Prado & O'Hara, 2012):** Phân ngưỡng học thuật chuẩn: `< 40%` (`SAFE_MEAN_REVERSION` — an toàn đánh đảo chiều tại Wall), `40%–65%` (`ELEVATED_IMBALANCE`), và `>= 65%` (`TOXIC_INFORMED_FLOW` — hủy lệnh Limit cản tàu, chuyển sang đánh thuận Squeeze).
+   - **Phần Bù Rủi Ro Biến Động VRP (`compute_vrp_metrics` — Carr & Wu, 2009):** So sánh $IV_{\text{ATM}}$ của Options COMEX với biến động thực tế Parkinson High-Low $RV$ trên chuỗi nến `1D` `GC=F` để bắt nhịp `VEGA CRUSH` ($VRP \ge +4.0\%$) và `GAMMA EXPLOSION` ($VRP \le -2.0\%$).
+   - **Z-Score Dẫn Dắt Put-Call Parity ($Z_{\Delta F}$) & Hệ Số Tương Quan Thông Tin Bayesian ($\rho_{v,s} = \sqrt{\text{SNR}/(1+\text{SNR})}$):** Kết hợp lọc độ dày thanh khoản phiên CME Globex ($\sigma_u$) và hệ số điều chỉnh khối lượng Fractional Kelly (`kelly_fraction_mult`).
+2. **Cửa Sổ Động `±10 Strikes` & Đồng Bộ `👉 SPOT` Realtime (`src/hud/html_dashboard.py` & `src/hud/neiro_terminal.py`):**
+   - Bảng `BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE & DÒNG LỆNH TỪNG STRIKE` chỉ hiển thị đúng `±10 strikes` quanh giá `GC=F` hiện hành (tối đa 21 dòng hiển thị).
+   - Hàm `applyLiveTick()` cập nhật tức thời vị trí hàng `.row-spot`, huy hiệu `.micro-spot-badge` (`👉 SPOT: $...`), cửa sổ `±10 strikes`, `#kpi-cme-price` và `#spine-current-price` ngay khi giá `GC=F` biến động.
+
