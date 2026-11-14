@@ -31,6 +31,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     total_vex = float(meta.get("total_net_vex", 0.0))
     total_chex = float(meta.get("total_net_chex", 0.0))
     total_thex = float(meta.get("total_theta", -19.9) or -19.9)
+    total_vega = float(meta.get("total_vega", total_vex) or total_vex)
+    atm_delta = float(meta.get("atm_delta", 0.505) or 0.505)
+    atm_gamma = float(meta.get("atm_gamma", 0.00042) or 0.00042)
     total_thex_display = f"${total_thex:+.1f}M/d" if abs(total_thex) >= 1.0 else f"${total_thex*1000:+.0f}k/d"
     expected_move = float(meta.get("expected_move_1s", 35.0))
     strike_above = float(meta.get("strike_above", spot + 20.0))
@@ -38,7 +41,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     strike_below = float(meta.get("strike_below", spot - 20.0))
     next_below = float(meta.get("next_below", strike_below - 20.0))
     zero_gamma = float(meta.get("zero_gamma_flip", spot))
-    gvz_iv = float(meta.get("gvz_iv", 24.1) or 24.1)
+    gvz_iv = float(meta.get("gvz_iv") or (float(meta.get("sigma_atm", 0.241)) * 100.0))
     air_pockets = meta.get("air_pockets", [])
 
     total_net_delta = float(meta.get("total_net_delta_contracts", 0.0) or (df["netDeltaContracts"].sum() if "netDeltaContracts" in df.columns else 0.0))
@@ -226,7 +229,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         <div class="neiro-subbar-right">
             <span style="color:#38BDF8; font-weight:700;">⚡ LIVE BLACK-76 REALTIME GREEKS RADAR (M1):</span>
             <span id="live-greeks-radar" style="margin-left: 6px; color: #CBD5E1;">
-                Delta &Delta;: <b>0.505</b> | Gamma &Gamma;: <b>0.00042</b> | Vega &nu;: <b>${total_vex:+.1f}M</b> | Theta &theta;: <b>{total_thex_display}</b> | Vanna (VEX): <b>${total_vex:+.1f}M</b> | Charm (CHEX): <b>${total_chex:+.1f}M/d</b>
+                Delta &Delta;: <b>{atm_delta:.3f}</b> | Gamma &Gamma;: <b>{atm_gamma:.5f}</b> | Vega &nu;: <b>${total_vega:+.1f}M</b> | Theta &theta;: <b>{total_thex_display}</b> | Vanna (VEX): <b>${total_vex:+.1f}M</b> | Charm (CHEX): <b>${total_chex:+.1f}M/d</b>
             </span>
             <span style="color:#64748B; margin-left: 8px;">| ATM: <b id="top-ticker-atm">${atm_strike:,.0f}</b> | IV: <b id="top-ticker-iv">{gvz_iv:.1f}%</b> | Zero Gamma: <b style="color:#FACC15;">${zero_gamma:,.1f}</b></span>
         </div>

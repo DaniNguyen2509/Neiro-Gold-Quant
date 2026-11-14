@@ -182,9 +182,17 @@ def load_and_preprocess_options(
             except Exception:
                 pass
 
+    # Preserve multi-expiry superposition metadata before sanitization
+    was_multi_expiry_aggregated = bool(hasattr(df_raw, "attrs") and df_raw.attrs.get("is_aggregated"))
+    saved_exp_attr = df_raw.attrs.get("expiration_date") if hasattr(df_raw, "attrs") else None
+
     # Data Analyst cleaning & sanitization pipeline
     from src.collector.validator import clean_and_sanitize_options_dataset
     df_raw = clean_and_sanitize_options_dataset(df_raw)
+    if saved_exp_attr:
+        df_raw.attrs["expiration_date"] = saved_exp_attr
+    if was_multi_expiry_aggregated:
+        df_raw.attrs["is_aggregated"] = True
 
     # Normalize column names
     col_clean = {c: c.strip() for c in df_raw.columns}
@@ -400,22 +408,41 @@ def load_and_preprocess_options(
     rule16_daily_move = (sigma_atm / 16.0) * spot_price
 
     strikes_all = df["strike"].values.astype(float)
-    denom = sigma_atm * np.sqrt(T_years)
-    d1 = (np.log(np.maximum(1e-4, spot_price / strikes_all)) + 0.5 * (sigma_atm ** 2) * T_years) / denom
-    d2 = d1 - denom
-    pdf_d1 = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1 ** 2))
-    cdf_d1 = 0.5 * (1.0 + np.vectorize(math.erf)(d1 / np.sqrt(2.0)))
+    sqrt_t = np.sqrt(T_years)
+    # Practitioner Black-76 Smile-Consistent IV per strike (fallback to sigma_atm if missing/out-of-bounds)
+    raw_civ = df["callIV"].values.astype(float) if "callIV" in df.columns else np.full(len(df), sigma_atm)
+    raw_piv = df["putIV"].values.astype(float) if "putIV" in df.columns else np.full(len(df), sigma_atm)
+    sigma_c = np.where((raw_civ > 0.03) & (raw_civ < 1.50), raw_civ, sigma_atm)
+    sigma_p = np.where((raw_piv > 0.03) & (raw_piv < 1.50), raw_piv, sigma_atm)
+
+    denom_c = np.maximum(1e-5, sigma_c * sqrt_t)
+    denom_p = np.maximum(1e-5, sigma_p * sqrt_t)
+    log_fk = np.log(np.maximum(1e-4, spot_price / strikes_all))
+
+    d1_c = (log_fk + 0.5 * (sigma_c ** 2) * T_years) / denom_c
+    d2_c = d1_c - denom_c
+    d1_p = (log_fk + 0.5 * (sigma_p ** 2) * T_years) / denom_p
+    d2_p = d1_p - denom_p
+
+    pdf_d1_c = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1_c ** 2))
+    pdf_d1_p = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1_p ** 2))
+    cdf_d1_c = 0.5 * (1.0 + np.vectorize(math.erf)(d1_c / np.sqrt(2.0)))
+    cdf_d2_c = 0.5 * (1.0 + np.vectorize(math.erf)(d2_c / np.sqrt(2.0)))
+    cdf_d1_p = 0.5 * (1.0 + np.vectorize(math.erf)(d1_p / np.sqrt(2.0)))
+    cdf_neg_d1_p = 1.0 - cdf_d1_p
+    cdf_neg_d2_p = 1.0 - (0.5 * (1.0 + np.vectorize(math.erf)(d2_p / np.sqrt(2.0))))
     df_disc = np.exp(-r * T_years)
 
     # Black-76 Gamma: e^(-rT) * n(d1) / (F * sigma * sqrt(T))
-    gamma_b76 = (df_disc * pdf_d1) / np.maximum(1e-4, spot_price * denom)
+    gamma_b76_c = (df_disc * pdf_d1_c) / np.maximum(1e-4, spot_price * denom_c)
+    gamma_b76_p = (df_disc * pdf_d1_p) / np.maximum(1e-4, spot_price * denom_p)
     raw_unphysical = (df["callGamma"].nunique() <= 3) or bool(((df["strike"] > (spot_price + 800.0)) & (df["callGamma"] > 0.001)).any())
     if raw_unphysical:
-        gamma_c = gamma_b76
-        gamma_p = gamma_b76
+        gamma_c = gamma_b76_c
+        gamma_p = gamma_b76_p
     else:
-        gamma_c = np.where(df["callGamma"] > 0, df["callGamma"], gamma_b76)
-        gamma_p = np.where(df["putGamma"] > 0, df["putGamma"], gamma_b76)
+        gamma_c = np.where(df["callGamma"] > 0, df["callGamma"], gamma_b76_c)
+        gamma_p = np.where(df["putGamma"] > 0, df["putGamma"], gamma_b76_p)
     df["callGamma"] = gamma_c
     df["putGamma"] = gamma_p
     if raw_unphysical or "callGammaPower" not in df.columns:
@@ -423,29 +450,52 @@ def load_and_preprocess_options(
     if raw_unphysical or "putGammaPower" not in df.columns:
         df["putGammaPower"] = gamma_p * df["putOpenInterest"]
 
-    # 3. GEX Calculation ($M / 1% move)
-    df["callGEX"] = gamma_c * df["callOpenInterest"] * MULT * scale
-    df["putGEX"] = - (gamma_p * df["putOpenInterest"] * MULT * scale)
-    df["netGEX"] = df["callGEX"] + df["putGEX"]
+    # 3. GEX, VEX, CHEX, Vega & Theta Calculation (Preserve Multi-Expiry Superposition when active)
+    has_superimposed = (
+        was_multi_expiry_aggregated
+        and "netGEX" in df.columns
+        and "netVEX" in df.columns
+        and "netCHEX" in df.columns
+        and float(df["netGEX"].abs().sum()) > 0
+    )
+    if not has_superimposed:
+        df["callGEX"] = gamma_c * df["callOpenInterest"] * MULT * scale
+        df["putGEX"] = - (gamma_p * df["putOpenInterest"] * MULT * scale)
+        df["netGEX"] = df["callGEX"] + df["putGEX"]
 
-    vanna = - df_disc * pdf_d1 * (d2 / sigma_atm)
-    # Charm (Rate of delta decay per calendar day, Black-76, CNGTHCTNHTON.html)
-    # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
-    # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * (1 - cdf(d1))] / 365
-    charm_call = df_disc * (pdf_d1 * (d2 / (2.0 * T_years)) - r * cdf_d1)
-    charm_put = df_disc * (pdf_d1 * (d2 / (2.0 * T_years)) + r * (1.0 - cdf_d1))
+        vanna_c = - df_disc * pdf_d1_c * (d2_c / sigma_c)
+        vanna_p = - df_disc * pdf_d1_p * (d2_p / sigma_p)
+        # Charm (Rate of delta decay per calendar day, Black-76, CNGTHCTNHTON.html)
+        charm_call = df_disc * (pdf_d1_c * (d2_c / (2.0 * T_years)) - r * cdf_d1_c)
+        charm_put = df_disc * (pdf_d1_p * (d2_p / (2.0 * T_years)) + r * cdf_neg_d1_p)
 
-    df["callVEX"] = vanna * df["callOpenInterest"] * MULT * spot_price * 0.01 / 1e6
-    df["putVEX"] = - (vanna * df["putOpenInterest"] * MULT * spot_price * 0.01 / 1e6)
-    df["netVEX"] = df["callVEX"] + df["putVEX"]
+        df["callVEX"] = vanna_c * df["callOpenInterest"] * MULT * spot_price * 0.01 / 1e6
+        df["putVEX"] = - (vanna_p * df["putOpenInterest"] * MULT * spot_price * 0.01 / 1e6)
+        df["netVEX"] = df["callVEX"] + df["putVEX"]
 
-    df["callCHEX"] = (charm_call / 365.0) * df["callOpenInterest"] * MULT * spot_price / 1e6
-    df["putCHEX"] = - ((charm_put / 365.0) * df["putOpenInterest"] * MULT * spot_price / 1e6)
-    df["netCHEX"] = df["callCHEX"] + df["putCHEX"]
+        df["callCHEX"] = (charm_call / 365.0) * df["callOpenInterest"] * MULT * spot_price / 1e6
+        df["putCHEX"] = - ((charm_put / 365.0) * df["putOpenInterest"] * MULT * spot_price / 1e6)
+        df["netCHEX"] = df["callCHEX"] + df["putCHEX"]
+
+    vega_c = spot_price * df_disc * sqrt_t * pdf_d1_c
+    vega_p = spot_price * df_disc * sqrt_t * pdf_d1_p
+    if not (has_superimposed and "totalVega" in df.columns and float(df["totalVega"].abs().sum()) > 0):
+        df["totalVega"] = (df["callOpenInterest"] * vega_c + df["putOpenInterest"] * vega_p) * MULT * 0.01 / 1e6
+
+    theta_common_c = - (spot_price * df_disc * pdf_d1_c * sigma_c) / (2.0 * sqrt_t)
+    theta_common_p = - (spot_price * df_disc * pdf_d1_p * sigma_p) / (2.0 * sqrt_t)
+    call_price_b76 = df_disc * (spot_price * cdf_d1_c - strikes_all * cdf_d2_c)
+    put_price_b76 = df_disc * (strikes_all * cdf_neg_d2_p - spot_price * cdf_neg_d1_p)
+    theta_call_day = (theta_common_c + r * call_price_b76) / 365.0
+    theta_put_day = (theta_common_p + r * put_price_b76) / 365.0
+    if not (has_superimposed and "totalTheta" in df.columns and float(df["totalTheta"].abs().sum()) > 0):
+        df["totalTheta"] = -((df["callOpenInterest"] * np.abs(theta_call_day) + df["putOpenInterest"] * np.abs(theta_put_day)) * MULT / 1e6)
+    else:
+        df["totalTheta"] = -df["totalTheta"].abs()
 
     # 4. Deltas & Dealer Net Position Delta (Contracts & DEX)
-    df["callDelta"] = df_disc * cdf_d1
-    df["putDelta"] = df["callDelta"] - df_disc
+    df["callDelta"] = df_disc * cdf_d1_c
+    df["putDelta"] = df_disc * (cdf_d1_p - 1.0)
     df["callDeltaContracts"] = np.round(df["callOpenInterest"] * df["callDelta"], 1)
     df["putDeltaContracts"] = np.round(df["putOpenInterest"] * df["putDelta"], 1)
     df["netDeltaContracts"] = np.round(df["callDeltaContracts"] + df["putDeltaContracts"], 1)
@@ -518,10 +568,18 @@ def load_and_preprocess_options(
     total_net_gex = float(df["netGEX"].sum())
     total_net_vex = float(df["netVEX"].sum())
     total_net_chex = float(df["netCHEX"].sum())
+    total_theta = -round(float(df["totalTheta"].abs().sum()), 2) if "totalTheta" in df.columns else -19.9
+    total_vega = round(float(df["totalVega"].sum()), 2) if "totalVega" in df.columns else 0.0
+    atm_delta = round(float(df.loc[atm_idx, "callDelta"]), 3) if ("callDelta" in df.columns and atm_idx in df.index) else 0.505
+    atm_gamma = round(float(df.loc[atm_idx, "callGamma"]), 5) if ("callGamma" in df.columns and atm_idx in df.index) else 0.00042
     regime = "LONG_GAMMA" if total_net_gex > 10.0 else ("SHORT_GAMMA" if total_net_gex < -10.0 else "NEUTRAL")
 
-    squeeze_trigger = call_wall + 2.50
-    waterfall_trigger = put_wall - 2.50
+    cw_mid_matches = df.loc[df["strike"] == call_wall, "callMid"] if "callMid" in df.columns else pd.Series(dtype=float)
+    pw_mid_matches = df.loc[df["strike"] == put_wall, "putMid"] if "putMid" in df.columns else pd.Series(dtype=float)
+    cw_mid_val = float(cw_mid_matches.iloc[0]) if (not cw_mid_matches.empty and float(cw_mid_matches.iloc[0]) > 0) else 2.50
+    pw_mid_val = float(pw_mid_matches.iloc[0]) if (not pw_mid_matches.empty and float(pw_mid_matches.iloc[0]) > 0) else 2.50
+    squeeze_trigger = round(call_wall + cw_mid_val, 2)
+    waterfall_trigger = round(put_wall - pw_mid_val, 2)
 
     basis_source = "CME_ONLY"
     if no_mt5:
@@ -612,6 +670,11 @@ def load_and_preprocess_options(
         "total_net_gex": total_net_gex,
         "total_net_vex": total_net_vex,
         "total_net_chex": total_net_chex,
+        "total_theta": total_theta,
+        "total_vega": total_vega,
+        "gvz_iv": round(float(sigma_atm * 100.0), 2),
+        "atm_delta": atm_delta,
+        "atm_gamma": atm_gamma,
         "regime": regime,
         "squeeze_trigger": squeeze_trigger,
         "waterfall_trigger": waterfall_trigger,
