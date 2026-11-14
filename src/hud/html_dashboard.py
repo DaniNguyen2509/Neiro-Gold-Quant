@@ -16,11 +16,15 @@ import argparse
 import datetime
 import gc
 import json
+import logging
 import math
+import os
 import sys
 import time
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
@@ -52,7 +56,10 @@ from src.quant_engine.level_state import (
 )
 from src.quant_engine.dealer import (
     compute_exact_gamma_flip,
+    compute_rolling_kyle_lambda_ols,
+    compute_vpin_bvc,
     compute_wall_siege_ratio,
+    evaluate_gamma_flip_integrity,
     find_gamma_weighted_walls,
 )
 from src.quant_engine.loader import clean_val, to_options_snapshot, load_multi_expiry_options
@@ -181,13 +188,20 @@ def load_and_preprocess_options(
                 if is_data_stale:
                     now_str = datetime.datetime.now().strftime("%H:%M:%S")
                     print(f"[{now_str}] ⚠️ [CẢNH BÁO NGUY HIỂM] File Options CSV ({csv_path}) đã cũ {file_age_hours:.1f} giờ! Chuỗi options có thể chưa nạp các strike mới trong ngày.")
-            except Exception:
-                pass
+            except Exception as stat_err:
+                _logger.debug("Could not stat CSV file %s: %s", csv_path, stat_err)
 
             data_parent = str(p_path.parent)
-            df_multi = load_multi_expiry_options(data_parent)
-            if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
-                df_raw = df_multi
+            sibling_chain_files = [
+                f for f in p_path.parent.glob("options_prices*.csv")
+                if "near_the_money" not in f.name.lower()
+            ]
+            if p_path.name.lower().startswith("options_prices") and len(sibling_chain_files) >= 2:
+                df_multi = load_multi_expiry_options(data_parent)
+                if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
+                    df_raw = df_multi
+                else:
+                    df_raw = pd.read_csv(csv_path)
             else:
                 df_raw = pd.read_csv(csv_path)
         else:
@@ -250,7 +264,7 @@ def load_and_preprocess_options(
                 is_data_stale,
             )
 
-    is_benchmark_fallback = False
+    is_benchmark_fallback = bool(df.attrs.get("is_benchmark_fallback", False))
     if df.empty:
         from src.quant_engine.loader import load_options_data
         df_bench = load_options_data()
@@ -305,9 +319,10 @@ def load_and_preprocess_options(
             p_cand = [
                 Path(csv_path),
                 Path(csv_path).parent / "options_prices_GCZ26.csv",
-                Path(csv_path).parent / "options_prices_GCZ26_near_the_money.csv",
-                Path("H:/My Drive/Neiro-Quant/data/options_prices_GCZ26.csv"),
             ]
+            env_data_dir = os.environ.get("NEIRO_OPTIONS_DATA_DIR")
+            if env_data_dir:
+                p_cand.append(Path(env_data_dir) / "options_prices_GCZ26.csv")
             recovered = False
             for fb_path in p_cand:
                 if fb_path.exists():
@@ -328,11 +343,12 @@ def load_and_preprocess_options(
                                 df = fb_clean
                                 recovered = True
                                 break
-                    except Exception:
-                        pass
+                    except Exception as fb_err:
+                        _logger.debug("Fallback CSV read failed for %s: %s", fb_path, fb_err)
             if not recovered:
                 from src.quant_engine.loader import BENCHMARK_GCZ26_DATA
                 df = pd.DataFrame(BENCHMARK_GCZ26_DATA)
+                is_benchmark_fallback = True
 
             # Recompute expiry metadata for recovered chain to avoid retaining contaminated metadata
             exp_val = ""
@@ -669,15 +685,19 @@ def load_and_preprocess_options(
         snap, spot_price=spot_price, r=r, dte_days=dte_days, default_iv=sigma_atm
     )
 
-    strike_above_res, _, strike_below_res, _, step_res, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
+    strike_above_res, next_above_res, strike_below_res, next_below_res, step_res, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
         df["strike"].values, spot_price, dte_days=dte_days, call_wall=call_wall, put_wall=put_wall
     )
     major_down_w, _ = find_next_major_wall(df, strike_below_res, direction="DOWN", oi_percentile=60.0)
     major_up_w, _ = find_next_major_wall(df, strike_above_res, direction="UP", oi_percentile=60.0)
+    down_pockets_res = detect_strike_air_pockets(df, strike_below_res, major_down_w, threshold_ratio=0.40)
+    up_pockets_res = detect_strike_air_pockets(df, strike_above_res, major_up_w, threshold_ratio=0.40)
+    has_down_ap_res = len(down_pockets_res) > 0 or (abs(strike_below_res - major_down_w) > step_res * 1.5)
+    has_up_ap_res = len(up_pockets_res) > 0 or (abs(major_up_w - strike_above_res) > step_res * 1.5)
     static_raw_pockets = (
-        detect_strike_air_pockets(df, strike_below_res, major_down_w, threshold_ratio=0.40)
+        down_pockets_res
         + detect_strike_air_pockets(df, major_down_w - 80.0, major_down_w, threshold_ratio=0.40)
-        + detect_strike_air_pockets(df, strike_above_res, major_up_w, threshold_ratio=0.40)
+        + up_pockets_res
         + detect_strike_air_pockets(df, major_up_w, min(major_up_w + 80.0, call_wall), threshold_ratio=0.40)
     )
     static_air_pockets: list[dict[str, Any]] = []
@@ -809,8 +829,16 @@ def load_and_preprocess_options(
         "synced_at_vn": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%d/%m/%Y %H:%M:%S VN"),
     }
     meta["strike_above"] = strike_above_res
+    meta["next_above"] = next_above_res
     meta["strike_below"] = strike_below_res
+    meta["next_below"] = next_below_res
+    meta["step"] = step_res
     meta["is_micro_guarded"] = is_micro_guarded_res
+    meta["major_up_wall"] = major_up_w
+    meta["major_down_wall"] = major_down_w
+    meta["has_up_air_pocket"] = has_up_ap_res
+    meta["has_down_air_pocket"] = has_down_ap_res
+    meta["atr_5m"] = compute_m5_equivalent_atr(m5_tape if isinstance(m5_tape, dict) else None)
     meta["air_pockets"] = static_air_pockets
 
     # Pre-computed Squeeze Ladder for O(1) realtime execution
@@ -1805,23 +1833,7 @@ def generate_html_terminal(
     buffer_down = min(step * 0.10, 2.50)
     front_run_tp = 1.00
 
-    # Exact Entry & SL Calculations
-    entry_squeeze = strike_above + buffer_up + 0.50
-    sl_squeeze = strike_above - 1.50
-    sl_dist_squeeze = round(entry_squeeze - sl_squeeze, 2)
-
-    entry_fade = strike_above - 1.00
-    sl_fade = strike_above + buffer_up + 1.50
-    sl_dist_fade = round(sl_fade - entry_fade, 2)
-
-    entry_rebound = strike_below + 1.00
-    sl_rebound = strike_below - 4.00
-    sl_dist_rebound = round(entry_rebound - sl_rebound, 2)
-
-    entry_breakdown = strike_below - buffer_down - 0.50
-    sl_breakdown = strike_below + 1.50
-    sl_dist_breakdown = round(sl_breakdown - entry_breakdown, 2)
-
+    # Exact Call Wall / Put Wall Entry & SL Calculations (1-4 strategies come from compute_tactical_intraday_matrix)
     entry_call_wall = call_wall - 1.00
     sl_call_wall = call_wall + 4.00
     sl_dist_cw = round(sl_call_wall - entry_call_wall, 2)
@@ -1831,10 +1843,6 @@ def generate_html_terminal(
     sl_dist_pw = round(entry_put_wall - sl_put_wall, 2)
 
     # Volatility sizing with exact calculated SL distance
-    size_squeeze = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_squeeze, gex_regime=regime)
-    size_fade = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_fade, gex_regime=regime)
-    size_rebound = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_rebound, gex_regime=regime)
-    size_breakdown = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_breakdown, gex_regime=regime)
     size_call_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_cw, gex_regime=regime)
     size_put_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_pw, gex_regime=regime)
     # Reuse precomputed static OI pockets when available; fallback only for synthetic tests
@@ -1871,11 +1879,6 @@ def generate_html_terminal(
         meta["air_pockets"] = all_air_pockets
     meta["call_wall_siege"] = call_wall_siege
     meta["put_wall_siege"] = put_wall_siege
-
-    # Strategy Table Targets with Invariant Enforcement (BUY: TP > Entry, SELL: TP < Entry)
-    front_run_tp = 1.00
-    buffer_up = min(step * 0.10, 2.50)
-    buffer_down = min(step * 0.10, 2.50)
 
     # Calibrated KHỐI 6 Strategy Matrix (V2.1 Stop-Hunt Clearance + Gamma-Aligned Gate)
     _k6_tape = meta.get("m5_tape") or {}
@@ -1950,6 +1953,59 @@ def generate_html_terminal(
     rb_gate_html = _k6_gate_pill(_k6_mat["rebound"])
     bd_gate_html = _k6_gate_pill(_k6_mat["breakdown"])
 
+    # 4-Card 3-Second Tactical Command Bar Initial Server-Rendered State
+    _zg_ref = float(zero_gamma) if (zero_gamma is not None and float(zero_gamma) > 0) else spot
+    _dist_flip = spot - _zg_ref
+    if total_gex >= 0 and _dist_flip >= 0:
+        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "MM GHÌM ĐẢO CHIỀU (LONG Γ)", "#4ADE80", "#22C55E"
+    elif total_gex < 0 and _dist_flip < 0:
+        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "MM ĐẨY SÓNG MẠNH (SHORT Γ)", "#F87171", "#EF4444"
+    else:
+        _cmd_reg_txt, _cmd_reg_col, _cmd_reg_bdr = "VÙNG CHUYỂN PHA (TRANH CHẤP)", "#FACC15", "#EAB308"
+    _cmd_reg_sub = f"Flip ${zero_gamma:,.0f} ({_dist_flip:+.1f}$) · NetGEX ${total_gex:+.1f}M" if zero_gamma else f"NetGEX ${total_gex:+.1f}M"
+
+    _dist_up = strike_above - spot
+    _dist_dn = spot - strike_below
+    _near_top = _dist_up <= _dist_dn
+    _ap_note = "⚠️ AIR POCKET TRÊN" if (has_up_air_pocket and _near_top) else ("⚠️ AIR POCKET DƯỚI" if (has_down_air_pocket and not _near_top) else "Biên ổn định")
+    _cmd_wall_txt = f"SÁT CẢN ${strike_above:,.0f} (+{_dist_up:.1f}$)" if _near_top else f"SÁT SÀN ${strike_below:,.0f} (-{_dist_dn:.1f}$)"
+    _cmd_wall_col = "#FACC15" if ((has_up_air_pocket and _near_top) or (has_down_air_pocket and not _near_top)) else "#38BDF8"
+    _cmd_wall_bdr = "#EF4444" if _near_top else "#22C55E"
+    _cmd_wall_sub = f"PW ${put_wall:,.0f} (-{spot - put_wall:.0f}$) · CW ${call_wall:,.0f} (+{call_wall - spot:.0f}$) · {_ap_note}"
+
+    _is_breaking_wall = _k6_vpin >= 65.0 or call_wall_siege >= 0.25 or put_wall_siege >= 0.25
+    if _k6_vpin >= 65.0:
+        _cmd_flow_txt, _cmd_flow_col, _cmd_flow_bdr = f"DÒNG ĐỘC HẠI PHÁ TƯỜNG (VPIN {_k6_vpin:.1f}%)", "#F87171", "#EF4444"
+    elif _is_breaking_wall:
+        _cmd_flow_txt, _cmd_flow_col, _cmd_flow_bdr = "ÁP LỰC CÔNG THÀNH (SIEGE/VPIN TĂNG)", "#FACC15", "#EAB308"
+    else:
+        _cmd_flow_txt, _cmd_flow_col, _cmd_flow_bdr = f"DÒNG TIỀN ĐỠ TƯỜNG (VPIN {_k6_vpin:.1f}%)", "#4ADE80", "#22C55E"
+    _k6_buy_pct = float(_k6_flow.get("bvc_buy_pct", 50.0))
+    _k6_df = float(_k6_flow.get("forward_dislocation_usd", 0.0))
+    _cmd_flow_sub = f"Mua BVC: {_k6_buy_pct:.1f}% · δF {_k6_df:+.2f}$ · CW/PW Siege: {call_wall_siege:.2f}x/{put_wall_siege:.2f}x"
+
+    _k6_candidates = [
+        ("1. BUY MUA ĐUỔI", "BUY", _k6_mat["squeeze"], size_squeeze.recommended_lots),
+        ("2. SELL CHẶN TIỀN TUYẾN", "SELL", _k6_mat["fade"], size_fade.recommended_lots),
+        ("3. BUY BẮT SÀN ATM", "BUY", _k6_mat["rebound"], size_rebound.recommended_lots),
+        ("4. SELL THỦNG SÀN", "SELL", _k6_mat["breakdown"], size_breakdown.recommended_lots),
+    ]
+    _k6_active = [c for c in _k6_candidates if c[2]["active"]]
+    _sess_open = _k6_sess.upper() != "GLOBEX_CLOSED"
+    if not _sess_open:
+        _cmd_act_txt, _cmd_act_col, _cmd_act_bdr = "ĐỨNG NGOÀI (GLOBEX ĐÓNG CỬA)", "#94A3B8", "#64748B"
+        _cmd_act_sub = "Chờ phiên Globex mở cửa trở lại để khớp lệnh COMEX GC."
+    elif _k6_active:
+        _best_title, _best_side, _best_it, _best_lot = min(_k6_active, key=lambda c: abs(float(c[2]["entry"]) - spot))
+        _is_b = (_best_side == "BUY")
+        _cmd_act_txt = f"{_best_title} @ {_best_it['entry']:.2f}"
+        _cmd_act_col = "#4ADE80" if _is_b else "#F87171"
+        _cmd_act_bdr = "#22C55E" if _is_b else "#EF4444"
+        _cmd_act_sub = f"SL {_best_it['sl']:.2f} (${_best_it['sl_dist']:.1f}) · TP {_best_it['tp']:.2f} · ~{_best_lot:.2f} Lot ({_best_it['gate_reason']})"
+    else:
+        _cmd_act_txt, _cmd_act_col, _cmd_act_bdr = "ĐỨNG NGOÀI QUAN SÁT (0 KÈO ACTIVE)", "#FACC15", "#EAB308"
+        _cmd_act_sub = f"VPIN {_k6_vpin:.1f}% · Chờ giá chạm bẫy & xác nhận bộ lọc ADR-028."
+
     # 5. Call Wall Fade TP (SELL: must be strictly < entry_call_wall)
     tp_call_wall = min(entry_call_wall - 3.00, atm_strike)
 
@@ -1967,7 +2023,7 @@ def generate_html_terminal(
     m5_avg_vol = float(m5_tape.get("avg_m5_volume") or 300.0)
 
     if m5_available:
-        m5_header_summary = f"Đỉnh ngày: <b style='color:#F87171;'>${m5_high:,.2f}</b> &bull; Đáy ngày: <b style='color:#4ADE80;'>${m5_low:,.2f}</b> &bull; Biên độ: <b style='color:#FACC15;'>${m5_range:.2f}$</b> &bull; TB Vol {m5_tf_label}: <b style='color:#38BDF8;'>{m5_avg_vol:.0f} HĐ</b>"
+        m5_header_summary = f"Đỉnh ngày: <b style='color:#F87171;'>${m5_high:,.2f}</b> &bull; Đáy ngày: <b style='color:#4ADE80;'>${m5_low:,.2f}</b> &bull; Biên độ: <b style='color:#FACC15;'>${m5_range:.2f}</b> &bull; TB Vol {m5_tf_label}: <b style='color:#38BDF8;'>{m5_avg_vol:.0f} HĐ</b>"
     else:
         m5_header_summary = "<span style='color:#64748B;'>Đang đồng bộ dữ liệu Orderflow trực tiếp từ sàn COMEX...</span>"
 
@@ -2097,7 +2153,29 @@ def generate_html_terminal(
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ background-color: var(--bg-base); color: var(--text-primary); font-family: 'Inter', sans-serif; padding: 14px; font-size: 13.5px; line-height: 1.5; }}
-        .container {{ width: 100%; max-width: 100%; margin: 0 auto; padding: 8px 14px; }}
+        .container {{ display: flex; flex-direction: column; width: 100%; max-width: 100%; margin: 0 auto; padding: 6px 12px; }}
+        .cockpit-stage {{ display: flex; flex-direction: column; width: 100%; }}
+        .cmd-3s-grid {{ display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 10px; margin-bottom: 12px; }}
+        @media (max-width: 1180px) {{ .cmd-3s-grid {{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }} }}
+        @media (max-width: 640px) {{
+            body {{ padding: 6px; }}
+            .container {{ padding: 4px; }}
+            .cmd-3s-grid {{ grid-template-columns: 1fr; }}
+            .spine-track {{ flex-wrap: wrap; justify-content: center; gap: 10px; }}
+            .spine-track > div:not(.spine-node) {{ display: none; }}
+            .glossary-grid {{ grid-template-columns: 1fr; }}
+            .header {{ padding: 10px 12px; }}
+        }}
+        .cmd-3s-card {{ background: #0B1220; border: 1px solid #1E293B; border-left: 4px solid #38BDF8; border-radius: 8px; padding: 10px 13px; }}
+        .cmd-3s-lbl {{ font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }}
+        .cmd-3s-val {{ font-size: 14.5px; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1.25; }}
+        .cmd-3s-sub {{ font-size: 11px; color: #CBD5E1; font-family: 'JetBrains Mono', monospace; margin-top: 3px; line-height: 1.3; }}
+        .drawer-box {{ border-color: #1E293B; padding: 11px 14px; margin-bottom: 10px; }}
+        .drawer-summary {{ cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: #CBD5E1; }}
+        .drawer-summary::-webkit-details-marker {{ display: none; }}
+        .drawer-hint {{ font-size: 10.5px; color: #38BDF8; font-weight: 600; }}
+        .k6-row-active td {{ background: rgba(34, 197, 94, 0.08); border-bottom-color: rgba(34, 197, 94, 0.28); }}
+        .k6-row-locked td {{ opacity: 0.62; }}
         
         .header {{ display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #1C1917 0%, #292524 100%); border: 1px solid #44403C; border-radius: 10px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }}
         .brand {{ display: flex; align-items: center; gap: 10px; }}
@@ -2152,15 +2230,48 @@ def generate_html_terminal(
 </head>
 <body>
 <div class="container">
-    {stale_badge_html}
-    {benchmark_badge_html}
-    {neiro_comp['nav_topbar_html']}
-    {neiro_comp['neiro_container_html']}
+    <div style="order: 0;">{stale_badge_html}{benchmark_badge_html}</div>
+    <div class="cockpit-stage" style="order: 1;">
+        {neiro_comp['nav_topbar_html']}
+        {neiro_comp['neiro_container_html']}
+    </div>
 
-    {pinning_table_html}
+    <!-- 3-SECOND TACTICAL COMMAND BAR (ALWAYS VISIBLE BELOW CHART) -->
+    <div id="tactical-3s-command-bar" class="cmd-3s-grid" style="order: 2;">
+        <div id="cmd-regime-card" class="cmd-3s-card" style="border-left-color: {_cmd_reg_bdr};">
+            <div class="cmd-3s-lbl">1. CHẾ ĐỘ THỊ TRƯỜNG (MM GAMMA)</div>
+            <div id="cmd-regime-val" class="cmd-3s-val" style="color: {_cmd_reg_col};">{_cmd_reg_txt}</div>
+            <div id="cmd-regime-sub" class="cmd-3s-sub">{_cmd_reg_sub}</div>
+        </div>
+        <div id="cmd-wall-card" class="cmd-3s-card" style="border-left-color: {_cmd_wall_bdr};">
+            <div class="cmd-3s-lbl">2. BẪY &amp; BỨC TƯỜNG GẦN NHẤT</div>
+            <div id="cmd-wall-val" class="cmd-3s-val" style="color: {_cmd_wall_col};">{_cmd_wall_txt}</div>
+            <div id="cmd-wall-sub" class="cmd-3s-sub">{_cmd_wall_sub}</div>
+        </div>
+        <div id="cmd-flow-card" class="cmd-3s-card" style="border-left-color: {_cmd_flow_bdr};">
+            <div class="cmd-3s-lbl">3. ĐÁNH GIÁ ORDERFLOW (ĐỠ HAY PHÁ)</div>
+            <div id="cmd-flow-val" class="cmd-3s-val" style="color: {_cmd_flow_col};">{_cmd_flow_txt}</div>
+            <div id="cmd-flow-sub" class="cmd-3s-sub">{_cmd_flow_sub}</div>
+        </div>
+        <div id="cmd-action-card" class="cmd-3s-card" style="border-left-color: {_cmd_act_bdr};">
+            <div class="cmd-3s-lbl">4. LỆNH TÁC CHIẾN NGAY (CHỌT HAY ĐỨNG NGOÀI)</div>
+            <div id="cmd-action-val" class="cmd-3s-val" style="color: {_cmd_act_col};">{_cmd_act_txt}</div>
+            <div id="cmd-action-sub" class="cmd-3s-sub">{_cmd_act_sub}</div>
+        </div>
+    </div>
+
+    <details class="table-box drawer-box" style="order: 6;">
+        <summary class="drawer-summary">
+            <span>BẢNG DỮ LIỆU VI CẤU TRÚC ±10 STRIKES &amp; INFORMED TRADER ACTION MATRIX</span>
+            <span class="drawer-hint">[Dữ liệu chi tiết · Bấm để mở/thu gọn]</span>
+        </summary>
+        <div style="margin-top: 10px;">
+            {pinning_table_html}
+        </div>
+    </details>
 
     <!-- KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW (PANEL LỚN HẲN MALZ 1997 SVI) -->
-    <details class="chart-box" style="margin-bottom: 16px; padding: 14px 16px;" ontoggle="if(this.open){{window.dispatchEvent(new Event('resize'));}}">
+    <details class="chart-box drawer-box" style="order: 7; margin-bottom: 10px;" ontoggle="if(this.open){{window.dispatchEvent(new Event('resize'));}}">
         <summary style="cursor:pointer; list-style:none; border-bottom:1px solid #1E293B; padding-bottom:10px;">
             <div style="font-size:14.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.3px; font-family:'JetBrains Mono', monospace;">
                 CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span>
@@ -2181,7 +2292,12 @@ def generate_html_terminal(
     <!-- KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX, VOLUME/OI, GREEKS BẬC 2 (ĐÃ TÍCH HỢP TRỰC TIẾP VÀO UNIFIED GREEKS & ORDERFLOW MATRIX & CANVAS TERMINAL TAB 1) -->
 
     <!-- KHỐI 3: KPI THỐNG KÊ TOÀN CẢNH CME GOLD FUTURES (7 THẺ TOÀN CẢNH) -->
-    <div class="kpi-grid">
+    <details class="table-box drawer-box" style="order: 8;">
+        <summary class="drawer-summary">
+            <span>KPI TOÀN CẢNH CME GOLD FUTURES (7 CHỈ SỐ GEX · DEX · SKEW · EXPECTED MOVE)</span>
+            <span class="drawer-hint">[Dữ liệu tham khảo · Bấm để mở/thu gọn]</span>
+        </summary>
+        <div class="kpi-grid" style="margin-top: 10px; margin-bottom: 0;">
         <div class="kpi-card">
             <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
             <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
@@ -2219,10 +2335,11 @@ def generate_html_terminal(
             </div>
             <div class="kpi-sub"><span class="badge badge-gold">{skew_label}</span></div>
         </div>
-    </div>
+        </div>
+    </details>
 
     <!-- KHỐI 4: THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CHỐT CHẶN MM (VISUAL LEVEL SPINE) -->
-    <div class="spine-container">
+    <div class="spine-container" style="order: 3; margin-bottom: 12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
             <div style="font-size:11.5px; font-weight:700; color:#94A3B8; text-transform:uppercase;">
                 THƯỚC ĐO VỊ TRÍ GIÁ SO VỚI CÁC BỨC TƯỜNG CỦA MARKET MAKER:
@@ -2244,7 +2361,7 @@ def generate_html_terminal(
             </div>
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#4ADE80;">SÀN DƯỚI</div>
-                <div class="spine-node-price" style="color:#4ADE80;">${strike_below:,.0f}</div>
+                <div id="spine-strike-below" class="spine-node-price" style="color:#4ADE80;">${strike_below:,.0f}</div>
             </div>
             <div style="flex:1; height:2px; background:#FACC15; margin:0 8px; position:relative;">
                 <div id="spine-dist-below" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
@@ -2261,8 +2378,8 @@ def generate_html_terminal(
                 </div>
             </div>
             <div class="spine-node">
-                <div class="spine-node-title" style="color:#F87171;">CẢN TRÊN{guard_tag}</div>
-                <div class="spine-node-price" style="color:#F87171;">${strike_above:,.0f}</div>
+                <div id="spine-above-title" class="spine-node-title" style="color:#F87171;">CẢN TRÊN{guard_tag}</div>
+                <div id="spine-strike-above" class="spine-node-price" style="color:#F87171;">${strike_above:,.0f}</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
                 <div id="spine-dist-call" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">
@@ -2278,7 +2395,12 @@ def generate_html_terminal(
     </div>
 
     <!-- KHỐI 5: BĂNG GIÁ & XUNG LỰC VOLUME M5 THỜI GIAN THỰC + BÓC TÁCH ORDERFLOW TỔ CHỨC (LEE-READY / BVC / PARITY BASIS) -->
-    <div class="table-box" style="margin-bottom: 16px; border: 1px solid #334155; background:#0B1120;">
+    <details class="table-box drawer-box" style="order: 9; border: 1px solid #334155; background:#0B1120;">
+        <summary class="drawer-summary">
+            <span>BĂNG GIÁ &amp; XUNG LỰC VOLUME M5 + ORDERFLOW TỔ CHỨC (LEE-READY / BVC / PARITY BASIS)</span>
+            <span class="drawer-hint">[Audit chi tiết · Bấm để mở/thu gọn]</span>
+        </summary>
+        <div style="margin-top: 10px;">
         <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span class="badge badge-gold">INSTITUTIONAL ORDERFLOW RECONSTRUCTION</span>
@@ -2326,10 +2448,11 @@ def generate_html_terminal(
                 </tbody>
             </table>
         </div>
-    </div>
+        </div>
+    </details>
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
-    <details class="table-box">
+    <details open class="table-box" style="order: 4; margin-bottom: 14px;">
         <summary class="section-header" style="cursor:pointer; list-style:none;">BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - 100% PURE CME FUTURES) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span></summary>
         <table>
             <thead>
@@ -2344,40 +2467,40 @@ def generate_html_terminal(
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f}){sq_gate_html}</td>
-                    <td>Vượt &gt; {entry_squeeze - 0.50:.2f}</td>
-                    <td>{entry_squeeze:.2f}</td>
-                    <td style="color:#F87171;">{sl_squeeze:.2f} (${sl_dist_squeeze:.1f})</td>
-                    <td style="color:#4ADE80;">{squeeze_tp:.2f}</td>
-                    <td style="color:#FACC15; font-weight:700;">~{size_squeeze.recommended_lots:.2f} Lot</td>
+                <tr id="k6-row-sq" class="{'k6-row-active' if _k6_mat['squeeze']['active'] else 'k6-row-locked'}">
+                    <td class="tag-buy"><span id="k6-sq-label">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</span><span id="k6-sq-gate">{sq_gate_html}</span></td>
+                    <td id="k6-sq-trig">Vượt &gt; {entry_squeeze - 0.50:.2f}</td>
+                    <td id="k6-sq-entry">{entry_squeeze:.2f}</td>
+                    <td id="k6-sq-sl" style="color:#F87171;">{sl_squeeze:.2f} (${sl_dist_squeeze:.1f})</td>
+                    <td id="k6-sq-tp" style="color:#4ADE80;">{squeeze_tp:.2f}</td>
+                    <td id="k6-sq-lot" style="color:#FACC15; font-weight:700;">~{size_squeeze.recommended_lots:.2f} Lot</td>
                     <td>MM vỡ trần Short -> Buộc mua Futures cover đẩy giá phóng lên trạm tiếp theo</td>
                 </tr>
-                <tr>
-                    <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f}){fd_gate_html}</td>
-                    <td>{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
-                    <td>{entry_fade:.2f}</td>
-                    <td style="color:#F87171;">{sl_fade:.2f} (${sl_dist_fade:.1f})</td>
-                    <td style="color:#4ADE80;">{tp_fade:.2f}</td>
-                    <td style="color:#FACC15; font-weight:700;">~{size_fade.recommended_lots:.2f} Lot</td>
+                <tr id="k6-row-fd" class="{'k6-row-active' if _k6_mat['fade']['active'] else 'k6-row-locked'}">
+                    <td class="tag-sell"><span id="k6-fd-label">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</span><span id="k6-fd-gate">{fd_gate_html}</span></td>
+                    <td id="k6-fd-trig">{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
+                    <td id="k6-fd-entry">{entry_fade:.2f}</td>
+                    <td id="k6-fd-sl" style="color:#F87171;">{sl_fade:.2f} (${sl_dist_fade:.1f})</td>
+                    <td id="k6-fd-tp" style="color:#4ADE80;">{tp_fade:.2f}</td>
+                    <td id="k6-fd-lot" style="color:#FACC15; font-weight:700;">~{size_fade.recommended_lots:.2f} Lot</td>
                     <td>Cản Vol cực đại -> MM tung lệnh bán chặn đầu ghìm giá quay lại ATM</td>
                 </tr>
-                <tr>
-                    <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f}){rb_gate_html}</td>
-                    <td>{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
-                    <td>{entry_rebound:.2f}</td>
-                    <td style="color:#F87171;">{sl_rebound:.2f} (${sl_dist_rebound:.1f})</td>
-                    <td style="color:#4ADE80;">{tp_rebound:.2f}</td>
-                    <td style="color:#FACC15; font-weight:700;">~{size_rebound.recommended_lots:.2f} Lot</td>
+                <tr id="k6-row-rb" class="{'k6-row-active' if _k6_mat['rebound']['active'] else 'k6-row-locked'}">
+                    <td class="tag-buy"><span id="k6-rb-label">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</span><span id="k6-rb-gate">{rb_gate_html}</span></td>
+                    <td id="k6-rb-trig">{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
+                    <td id="k6-rb-entry">{entry_rebound:.2f}</td>
+                    <td id="k6-rb-sl" style="color:#F87171;">{sl_rebound:.2f} (${sl_dist_rebound:.1f})</td>
+                    <td id="k6-rb-tp" style="color:#4ADE80;">{tp_rebound:.2f}</td>
+                    <td id="k6-rb-lot" style="color:#FACC15; font-weight:700;">~{size_rebound.recommended_lots:.2f} Lot</td>
                     <td>Đệm Put đỡ kỹ thuật -> MM gom mua đẩy giá phục hồi (vào khi có rút chân)</td>
                 </tr>
-                <tr>
-                    <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f}){bd_gate_html}</td>
-                    <td>Thủng &lt; {entry_breakdown + 0.50:.2f}</td>
-                    <td>{entry_breakdown:.2f}</td>
-                    <td style="color:#F87171;">{sl_breakdown:.2f} (${sl_dist_breakdown:.1f})</td>
-                    <td style="color:#4ADE80;">{breakdown_tp:.2f}</td>
-                    <td style="color:#FACC15; font-weight:700;">~{size_breakdown.recommended_lots:.2f} Lot</td>
+                <tr id="k6-row-bd" class="{'k6-row-active' if _k6_mat['breakdown']['active'] else 'k6-row-locked'}">
+                    <td class="tag-sell"><span id="k6-bd-label">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</span><span id="k6-bd-gate">{bd_gate_html}</span></td>
+                    <td id="k6-bd-trig">Thủng &lt; {entry_breakdown + 0.50:.2f}</td>
+                    <td id="k6-bd-entry">{entry_breakdown:.2f}</td>
+                    <td id="k6-bd-sl" style="color:#F87171;">{sl_breakdown:.2f} (${sl_dist_breakdown:.1f})</td>
+                    <td id="k6-bd-tp" style="color:#4ADE80;">{breakdown_tp:.2f}</td>
+                    <td id="k6-bd-lot" style="color:#FACC15; font-weight:700;">~{size_breakdown.recommended_lots:.2f} Lot</td>
                     <td>Thủng đệm sàn -> Phía dưới là túi rỗng Air Pocket -> CẤM ĐỠ DAO, MM xả lũ</td>
                 </tr>
             </tbody>
@@ -2385,7 +2508,7 @@ def generate_html_terminal(
     </details>
 
     <!-- KHỐI 7: TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (QUICK GLOSSARY - 1 DÒNG DỄ HIỂU, KHÔNG ICON) -->
-    <details class="table-box">
+    <details class="table-box drawer-box" style="order: 10;">
         <summary class="section-header" style="cursor:pointer; list-style:none;">
             <div>TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (GIẢI THÍCH 1 DÒNG ĐƠN GIẢN) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span></div>
             <div style="font-size:11.5px; font-weight:400; color:#94A3B8;">Ngôn từ dễ hiểu, không rườm rà, hỗ trợ ra quyết định nhanh</div>
@@ -2438,9 +2561,8 @@ def generate_html_terminal(
         </div>
     </details>
 
-    <div class="footer">
+    <div class="footer" style="order: 11;">
         NEIRO-QUANT HEDGE FUND QUANTITATIVE SYSTEM &bull; 100% PURE CME GOLD FUTURES &bull; ZERO TOUCH CLOUD AUTOMATION
-    </div>
     </div>
 </div>
 {neiro_comp['neiro_js_script']}
@@ -2495,26 +2617,42 @@ def sync_latest_cloud_options_csv(csv_path: str = "data/options_prices_GCZ26.csv
             age_h = (time.time() - p.stat().st_mtime) / 3600.0
             if age_h <= max_age_hours:
                 return False
+        import io
         import urllib.request
+        from src.collector.validator import validate_options_frame
+
         url = f"https://raw.githubusercontent.com/DaniNguyen2509/Neiro-Gold-Quant/main/data/options_prices_GCZ26.csv?t={int(time.time())}"
         req = urllib.request.Request(url, headers={"User-Agent": "Neiro-Gold-Quant/1.0"})
         with urllib.request.urlopen(req, timeout=3.0) as resp:
             if resp.status == 200:
                 text = resp.read().decode("utf-8", errors="replace")
                 if "strike" in text and len(text.splitlines()) >= 10:
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    p.write_text(text, encoding="utf-8")
-                    return True
-    except Exception:
-        pass
+                    cand_df = pd.read_csv(io.StringIO(text))
+                    ref_p = basis_engine.fetch_live_cme_futures_price() or 4000.0
+                    val = validate_options_frame(cand_df, reference_price=ref_p)
+                    if val.ok:
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(text, encoding="utf-8")
+                        return True
+    except Exception as sync_err:
+        _logger.warning("Cloud options CSV sync skipped (%s): %s", csv_path, sync_err)
     return False
 
 
-def _write_live_json_artifacts(version_data: dict[str, Any]) -> list[str]:
+def _write_live_json_artifacts(
+    version_data: dict[str, Any],
+    targets: list[str] | None = None,
+) -> list[str]:
     """Writes version.json and tactical_levels.json mirrors cleanly."""
     version_json_str = json.dumps(version_data, indent=2)
     written: list[str] = []
-    for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:
+    dest_list = targets if targets is not None else [
+        "exports/version.json",
+        "version.json",
+        "exports/tactical_levels.json",
+        "tactical_levels.json",
+    ]
+    for json_out in dest_list:
         jp = Path(json_out)
         jp.parent.mkdir(parents=True, exist_ok=True)
         jp.write_text(version_json_str, encoding="utf-8")
@@ -2522,7 +2660,50 @@ def _write_live_json_artifacts(version_data: dict[str, Any]) -> list[str]:
     return written
 
 
-def _run_lightweight_live_tick() -> list[str]:
+def _compute_live_microstructure_payload(tape: Any) -> dict[str, Any]:
+    """Computes live BVC, VPIN, Kyle's Lambda OLS, and M5-equivalent ATR from tape."""
+    m1_candles = (tape.get("chart_candles") or []) if isinstance(tape, dict) else []
+    bvc_vpin = compute_vpin_bvc(m1_candles, window=24)
+    kyle = compute_rolling_kyle_lambda_ols(m1_candles, window=24)
+    atr_5m = compute_m5_equivalent_atr(tape if isinstance(tape, dict) else None)
+    return {
+        "bvc_cvd_contracts": float(bvc_vpin.get("bvc_cvd_contracts", 0.0)),
+        "bvc_buy_pct": float(bvc_vpin.get("bvc_buy_pct", 50.0)),
+        "vpin_pct": float(bvc_vpin.get("vpin_pct", 32.0)),
+        "vpin_regime": str(bvc_vpin.get("vpin_regime", "SAFE_MEAN_REVERSION")),
+        "vpin_label": str(bvc_vpin.get("vpin_label", "")),
+        "kyle_lambda_ols": float(kyle.get("kyle_lambda_ols", 0.85)),
+        "kyle_lambda_regime": str(kyle.get("kyle_lambda_regime", "NORMAL_LIQUIDITY")),
+        "kyle_lambda_label": str(kyle.get("kyle_lambda_label", "")),
+        "atr_5m": float(atr_5m),
+    }
+
+
+def _load_strikes_fast(input_csv: str) -> np.ndarray | None:
+    """Reads only positive numeric strikes quickly from CSV without full DF parse."""
+    p = Path(input_csv)
+    if not p.exists():
+        return None
+    try:
+        import csv as _csv
+
+        vals: list[float] = []
+        with p.open("r", encoding="utf-8", errors="replace", newline="") as fh:
+            reader = _csv.DictReader(fh)
+            for row in reader:
+                raw_k = row.get("strike")
+                if raw_k is None:
+                    continue
+                k = clean_val(raw_k, default=0.0)
+                if k > 0.0:
+                    vals.append(k)
+        return np.array(vals, dtype=float) if vals else None
+    except Exception as err:
+        _logger.debug("Fast strike scan failed for %s: %s", input_csv, err)
+        return None
+
+
+def _run_lightweight_live_tick(input_csv: str = "data/options_prices_GCZ26.csv") -> list[str]:
     """Lightweight JSON-only live update (< 250ms) when static options chain CSV is unchanged."""
     base_path = Path("exports/version.json")
     if not base_path.exists():
@@ -2544,10 +2725,43 @@ def _run_lightweight_live_tick() -> list[str]:
     version_data["synced_at_vn"] = now_vn.strftime("%d/%m/%Y %H:%M:%S VN")
     if live_p > 500.0:
         version_data["spot_price"] = round(live_p, 2)
+        imp_f = float(version_data.get("implied_forward_price", 0.0) or 0.0)
+        if imp_f > 500.0:
+            version_data["forward_dislocation_usd"] = round(imp_f - live_p, 2)
+        strikes_arr = _load_strikes_fast(input_csv)
+        if strikes_arr is not None and len(strikes_arr) > 0:
+            s_up, s_next_up, s_dn, s_next_dn, s_step, _ = resolve_adaptive_tactical_strikes(
+                strikes_arr,
+                live_p,
+                dte_days=float(version_data.get("dte_days", 8.0) or 8.0),
+                call_wall=float(version_data.get("call_wall", 0.0) or 0.0),
+                put_wall=float(version_data.get("put_wall", 0.0) or 0.0),
+            )
+            version_data["strike_above"] = s_up
+            version_data["next_above"] = s_next_up
+            version_data["strike_below"] = s_dn
+            version_data["next_below"] = s_next_dn
+            version_data["step"] = s_step
+
     if isinstance(tape, dict) and tape.get("available"):
         version_data["market_open"] = bool(tape.get("market_open", True))
         if tape.get("chart_candles"):
             version_data["recent_candles"] = (tape.get("chart_candles") or [])[-60:]
+            micro = _compute_live_microstructure_payload(tape)
+            version_data.update(micro)
+            eff_spot = float(version_data.get("spot_price", 0.0) or 0.0)
+            eff_flip = float(version_data.get("zero_gamma_flip", 0.0) or 0.0)
+            if eff_spot > 500.0 and eff_flip > 0.0:
+                fi = evaluate_gamma_flip_integrity(
+                    spot_price=eff_spot,
+                    zero_gamma_flip=eff_flip,
+                    dealer_hedge_flow=float(version_data.get("dealer_hedge_futures_flow", 0.0) or 0.0),
+                    forward_dislocation_usd=float(version_data.get("forward_dislocation_usd", 0.0) or 0.0),
+                    bvc_buy_pct=float(micro.get("bvc_buy_pct", 50.0)),
+                    kyle_lambda_regime=str(micro.get("kyle_lambda_regime", "NORMAL_LIQUIDITY")),
+                )
+                version_data["flip_integrity_label"] = str(fi.get("flip_integrity_label", ""))
+                version_data["flip_integrity_color"] = str(fi.get("flip_integrity_color", "#FACC15"))
     return _write_live_json_artifacts(version_data)
 
 
@@ -2556,6 +2770,8 @@ def run_pipeline(
     output_files: list[str] | str | Path | None = None,
     basis: float | None = None,
     no_mt5: bool = True,
+    sync_cloud: bool = True,
+    write_root_json: bool = True,
 ) -> list[str]:
     if output_files is None:
         output_files = [
@@ -2565,8 +2781,11 @@ def run_pipeline(
     elif isinstance(output_files, (str, Path)):
         output_files = [str(output_files)]
 
-    sync_latest_cloud_options_csv(input_csv, max_age_hours=2.0)
+    if sync_cloud:
+        sync_latest_cloud_options_csv(input_csv, max_age_hours=2.0)
     df_raw, meta = load_and_preprocess_options(input_csv, basis=basis, no_mt5=no_mt5)
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    meta.setdefault("timestamp_utc", now_utc.isoformat())
     fig_smile = build_volatility_smile_figure(df_raw, meta)
     html_content = generate_html_terminal(df_raw, meta, None, fig_smile=fig_smile)
 
@@ -2580,6 +2799,7 @@ def run_pipeline(
     # Export lightweight JSON metadata & tactical levels for 100% online auto-sync
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     now_vn = now_utc.astimezone(datetime.timezone(datetime.timedelta(hours=7)))
+    inst_flow_v = meta.get("institutional_orderflow") or {}
     version_data = {
         "timestamp_utc": now_utc.isoformat(),
         "synced_at_vn": now_vn.strftime("%d/%m/%Y %H:%M:%S VN"),
@@ -2587,37 +2807,58 @@ def run_pipeline(
         "atm_strike": float(meta.get("atm_strike", 0.0)),
         "call_wall": float(meta.get("call_wall", 0.0)),
         "put_wall": float(meta.get("put_wall", 0.0)),
+        "call_wall_siege": float(meta.get("call_wall_siege", 0.0)),
+        "put_wall_siege": float(meta.get("put_wall_siege", 0.0)),
         "zero_gamma_flip": float(meta.get("zero_gamma_flip", 0.0)),
         "regime": str(meta.get("regime", "UNKNOWN")),
         "total_net_gex": float(meta.get("total_net_gex", 0.0)),
         "total_net_vex": float(meta.get("total_net_vex", 0.0)),
         "total_net_chex": float(meta.get("total_net_chex", 0.0)),
         "strike_above": float(meta.get("strike_above", 0.0)),
+        "next_above": float(meta.get("next_above", 0.0)),
         "strike_below": float(meta.get("strike_below", 0.0)),
+        "next_below": float(meta.get("next_below", 0.0)),
+        "step": float(meta.get("step", 25.0)),
+        "dte_days": float(meta.get("dte_days", 8.0)),
+        "major_up_wall": float(meta.get("major_up_wall", meta.get("call_wall", 0.0))),
+        "major_down_wall": float(meta.get("major_down_wall", meta.get("put_wall", 0.0))),
+        "has_up_air_pocket": bool(meta.get("has_up_air_pocket", False)),
+        "has_down_air_pocket": bool(meta.get("has_down_air_pocket", False)),
+        "atr_5m": float(meta.get("atr_5m", 4.0)),
         "expected_move_1s": float(meta.get("expected_move_1s", 0.0)),
-        "implied_forward_price": float((meta.get("institutional_orderflow") or {}).get("implied_forward_price", meta.get("spot_price", 0.0))),
-        "forward_dislocation_usd": float((meta.get("institutional_orderflow") or {}).get("forward_dislocation_usd", 0.0)),
-        "dealer_hedge_futures_flow": float((meta.get("institutional_orderflow") or {}).get("dealer_hedge_futures_flow", 0.0)),
-        "bvc_cvd_contracts": float((meta.get("institutional_orderflow") or {}).get("bvc_cvd_contracts", 0.0)),
-        "bvc_buy_pct": float((meta.get("institutional_orderflow") or {}).get("bvc_buy_pct", 50.0)),
-        "flip_integrity_label": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_label", "")),
-        "flip_integrity_color": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_color", "#FACC15")),
-        "dynamic_vacuum": (meta.get("institutional_orderflow") or {}).get("dynamic_vacuum") or {},
-        "institutional_fvgs": (meta.get("institutional_orderflow") or {}).get("institutional_fvgs") or [],
-        "post_sweep_execution": (meta.get("institutional_orderflow") or {}).get("post_sweep_execution") or {},
+        "implied_forward_price": float(inst_flow_v.get("implied_forward_price", meta.get("spot_price", 0.0))),
+        "forward_dislocation_usd": float(inst_flow_v.get("forward_dislocation_usd", 0.0)),
+        "dealer_hedge_futures_flow": float(inst_flow_v.get("dealer_hedge_futures_flow", 0.0)),
+        "bvc_cvd_contracts": float(inst_flow_v.get("bvc_cvd_contracts", 0.0)),
+        "bvc_buy_pct": float(inst_flow_v.get("bvc_buy_pct", 50.0)),
+        "vpin_pct": float(inst_flow_v.get("vpin_pct", 32.0)),
+        "vpin_label": str(inst_flow_v.get("vpin_label", "")),
+        "kyle_lambda_ols": float(inst_flow_v.get("kyle_lambda_ols", 0.85)),
+        "kyle_lambda_label": str(inst_flow_v.get("kyle_lambda_label", "")),
+        "flip_integrity_label": str(inst_flow_v.get("flip_integrity_label", "")),
+        "flip_integrity_color": str(inst_flow_v.get("flip_integrity_color", "#FACC15")),
+        "dynamic_vacuum": inst_flow_v.get("dynamic_vacuum") or {},
+        "institutional_fvgs": inst_flow_v.get("institutional_fvgs") or [],
+        "post_sweep_execution": inst_flow_v.get("post_sweep_execution") or {},
         "market_open": bool((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("market_open", True)),
         "recent_candles": ((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("chart_candles") or [])[-60:],
     }
-    saved_paths.extend(_write_live_json_artifacts(version_data))
+    json_targets = None
+    if not write_root_json and saved_paths:
+        out_dir = Path(saved_paths[0]).parent
+        json_targets = [str(out_dir / "version.json"), str(out_dir / "tactical_levels.json")]
+    saved_paths.extend(_write_live_json_artifacts(version_data, targets=json_targets))
 
-    # Optional mirror to Google Drive Desktop if available locally
-    drive_target = Path("H:/My Drive/Neiro-Quant/latest_gold_dashboard.html")
-    if drive_target.parent.exists():
-        try:
-            drive_target.write_text(html_content, encoding="utf-8")
-            saved_paths.append(str(drive_target))
-        except Exception:
-            pass
+    # Optional mirror to local cloud-sync folder if explicitly configured via env var
+    env_drive_dir = os.environ.get("NEIRO_DRIVE_MIRROR_DIR")
+    if env_drive_dir:
+        drive_target = Path(env_drive_dir) / "latest_gold_dashboard.html"
+        if drive_target.parent.exists():
+            try:
+                drive_target.write_text(html_content, encoding="utf-8")
+                saved_paths.append(str(drive_target))
+            except Exception as drive_err:
+                _logger.warning("Drive mirror HTML write failed for %s: %s", drive_target, drive_err)
 
     # Zero-Waste Memory Cleanup: Giai phong doi tuong lon khoi RAM
     del df_raw, meta, fig_smile, html_content
@@ -2676,8 +2917,8 @@ def clear_workspace_cache() -> int:
                     try:
                         f.unlink()
                         removed += 1
-                    except Exception:
-                        pass
+                    except Exception as unlink_err:
+                        _logger.debug("Could not remove temp file %s: %s", f, unlink_err)
     return removed
 
 
@@ -2699,7 +2940,11 @@ def start_local_live_bridge_server(port: int = 8765) -> None:
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            origin = self.headers.get("Origin") if self.headers else None
+            if origin is None:
+                self.send_header("Access-Control-Allow-Origin", "*")
+            elif origin == "null" or origin.startswith(("http://127.0.0.1", "http://localhost")):
+                self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -2714,8 +2959,8 @@ def start_local_live_bridge_server(port: int = 8765) -> None:
                         data = json.loads(v_path.read_text(encoding="utf-8"))
                         self._send_json(data)
                         return
-                    except Exception:
-                        pass
+                    except Exception as ver_err:
+                        _logger.warning("Failed reading version.json in bridge handler: %s", ver_err)
                 self._send_json({"error": "version.json not found"}, status=404)
                 return
 
@@ -2730,17 +2975,21 @@ def start_local_live_bridge_server(port: int = 8765) -> None:
                         return
 
                 tape = fetch_live_cme_m5_tape(limit=8, include_htf=(tf != "1m"))
-                candles = (
-                    tape.get("chart_candles", [])
-                    if tf == "1m"
-                    else (tape.get("tf_candles") or {}).get(tf, tape.get("chart_candles", []))
-                )
+                candles: list[dict[str, Any]] = []
+                if isinstance(tape, dict):
+                    candles = (
+                        tape.get("chart_candles", [])
+                        if tf == "1m"
+                        else (tape.get("tf_candles") or {}).get(tf, tape.get("chart_candles", []))
+                    ) or []
+                micro_live = _compute_live_microstructure_payload(tape)
                 payload = {
-                    "available": bool(tape.get("available", False)),
-                    "market_open": bool(tape.get("market_open", True)),
-                    "latest_price": float(tape.get("latest_price", 0.0)),
+                    "available": bool(tape.get("available", False)) if isinstance(tape, dict) else False,
+                    "market_open": bool(tape.get("market_open", True)) if isinstance(tape, dict) else True,
+                    "latest_price": float(tape.get("latest_price", 0.0)) if isinstance(tape, dict) else 0.0,
                     "tf": tf,
                     "candles": candles[-180:],
+                    **micro_live,
                 }
                 with _bridge_cache_lock:
                     _bridge_cache[tf] = (time.monotonic(), payload)
@@ -2754,8 +3003,8 @@ def start_local_live_bridge_server(port: int = 8765) -> None:
             server = ThreadingHTTPServer(("127.0.0.1", port), _YahooBridgeHandler)
             server.daemon_threads = True
             server.serve_forever()
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[BRIDGE WARNING] Local bridge port {port} unavailable: {exc}")
 
     t = threading.Thread(target=_serve, daemon=True)
     t.start()
@@ -2807,7 +3056,7 @@ def main():
                     last_full_html_mono = time.monotonic()
                     mode_tag = "Full Rebuild"
                 else:
-                    saved = _run_lightweight_live_tick()
+                    saved = _run_lightweight_live_tick(input_csv=args.input)
                     mode_tag = "Live JSON Tick"
 
                 # Clear ephemeral quote caches for fresh next cycle without discarding unchanged static CSV

@@ -168,19 +168,29 @@ def test_run_pipeline_end_to_end():
     if not pathlib.Path(csv_path).exists():
         pytest.skip(f"Options test data {csv_path} not found")
 
-    with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4180.0):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_html = pathlib.Path(tmpdir) / "test_dashboard.html"
-            saved = run_pipeline(input_csv=csv_path, output_files=[str(out_html)], no_mt5=True)
+    with (
+        mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4180.0),
+        mock.patch("src.hud.html_dashboard.fetch_live_cme_m5_tape", return_value={}),
+        tempfile.TemporaryDirectory() as tmpdir,
+    ):
+        out_html = pathlib.Path(tmpdir) / "test_dashboard.html"
+        saved = run_pipeline(
+            input_csv=csv_path,
+            output_files=[str(out_html)],
+            no_mt5=True,
+            sync_cloud=False,
+            write_root_json=False,
+        )
 
-            assert len(saved) >= 1
-            assert out_html.exists()
-            content = out_html.read_text(encoding="utf-8")
-            assert "<!DOCTYPE html>" in content
-            assert "GOLD OPTIONS TACTICAL TERMINAL" in content
-            assert "BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY" in content
-            assert "MA TRẬN 6 KỊCH BẢN" not in content
-            assert "refreshWithCacheBuster()" in content
+        assert len(saved) >= 1
+        assert out_html.exists()
+        assert (pathlib.Path(tmpdir) / "version.json").exists()
+        content = out_html.read_text(encoding="utf-8")
+        assert "<!DOCTYPE html>" in content
+        assert "GOLD OPTIONS TACTICAL TERMINAL" in content
+        assert "BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY" in content
+        assert "MA TRẬN 6 KỊCH BẢN" not in content
+        assert "refreshWithCacheBuster()" in content
 
 
 def test_otm_wall_selection_filtering():
@@ -565,5 +575,182 @@ def test_microstructure_table_plus_minus_10_strikes_and_informed_bar():
     assert html.count('style="display:none; "') == 14
 
 
+def test_3sec_command_bar_flex_ordering_and_live_microstructure_payload(tmp_path):
+    """Verify 3-Second Tactical Command Bar, above-the-fold flex ordering, and live VPIN/ATR helper."""
+    from src.hud.html_dashboard import (
+        _compute_live_microstructure_payload,
+        build_volatility_smile_figure,
+        generate_html_terminal,
+    )
+
+    rows = [
+        {"strike": 3950.0, "callOpenInterest": 200, "putOpenInterest": 1800, "callVolume": 40, "putVolume": 300, "netGEX": -12.0, "netVEX": -1.5, "netCHEX": -0.3, "netDeltaContracts": -200.0},
+        {"strike": 4000.0, "callOpenInterest": 900, "putOpenInterest": 900, "callVolume": 150, "putVolume": 150, "netGEX": 15.0, "netVEX": 1.8, "netCHEX": 0.4, "netDeltaContracts": 100.0},
+        {"strike": 4050.0, "callOpenInterest": 2200, "putOpenInterest": 250, "callVolume": 400, "putVolume": 50, "netGEX": 28.0, "netVEX": 3.0, "netCHEX": 0.8, "netDeltaContracts": 450.0},
+    ]
+    df_sample = pd.DataFrame(rows)
+    meta = {
+        "spot_price": 4010.0,
+        "atm_strike": 4000.0,
+        "regime": "LONG_GAMMA",
+        "total_net_gex": 31.0,
+        "total_net_vex": 3.3,
+        "total_net_chex": 0.9,
+        "expected_move_1s": 30.0,
+        "rule16_daily_move": 14.0,
+        "call_wall": 4050.0,
+        "call_wall_oi": 2200,
+        "put_wall": 3950.0,
+        "put_wall_oi": 1800,
+        "zero_gamma_flip": 3985.0,
+        "m5_tape": {"market_open": True, "candles": []},
+        "institutional_orderflow": {"vpin_pct": 31.5, "session_name": "NY_COMEX_DEEP"},
+    }
+    fig_smile = build_volatility_smile_figure(df_sample, meta)
+    html = generate_html_terminal(df_sample, meta, None, fig_smile=fig_smile)
+
+    # 1. 3-Second Tactical Command Bar IDs
+    for elem_id in (
+        'id="tactical-3s-command-bar"',
+        'id="cmd-regime-val"',
+        'id="cmd-wall-val"',
+        'id="cmd-flow-val"',
+        'id="cmd-action-val"',
+        'id="spine-strike-above"',
+        'id="spine-strike-below"',
+        'id="k6-row-sq"',
+        'id="k6-sq-entry"',
+        'id="k6-fd-gate"',
+        'id="k6-rb-tp"',
+        'id="k6-bd-lot"',
+    ):
+        assert elem_id in html
+
+    # 2. Flex ordering prioritizes Chart (order: 1) -> 3s Bar (order: 2) -> Spine (order: 3) -> KHỐI 6 open (order: 4)
+    assert '<div class="cockpit-stage" style="order: 1;">' in html
+    assert '<div id="tactical-3s-command-bar" class="cmd-3s-grid" style="order: 2;">' in html
+    assert '<div class="spine-container" style="order: 3;' in html
+    assert '<details open class="table-box" style="order: 4;' in html
+
+    # 3. Live microstructure helper computes non-empty VPIN, BVC, Kyle, ATR from 1m tape
+    fake_candles = [
+        {"open": 4000.0 + (i % 3) * 0.2, "high": 4001.5, "low": 3999.5, "close": 4000.3 + (i % 2) * 0.2, "volume": 120 + i}
+        for i in range(50)
+    ]
+    live_micro = _compute_live_microstructure_payload({"chart_candles": fake_candles})
+    assert 5.0 <= live_micro["vpin_pct"] <= 99.0
+    assert 0.0 <= live_micro["bvc_buy_pct"] <= 100.0
+    assert 2.0 <= live_micro["atr_5m"] <= 6.5
+    assert "λ" in live_micro["kyle_lambda_label"]
+
+
+def test_out_of_range_csv_benchmark_fallback_sets_flag(tmp_path: pathlib.Path) -> None:
+    """Out-of-range CSV falling back to BENCHMARK_GCZ26_DATA must set is_benchmark_fallback=True."""
+    bad_csv = tmp_path / "out_of_range.csv"
+    pd.DataFrame(
+        [
+            {"strike": 1000.0, "callOpenInterest": 100, "putOpenInterest": 100, "callMid": 10.0, "putMid": 1.0},
+            {"strike": 1025.0, "callOpenInterest": 100, "putOpenInterest": 100, "callMid": 5.0, "putMid": 2.0},
+            {"strike": 1050.0, "callOpenInterest": 100, "putOpenInterest": 100, "callMid": 2.0, "putMid": 5.0},
+        ]
+    ).to_csv(bad_csv, index=False)
+
+    with (
+        mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4180.0),
+        mock.patch("src.hud.html_dashboard.fetch_live_cme_m5_tape", return_value={}),
+    ):
+        _df, meta = load_and_preprocess_options(str(bad_csv), no_mt5=True)
+    assert meta.get("is_benchmark_fallback") is True
+
+
+def test_sync_latest_cloud_options_csv_rejects_corrupt_payload(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sync_latest_cloud_options_csv must validate downloaded CSV with validate_options_frame."""
+    import io
+    import os
+    from src.hud import html_dashboard as hd
+
+    target = tmp_path / "options_prices_GCZ26.csv"
+    valid_seed = "strike,callOpenInterest,putOpenInterest\n4000,500,500\n"
+    target.write_text(valid_seed, encoding="utf-8")
+    old_t = 1000.0
+    os.utime(target, (old_t, old_t))
+    hd._CLOUD_CSV_SYNC_TS.clear()
+
+    corrupt_rows = ["strike,callOpenInterest,putOpenInterest"] + [
+        f"{100 + i},0,0" for i in range(12)
+    ]
+    corrupt_bytes = ("\n".join(corrupt_rows)).encode("utf-8")
+
+    class _Resp(io.BytesIO):
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda *_a, **_kw: _Resp(corrupt_bytes))
+    monkeypatch.setattr("src.quant_engine.basis.fetch_live_cme_futures_price", lambda: 4000.0)
+
+    synced = hd.sync_latest_cloud_options_csv(str(target), max_age_hours=0.1)
+    assert synced is False
+    assert target.read_text(encoding="utf-8") == valid_seed
+
+
+def test_lightweight_live_tick_updates_tactical_strikes_and_forward_dislocation(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_run_lightweight_live_tick refreshes tactical strikes and delta-F cleanly."""
+    import json
+    from src.hud import html_dashboard as hd
+
+    exports_dir = tmp_path / "exports"
+    exports_dir.mkdir()
+    csv_path = tmp_path / "options_prices_GCZ26.csv"
+    pd.DataFrame(
+        [
+            {"strike": 4000.0},
+            {"strike": 4025.0},
+            {"strike": 4050.0},
+        ]
+    ).to_csv(csv_path, index=False)
+
+    seed = {
+        "spot_price": 4010.0,
+        "implied_forward_price": 4035.5,
+        "forward_dislocation_usd": 25.5,
+        "call_wall": 4050.0,
+        "put_wall": 4000.0,
+        "zero_gamma_flip": 4020.0,
+        "dte_days": 30.0,
+        "strike_above": 4025.0,
+        "strike_below": 4000.0,
+        "dealer_hedge_futures_flow": 120.0,
+    }
+    (exports_dir / "version.json").write_text(json.dumps(seed), encoding="utf-8")
+
+    fake_tape = {
+        "available": True,
+        "latest_price": 4031.25,
+        "market_open": True,
+        "chart_candles": [
+            {"open": 4029.0, "high": 4032.0, "low": 4028.5, "close": 4031.25, "volume": 150}
+            for _ in range(30)
+        ],
+    }
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(hd, "fetch_live_cme_m5_tape", lambda limit=8, include_htf=False: fake_tape)
+
+    written = hd._run_lightweight_live_tick(input_csv=str(csv_path))
+    assert written
+    updated = json.loads((exports_dir / "version.json").read_text(encoding="utf-8"))
+    assert updated["spot_price"] == 4031.25
+    assert updated["strike_above"] == 4050.0
+    assert updated["strike_below"] == 4025.0
+    assert updated["forward_dislocation_usd"] == 4.25
+    assert updated["flip_integrity_label"] != ""
 
 

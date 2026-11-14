@@ -12,6 +12,7 @@ Standardized 1:1 against the authentic Neiro-NQ-Quant tactical trading cockpit:
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from typing import Any
 import pandas as pd
@@ -196,10 +197,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
     /* Chart & Canvas View */
     .neiro-body-container {
-        display: flex; flex: 1; width: 100%; height: 700px;
+        display: flex; flex: 0 0 auto; width: 100%; height: 540px;
         position: relative; overflow: hidden; background: #000000;
-        border: 1px solid #1E293B; border-radius: 6px; margin-bottom: 14px;
+        border: 1px solid #1E293B; border-radius: 6px; margin-bottom: 10px;
     }
+    .neiro-body-container.expanded { height: 700px; }
     #tv-chart-wrapper {
         position: relative; width: 100%; height: 100%; background-color: #000000;
     }
@@ -209,17 +211,36 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         pointer-events: none; z-index: 5;
     }
 
-    /* Floating Tactical Quant HUD Card (Top-Left of Chart) */
+    /* Compact Floating Quant HUD Card (5 Core Signals - Top-Left of Chart) */
     .neiro-floating-hud {
-        position: absolute; top: 12px; left: 14px; z-index: 10;
-        display: flex; flex-direction: column; gap: 4px;
-        background: rgba(8, 11, 18, 0.92); border: 1px solid #1E293B; border-radius: 4px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
-        padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
-        pointer-events: none;
+        position: absolute; top: 10px; left: 12px; z-index: 10;
+        display: flex; flex-direction: column; gap: 3px;
+        background: rgba(8, 11, 18, 0.88); border: 1px solid #1E293B; border-radius: 5px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+        padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+        max-width: min(430px, calc(100% - 24px)); pointer-events: none;
     }
-    .hud-item { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-    .hud-label { color: #94A3B8; font-weight: 700; font-size: 10.5px; min-width: 140px; }
+    .hud-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hud-label { color: #94A3B8; font-weight: 700; font-size: 10px; min-width: 112px; }
+
+    @media (max-width: 1180px) {
+        .neiro-win-topbar {
+            height: auto; min-height: 34px; flex-wrap: wrap; gap: 6px; padding: 6px 8px;
+        }
+        .neiro-top-left, .neiro-top-center, .neiro-top-right {
+            flex-wrap: wrap; max-width: 100%; min-width: 0;
+        }
+        .neiro-quant-pill {
+            flex-wrap: wrap; max-width: 100%; min-width: 0;
+        }
+    }
+    @media (max-width: 768px) {
+        .neiro-win-subbar {
+            height: auto; flex-wrap: wrap; gap: 4px; padding: 4px 10px;
+        }
+        .neiro-floating-hud { padding: 5px 8px; }
+        .hud-label { min-width: 84px; }
+    }
     """
 
     # 2. Navigation Topbar HTML (Exact 1:1 Neiro-NQ-Quant layout)
@@ -236,7 +257,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 <button class="timeframe-pill" onclick="setTimeframe('1h')">1H</button>
                 <button class="timeframe-pill" onclick="setTimeframe('d')">1D</button>
             </div>
-            <span class="neiro-badge-contract">M1 INTRADAY</span>
+            <span class="neiro-badge-contract" id="neiro-tf-badge">M1 INTRADAY</span>
         </div>
 
         <!-- Center: Quantitative Metrics Pill -->
@@ -247,12 +268,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 <span class="ticker-change change-up" id="top-ticker-change">+0.00 (+0.00%)</span>
                 <span class="neiro-win-sep">|</span>
                 <span class="neiro-pill-lbl">GEX:</span> <b id="kpi-gex-val" style="color:{regime_color};">${total_gex:+.1f}M</b>
-                <span class="neiro-pill-lbl">CHEX:</span> <b id="top-charm-val" style="color:#C084FC;">${total_chex:+.1f}M/d</b>
-                <span class="neiro-pill-lbl">VEX:</span> <b id="kpi-vex-val" style="color:#22D3EE;">${total_vex:+.1f}M</b>
-                <span class="neiro-pill-lbl">TEX:</span> <b id="top-theta-val" style="color:#FB923C;">{total_thex_display}</b>
-                <span class="neiro-win-sep">|</span>
-                <span class="neiro-pill-lbl">SQZ:</span> <b style="color:#4ADE80;">&gt;${strike_above:,.0f}</b>/<b style="color:#F87171;">&lt;${strike_below:,.0f}</b>
-                <span class="neiro-pill-lbl">1-&sigma;:</span> <b id="kpi-move-val" style="color:#FACC15;">&plusmn;${expected_move:,.1f}</b>
+                <span class="neiro-pill-lbl">VPIN:</span> <b id="top-vpin-val" style="color:{vpin_col};">{vpin_pct:.1f}%</b>
                 <span class="neiro-win-sep">|</span>
                 <span class="neiro-pill-lbl">CVD:</span> <b id="top-cvd-val" style="color:{cvd_color};">{bvc_cvd_val:+.0f} HĐ ({bvc_buy_pct:.0f}%B)</b>
                 <span class="neiro-pill-lbl">MM HEDGE:</span> <b id="top-hedge-val" style="color:{hedge_color};">{dealer_hedge_val:+.0f} GC</b>
@@ -260,11 +276,16 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         </div>
 
         <div class="neiro-top-right">
-            <span class="neiro-badge-contract" id="cloud-sync-badge" style="background:rgba(34,197,94,0.15); border-color:rgba(34,197,94,0.4); color:#4ADE80; font-size:10px; cursor:pointer;" title="Đồng bộ trực tuyến 100% từ Cloud. Bấm để kiểm tra ngay." onclick="checkCloudSyncNow(true)">
-                ● CLOUD SYNC: LIVE
+            <button id="btn-overlay-mode" class="timeframe-pill" onclick="toggleOverlayMode()" title="Chuyển lớp phủ Chart: Tinh gọn (3 đường cấu trúc + Entry/SL/TP) hoặc Đầy đủ (thêm Vanna, Charm, FVG, Air Pocket)">
+                Lớp phủ: Tinh gọn
+            </button>
+            <button id="btn-chart-height" class="timeframe-pill" onclick="toggleChartHeight()" title="Phóng to hoặc thu gọn chiều cao biểu đồ">
+                Mở rộng Chart
+            </button>
+            <span class="neiro-badge-contract" id="cloud-sync-badge" style="background:rgba(148,163,184,0.16); border-color:rgba(148,163,184,0.4); color:#CBD5E1; font-size:10px; cursor:pointer;" title="Trạng thái đồng bộ realtime. Bấm để kiểm tra ngay." onclick="checkCloudSyncNow(true)">
+                ● SNAPSHOT BUILD
             </span>
-            <span id="sync-time-ago" style="color:#94A3B8; font-size:10px; margin-right:4px;">(đang đồng bộ)</span>
-            <span style="color:#64748B; font-size:11px; font-weight:600; margin-right:8px;">CME GLOBEX &bull; GCZ26 GOLD</span>
+            <span id="sync-time-ago" style="color:#94A3B8; font-size:10px; margin-right:4px;">(vừa nạp)</span>
             <button onclick="clearHistoryAndCache()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); color:#F87171; border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-weight:600;" title="Dọn RAM & Cache">
                 Dọn RAM
             </button>
@@ -274,45 +295,44 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     <!-- Authentic Greeks Subbar -->
     <div class="neiro-win-subbar">
         <div class="neiro-subbar-left">
-            <span class="neiro-watermark-text" style="color:#38BDF8; font-weight:700;">NEIRO-QUANT TERMINAL &bull; CME GOLD FUTURES [M1]</span>
+            <span class="neiro-watermark-text" style="color:#38BDF8; font-weight:700;">NEIRO-QUANT TERMINAL &bull; CME GOLD FUTURES [GC=F / GCZ26]</span>
         </div>
         <div class="neiro-subbar-right">
-            <span style="color:#38BDF8; font-weight:700;">⚡ LIVE BLACK-76 REALTIME GREEKS RADAR (M1):</span>
-            <span id="live-greeks-radar" style="margin-left: 6px; color: #CBD5E1;">
-                Delta &Delta;: <b>{atm_delta:.3f}</b> | Gamma &Gamma;: <b>{atm_gamma:.5f}</b> | Vega &nu;: <b>${total_vega:+.1f}M</b> | Theta &theta;: <b>{total_thex_display}</b> | Vanna (VEX): <b>${total_vex:+.1f}M</b> | Charm (CHEX): <b>${total_chex:+.1f}M/d</b>
-            </span>
-            <span style="color:#64748B; margin-left: 8px;">| ATM: <b id="top-ticker-atm">${atm_strike:,.0f}</b> | IV: <b id="top-ticker-iv">{gvz_iv:.1f}%</b> | Zero Gamma: <b style="color:#FACC15;">${zero_gamma:,.1f}</b></span>
+            <span style="color:#64748B;">ATM: <b id="top-ticker-atm">${atm_strike:,.0f}</b> | IV: <b id="top-ticker-iv">{gvz_iv:.1f}%</b> | Zero Gamma: <b style="color:#FACC15;">${zero_gamma:,.1f}</b> | 1-&sigma;: <b id="kpi-move-val" style="color:#FACC15;">&plusmn;${expected_move:,.1f}</b></span>
         </div>
     </div>
     """
 
-    # 3. Main M1 Chart Body with Floating Tactical HUD (Neiro-NQ-Quant Standard)
+    # 3. Main M1 Chart Body with Compact 5-Line Floating Tactical HUD
     neiro_container_html = f"""
     <div class="neiro-body-container" id="neiro-view-container">
         <div id="tv-chart-wrapper">
-            <!-- Floating Quant HUD Card at Top-Left of Chart -->
+            <!-- Compact 5-Line Quant HUD Card at Top-Left of Chart -->
             <div class="neiro-floating-hud">
-                <div class="hud-item"><span class="hud-label">NET GEX (Trục ATM):</span> <b id="hud-gex-val" style="color:{regime_color};">${total_gex:+.1f}M</b></div>
+                <div class="hud-item">
+                    <span class="hud-label">REGIME / FLIP:</span>
+                    <b id="hud-gex-val" style="color:{regime_color};">${total_gex:+.1f}M</b>
+                    <span style="color:#64748B;">&bull;</span>
+                    <span id="hud-flip-verdict-box" style="border-left:2px solid {flip_verdict_col}; padding-left:5px;">
+                        <b id="hud-flip-verdict" style="color:{flip_verdict_col}; font-size:10px;">{flip_verdict_lbl}</b>
+                    </span>
+                </div>
                 <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &uarr;:</span> <b id="hud-sqz-up" style="color:#4ADE80;">&gt; ${strike_above:,.0f} &rarr; TP ${next_above:,.0f}</b></div>
                 <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &darr;:</span> <b id="hud-sqz-down" style="color:#F87171;">&lt; ${strike_below:,.0f} &rarr; TP ${next_below:,.0f}</b></div>
-                <div class="hud-item"><span class="hud-label">VANNA (VEX):</span> <b id="hud-vanna-val" style="color:#22D3EE;">${total_vex:+.1f}M</b></div>
-                <div class="hud-item"><span class="hud-label">CHARM (CHEX):</span> <b id="hud-charm-val" style="color:#C084FC;">${total_chex:+.1f}M/d</b></div>
-                <div class="hud-item"><span class="hud-label">THETA (TEX):</span> <b id="hud-theta-val" style="color:#FB923C;">{total_thex_display}</b></div>
-                <div class="hud-item"><span class="hud-label">1-SIGMA:</span> <b id="hud-sigma-val" style="color:#FACC15;">&plusmn;${expected_move:,.1f}</b></div>
-                <div style="border-top:1px solid #1E293B; margin:4px 0 2px 0; padding-top:4px; font-size:9.5px; color:#38BDF8; font-weight:800; letter-spacing:0.4px;">⚡ REALTIME ORDERFLOW (ZERO-LAG 60FPS)</div>
-                <div class="hud-item"><span class="hud-label">OPTIONS LEAD (&delta;F):</span> <b id="hud-lead-val" style="color:{disloc_color};">F_opt ${f_opt_val:,.2f} ({delta_f_val:+.2f}$)</b></div>
-                <div class="hud-item"><span class="hud-label">ÉP DEALER HEDGE:</span> <b id="hud-hedge-val" style="color:{hedge_color};">{dealer_hedge_val:+,.1f} HĐ GC</b></div>
-                <div class="hud-item"><span class="hud-label">BVC CVD &amp; BUY %:</span> <b id="hud-cvd-val" style="color:{cvd_color};">{bvc_cvd_val:+,.0f} HĐ | {bvc_buy_pct:.1f}% MUA</b></div>
-                <div style="width:100%; height:5px; background:#EF4444; border-radius:3px; overflow:hidden; margin:1px 0;">
+                <div class="hud-item" style="flex-wrap:nowrap;">
+                    <span class="hud-label">VPIN &amp; BVC:</span>
+                    <b id="hud-vpin-val" style="color:{vpin_col}; font-size:10px;">{vpin_label}</b>
+                    <span style="color:#64748B;">&bull;</span>
+                    <b id="hud-cvd-val" style="color:{cvd_color}; font-size:10px;">{bvc_cvd_val:+,.0f} HĐ | {bvc_buy_pct:.1f}% MUA</b>
+                </div>
+                <div style="width:100%; height:4px; background:#EF4444; border-radius:2px; overflow:hidden;">
                     <div id="hud-bvc-bar" style="width:{bvc_buy_pct:.1f}%; height:100%; background:#22C55E; transition:width 0.12s linear;"></div>
                 </div>
-                <div class="hud-item"><span class="hud-label">KYLE'S LAMBDA (&lambda;):</span> <b id="hud-kyle-val" style="color:#38BDF8; font-size:10px;">{kyle_label}</b></div>
-                <div class="hud-item"><span class="hud-label">VPIN TOXICITY:</span> <b id="hud-vpin-val" style="color:{vpin_col}; font-size:10px;">{vpin_label}</b></div>
-                <div class="hud-item"><span class="hud-label">INFORMED ACTION:</span> <b id="hud-informed-val" style="color:{informed_col}; font-size:10px;">{informed_badge} (&rho;={rho_vs:.2f}, Kelly {kelly_mult:.2f}x)</b></div>
-                <div class="hud-item"><span class="hud-label">POST-SWEEP / VACUUM:</span> <b id="hud-post-sweep-val" style="color:{post_sweep_col}; font-size:10px;" title="{vac_label}">{post_sweep_label}</b></div>
-                <div id="hud-flip-verdict-box" style="margin-top:3px; padding:4px 7px; border-radius:4px; background:rgba(15,23,42,0.95); border:1px solid {flip_verdict_col}; border-left:3px solid {flip_verdict_col};">
-                    <div style="font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;">BỘ LỌC GAMMA FLIP (THẬT vs. FAKEOUT TRAP):</div>
-                    <b id="hud-flip-verdict" style="color:{flip_verdict_col}; font-size:10.5px;">{flip_verdict_lbl}</b>
+                <div class="hud-item">
+                    <span class="hud-label">POST-SWEEP / KYLE:</span>
+                    <b id="hud-post-sweep-val" style="color:{post_sweep_col}; font-size:10px;" title="{vac_label}">{post_sweep_label}</b>
+                    <span style="color:#64748B;">&bull;</span>
+                    <b id="hud-kyle-val" style="color:#38BDF8; font-size:9.5px;">{kyle_label}</b>
                 </div>
             </div>
             <div id="neiro-tv-chart"></div>
@@ -378,15 +398,37 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             except Exception:
                 continue
 
-    m5_tape = meta.get("m5_tape") or {}
+    raw_m5_tape = meta.get("m5_tape")
+    m5_tape = raw_m5_tape if isinstance(raw_m5_tape, dict) else {}
     chart_candles = m5_tape.get("chart_candles") or []
     tf_candles = m5_tape.get("tf_candles") or {}
     market_open_flag = bool(m5_tape.get("market_open", True))
 
+    regime_val = str(meta.get("regime") or ("LONG_GAMMA" if total_gex > 10.0 else ("SHORT_GAMMA" if total_gex < -10.0 else "NEUTRAL")))
+    dte_days_val = float(meta.get("dte_days") or 8.0)
+    step_val = float(meta.get("step") or 25.0)
+    atr_5m_val = float(meta.get("atr_5m") or 4.0)
+    major_up_wall_val = float(meta.get("major_up_wall") or call_wall)
+    major_down_wall_val = float(meta.get("major_down_wall") or put_wall)
+    has_up_ap_val = bool(meta.get("has_up_air_pocket", bool(air_pockets)))
+    has_down_ap_val = bool(meta.get("has_down_air_pocket", bool(air_pockets)))
+    session_name_val = str(inst_flow.get("session_name") or ("GLOBEX_CLOSED" if not market_open_flag else "NY_COMEX_DEEP"))
+
     json_options_str = json.dumps(js_options_data)
+    build_ts_utc = str(meta.get("timestamp_utc") or datetime.now(timezone.utc).isoformat())
     json_meta_str = json.dumps({
+        "timestamp_utc": build_ts_utc,
         "spot": spot,
         "market_open": market_open_flag,
+        "regime": regime_val,
+        "dte_days": dte_days_val,
+        "step": step_val,
+        "atr_5m": atr_5m_val,
+        "major_up_wall": major_up_wall_val,
+        "major_down_wall": major_down_wall_val,
+        "has_up_air_pocket": has_up_ap_val,
+        "has_down_air_pocket": has_down_ap_val,
+        "session_name": session_name_val,
         "atm_strike": atm_strike,
         "call_wall": call_wall,
         "call_wall_oi": call_wall_oi,
@@ -407,7 +449,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "vanna_peak_val": vanna_peak_val,
         "charm_peak_strike": charm_peak_strike,
         "charm_peak_val": charm_peak_val,
-        "dte_days": 8.0,
         "multiplier": 100.0,
         "air_pockets": air_pockets,
         "implied_forward_price": f_opt_val,
@@ -443,10 +484,77 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     let neiroChart = null;
     let candleSeries = null;
     let livePriceLine = null;
+    let vannaPriceLine = null;
+    let charmPriceLine = null;
     let currentGoldPrice = window.INITIAL_META.spot;
     let yahooAnchorPrice = window.INITIAL_META.spot;
     let currentTf = '1m';
     let currentPeriodSec = 60;
+    let overlayCompactMode = true;
+    let chartExpanded = false;
+    let liveTacticalMatrix = null;
+    let lastBridgeSuccessEpoch = 0;
+    let lastCloudSuccessEpoch = 0;
+    let lastAuthoritativeVpinEpoch = 0;
+    let liveVpinPct = Number(window.INITIAL_META.vpin_pct || 32.0);
+    let liveVpinLabel = String(window.INITIAL_META.vpin_label || '🟢 VPIN 32.0% [AN TOÀN FADE WALL]');
+    let liveAtr5m = Number(window.INITIAL_META.atr_5m || 4.0);
+
+    function toggleOverlayMode() {{
+        overlayCompactMode = !overlayCompactMode;
+        const btn = document.getElementById('btn-overlay-mode');
+        if (btn) {{
+            btn.innerText = overlayCompactMode ? 'Lớp phủ: Tinh gọn' : 'Lớp phủ: Đầy đủ';
+            btn.classList.toggle('active', !overlayCompactMode);
+        }}
+        syncSecondaryPriceLines();
+        requestAnimationFrame(drawNeiroOverlay);
+    }}
+
+    function toggleChartHeight() {{
+        chartExpanded = !chartExpanded;
+        const box = document.getElementById('neiro-view-container');
+        const btn = document.getElementById('btn-chart-height');
+        if (box) box.classList.toggle('expanded', chartExpanded);
+        if (btn) btn.innerText = chartExpanded ? 'Thu gọn Chart' : 'Mở rộng Chart';
+        window.dispatchEvent(new Event('resize'));
+    }}
+
+    function syncSecondaryPriceLines() {{
+        if (!candleSeries) return;
+        const m = window.INITIAL_META || {{}};
+        if (!overlayCompactMode) {{
+            if (!vannaPriceLine && m.vanna_peak_strike) {{
+                vannaPriceLine = candleSeries.createPriceLine({{
+                    price: m.vanna_peak_strike,
+                    color: '#22D3EE',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'VANNA (VEX)',
+                }});
+            }}
+            if (!charmPriceLine && m.charm_peak_strike) {{
+                charmPriceLine = candleSeries.createPriceLine({{
+                    price: m.charm_peak_strike,
+                    color: '#C084FC',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'CHARM (CHEX)',
+                }});
+            }}
+        }} else {{
+            if (vannaPriceLine) {{
+                try {{ candleSeries.removePriceLine(vannaPriceLine); }} catch (e) {{}}
+                vannaPriceLine = null;
+            }}
+            if (charmPriceLine) {{
+                try {{ candleSeries.removePriceLine(charmPriceLine); }} catch (e) {{}}
+                charmPriceLine = null;
+            }}
+        }}
+    }}
 
     function isCmeGlobexMarketOpen() {{
         try {{
@@ -496,6 +604,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         else if (normTf === '1d') period = 86400;
 
         currentPeriodSec = period;
+        const tfBadge = document.getElementById('neiro-tf-badge');
+        if (tfBadge) {{
+            const tfLabels = {{ '1m': 'M1 INTRADAY', '5m': 'M5 INTRADAY', '15m': 'M15 INTRADAY', '1h': 'H1 INTRADAY', '1d': 'D1 SWING' }};
+            tfBadge.innerText = tfLabels[normTf] || (normTf.toUpperCase() + ' INTRADAY');
+        }}
         buildHistoricalGoldBars(period, normTf);
         pollLiveYahooChart(normTf);
     }}
@@ -674,6 +787,481 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return x > 0 ? 1 - p : p;
     }}
 
+    function computeM5AtrJs(candles, tfKey = '1m', fallbackAtr = 4.0) {{
+        if (!Array.isArray(candles) || candles.length === 0) {{
+            return Math.max(2.0, Math.min(6.5, Number(fallbackAtr || 4.0)));
+        }}
+        const sample = candles.slice(-14);
+        const scale = (tfKey === '1m') ? 2.2 : 1.0;
+        let sumR = 0.0;
+        let cnt = 0;
+        for (let i = 0; i < sample.length; i++) {{
+            const b = sample[i];
+            if (b && b.high !== undefined && b.low !== undefined) {{
+                sumR += Math.max(0.0, Number(b.high) - Number(b.low));
+                cnt++;
+            }}
+        }}
+        if (cnt === 0) return Math.max(2.0, Math.min(6.5, Number(fallbackAtr || 4.0)));
+        const raw = (sumR / cnt) * scale;
+        return Math.round(Math.max(2.0, Math.min(6.5, raw)) * 100) / 100;
+    }}
+
+    function percentileSortedJs(sortedArr, p) {{
+        if (!sortedArr.length) return 0.25;
+        if (sortedArr.length === 1) return sortedArr[0];
+        const pos = (p / 100.0) * (sortedArr.length - 1);
+        const lo = Math.floor(pos);
+        const hi = Math.min(sortedArr.length - 1, lo + 1);
+        const frac = pos - lo;
+        return sortedArr[lo] * (1.0 - frac) + sortedArr[hi] * frac;
+    }}
+
+    function computeLiveVpinBvcJs(candles, win = 24) {{
+        if (!Array.isArray(candles) || candles.length < 3) return null;
+        let stdDp = 1.0;
+        let recent = [];
+        if (candles.length >= win + 20) {{
+            const bgCandles = candles.slice(0, -6);
+            const dpBg = bgCandles.map(c => Number(c.close || 0) - Number(c.open || 0));
+            const absSorted = dpBg.map(v => Math.abs(v)).sort((a, b) => a - b);
+            const sortedBg = dpBg.slice().sort((a, b) => a - b);
+            const q60 = percentileSortedJs(absSorted, 60.0);
+            const medBg = percentileSortedJs(sortedBg, 50.0);
+            const devSorted = dpBg.map(v => Math.abs(v - medBg)).sort((a, b) => a - b);
+            const madBg = percentileSortedJs(devSorted, 50.0) * 1.4826;
+            stdDp = Math.max(0.25, 0.5 * (q60 / 0.8416) + 0.5 * madBg);
+            recent = candles.slice(-12);
+        }} else {{
+            recent = candles.slice(-win);
+            const dps = recent.map(c => Number(c.close || 0) - Number(c.open || 0));
+            const mean = dps.reduce((a, b) => a + b, 0) / Math.max(1, dps.length);
+            const variance = dps.reduce((a, b) => a + (b - mean) * (b - mean), 0) / Math.max(1, dps.length);
+            stdDp = Math.max(0.25, dps.length > 1 ? Math.sqrt(variance) : 1.0);
+        }}
+
+        let bvcCvd = 0.0;
+        let bvcBuyVol = 0.0;
+        let bvcTotalVol = 0.0;
+        const barSlices = [];
+        for (let i = 0; i < recent.length; i++) {{
+            const c = recent[i];
+            const vol = Number(c && c.volume ? c.volume : 0);
+            if (vol <= 0) continue;
+            const dp = Number(c.close || 0) - Number(c.open || 0);
+            const buyFrac = normCdf(dp / stdDp);
+            const buyVol = vol * buyFrac;
+            const sellVol = vol - buyVol;
+            const signedRatio = 2.0 * buyFrac - 1.0;
+            bvcCvd += buyVol - sellVol;
+            bvcBuyVol += buyVol;
+            bvcTotalVol += vol;
+            barSlices.push({{ vol: vol, ratio: signedRatio }});
+        }}
+        if (bvcTotalVol <= 0 || barSlices.length === 0) return null;
+
+        const nBuckets = Math.min(5, barSlices.length);
+        const targetBucketVol = Math.max(1.0, bvcTotalVol / nBuckets);
+        const bucketImbs = [];
+        let curSigned = 0.0;
+        let curVol = 0.0;
+        for (let i = 0; i < barSlices.length; i++) {{
+            let rem = barSlices[i].vol;
+            const sRatio = barSlices[i].ratio;
+            while (rem > 1e-9) {{
+                const need = targetBucketVol - curVol;
+                const take = need > 1e-9 ? Math.min(rem, need) : rem;
+                curSigned += take * sRatio;
+                curVol += take;
+                rem -= take;
+                if (curVol >= targetBucketVol - 1e-6 && bucketImbs.length < nBuckets) {{
+                    bucketImbs.push(Math.abs(curSigned) / Math.max(1.0, curVol));
+                    curSigned = 0.0;
+                    curVol = 0.0;
+                }}
+            }}
+        }}
+        if (curVol > 1e-6 && bucketImbs.length < nBuckets) {{
+            bucketImbs.push(Math.abs(curSigned) / Math.max(1.0, curVol));
+        }}
+        const rawVpin = bucketImbs.length ? (bucketImbs.reduce((a, b) => a + b, 0) / bucketImbs.length) : (Math.abs(bvcCvd) / bvcTotalVol);
+        const vpinPct = Math.round(Math.max(5.0, Math.min(99.0, rawVpin * 100.0)) * 10) / 10;
+        const buyPct = Math.round((bvcBuyVol / bvcTotalVol) * 1000) / 10;
+        let vpinLbl = '🟢 VPIN ' + vpinPct.toFixed(1) + '% [NHIỄU ĐÁM ĐÔNG — AN TOÀN FADE WALL]';
+        if (vpinPct >= 65.0) {{
+            vpinLbl = '🚨 VPIN ' + vpinPct.toFixed(1) + '% [ĐỘC TÍNH >=65% — CẤM CHẶN TÀU]';
+        }} else if (vpinPct >= 40.0) {{
+            vpinLbl = '⚠️ VPIN ' + vpinPct.toFixed(1) + '% [LỆCH DÒNG LỆNH — GIẢM SIZE LIMIT]';
+        }}
+        return {{
+            bvcCvd: Math.round(bvcCvd * 10) / 10,
+            buyPct: buyPct,
+            vpinPct: vpinPct,
+            vpinLabel: vpinLbl,
+        }};
+    }}
+
+    function resolveAdaptiveStrikesJs(spot, dteDays, callWall, putWall) {{
+        const opts = window.INITIAL_OPTIONS || [];
+        const uniqueSet = new Set();
+        opts.forEach(o => {{ if (o && o.strike) uniqueSet.add(Number(o.strike)); }});
+        const sorted = Array.from(uniqueSet).sort((a, b) => a - b);
+        if (!sorted.length) sorted.push(Math.round(spot));
+
+        const aboveList = sorted.filter(s => s > spot);
+        const rawAbove = aboveList.length > 0 ? aboveList[0] : (callWall > spot ? callWall : spot + 25.0);
+        const rawNextAbove = aboveList.length > 1 ? aboveList[1] : rawAbove + 25.0;
+
+        const belowList = sorted.filter(s => s <= spot);
+        const rawBelow = belowList.length > 0 ? belowList[belowList.length - 1] : (putWall < spot ? putWall : spot - 25.0);
+        const rawNextBelow = belowList.length > 1 ? belowList[belowList.length - 2] : rawBelow - 25.0;
+
+        let rawStep = 25.0;
+        if (sorted.length > 1) {{
+            rawStep = Infinity;
+            for (let i = 1; i < sorted.length; i++) {{
+                const d = sorted[i] - sorted[i - 1];
+                if (d > 0 && d < rawStep) rawStep = d;
+            }}
+            if (!isFinite(rawStep)) rawStep = 25.0;
+        }}
+
+        let isMicro = false;
+        let strikeAbove = rawAbove;
+        let nextAbove = rawNextAbove;
+        let strikeBelow = rawBelow;
+        let nextBelow = rawNextBelow;
+        let step = rawStep;
+
+        if (dteDays <= 10.0) {{
+            const fineStep = 5.0;
+            let fineAbove = Math.ceil(spot / fineStep) * fineStep;
+            if (fineAbove <= spot) fineAbove += fineStep;
+            if ((rawAbove - spot) > fineStep) {{
+                strikeAbove = fineAbove;
+                nextAbove = rawAbove > (fineAbove + fineStep) ? (fineAbove + fineStep) : rawAbove;
+                step = Math.min(step, fineStep);
+                isMicro = true;
+            }}
+            let fineBelow = Math.floor(spot / fineStep) * fineStep;
+            if (fineBelow >= spot) fineBelow -= fineStep;
+            if ((spot - rawBelow) > fineStep) {{
+                strikeBelow = fineBelow;
+                nextBelow = rawBelow < (fineBelow - fineStep) ? (fineBelow - fineStep) : rawBelow;
+                step = Math.min(step, fineStep);
+                isMicro = true;
+            }}
+            if (isMicro) {{
+                if (nextAbove > strikeAbove + step) nextAbove = strikeAbove + step;
+                if (nextBelow < strikeBelow - step) nextBelow = strikeBelow - step;
+            }}
+        }}
+        return {{ strikeAbove, nextAbove, strikeBelow, nextBelow, step, isMicroGuarded: isMicro }};
+    }}
+
+    function sizeXauusdJs(slUsd, gexRegime) {{
+        const sl = slUsd > 0 ? slUsd : 4.5;
+        const reg = String(gexRegime || 'LONG_GAMMA').toUpperCase();
+        const kappa = reg.includes('LONG') ? 1.0 : (reg.includes('SHORT') ? 0.5 : 0.75);
+        const baseLots = 100.0 / (100.0 * sl);
+        const rawLots = baseLots * kappa;
+        const floored = Math.floor((rawLots / 0.01) + 1e-9) * 0.01;
+        return Math.max(0.01, Math.min(5.0, Math.round(floored * 100) / 100));
+    }}
+
+    function r2(v) {{
+        const s = v < 0 ? -1 : 1;
+        const av = Math.abs(v) * 100.0;
+        const fl = Math.floor(av);
+        if ((av - fl) === 0.5) {{
+            return s * ((fl % 2 === 0 ? fl : fl + 1) / 100.0);
+        }}
+        return s * (Math.floor(av + 0.5) / 100.0);
+    }}
+
+    function computeTacticalMatrixJs(params) {{
+        const atr5 = Math.max(2.0, Math.min(6.5, Number(params.atr5m || 4.0)));
+        const brkOff = Math.max(2.80, r2(0.8 * atr5));
+        const slBrk = Math.max(5.00, r2(1.5 * atr5), r2(brkOff + 2.00));
+        const slRev = Math.max(5.00, r2(1.4 * atr5));
+        const frontRunTp = 1.00;
+
+        const normReg = String(params.regime || 'NEUTRAL').toUpperCase();
+        const isLongGamma = normReg.includes('LONG');
+        const isShortGamma = normReg.includes('SHORT');
+        const zFlip = (params.zeroGamma && params.zeroGamma > 0) ? Number(params.zeroGamma) : Number(params.spot);
+        const aboveZg = Number(params.spot) >= zFlip;
+        const belowZg = Number(params.spot) < zFlip;
+        const sessionOpen = Boolean(params.sessionOpen);
+        const nearPutWall = (Number(params.putWall) > 0) && (Math.abs(params.strikeBelow - params.putWall) <= Math.max(params.step, 5.0));
+
+        // 1. BUY Squeeze
+        const entrySq = r2(params.strikeAbove + brkOff);
+        const slSq = r2(entrySq - slBrk);
+        const rawSqTp = params.hasUpAirPocket ? (params.majorUpWall - frontRunTp) : (params.nextAbove - frontRunTp);
+        const tpSq = r2(Math.min(Math.max(entrySq + 4.00, rawSqTp), entrySq + 1.5 * slBrk));
+        const sqActive = sessionOpen && isShortGamma && Boolean(params.hasUpAirPocket) && (params.vpinPct >= 55.0 || params.callWallSiege >= 0.25);
+        const sqReason = sqActive ? 'SHORT_GAMMA + Air Pocket + Áp lực phá trần' : (!sessionOpen ? 'GLOBEX ĐÓNG CỬA' : 'Chờ SHORT_GAMMA + Air Pocket + VPIN/Siege');
+
+        // 2. SELL Fade
+        const entryFd = r2(params.strikeAbove - 1.00);
+        const slFd = r2(entryFd + slRev);
+        const candFdTp = (params.strikeBelow < entryFd - 2.00) ? Math.min(params.spot, params.strikeBelow + frontRunTp) : (entryFd - 4.50);
+        const tpFd = r2(Math.max(entryFd - 6.00, Math.min(entryFd - 3.00, candFdTp)));
+        const fdActive = sessionOpen && (params.vpinPct < 58.0) && (isLongGamma || aboveZg);
+        const fdReason = fdActive ? 'MM LONG_GAMMA / Trên Zero Gamma + VPIN an toàn' : (!sessionOpen ? 'GLOBEX ĐÓNG CỬA' : (params.vpinPct >= 58.0 ? 'VPIN CAO (>=58%)' : 'Dưới Zero Gamma (Cấm chặn tàu)'));
+
+        // 3. BUY Rebound
+        const entryRb = r2(params.strikeBelow + 1.00);
+        const slRb = r2(entryRb - slRev);
+        const tpRb = r2(Math.min(entryRb + 7.50, Math.max(entryRb + 3.00, params.strikeAbove - frontRunTp)));
+        const rbActive = sessionOpen && (params.vpinPct < 55.0) && (isLongGamma || aboveZg || nearPutWall);
+        const rbReason = rbActive ? (nearPutWall ? 'Gần Put Wall + VPIN an toàn' : 'MM LONG_GAMMA / Trên Zero Gamma') : (!sessionOpen ? 'GLOBEX ĐÓNG CỬA' : (params.vpinPct >= 55.0 ? 'VPIN ĐỘC HẠI (>=55%)' : 'SHORT_GAMMA xa Put Wall (Tránh bắt dao)'));
+
+        // 4. SELL Breakdown
+        const entryBd = r2(params.strikeBelow - brkOff);
+        const slBd = r2(entryBd + slBrk);
+        const rawBdTp = params.hasDownAirPocket ? (params.majorDownWall + frontRunTp) : (params.nextBelow + frontRunTp);
+        const tpBd = r2(Math.max(Math.min(entryBd - 4.00, rawBdTp), entryBd - 1.5 * slBrk));
+        const bdActive = sessionOpen && isShortGamma && Boolean(params.hasDownAirPocket) && belowZg && (params.vpinPct >= 50.0 || params.putWallSiege >= 0.20);
+        const bdReason = bdActive ? 'SHORT_GAMMA dưới ZG + Air Pocket + Áp lực xả' : (!sessionOpen ? 'GLOBEX ĐÓNG CỬA' : 'Chờ SHORT_GAMMA dưới ZG + Air Pocket + VPIN/Siege');
+
+        return {{
+            atr5m: atr5,
+            strikeAbove: params.strikeAbove,
+            strikeBelow: params.strikeBelow,
+            isMicroGuarded: params.isMicroGuarded,
+            squeeze: {{ key: 'sq', side: 'BUY', title: '1. BUY MUA ĐUỔI', label: '1. BUY MUA ĐUỔI (Squeeze ' + Math.round(params.strikeAbove) + ')', trig: 'Vượt > ' + r2(entrySq - 0.50).toFixed(2), entry: entrySq, sl: slSq, slDist: r2(entrySq - slSq), tp: tpSq, active: sqActive, badge: sqActive ? '[KÍCH HOẠT]' : '[CHỜ XÁC NHẬN]', reason: sqReason, lots: sizeXauusdJs(r2(entrySq - slSq), normReg) }},
+            fade:    {{ key: 'fd', side: 'SELL', title: '2. SELL CHẶN TIỀN TUYẾN', label: '2. SELL CHẶN TIỀN TUYẾN (Fade ' + Math.round(params.strikeAbove) + ')', trig: (params.strikeAbove - 1.50).toFixed(2) + ' - ' + params.strikeAbove.toFixed(2), entry: entryFd, sl: slFd, slDist: r2(slFd - entryFd), tp: tpFd, active: fdActive, badge: fdActive ? '[KÍCH HOẠT]' : '[TẠM KHÓA]', reason: fdReason, lots: sizeXauusdJs(r2(slFd - entryFd), normReg) }},
+            rebound: {{ key: 'rb', side: 'BUY', title: '3. BUY BẮT SÀN ATM', label: '3. BUY BẮT SÀN ATM (Rebound ' + Math.round(params.strikeBelow) + ')', trig: params.strikeBelow.toFixed(2) + ' - ' + (params.strikeBelow + 1.50).toFixed(2), entry: entryRb, sl: slRb, slDist: r2(entryRb - slRb), tp: tpRb, active: rbActive, badge: rbActive ? '[KÍCH HOẠT]' : '[TẠM KHÓA]', reason: rbReason, lots: sizeXauusdJs(r2(entryRb - slRb), normReg) }},
+            breakdown: {{ key: 'bd', side: 'SELL', title: '4. SELL THỦNG SÀN', label: '4. SELL THỦNG SÀN & VACUUM RUN (Breakdown ' + Math.round(params.strikeBelow) + ')', trig: 'Thủng < ' + r2(entryBd + 0.50).toFixed(2), entry: entryBd, sl: slBd, slDist: r2(slBd - entryBd), tp: tpBd, active: bdActive, badge: bdActive ? '[KÍCH HOẠT]' : '[CHỜ XÁC NHẬN]', reason: bdReason, lots: sizeXauusdJs(r2(slBd - entryBd), normReg) }},
+        }};
+    }}
+
+    function updateRealtimeTacticalCockpit() {{
+        const m = window.INITIAL_META || {{}};
+        const spot = Number(currentGoldPrice || m.spot || 0);
+        if (!spot) return;
+
+        const dteDays = Number(m.dte_days || 8.0);
+        const callWall = Number(m.call_wall || spot + 50);
+        const putWall = Number(m.put_wall || spot - 50);
+        const zFlip = Number(m.zero_gamma_flip || spot);
+        const strikes = resolveAdaptiveStrikesJs(spot, dteDays, callWall, putWall);
+
+        m.strike_above = strikes.strikeAbove;
+        m.next_above = strikes.nextAbove;
+        m.strike_below = strikes.strikeBelow;
+        m.next_below = strikes.nextBelow;
+        m.step = strikes.step;
+
+        const sessionOpen = isCmeGlobexMarketOpen();
+        const regime = String(m.regime || (Number(m.total_net_gex || 0) >= 0 ? 'LONG_GAMMA' : 'SHORT_GAMMA'));
+        const mat = computeTacticalMatrixJs({{
+            spot: spot,
+            strikeAbove: strikes.strikeAbove,
+            nextAbove: strikes.nextAbove,
+            strikeBelow: strikes.strikeBelow,
+            nextBelow: strikes.nextBelow,
+            step: strikes.step,
+            callWall: callWall,
+            putWall: putWall,
+            zeroGamma: zFlip,
+            majorUpWall: Number(m.major_up_wall || callWall),
+            majorDownWall: Number(m.major_down_wall || putWall),
+            hasUpAirPocket: Boolean(m.has_up_air_pocket),
+            hasDownAirPocket: Boolean(m.has_down_air_pocket),
+            regime: regime,
+            vpinPct: liveVpinPct,
+            callWallSiege: Number(m.call_wall_siege || 0),
+            putWallSiege: Number(m.put_wall_siege || 0),
+            sessionOpen: sessionOpen,
+            atr5m: liveAtr5m,
+            isMicroGuarded: strikes.isMicroGuarded,
+        }});
+        liveTacticalMatrix = mat;
+
+        // 1. Topbar & HUD VPIN sync
+        const vpinCol = liveVpinPct >= 65.0 ? '#F87171' : (liveVpinPct >= 40.0 ? '#FACC15' : '#4ADE80');
+        const topVpin = document.getElementById('top-vpin-val');
+        if (topVpin) {{ topVpin.innerText = liveVpinPct.toFixed(1) + '%'; topVpin.style.color = vpinCol; }}
+        const hudVpin = document.getElementById('hud-vpin-val');
+        if (hudVpin) {{ hudVpin.innerText = liveVpinLabel; hudVpin.style.color = vpinCol; }}
+        const microVpin = document.getElementById('micro-vpin-val');
+        if (microVpin) {{ microVpin.innerText = liveVpinLabel; microVpin.style.color = vpinCol; }}
+
+        // 2. Spine (KHOI 4) real-time strikes & distances
+        const elSb = document.getElementById('spine-strike-below');
+        if (elSb) elSb.innerText = '$' + Math.round(strikes.strikeBelow).toLocaleString('en-US');
+        const elSa = document.getElementById('spine-strike-above');
+        if (elSa) elSa.innerText = '$' + Math.round(strikes.strikeAbove).toLocaleString('en-US');
+        const elSat = document.getElementById('spine-above-title');
+        if (elSat) elSat.innerText = 'CẢN TRÊN' + (strikes.isMicroGuarded ? ' (VI MÔ)' : '');
+        const elDp = document.getElementById('spine-dist-put');
+        if (elDp) elDp.innerText = ((spot - putWall) >= 0 ? '+' : '') + (spot - putWall).toFixed(1) + '$';
+        const elDb = document.getElementById('spine-dist-below');
+        if (elDb) elDb.innerText = ((spot - strikes.strikeBelow) >= 0 ? '+' : '') + (spot - strikes.strikeBelow).toFixed(1) + '$';
+        const elDa = document.getElementById('spine-dist-above');
+        if (elDa) elDa.innerText = ((strikes.strikeAbove - spot) >= 0 ? '+' : '') + (strikes.strikeAbove - spot).toFixed(1) + '$';
+        const elDc = document.getElementById('spine-dist-call');
+        if (elDc) elDc.innerText = ((callWall - spot) >= 0 ? '+' : '') + (callWall - spot).toFixed(1) + '$';
+
+        // 3. KHOI 6 Dynamic Rows
+        const items = [mat.squeeze, mat.fade, mat.rebound, mat.breakdown];
+        items.forEach(it => {{
+            const row = document.getElementById('k6-row-' + it.key);
+            if (row) {{
+                row.classList.toggle('k6-row-active', it.active);
+                row.classList.toggle('k6-row-locked', !it.active);
+            }}
+            const lbl = document.getElementById('k6-' + it.key + '-label');
+            if (lbl) lbl.innerText = it.label;
+            const gate = document.getElementById('k6-' + it.key + '-gate');
+            if (gate) {{
+                const col = it.active ? '#4ADE80' : '#94A3B8';
+                const bg = it.active ? 'rgba(34,197,94,0.14)' : 'rgba(100,116,139,0.16)';
+                gate.innerHTML = "<span style='display:inline-block; margin-left:6px; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:700; color:" + col + "; background:" + bg + "; border:1px solid " + col + ";'>" + it.badge + "</span><div style='font-size:10px; color:#64748B; font-weight:400; margin-top:2px;'>" + it.reason + "</div>";
+            }}
+            const trig = document.getElementById('k6-' + it.key + '-trig');
+            if (trig) trig.innerText = it.trig;
+            const ent = document.getElementById('k6-' + it.key + '-entry');
+            if (ent) ent.innerText = it.entry.toFixed(2);
+            const slEl = document.getElementById('k6-' + it.key + '-sl');
+            if (slEl) slEl.innerText = it.sl.toFixed(2) + ' ($' + it.slDist.toFixed(1) + ')';
+            const tpEl = document.getElementById('k6-' + it.key + '-tp');
+            if (tpEl) tpEl.innerText = it.tp.toFixed(2);
+            const lotEl = document.getElementById('k6-' + it.key + '-lot');
+            if (lotEl) lotEl.innerText = '~' + it.lots.toFixed(2) + ' Lot';
+        }});
+
+        // 4. 3-Second Tactical Command Bar (4 Boxes)
+        const netGex = Number(m.total_net_gex || 0);
+        const distFlip = spot - zFlip;
+        const isLongG = netGex >= 0 && distFlip >= 0;
+        const regVal = document.getElementById('cmd-regime-val');
+        const regSub = document.getElementById('cmd-regime-sub');
+        const regCard = document.getElementById('cmd-regime-card');
+        if (regVal && regSub) {{
+            if (netGex >= 0 && distFlip >= 0) {{
+                regVal.innerText = 'MM GHÌM ĐẢO CHIỀU (LONG Γ)';
+                regVal.style.color = '#4ADE80';
+                if (regCard) regCard.style.borderLeftColor = '#22C55E';
+            }} else if (netGex < 0 && distFlip < 0) {{
+                regVal.innerText = 'MM ĐẨY SÓNG MẠNH (SHORT Γ)';
+                regVal.style.color = '#F87171';
+                if (regCard) regCard.style.borderLeftColor = '#EF4444';
+            }} else {{
+                regVal.innerText = 'VÙNG CHUYỂN PHA (TRANH CHẤP)';
+                regVal.style.color = '#FACC15';
+                if (regCard) regCard.style.borderLeftColor = '#EAB308';
+            }}
+            regSub.innerText = 'Flip $' + zFlip.toFixed(0) + ' (' + (distFlip >= 0 ? '+' : '') + distFlip.toFixed(1) + '$) · NetGEX $' + (netGex >= 0 ? '+' : '') + netGex.toFixed(1) + 'M';
+        }}
+
+        const distAbove = strikes.strikeAbove - spot;
+        const distBelow = spot - strikes.strikeBelow;
+        const wallVal = document.getElementById('cmd-wall-val');
+        const wallSub = document.getElementById('cmd-wall-sub');
+        const wallCard = document.getElementById('cmd-wall-card');
+        if (wallVal && wallSub) {{
+            const nearTop = distAbove <= distBelow;
+            const apNote = m.has_up_air_pocket && nearTop ? ' ⚠️ AIR POCKET TRÊN' : (m.has_down_air_pocket && !nearTop ? ' ⚠️ AIR POCKET DƯỚI' : ' · Biên ổn định');
+            wallVal.innerText = nearTop
+                ? ('SÁT CẢN $' + Math.round(strikes.strikeAbove).toLocaleString('en-US') + ' (+' + distAbove.toFixed(1) + '$)')
+                : ('SÁT SÀN $' + Math.round(strikes.strikeBelow).toLocaleString('en-US') + ' (-' + distBelow.toFixed(1) + '$)');
+            wallVal.style.color = (m.has_up_air_pocket && nearTop) || (m.has_down_air_pocket && !nearTop) ? '#FACC15' : '#38BDF8';
+            if (wallCard) wallCard.style.borderLeftColor = nearTop ? '#EF4444' : '#22C55E';
+            wallSub.innerText = 'PW $' + Math.round(putWall).toLocaleString('en-US') + ' (-' + (spot - putWall).toFixed(0) + '$) · CW $' + Math.round(callWall).toLocaleString('en-US') + ' (+' + (callWall - spot).toFixed(0) + '$)' + apNote;
+        }}
+
+        const flowVal = document.getElementById('cmd-flow-val');
+        const flowSub = document.getElementById('cmd-flow-sub');
+        const flowCard = document.getElementById('cmd-flow-card');
+        if (flowVal && flowSub) {{
+            const cwSiege = Number(m.call_wall_siege || 0);
+            const pwSiege = Number(m.put_wall_siege || 0);
+            const isBreaking = liveVpinPct >= 65.0 || cwSiege >= 0.25 || pwSiege >= 0.25;
+            if (liveVpinPct >= 65.0) {{
+                flowVal.innerText = 'DÒNG ĐỘC HẠI PHÁ TƯỜNG (VPIN ' + liveVpinPct.toFixed(1) + '%)';
+                flowVal.style.color = '#F87171';
+                if (flowCard) flowCard.style.borderLeftColor = '#EF4444';
+            }} else if (isBreaking) {{
+                flowVal.innerText = 'ÁP LỰC CÔNG THÀNH (SIEGE/VPIN TĂNG)';
+                flowVal.style.color = '#FACC15';
+                if (flowCard) flowCard.style.borderLeftColor = '#EAB308';
+            }} else {{
+                flowVal.innerText = 'DÒNG TIỀN ĐỠ TƯỜNG (VPIN ' + liveVpinPct.toFixed(1) + '%)';
+                flowVal.style.color = '#4ADE80';
+                if (flowCard) flowCard.style.borderLeftColor = '#22C55E';
+            }}
+            flowSub.innerText = 'Mua BVC: ' + liveBuyPct.toFixed(1) + '% · δF ' + (liveForwardDisloc >= 0 ? '+' : '') + liveForwardDisloc.toFixed(2) + '$ · CW/PW Siege: ' + cwSiege.toFixed(2) + 'x/' + pwSiege.toFixed(2) + 'x';
+        }}
+
+        const actVal = document.getElementById('cmd-action-val');
+        const actSub = document.getElementById('cmd-action-sub');
+        const actCard = document.getElementById('cmd-action-card');
+        if (actVal && actSub) {{
+            const activeList = items.filter(it => it.active);
+            let best = null;
+            if (activeList.length > 0) {{
+                // Prefer momentum breakout in Short Gamma, otherwise nearest trigger distance
+                best = activeList.slice().sort((a, b) => Math.abs(a.entry - spot) - Math.abs(b.entry - spot))[0];
+            }}
+            if (!sessionOpen) {{
+                actVal.innerText = 'ĐỨNG NGOÀI (GLOBEX ĐÓNG CỬA)';
+                actVal.style.color = '#94A3B8';
+                if (actCard) actCard.style.borderLeftColor = '#64748B';
+                actSub.innerText = 'Chờ phiên Globex mở cửa trở lại để khớp lệnh COMEX GC.';
+            }} else if (best) {{
+                const isBuy = best.side === 'BUY';
+                actVal.innerText = best.title + ' @ ' + best.entry.toFixed(2);
+                actVal.style.color = isBuy ? '#4ADE80' : '#F87171';
+                if (actCard) actCard.style.borderLeftColor = isBuy ? '#22C55E' : '#EF4444';
+                actSub.innerText = 'SL ' + best.sl.toFixed(2) + ' ($' + best.slDist.toFixed(1) + ') · TP ' + best.tp.toFixed(2) + ' · ~' + best.lots.toFixed(2) + ' Lot (' + best.reason + ')';
+            }} else {{
+                actVal.innerText = 'ĐỨNG NGOÀI QUAN SÁT (0 KÈO ACTIVE)';
+                actVal.style.color = '#FACC15';
+                if (actCard) actCard.style.borderLeftColor = '#EAB308';
+                actSub.innerText = 'VPIN ' + liveVpinPct.toFixed(1) + '% · Chờ giá chạm bẫy & xác nhận bộ lọc ADR-028.';
+            }}
+        }}
+    }}
+
+    function updateSyncBadgeHonest() {{
+        const badge = document.getElementById('cloud-sync-badge');
+        if (!badge) return;
+        const now = Date.now();
+        if (!isCmeGlobexMarketOpen()) {{
+            badge.style.background = 'rgba(148, 163, 184, 0.18)';
+            badge.style.borderColor = 'rgba(148, 163, 184, 0.4)';
+            badge.style.color = '#CBD5E1';
+            badge.innerText = '● CME GLOBEX: CLOSED (SETTLED)';
+            return;
+        }}
+        if (lastBridgeSuccessEpoch && (now - lastBridgeSuccessEpoch) < 12000) {{
+            badge.style.background = 'rgba(34, 197, 94, 0.18)';
+            badge.style.borderColor = 'rgba(34, 197, 94, 0.45)';
+            badge.style.color = '#4ADE80';
+            badge.innerText = '● LIVE BRIDGE (2.5s)';
+            return;
+        }}
+        const tsUtc = window.INITIAL_META && window.INITIAL_META.timestamp_utc;
+        const parsedTs = tsUtc ? Date.parse(tsUtc) : NaN;
+        const ageMs = !isNaN(parsedTs) ? (now - parsedTs) : Infinity;
+        if (lastCloudSuccessEpoch && ageMs < 180000) {{
+            badge.style.background = 'rgba(56, 189, 248, 0.16)';
+            badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+            badge.style.color = '#38BDF8';
+            badge.innerText = '● CLOUD SYNC (LIVE)';
+            return;
+        }}
+        const minsOld = isFinite(ageMs) ? Math.max(0, Math.floor(ageMs / 60000)) : null;
+        badge.style.background = 'rgba(234, 179, 8, 0.14)';
+        badge.style.borderColor = 'rgba(234, 179, 8, 0.4)';
+        badge.style.color = '#FACC15';
+        badge.innerText = minsOld !== null ? ('● OFFLINE SNAPSHOT (' + minsOld + 'p)') : '● OFFLINE SNAPSHOT';
+    }}
+
     function updateSqueezeHud(price) {{
         const ladder = (window.INITIAL_META && window.INITIAL_META.squeeze_ladder) || [];
         if (!ladder.length || !price) return;
@@ -699,24 +1287,41 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
     }}
 
-    function evaluateBarOrderflow(candles) {{
-        if (!Array.isArray(candles) || candles.length < 5) return;
-        const valid = candles.slice(-24).filter(b => b && Number(b.volume || 0) > 0);
-        if (valid.length < 5) return;
-        const lams = valid.map(b => Math.abs(Number(b.close) - Number(b.open)) / Number(b.volume) * 1000.0);
-        const avgLam = lams.reduce((a, b) => a + b, 0) / lams.length;
-        const avgVol = valid.reduce((a, b) => a + Number(b.volume), 0) / valid.length;
-        const lastLam = lams[lams.length - 1];
-        const lastVol = Number(valid[valid.length - 1].volume);
-        if (lastVol >= 1.3 * avgVol && lastLam <= 0.55 * Math.max(1e-6, avgLam)) {{
-            liveKyleLabel = 'HẤP THỤ TẢNG BĂNG (BAR REAL VOL)';
-        }} else if (lastLam >= 1.75 * Math.max(1e-6, avgLam)) {{
-            liveKyleLabel = 'TRƯỢT GIÁ RỖNG SỔ LỆNH (BAR VACUUM)';
+    function evaluateBarOrderflow(candles, tfKey = '1m') {{
+        const m1Source = (tfKey === '1m' && Array.isArray(candles) && candles.length >= 3)
+            ? candles
+            : (window.INITIAL_CANDLES || candles || []);
+        const valid = Array.isArray(candles) ? candles.slice(-24).filter(b => b && Number(b.volume || 0) > 0) : [];
+        if (valid.length >= 5) {{
+            const lams = valid.map(b => Math.abs(Number(b.close) - Number(b.open)) / Number(b.volume) * 1000.0);
+            const avgLam = lams.reduce((a, b) => a + b, 0) / lams.length;
+            const avgVol = valid.reduce((a, b) => a + Number(b.volume), 0) / valid.length;
+            const lastLam = lams[lams.length - 1];
+            const lastVol = Number(valid[valid.length - 1].volume);
+            if (lastVol >= 1.3 * avgVol && lastLam <= 0.55 * Math.max(1e-6, avgLam)) {{
+                liveKyleLabel = 'HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)';
+            }} else if (lastLam >= 1.75 * Math.max(1e-6, avgLam)) {{
+                liveKyleLabel = 'TRƯỢT GIÁ RỖNG SỔ LỆNH (VACUUM MARKET SWEEP)';
+            }} else if (Date.now() - lastAuthoritativeVpinEpoch > 3000) {{
+                liveKyleLabel = 'THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (BAR OLS)';
+            }}
+        }}
+        if (Array.isArray(m1Source) && m1Source.length >= 3) {{
+            liveAtr5m = computeM5AtrJs(m1Source, '1m', liveAtr5m);
+            if (Date.now() - lastAuthoritativeVpinEpoch > 3000) {{
+                const bvc = computeLiveVpinBvcJs(m1Source, 24);
+                if (bvc) {{
+                    liveCvdContracts = bvc.bvcCvd;
+                    liveBuyPct = bvc.buyPct;
+                    liveVpinPct = bvc.vpinPct;
+                    liveVpinLabel = bvc.vpinLabel;
+                }}
+            }}
         }}
     }}
 
     function applyLiveTick(newPrice, tickVol = null, isAuthoritativeYahoo = false) {{
-        if (!newPrice || isNaN(newPrice) || !candleSeries) return;
+        if (!newPrice || isNaN(newPrice)) return;
         const marketOpen = isCmeGlobexMarketOpen();
         if (!marketOpen && !isAuthoritativeYahoo) return;
 
@@ -775,13 +1380,15 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
         liveCandleDelta = activeCandle.delta || 0.0;
 
-        candleSeries.update({{
-            time: activeCandle.time,
-            open: activeCandle.open,
-            high: activeCandle.high,
-            low: activeCandle.low,
-            close: activeCandle.close,
-        }});
+        if (candleSeries) {{
+            candleSeries.update({{
+                time: activeCandle.time,
+                open: activeCandle.open,
+                high: activeCandle.high,
+                low: activeCandle.low,
+                close: activeCandle.close,
+            }});
+        }}
 
         // 2. Zero-Latency Dealer Gamma Hedge Flow & Put-Call Parity Lead-Lag (delta_F)
         const netGexM = window.INITIAL_META.total_net_gex || -17.2;
@@ -930,7 +1537,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }});
         }}
 
-        // 5. Repaint 60FPS Canvas immediately with zero lag
+        // 5. Recompute 3-second tactical context (Command Bar + Spine + KHOI 6) & repaint Canvas
+        updateRealtimeTacticalCockpit();
         requestAnimationFrame(drawNeiroOverlay);
     }}
 
@@ -956,7 +1564,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         neiroChart = LightweightCharts.createChart(container, {{
             width: container.clientWidth,
-            height: container.clientHeight || 700,
+            height: container.clientHeight || 540,
             layout: {{
                 background: {{ type: 'solid', color: '#000000' }},
                 textColor: '#94A3B8',
@@ -1002,6 +1610,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         buildHistoricalGoldBars(60, '1m');
         updateSqueezeHud(currentGoldPrice);
+        updateRealtimeTacticalCockpit();
+        updateSyncBadgeHonest();
 
         livePriceLine = candleSeries.createPriceLine({{
             price: currentGoldPrice,
@@ -1012,32 +1622,12 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             title: 'F0 LIVE',
         }});
 
-        // PriceLine markers on Right Price Scale for Peak Vanna & Peak Charm
-        if (window.INITIAL_META.vanna_peak_strike) {{
-            candleSeries.createPriceLine({{
-                price: window.INITIAL_META.vanna_peak_strike,
-                color: '#22D3EE',
-                lineWidth: 1.5,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: 'VANNA (VEX)',
-            }});
-        }}
-        if (window.INITIAL_META.charm_peak_strike) {{
-            candleSeries.createPriceLine({{
-                price: window.INITIAL_META.charm_peak_strike,
-                color: '#C084FC',
-                lineWidth: 1.5,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: 'CHARM (CHEX)',
-            }});
-        }}
+        syncSecondaryPriceLines();
 
         const handleResize = () => {{
             if (!container || !neiroChart) return;
             const newW = container.clientWidth;
-            const newH = container.clientHeight || 700;
+            const newH = container.clientHeight || 540;
             neiroChart.applyOptions({{ width: newW, height: newH }});
             if (canvas) {{
                 canvas.width = newW;
@@ -1123,55 +1713,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const panelX = rightX - panelW;
         const chartW = panelX - 6;
 
-        // 0. Top-Center 60FPS Orderflow Tug-of-War & Live Delta Footprint Gauge on Canvas
-        const gaugeW = Math.min(430, Math.max(260, chartW - 340));
-        if (gaugeW >= 260) {{
-            const gaugeX = Math.max(310, (chartW - gaugeW) / 2 + 90);
-            const gaugeY = 10;
-            ctx.fillStyle = 'rgba(8, 11, 18, 0.90)';
-            ctx.fillRect(gaugeX, gaugeY, gaugeW, 38);
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(gaugeX, gaugeY, gaugeW, 38);
-
-            ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
-            ctx.textAlign = 'left';
-            ctx.fillStyle = '#4ADE80';
-            ctx.fillText('⚡ MUA BVC: ' + liveBuyPct.toFixed(1) + '%', gaugeX + 8, gaugeY + 13);
-
-            ctx.textAlign = 'center';
-            const dCol = liveCandleDelta >= 0 ? '#4ADE80' : '#F87171';
-            ctx.fillStyle = dCol;
-            ctx.fillText('NẾN M1 Δ: ' + (liveCandleDelta >= 0 ? '+' : '') + liveCandleDelta.toFixed(1) + ' HĐ · CVD: ' + (liveCvdContracts >= 0 ? '+' : '') + Math.round(liveCvdContracts), gaugeX + gaugeW / 2, gaugeY + 13);
-
-            ctx.textAlign = 'right';
-            ctx.fillStyle = '#F87171';
-            ctx.fillText('BÁN: ' + (100 - liveBuyPct).toFixed(1) + '%', gaugeX + gaugeW - 8, gaugeY + 13);
-
-            // Animated Buy/Sell Tug-of-War Bar
-            const barX = gaugeX + 8;
-            const barY = gaugeY + 18;
-            const barW = gaugeW - 16;
-            const buyW = Math.round(barW * (liveBuyPct / 100.0));
-            ctx.fillStyle = '#EF4444';
-            ctx.fillRect(barX, barY, barW, 6);
-            ctx.fillStyle = '#22C55E';
-            ctx.fillRect(barX, barY, buyW, 6);
-
-            // Sub-caption: Dealer Hedge & Options Lead
-            ctx.textAlign = 'left';
-            ctx.font = '8.5px "JetBrains Mono", monospace';
-            ctx.fillStyle = liveDealerHedgeGC >= 0 ? '#86EFAC' : '#FCA5A5';
-            ctx.fillText('MM HEDGE: ' + (liveDealerHedgeGC >= 0 ? '+' : '') + liveDealerHedgeGC.toFixed(0) + ' HĐ GC', gaugeX + 8, gaugeY + 34);
-            ctx.textAlign = 'right';
-            ctx.fillStyle = '#38BDF8';
-            ctx.fillText('OPTIONS LEAD δF: ' + (liveForwardDisloc >= 0 ? '+' : '') + liveForwardDisloc.toFixed(2) + '$ · ' + liveKyleLabel.slice(0, 26), gaugeX + gaugeW - 8, gaugeY + 34);
-        }}
-
         // Live Candle Orderflow Footprint Badge right next to current F0 LIVE price line
         const yLive = candleSeries.priceToCoordinate(currentGoldPrice);
         if (yLive !== null && yLive >= 36 && yLive <= h - 24) {{
-            const fpTxt = '⚡ Δ ' + (liveCandleDelta >= 0 ? '+' : '') + liveCandleDelta.toFixed(1) + ' HĐ | CVD ' + (liveCvdContracts >= 0 ? '+' : '') + Math.round(liveCvdContracts) + ' | MM ' + (liveDealerHedgeGC >= 0 ? '+' : '') + Math.round(liveDealerHedgeGC) + ' GC';
+            const fpTxt = '⚡ Δ ' + (liveCandleDelta >= 0 ? '+' : '') + liveCandleDelta.toFixed(1) + ' HĐ | CVD ' + (liveCvdContracts >= 0 ? '+' : '') + Math.round(liveCvdContracts) + ' | VPIN ' + liveVpinPct.toFixed(1) + '%';
             ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
             const fpW = ctx.measureText(fpTxt).width + 12;
             const fpX = Math.max(14, chartW - fpW - 10);
@@ -1193,7 +1738,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         ctx.lineWidth = 1;
         ctx.strokeRect(panelX - 4, 0, panelW, h);
 
-        // 2. Draw Air Pocket Vacuum Zones (Both Main Chart Canvas and Right Greeks Panel)
+        // 2. Secondary Structural Zones (Air Pockets & Institutional FVGs) — visible in Full Overlay Mode
+        if (!overlayCompactMode) {{
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
             const pFrom = parseFloat(ap.from || 0);
@@ -1288,17 +1834,33 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 }}
             }}
         }});
+        }}
 
-        // 3. Key Quant Options Levels: Call/Put Wall, Gamma Flip, Squeeze, Vanna, Charm
+        // 3. Key Quant Options Levels: Core 3 Structure Lines + Active Strategy Entry/SL/TP (+ Full Mode Extras)
         const keyLevels = [
             {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
-            {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
-            {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA SQUEEZE ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
             {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], txt: 'GAMMA FLIP (Trục cân đối) $' + Math.round(m.zero_gamma_flip) + ' · [' + (liveFlipVerdict.split(':')[0] || 'KIỂM ĐỊNH') + ']' }},
-            {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: 'CHARM (CHEX) · GHÌM GIÁ ĐÊM ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
-            {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], txt: 'VANNA (VEX) · V-REBOUND ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }},
         ];
+        if (!overlayCompactMode) {{
+            keyLevels.push(
+                {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
+                {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA SQUEEZE ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
+                {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: 'CHARM (CHEX) · GHÌM GIÁ ĐÊM ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
+                {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], txt: 'VANNA (VEX) · V-REBOUND ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }}
+            );
+        }}
+        if (liveTacticalMatrix) {{
+            const act = [liveTacticalMatrix.squeeze, liveTacticalMatrix.fade, liveTacticalMatrix.rebound, liveTacticalMatrix.breakdown].filter(s => s && s.active);
+            if (act.length > 0) {{
+                const topAct = act.slice().sort((a, b) => Math.abs(a.entry - currentGoldPrice) - Math.abs(b.entry - currentGoldPrice))[0];
+                keyLevels.push(
+                    {{ p: topAct.entry, c: topAct.side === 'BUY' ? '#4ADE80' : '#FB7185', d: [3, 2], txt: 'ACTIVE ENTRY ' + topAct.side + ' $' + topAct.entry.toFixed(2) }},
+                    {{ p: topAct.sl,    c: '#EF4444', d: [2, 2], txt: 'SL $' + topAct.sl.toFixed(2) }},
+                    {{ p: topAct.tp,    c: '#38BDF8', d: [2, 2], txt: 'TP $' + topAct.tp.toFixed(2) }}
+                );
+            }}
+        }}
 
         keyLevels.forEach(L => {{
             if (!L.p) return;
@@ -1474,7 +2036,13 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     // =========================================================================
     // 100% ONLINE ZERO-TOUCH CLOUD SYNC & REALTIME WEBSOCKET ORDERFLOW ENGINE
     // =========================================================================
+    function parseIsoEpochMs(tsStr) {{
+        if (!tsStr) return 0;
+        const ms = Date.parse(String(tsStr));
+        return Number.isFinite(ms) ? ms : 0;
+    }}
     let lastCloudTimestamp = window.INITIAL_META ? (window.INITIAL_META.timestamp_utc || null) : null;
+    let lastStaticSnapshotEpochMs = parseIsoEpochMs(lastCloudTimestamp);
     let buildEpoch = Date.now();
     let lastWsTickEpoch = 0;
     let lastWsRefPrice = null;
@@ -1535,7 +2103,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (window.INITIAL_TF_CANDLES) {{
             window.INITIAL_TF_CANDLES[tfKey] = merged;
         }}
-        if (tfKey === currentTfKey && candleSeries && merged.length > 0) {{
+        if (tfKey === currentTf && candleSeries && merged.length > 0) {{
             const lastBar = merged[merged.length - 1];
             activeCandle = {{
                 time: lastBar.time,
@@ -1546,7 +2114,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 volume: Number(lastBar.volume || 0),
                 delta: lastBar.delta || 0,
             }};
-            evaluateBarOrderflow(merged);
+            evaluateBarOrderflow(merged, tfKey);
             candleSeries.update({{
                 time: lastBar.time,
                 open: lastBar.open,
@@ -1560,34 +2128,64 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
     let lastYahooPollEpoch = 0;
 
-    async function pollLiveYahooChart(tf = currentTfKey) {{
+    async function pollLiveYahooChart(tf = currentTf) {{
         const ts = Date.now();
         lastYahooPollEpoch = ts;
         try {{
             const res = await fetch('http://127.0.0.1:8765/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts, {{ cache: 'no-store' }});
             if (res && res.ok) {{
                 const payload = await res.json();
-                if (payload && payload.market_open !== undefined && window.INITIAL_META) {{
-                    window.INITIAL_META.market_open = Boolean(payload.market_open);
+                lastBridgeSuccessEpoch = Date.now();
+                if (window.INITIAL_META) {{
+                    window.INITIAL_META.timestamp_utc = new Date().toISOString();
+                    if (payload && payload.market_open !== undefined) {{
+                        window.INITIAL_META.market_open = Boolean(payload.market_open);
+                    }}
+                }}
+                if (payload && payload.vpin_pct !== undefined) {{
+                    liveVpinPct = Number(payload.vpin_pct);
+                    if (payload.vpin_label) liveVpinLabel = String(payload.vpin_label);
+                    if (payload.bvc_buy_pct !== undefined) liveBuyPct = Number(payload.bvc_buy_pct);
+                    if (payload.bvc_cvd_contracts !== undefined) liveCvdContracts = Number(payload.bvc_cvd_contracts);
+                    if (payload.kyle_lambda_label) liveKyleLabel = String(payload.kyle_lambda_label);
+                    if (payload.atr_5m !== undefined) liveAtr5m = Number(payload.atr_5m);
+                    lastAuthoritativeVpinEpoch = Date.now();
                 }}
                 if (payload && Array.isArray(payload.candles) && payload.candles.length > 0) {{
                     mergeLiveCandles(payload.candles, tf);
                 }}
                 if (payload && payload.latest_price) {{
                     applyLiveTick(Number(payload.latest_price), null, true);
+                }} else {{
+                    updateRealtimeTacticalCockpit();
                 }}
+                buildEpoch = Date.now();
+                updateSyncTimeAgo();
+                updateSyncBadgeHonest();
                 return true;
             }}
         }} catch (e) {{
             // Local bridge not running; fallback to Cloud/Version JSON sync
         }}
+        updateSyncBadgeHonest();
         return false;
     }}
 
-    function hotPatchCloudMeta(data) {{
-        if (!data || !window.INITIAL_META) return;
+    function hotPatchCloudMeta(data, opts = {{}}) {{
+        if (!data || !window.INITIAL_META) return false;
+        const incomingMs = parseIsoEpochMs(data.timestamp_utc);
+        if (!opts.ignoreTimestamp && incomingMs > 0 && lastStaticSnapshotEpochMs > 0 && incomingMs < lastStaticSnapshotEpochMs) {{
+            return false;
+        }}
+        if (incomingMs > 0) {{
+            lastStaticSnapshotEpochMs = Math.max(lastStaticSnapshotEpochMs, incomingMs);
+        }}
         const m = window.INITIAL_META;
-        if (data.market_open !== undefined) m.market_open = Boolean(data.market_open);
+        const nowMs = Date.now();
+        const bridgeLive = Boolean(lastBridgeSuccessEpoch && (nowMs - lastBridgeSuccessEpoch) < 15000);
+        const allowLiveMarketState = Boolean(opts.forceLive || !bridgeLive);
+
+        if (allowLiveMarketState && data.market_open !== undefined) m.market_open = Boolean(data.market_open);
         if (data.call_wall) m.call_wall = data.call_wall;
         if (data.put_wall) m.put_wall = data.put_wall;
         if (data.zero_gamma_flip) m.zero_gamma_flip = data.zero_gamma_flip;
@@ -1605,24 +2203,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
         if (data.total_net_vex !== undefined) {{
             m.total_net_vex = data.total_net_vex;
-            const vTxt = '$' + (data.total_net_vex >= 0 ? '+' : '') + data.total_net_vex.toFixed(1) + 'M';
-            const el1 = document.getElementById('kpi-vex-val');
-            const el2 = document.getElementById('hud-vanna-val');
-            if (el1) el1.innerText = vTxt;
-            if (el2) el2.innerText = vTxt;
         }}
         if (data.total_net_chex !== undefined) {{
             m.total_net_chex = data.total_net_chex;
-            const cTxt = '$' + (data.total_net_chex >= 0 ? '+' : '') + data.total_net_chex.toFixed(1) + 'M/d';
-            const el1 = document.getElementById('top-charm-val');
-            const el2 = document.getElementById('hud-charm-val');
-            if (el1) el1.innerText = cTxt;
-            if (el2) el2.innerText = cTxt;
         }}
         if (data.implied_forward_price) liveImpliedForward = data.implied_forward_price;
         if (data.dealer_hedge_futures_flow !== undefined) liveDealerHedgeGC = data.dealer_hedge_futures_flow;
-        if (data.bvc_cvd_contracts !== undefined) liveCvdContracts = data.bvc_cvd_contracts;
-        if (data.bvc_buy_pct !== undefined) liveBuyPct = data.bvc_buy_pct;
+        if (allowLiveMarketState && data.bvc_cvd_contracts !== undefined) liveCvdContracts = data.bvc_cvd_contracts;
+        if (allowLiveMarketState && data.bvc_buy_pct !== undefined) liveBuyPct = data.bvc_buy_pct;
         if (data.dynamic_vacuum && typeof data.dynamic_vacuum === 'object') {{
             m.dynamic_vacuum = data.dynamic_vacuum;
         }}
@@ -1638,7 +2226,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 : (psRegime === 'POST_SWEEP_V_SHAPE'
                     ? '#4ADE80'
                     : (psRegime === 'POST_SWEEP_PULLBACK' ? '#38BDF8' : '#94A3B8'));
-            const vacTitle = String((m.dynamic_vacuum && m.dynamic_vacuum.vacuum_label) || '');
+            const vacTitle = String((m.dynamic_vacuum && (m.dynamic_vacuum.label_vi || m.dynamic_vacuum.vacuum_label)) || '');
             ['hud-post-sweep-val', 'micro-post-sweep-val'].forEach((id) => {{
                 const el = document.getElementById(id);
                 if (el) {{
@@ -1648,24 +2236,42 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 }}
             }});
         }}
-        if (Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
+        if (allowLiveMarketState && Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
             mergeLiveCandles(data.recent_candles, '1m');
         }}
-        if (data.tf_candles && typeof data.tf_candles === 'object') {{
+        if (allowLiveMarketState && data.tf_candles && typeof data.tf_candles === 'object') {{
             Object.keys(data.tf_candles).forEach((k) => {{
                 mergeLiveCandles(data.tf_candles[k], k);
             }});
         }}
-        if (data.spot_price) {{
+        if (allowLiveMarketState && data.timestamp_utc) m.timestamp_utc = data.timestamp_utc;
+        if (data.regime) m.regime = data.regime;
+        if (data.call_wall_siege !== undefined) m.call_wall_siege = Number(data.call_wall_siege);
+        if (data.put_wall_siege !== undefined) m.put_wall_siege = Number(data.put_wall_siege);
+        if (data.major_up_wall) m.major_up_wall = Number(data.major_up_wall);
+        if (data.major_down_wall) m.major_down_wall = Number(data.major_down_wall);
+        if (data.has_up_air_pocket !== undefined) m.has_up_air_pocket = Boolean(data.has_up_air_pocket);
+        if (data.has_down_air_pocket !== undefined) m.has_down_air_pocket = Boolean(data.has_down_air_pocket);
+        if (allowLiveMarketState && data.vpin_pct !== undefined && (lastAuthoritativeVpinEpoch === 0 || (nowMs - lastAuthoritativeVpinEpoch) >= 15000 || incomingMs >= lastAuthoritativeVpinEpoch)) {{
+            liveVpinPct = Number(data.vpin_pct);
+            if (data.vpin_label) liveVpinLabel = String(data.vpin_label);
+            if (data.kyle_lambda_label) liveKyleLabel = String(data.kyle_lambda_label);
+            if (data.atr_5m !== undefined) liveAtr5m = Number(data.atr_5m);
+            lastAuthoritativeVpinEpoch = Date.now();
+        }}
+        if (allowLiveMarketState && data.spot_price) {{
             yahooAnchorPrice = Number(data.spot_price);
             if (Math.abs(data.spot_price - currentGoldPrice) > 0.01) {{
                 applyLiveTick(data.spot_price, null, true);
             }} else {{
+                updateRealtimeTacticalCockpit();
                 requestAnimationFrame(drawNeiroOverlay);
             }}
         }} else {{
+            updateRealtimeTacticalCockpit();
             requestAnimationFrame(drawNeiroOverlay);
         }}
+        return true;
     }}
 
     async function checkCloudSyncNow(isManual = false) {{
@@ -1673,40 +2279,25 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         try {{
             if (badge && isManual) badge.innerText = '⟳ SYNCING...';
             if (isManual || (Date.now() - lastYahooPollEpoch > 4000)) {{
-                await pollLiveYahooChart(currentTfKey);
+                await pollLiveYahooChart(currentTf);
             }}
             const data = await fetchCloudVersionJson();
             if (data && data.timestamp_utc) {{
+                const incomingMs = parseIsoEpochMs(data.timestamp_utc);
+                if (incomingMs > 0 && lastStaticSnapshotEpochMs > 0 && incomingMs <= lastStaticSnapshotEpochMs) {{
+                    updateSyncBadgeHonest();
+                    return;
+                }}
                 lastCloudTimestamp = data.timestamp_utc;
+                lastCloudSuccessEpoch = Date.now();
                 buildEpoch = Date.now();
                 updateSyncTimeAgo();
                 hotPatchCloudMeta(data);
-
-                if (badge) {{
-                    if (!isCmeGlobexMarketOpen()) {{
-                        badge.style.background = 'rgba(148, 163, 184, 0.18)';
-                        badge.style.color = '#CBD5E1';
-                        badge.innerText = '● CME GLOBEX: CLOSED (SETTLED)';
-                    }} else {{
-                        badge.style.background = 'rgba(34, 197, 94, 0.15)';
-                        badge.style.color = '#4ADE80';
-                        badge.innerText = '● YAHOO GC=F SYNC: LIVE';
-                    }}
-                }}
+                updateSyncBadgeHonest();
                 return;
             }}
         }} catch (e) {{}}
-        if (badge) {{
-            if (!isCmeGlobexMarketOpen()) {{
-                badge.style.background = 'rgba(148, 163, 184, 0.18)';
-                badge.style.color = '#CBD5E1';
-                badge.innerText = '● CME GLOBEX: CLOSED (SETTLED)';
-            }} else {{
-                badge.style.background = 'rgba(34, 197, 94, 0.15)';
-                badge.style.color = '#4ADE80';
-                badge.innerText = '● YAHOO GC=F STREAM: AUTO';
-            }}
-        }}
+        updateSyncBadgeHonest();
     }}
 
     // 100% Pure CME Gold Futures (GC=F) Real-Time Stream (No Crypto PAXG Proxy Contamination)
@@ -1719,10 +2310,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
     function connectLiveGoldOrderflowStream() {{
         if (!isCmeGlobexMarketOpen()) {{
+            updateSyncBadgeHonest();
             setTimeout(connectLiveGoldOrderflowStream, 30000);
             return;
         }}
-        pollLiveYahooChart(currentTfKey);
+        pollLiveYahooChart(currentTf);
         setTimeout(connectLiveGoldOrderflowStream, YAHOO_POLL_INTERVAL_MS);
     }}
 

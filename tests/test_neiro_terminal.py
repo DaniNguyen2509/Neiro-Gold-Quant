@@ -148,3 +148,59 @@ def test_neiro_terminal_adr026_zero_fake_vtick_fvg_and_squeeze_ladder():
     assert "paxgusdt@aggTrade" not in comp["neiro_js_script"]
     assert "window.location.reload()" not in comp["neiro_js_script"]
 
+
+def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
+    """Verify currentTfKey ReferenceError is fixed, canvas gauge removed, and realtime JS engines wired."""
+    meta = {
+        "spot_price": 4005.0,
+        "atm_strike": 4000.0,
+        "call_wall": 4050.0,
+        "put_wall": 3980.0,
+        "strike_above": 4025.0,
+        "next_above": 4050.0,
+        "strike_below": 4000.0,
+        "next_below": 3975.0,
+        "zero_gamma_flip": 4010.0,
+        "total_net_gex": -15.0,
+        "regime": "SHORT_GAMMA",
+        "dte_days": 5.0,
+        "step": 25.0,
+        "atr_5m": 3.8,
+        "air_pockets": [{"from": 4025.0, "to": 4050.0, "severity": "HIGH"}],
+    }
+    df = pd.DataFrame([
+        {"strike": 3980.0, "callOpenInterest": 200, "putOpenInterest": 1200, "callVolume": 30, "putVolume": 180, "netGEX": -10.0, "netVEX": -1.0, "netCHEX": -0.2},
+        {"strike": 4000.0, "callOpenInterest": 600, "putOpenInterest": 700, "callVolume": 100, "putVolume": 120, "netGEX": -5.0, "netVEX": 0.5, "netCHEX": 0.2},
+        {"strike": 4025.0, "callOpenInterest": 900, "putOpenInterest": 300, "callVolume": 200, "putVolume": 40, "netGEX": 8.0, "netVEX": 1.2, "netCHEX": 0.4},
+    ])
+    comp = render_neiro_orderflow_component(meta, df)
+    js = comp["neiro_js_script"]
+    nav = comp["nav_topbar_html"]
+    hud = comp["neiro_container_html"]
+
+    # Dead currentTfKey bug must never reappear
+    assert "currentTfKey" not in js
+    assert "let currentTf = '1m'" in js
+
+    # Overlapping Top-Center Canvas Gauge must be removed
+    assert "NẾN M1 Δ:" not in js
+
+    # Toggle buttons & compact HUD controls
+    assert "toggleOverlayMode()" in nav
+    assert "toggleChartHeight()" in nav
+    assert 'id="neiro-tf-badge"' in nav
+    assert 'id="top-vpin-val"' in nav
+    assert hud.count('class="hud-item"') == 5
+
+    # Realtime ADR-028 JS parity engines & 3-tier sync
+    for fn_name in (
+        "computeLiveVpinBvcJs",
+        "computeM5AtrJs",
+        "resolveAdaptiveStrikesJs",
+        "computeTacticalMatrixJs",
+        "updateRealtimeTacticalCockpit",
+        "updateSyncBadgeHonest",
+    ):
+        assert fn_name in js
+
+
