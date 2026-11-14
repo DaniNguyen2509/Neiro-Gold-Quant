@@ -310,7 +310,7 @@ void PhysicsEngineUpdate(const MqlRates &rt[], int got, int N, int offset=0, boo
          
          if(isCurve)
            {
-            // Trạng thái ĐANG CONG (Gia tốc rõ rệt hơn Đường thẳng)
+            // Trang thai DANG CONG (Gia toc ro ret hon Duong thang)
             if(epDominates)
               {
                if(isP2Flip)

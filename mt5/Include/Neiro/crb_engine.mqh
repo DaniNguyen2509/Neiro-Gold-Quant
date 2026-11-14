@@ -517,7 +517,7 @@ void CiProcessBar(int b)
         }
      }
    //--- Vach cuc tri CISD (chan doan chung) ---
-   // LUON ghi lai cuc tri cho cac co che khac dung (nhu Slope Sóng Cực Trị).
+   // LUON ghi lai cuc tri cho cac co che khac dung (nhu Slope Song Cuc Tri).
    // Viec hien thi se do Indicator tu quyet dinh thong qua g_cfg.cxShow o phan ve.
    int cur=CxCur();
    if(cur>=0) CxRetire(cur,b);

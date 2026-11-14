@@ -258,9 +258,9 @@ input double           InpCisdTxtGap= 0.3;                  // Vach CISD - day c
 input bool             InpTsAlert   = true;                 // Alert khi co TS moi
 
 //==================================================================
-//   6 - CHẨN ĐOÁN
+//   6 - CHAN DOAN
 //==================================================================
-input group "6 - CHẨN ĐOÁN"
+input group "6 - CHAN DOAN"
 input bool             InpDgShowAll = false;                 
 input int              InpDgKeep    = 50;                   
 input color            InpDgCBull   = C'69,160,136';        
@@ -340,40 +340,40 @@ input color       InpOlColBull = C'8,153,129';  //    mau: OLHC - tin hieu TANG
 //   16 - GANN SWING CONSOLIDATION
 //==================================================================
 input group "16 - GANN SWING CONSOLIDATION"
-input bool   InpGsOn       = false;             // Bật Gann Swing
-input int    InpGsMethod   = 0;                 // Cách phát hiện (0: A, 1: B, 2: C)
-input bool   InpGsUseClose = false;             // Dò sóng theo Close (thay vì High/Low)
-input int    InpGsLayer    = 0;                 // Tầng khung (0: F1, 1: SF1)
-input int    InpGsOvMode   = 2;                 // Kiểu chồng hộp (0: a, 1: b, 2: c)
-input int    InpGsMinTouch = 2;                 // Số lần chạm tối thiểu mỗi biên
-input double InpGsTolPct   = 20.0;              // Dung sai chạm biên (%)
-input double InpGsMaxAtr   = 3.0;               // Chiều cao hộp tối đa (x ATR)
+input bool   InpGsOn       = false;             // Bat Gann Swing
+input int    InpGsMethod   = 0;                 // Cach phat hien (0: A, 1: B, 2: C)
+input bool   InpGsUseClose = false;             // Do song theo Close (thay vi High/Low)
+input int    InpGsLayer    = 0;                 // Tang khung (0: F1, 1: SF1)
+input int    InpGsOvMode   = 2;                 // Kieu chong hop (0: a, 1: b, 2: c)
+input int    InpGsMinTouch = 2;                 // So lan cham toi thieu moi bien
+input double InpGsTolPct   = 20.0;              // Dung sai cham bien (%)
+input double InpGsMaxAtr   = 3.0;               // Chieu cao hop toi da (x ATR)
 input int    InpGsAtrLen   = 14;                // ATR Length
-input int    InpGsMinBars  = 10;                // Số nến tối thiểu của vùng
-input int    InpGsMaxPiv   = 20;                // Số điểm swing tối đa xét (Cách A/B)
-input int    InpGsMaxLook  = 150;               // Số nến tối đa xét (Cách C)
-input int    InpGsDrawMode = 0;                 // Biên vẽ (0: Ngoài, 1: Trong, 2: Cả hai)
-input int    InpGsBrkMode  = 0;                 // Biên xét phá (0: Ngoài, 1: Trong)
-input bool   InpGsCfOn     = false;             // Bật bộ lọc kiểu C
-input double InpGsCfClose  = 60.0;              // Tỷ lệ nến đóng cửa trong biên trong >= %
-input double InpGsCfIB     = 0.0;               // Tỷ lệ inside bar >= %
-input int    InpGsBtrN     = 5;                 // Cửa sổ BTR (số nến)
-input double InpGsDBody    = 0.60;              // BAG - Thân/Range >=
-input double InpGsDClose   = 0.70;              // BAG - Vị trí Close >=
-input double InpGsDAtr     = 1.20;              // BAG - Range nến >= x ATR
+input int    InpGsMinBars  = 10;                // So nen toi thieu cua vung
+input int    InpGsMaxPiv   = 20;                // So diem swing toi da xet (Cach A/B)
+input int    InpGsMaxLook  = 150;               // So nen toi da xet (Cach C)
+input int    InpGsDrawMode = 0;                 // Bien ve (0: Ngoai, 1: Trong, 2: Ca hai)
+input int    InpGsBrkMode  = 0;                 // Bien xet pha (0: Ngoai, 1: Trong)
+input bool   InpGsCfOn     = false;             // Bat bo loc kieu C
+input double InpGsCfClose  = 60.0;              // Ty le nen dong cua trong bien trong >= %
+input double InpGsCfIB     = 0.0;               // Ty le inside bar >= %
+input int    InpGsBtrN     = 5;                 // Cua so BTR (so nen)
+input double InpGsDBody    = 0.60;              // BAG - Than/Range >=
+input double InpGsDClose   = 0.70;              // BAG - Vi tri Close >=
+input double InpGsDAtr     = 1.20;              // BAG - Range nen >= x ATR
 input bool   InpGsVolOn    = false;             // BAG - Filter Volume
 input double InpGsVolMult  = 1.5;               // BAG - >= x TB
-input int    InpGsVolLen   = 20;                // BAG - Kỳ TB
-input bool   InpGsSzOn     = true;              // Bật Min FVG Size
-input double InpGsSzMult   = 0.30;              // Chiều cao FVG >= x ATR
-input int    InpGsSzMode   = 1;                 // Hình thức áp dụng (0: Cả BO & BAG, 1: Chỉ BAG)
-input bool   InpGsAlertOn  = true;              // Alert khi có tín hiệu GS
+input int    InpGsVolLen   = 20;                // BAG - Ky TB
+input bool   InpGsSzOn     = true;              // Bat Min FVG Size
+input double InpGsSzMult   = 0.30;              // Chieu cao FVG >= x ATR
+input int    InpGsSzMode   = 1;                 // Hinh thuc ap dung (0: Ca BO & BAG, 1: Chi BAG)
+input bool   InpGsAlertOn  = true;              // Alert khi co tin hieu GS
 
-input group "16.1 - GANN HÌNH ẢNH"
-input color  InpGsBorder   = C'0,188,212';      // Hộp - Viền
-input color  InpGsFill     = C'0,188,212';      // Nền
-input int    InpGsFillTr   = 88;                // Nền - Trong suốt (0-100)
-input color  InpGsInner    = C'255,152,0';      // Biên trong
+input group "16.1 - GANN HINH ANH"
+input color  InpGsBorder   = C'0,188,212';      // Hop - Vien
+input color  InpGsFill     = C'0,188,212';      // Nen
+input int    InpGsFillTr   = 88;                // Nen - Trong suot (0-100)
+input color  InpGsInner    = C'255,152,0';      // Bien trong
 input color  InpGsBOBuy    = C'38,166,154';     // B/O Buy
 input color  InpGsBOSell   = C'239,83,80';      // B/O Sell
 input color  InpGsBAGBuy   = C'0,230,118';      // BAG Buy
@@ -382,21 +382,21 @@ input color  InpGsBTRBuy   = C'66,165,245';     // BTR Buy
 input color  InpGsBTRSell  = C'255,167,38';     // BTR Sell
 input color  InpGsBTRsBuy  = C'21,101,192';     // BTR* Buy
 input color  InpGsBTRsSell = C'230,81,0';       // BTR* Sell
-input bool   InpGsShowF1   = false;             // Vẽ sóng F1
-input color  InpGsColF1    = clrAqua;           // Màu F1
-input bool   InpGsShowSF   = false;             // Vẽ sóng SF1
-input color  InpGsColSF    = clrYellow;         // Màu SF1
+input bool   InpGsShowF1   = false;             // Ve song F1
+input color  InpGsColF1    = clrAqua;           // Mau F1
+input bool   InpGsShowSF   = false;             // Ve song SF1
+input color  InpGsColSF    = clrYellow;         // Mau SF1
 
 
 //==================================================================
 //   17 - FVG MULTI-TIMEFRAME
 //==================================================================
 input group "17 - FVG MULTI-TIMEFRAME"
-input bool        InpFvgOn      = false;             // Bật FVG MTF
+input bool        InpFvgOn      = false;             // Bat FVG MTF
 input int         InpFvgN       = 100;               // Number of FVGs
 input ENUM_LINE_STYLE InpFvgHtfSty = STYLE_DASH;     // HTF FVG Style
-input bool        InpFvgExtOn   = false;             // Kéo dài FVG đến khi bị lấp
-input bool        InpFvgHideFill= false;             // Ẩn FVG đã lấp
+input bool        InpFvgExtOn   = false;             // Keo dai FVG den khi bi lap
+input bool        InpFvgHideFill= false;             // An FVG da lap
 input bool        InpFvgCtfOn   = false;             // ChartTF FVG
 input color       InpFvgBullClr = C'0,128,0';        // BullFVG Clr
 input color       InpFvgBearClr = C'255,165,0';      // BearFVG Clr
@@ -418,11 +418,11 @@ input bool             InpSlLean   = false;             // CHE DO GON - chan VE 
 input bool             InpSlOn     = false;             // Bat cum do doc
 enum ENUM_SL_ANCHOR
   {
-   SL_ANCHOR_CISD,    // Sóng Cực Trị
-   SL_ANCHOR_FIXED    // Nến Cố Định
+   SL_ANCHOR_CISD,    // Song Cuc Tri
+   SL_ANCHOR_FIXED    // Nen Co Dinh
   };
 input ENUM_SL_ANCHOR   InpSlAnchor = SL_ANCHOR_CISD;    // Chon diem neo
-input ENUM_TIMEFRAMES  InpSlTF     = PERIOD_M15;        // Khung doc du lieu (Nến cố định)
+input ENUM_TIMEFRAMES  InpSlTF     = PERIOD_M15;        // Khung doc du lieu (Nen co dinh)
 input int              InpSlLen    = 9;                 // Hoi quy qua N nen (3..500)
 input ENUM_APPLIED_PRICE InpSlSrc  = PRICE_WEIGHTED;    // Lay gia nao
 input int              InpSlAtrLen = 14;                // Chuan hoa - chu ky ATR
@@ -461,9 +461,9 @@ input bool             InpDbMech   = false;             // Them hai dong JUDAS /
 
 // Dinh nghia o CUOI file (can EngineTf()), nhung Rebuild() goi truoc -> khai bao truoc.
 //==================================================================
-//   15 - DISPLACEMENT SỚM (V7)
+//   15 - DISPLACEMENT SOM (V7)
 //==================================================================
-input group "15 - DISPLACEMENT SỚM (V7)"
+input group "15 - DISPLACEMENT SOM (V7)"
 input bool   InpDispOn         = false;       // BAT CANH BAO DISPLACEMENT SOM
 input double InpDispAtrMult    = 1.5;         // Nguong than nen (x ATR)
 input double InpDispVolMult    = 1.5;         // Nguong khoi luong (x Trung binh 20)
@@ -1283,7 +1283,7 @@ void SlCompute()
    int got=CopyRates(_Symbol,SlTfEff(),0,N+sl_cur_offset+SlAtrEff()+maxMA+50,rt);
    if(got<N+sl_cur_offset+2) return;
 
-   // Lấy ATR tại điểm neo cuối (last - offset) giống như Pine Script ta.atr[offset]
+   // Lay ATR tai diem neo cuoi (last - offset) giong nhu Pine Script ta.atr[offset]
    double atr=SlAtr(rt,got-sl_cur_offset,SlAtrEff());
    int last=got-1;
 
@@ -1544,10 +1544,10 @@ void DbDraw()
    ObjectSetInteger(0,bg,OBJPROP_COLOR,cBg);
 
    //--- KET LUAN ---
-   string sSta="CHỜ NẾN";
+   string sSta="CHO NEN";
    color  cSta=InpSlColFlat;
-   string sDesc="Chưa đủ dữ liệu nến";
-   string sAct="Đứng ngoài chờ nến";
+   string sDesc="Chua du du lieu nen";
+   string sAct="Dung ngoai cho nen";
    bool haveP2=(InpSlOn && sl_p2ok);
 
    if(sl_ok)
@@ -1557,18 +1557,18 @@ void DbDraw()
       
       if(loan)
         {
-         sSta="NHIỄU LOẠN";
-         sDesc="Hành vi giá nhiễu loạn (Choppy)";
-         sAct="Không giao dịch (No Trade Zone)";
+         sSta="NHIEU LOAN";
+         sDesc="Hanh vi gia nhieu loan (Choppy)";
+         sAct="Khong giao dich (No Trade Zone)";
         }
       else if(InpEnergyOn)
         {
          if(MathAbs(sl_bNorm) <= InpSlFlat)
            {
-            sSta="TÍCH LŨY";
+            sSta="TICH LUY";
             cSta=clrMagenta;
-            sDesc="Giá nén chặt trong biên độ hẹp (Consolidation)";
-            sAct="Chờ đợi Breakout xác nhận";
+            sDesc="Gia nen chat trong bien do hep (Consolidation)";
+            sAct="Cho doi Breakout xac nhan";
            }
          else
            {
@@ -1583,34 +1583,34 @@ void DbDraw()
                  {
                   if(isP2Flip)
                     {
-                     sSta="ĐẢO CHIỀU XÁC NHẬN";
+                     sSta="DAO CHIEU XAC NHAN";
                      cSta=isUptrend?InpSlP2Dn:InpSlP2Up;
-                     sDesc="Gia tốc đảo chiều. Cấu trúc giá thay đổi";
-                     sAct="Tìm kiếm Entry đảo chiều (Reversal)";
+                     sDesc="Gia toc dao chieu. Cau truc gia thay doi";
+                     sAct="Tim kiem Entry dao chieu (Reversal)";
                     }
                   else
                     {
-                     sSta="KIỆT SỨC (CĂNG MAX)";
+                     sSta="KIET SUC (CANG MAX)";
                      cSta=isUptrend?InpSlP2Dn:InpSlP2Up;
-                     sDesc="Đà giá mở rộng quá mức (Overextended)";
-                     sAct="Chuẩn bị kịch bản đảo chiều (Reversal)";
+                     sDesc="Da gia mo rong qua muc (Overextended)";
+                     sAct="Chuan bi kich ban dao chieu (Reversal)";
                     }
                  }
                else
                  {
                   if(isP2Flip)
                     {
-                     sSta="PULLBACK SÂU";
+                     sSta="PULLBACK SAU";
                      cSta=C'255,167,38'; // Orange
-                     sDesc="Retracement sâu về Discount/Premium";
-                     sAct="Tìm kiếm Entry thuận xu hướng";
+                     sDesc="Retracement sau ve Discount/Premium";
+                     sAct="Tim kiem Entry thuan xu huong";
                     }
                   else
                     {
-                     sSta="PULLBACK NHẸ";
+                     sSta="PULLBACK NHE";
                      cSta=C'255,167,38'; // Orange
-                     sDesc="Nhịp hồi ngắn. Xung lượng chính vẫn mạnh";
-                     sAct="Chốt lời ngắn. KHÔNG bắt đỉnh/đáy";
+                     sDesc="Nhip hoi ngan. Xung luong chinh van manh";
+                     sAct="Chot loi ngan. KHONG bat dinh/day";
                     }
                  }
               }
@@ -1618,26 +1618,26 @@ void DbDraw()
               {
                if(!epDominates)
                  {
-                  sSta="BÙNG NỔ THỰC SỰ";
+                  sSta="BUNG NO THUC SU";
                   cSta=isUptrend?InpSlColUp:InpSlColDn;
-                  sDesc="Đột phá động lượng, Volume YẾU";
-                  sAct="Cảnh giác Fakeout/Stop Hunt. Scalp hoặc Nghỉ";
+                  sDesc="Dot pha dong luong, Volume YEU";
+                  sAct="Canh giac Fakeout/Stop Hunt. Scalp hoac Nghi";
                  }
                else
                  {
                   if(sl_mass > 1.5)
                     {
-                     sSta="QUÁN TÍNH (" + string(isUptrend?"TĂNG":"GIẢM") + ")";
+                     sSta="QUAN TINH (" + string(isUptrend?"TANG":"GIAM") + ")";
                      cSta=isUptrend?InpSlColUp:InpSlColDn;
-                     sDesc="Động lượng duy trì, Volume dồi dào";
-                     sAct="Nắm giữ lệnh thuận xu hướng";
+                     sDesc="Dong luong duy tri, Volume doi dao";
+                     sAct="Nam giu lenh thuan xu huong";
                     }
                   else
                     {
-                     sSta="TÍCH LŨY";
+                     sSta="TICH LUY";
                      cSta=clrMagenta;
-                     sDesc="Giá nén chặt trong biên độ hẹp (Consolidation)";
-                     sAct="Chờ đợi Breakout xác nhận";
+                     sDesc="Gia nen chat trong bien do hep (Consolidation)";
+                     sAct="Cho doi Breakout xac nhan";
                     }
                  }
               }
@@ -1645,34 +1645,34 @@ void DbDraw()
         }
       else if(cong) // Legacy State Machine
         {
-         sSta="CHUYỂN HƯỚNG";
+         sSta="CHUYEN HUONG";
          cSta=(sl_p2a>=0.0)? InpSlP2Up : InpSlP2Dn;
-         sDesc="Cấu trúc giá chuyển pha, chưa rõ xu hướng";
-         sAct="Đứng ngoài quan sát";
+         sDesc="Cau truc gia chuyen pha, chua ro xu huong";
+         sAct="Dung ngoai quan sat";
         }
       else if(sl_bNorm>InpSlFlat)
         {
          if(haveP2 && sl_p2Slope<=InpSlFlat)
-           { sSta="KIỆT SỨC (TĂNG)"; cSta=InpSlP2Dn;
-             sDesc="Xung lượng Tăng suy yếu dần"; sAct="Canh chốt lời (Take Profit)"; }
+           { sSta="KIET SUC (TANG)"; cSta=InpSlP2Dn;
+             sDesc="Xung luong Tang suy yeu dan"; sAct="Canh chot loi (Take Profit)"; }
          else
-           { sSta="TĂNG"; cSta=InpSlColUp;
-             sDesc="Xu hướng Tăng ổn định"; sAct="Follow Trend"; }
+           { sSta="TANG"; cSta=InpSlColUp;
+             sDesc="Xu huong Tang on dinh"; sAct="Follow Trend"; }
         }
       else if(sl_bNorm<-InpSlFlat)
         {
          if(haveP2 && sl_p2Slope>=-InpSlFlat)
-           { sSta="KIỆT SỨC (GIẢM)"; cSta=InpSlP2Up;
-             sDesc="Xung lượng Giảm suy yếu dần"; sAct="Canh chốt lời (Take Profit)"; }
+           { sSta="KIET SUC (GIAM)"; cSta=InpSlP2Up;
+             sDesc="Xung luong Giam suy yeu dan"; sAct="Canh chot loi (Take Profit)"; }
          else
-           { sSta="GIẢM"; cSta=InpSlColDn;
-             sDesc="Xu hướng Giảm ổn định"; sAct="Follow Trend"; }
+           { sSta="GIAM"; cSta=InpSlColDn;
+             sDesc="Xu huong Giam on dinh"; sAct="Follow Trend"; }
         }
       else
         {
-         sSta="ĐI NGANG";
-         sDesc="Giá đi ngang (Ranging)";
-         sAct="Không giao dịch (No Trade Zone)";
+         sSta="DI NGANG";
+         sDesc="Gia di ngang (Ranging)";
+         sAct="Khong giao dich (No Trade Zone)";
         }
      }
 
@@ -1696,8 +1696,8 @@ void DbDraw()
       string s1Dir = "";
       double curS1 = MathAbs(sl_bNorm);
       double prevS1 = MathAbs(sl_bNormPrev);
-      if(curS1 > prevS1) s1Dir = " (Tăng)";
-      else if(curS1 < prevS1) s1Dir = " (Giảm)";
+      if(curS1 > prevS1) s1Dir = " (Tang)";
+      else if(curS1 < prevS1) s1Dir = " (Giam)";
       vSlope = SlFmt(sl_bNormPrev, 2) + " -> " + SlFmt(sl_bNorm, 2) + s1Dir;
      }
    string vRaw  = sl_ok  ? SlFmt(sl_bRaw,digs)         : "-";
@@ -1708,8 +1708,8 @@ void DbDraw()
       string slpDir = "";
       double curSlp = MathAbs(sl_p2Slope);
       double prevSlpAbs = MathAbs(sl_p2SlopePrev);
-      if(curSlp > prevSlpAbs) slpDir = " (Tăng)";
-      else if(curSlp < prevSlpAbs) slpDir = " (Giảm)";
+      if(curSlp > prevSlpAbs) slpDir = " (Tang)";
+      else if(curSlp < prevSlpAbs) slpDir = " (Giam)";
       vP2S = SlFmt(sl_p2SlopePrev, 2) + " -> " + SlFmt(sl_p2Slope, 2) + slpDir;
      }
    string vAcc  = "-";
@@ -1718,8 +1718,8 @@ void DbDraw()
         string accDir = "";
         double curAcc = MathAbs(sl_p2Acc);
         double prevAccAbs = MathAbs(sl_p2AccPrev);
-        if(curAcc > prevAccAbs) accDir = " (Tăng)";
-        else if(curAcc < prevAccAbs) accDir = " (Giảm)";
+        if(curAcc > prevAccAbs) accDir = " (Tang)";
+        else if(curAcc < prevAccAbs) accDir = " (Giam)";
         vAcc = SlFmt(sl_p2AccPrev, 3) + " -> " + SlFmt(sl_p2Acc, 3) + accDir;
        }
    string vR22  = sl_p2ok? DoubleToString(sl_p2r2,2)   : "-";
@@ -1780,9 +1780,9 @@ void DbDraw()
       int idx = 0;
       
       if(i==idx){ nm=" ";           vl=vWin;   tp=tWin;   } idx++;
-      if(i==idx){ nm="Độ dốc 1";    vl=vSlope; tp=tSlope; } idx++;
-      if(i==idx){ nm="Độ tin cậy";  vl=vR2;    tp=tR2;    } idx++;
-      if(i==idx){ nm="Độ dốc 2";    vl=vP2S;   tp=tP2S;   } idx++;
+      if(i==idx){ nm="Do doc 1";    vl=vSlope; tp=tSlope; } idx++;
+      if(i==idx){ nm="Do tin cay";  vl=vR2;    tp=tR2;    } idx++;
+      if(i==idx){ nm="Do doc 2";    vl=vP2S;   tp=tP2S;   } idx++;
       if(i==idx){ nm=" ";           vl=vAcc;   tp=tAcc;   cv=cAcc; } idx++;
       
       if(i==idx){ nm=" ";           vl=sSta;   cv=cSta; } idx++;
@@ -1844,14 +1844,14 @@ void Rebuild(const int rates_total)
    // ben tren - bang van biet cu JD/TS gan nhat, bias H1 van tinh.
 
    //==================================================================
-   // DISPLACEMENT SỚM (V7)
+   // DISPLACEMENT SOM (V7)
    //==================================================================
    if(InpDispOn)
      {
-      int b = rates_total - 1; // nến hiện tại
+      int b = rates_total - 1; // nen hien tai
       double myAtr14 = gA14[b];
       
-      // Tính avgVol20
+      // Tinh avgVol20
       double avgVol20 = 0;
       int p = 20;
       if(p > rates_total) p = rates_total;
@@ -1866,7 +1866,7 @@ void Rebuild(const int rates_total)
       double btmWick = MathMin(gC[b], gO[b]) - gL[b];
       
       double prevAcc = 0;
-      if (b > 0) prevAcc = sl_p2Acc; // Chú ý: Cần track mảng sl_p2Acc nếu muốn chính xác, ở đây dùng tạm giá trị sl_p2Acc tính toán ở trên.
+      if (b > 0) prevAcc = sl_p2Acc; // Chu y: Can track mang sl_p2Acc neu muon chinh xac, o day dung tam gia tri sl_p2Acc tinh toan o tren.
 
       bool accSurging = (!InpDispAccSurging) || (MathAbs(sl_p2Acc) > MathAbs(prevAcc));
       bool accBuyOk = (!InpDispUseAcc) || (sl_p2Acc > 0 && accSurging);
@@ -2092,7 +2092,7 @@ string GetAlertState()
    
    if(InpEnergyOn)
      {
-      if(MathAbs(sl_bNorm) <= InpSlFlat || sl_mass <= 1.5) return "TÍCH LŨY (NÉN)";
+      if(MathAbs(sl_bNorm) <= InpSlFlat || sl_mass <= 1.5) return "TICH LUY (NEN)";
       
       bool isUptrend = (sl_bNorm > 0);
       bool isBraking = (haveP2 && ((isUptrend && sl_p2Acc < 0) || (!isUptrend && sl_p2Acc > 0)));
@@ -2102,7 +2102,7 @@ string GetAlertState()
       return "TRENDING_ENERGY";
      }
    
-   if(MathAbs(sl_bNorm) <= InpSlFlat) return "TÍCH LŨY (NÉN)"; // Hoac Di Ngang
+   if(MathAbs(sl_bNorm) <= InpSlFlat) return "TICH LUY (NEN)"; // Hoac Di Ngang
    
    return "OTHER";
 }
@@ -2201,7 +2201,7 @@ int OnCalculate(const int rates_total,
       string sta = GetAlertState();
       bool skip = false;
       if(sta=="GIA LOAN" && !InpAlertNoisy) skip=true;
-      if(sta=="TÍCH LŨY (NÉN)" && !InpAlertAccum) skip=true;
+      if(sta=="TICH LUY (NEN)" && !InpAlertAccum) skip=true;
       if(!skip) Alert("2TC-v10 ["+_Symbol+" "+StringSubstr(EnumToString(EngineTf()),7)+"]: "+g_alertMsg);
      }
 
