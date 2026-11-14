@@ -3,6 +3,7 @@ from typing import Any
 import numpy as np
 
 from .models import OptionsSnapshot, Wall
+from .institutional import resolve_cme_session_liquidity
 
 
 def _brentq(f, a: float, b: float, xtol: float = 0.01, maxiter: int = 100) -> float:
@@ -730,6 +731,11 @@ def reconstruct_institutional_orderflow(
     dte_days: float = 15.0,
     m5_tape: dict[str, Any] | None = None,
     zero_gamma_flip: float | None = None,
+    call_wall: float | None = None,
+    put_wall: float | None = None,
+    air_pockets: list[dict[str, Any]] | None = None,
+    vrp_spread_pct: float = 0.0,
+    session_tag: str | None = None,
 ) -> dict[str, Any]:
     """Reconstructs real-time institutional orderflow without paid CME MDP 3.0 Level 3 feed.
 
@@ -759,6 +765,27 @@ def reconstruct_institutional_orderflow(
         "flip_integrity_regime": "CONTESTED_FLIP_ZONE",
         "flip_integrity_label": "⚖️ ĐANG ĐỒNG BỘ DỮ LIỆU TRỤC GAMMA FLIP",
         "flip_integrity_color": "#38BDF8",
+        "dynamic_vacuum": {
+            "vacuum_active": False,
+            "regime": "NORMAL_DEPTH",
+            "label_vi": "ĐỘ SÂU THỊ TRƯỜNG ỔN ĐỊNH",
+            "illiq_latest": 0.0,
+            "illiq_q95": 0.0,
+            "illiq_percentile": 0.0,
+            "rs_latest": 0.0,
+            "rs_z_score": 0.0,
+            "session_tag": session_tag or "LONDON_DEEP",
+            "vacuum_bar_times": [],
+        },
+        "institutional_fvgs": [],
+        "post_sweep_execution": {
+            "post_sweep_regime": "MONITORING",
+            "allow_reversal": False,
+            "direction": "NONE",
+            "entry_style": "WAIT_SWEEP_CONFIRMATION",
+            "target_zone": [],
+            "label_vi": "THEO DÕI — CHỜ TÍN HIỆU QUÉT & HẤP THỤ TẠI WALL",
+        },
     }
     if df is None or getattr(df, "empty", True) or spot_price <= 0:
         return empty_res
@@ -961,6 +988,41 @@ def reconstruct_institutional_orderflow(
         kyle_lambda_regime=kyle_regime,
     )
 
+    resolved_session = session_tag or resolve_cme_session_liquidity()[0]
+    eff_call_wall = float(call_wall or 0.0)
+    eff_put_wall = float(put_wall or 0.0)
+    if eff_call_wall <= 0.0 and "callOpenInterest" in df.columns:
+        c_oi_idx = df["callOpenInterest"].astype(float).idxmax()
+        eff_call_wall = float(df.loc[c_oi_idx, "strike"])
+    if eff_put_wall <= 0.0 and "putOpenInterest" in df.columns:
+        p_oi_idx = df["putOpenInterest"].astype(float).idxmax()
+        eff_put_wall = float(df.loc[p_oi_idx, "strike"])
+
+    dynamic_vacuum = compute_dynamic_liquidity_vacuum(candles, session_tag=resolved_session)
+    struct_levels = [
+        lvl for lvl in (eff_call_wall, eff_put_wall, zero_gamma_flip)
+        if lvl is not None and float(lvl) > 0.0
+    ]
+    institutional_fvgs = detect_institutional_fvgs(
+        candles,
+        vacuum_bar_times=dynamic_vacuum["vacuum_bar_times"],
+        structural_levels=struct_levels,
+        air_pockets=air_pockets,
+        session_tag=resolved_session,
+    )
+    post_sweep_exec = classify_post_sweep_execution(
+        candles=candles,
+        spot_price=spot_price,
+        call_wall=eff_call_wall,
+        put_wall=eff_put_wall,
+        vpin_pct=vpin_pct,
+        kyle_regime=kyle_regime,
+        parity_z_score=parity_z_score,
+        vrp_spread_pct=vrp_spread_pct,
+        active_fvgs=institutional_fvgs,
+        session_tag=resolved_session,
+    )
+
     return {
         "implied_forward_price": round(f_opt, 2),
         "forward_dislocation_usd": delta_f,
@@ -986,6 +1048,9 @@ def reconstruct_institutional_orderflow(
         "flip_integrity_regime": flip_integrity["flip_integrity_regime"],
         "flip_integrity_label": flip_integrity["flip_integrity_label"],
         "flip_integrity_color": flip_integrity["flip_integrity_color"],
+        "dynamic_vacuum": dynamic_vacuum,
+        "institutional_fvgs": institutional_fvgs,
+        "post_sweep_execution": post_sweep_exec,
     }
 
 
@@ -1162,3 +1227,357 @@ def compute_rolling_kyle_lambda_ols(candles: list[dict[str, Any]], window: int =
         "kyle_lambda_regime": kyle_regime,
         "kyle_lambda_label": kyle_label,
     }
+
+
+def compute_rogers_satchell_bar(
+    open_p: float,
+    high_p: float,
+    low_p: float,
+    close_p: float,
+) -> float:
+    """Computes drift-independent Rogers-Satchell (1991) bar range volatility.
+
+    Unlike Parkinson/Garman-Klass, handles non-zero directional drift during
+    momentum cascades without underestimating volatility.
+    """
+    if open_p <= 0.0 or high_p <= 0.0 or low_p <= 0.0 or close_p <= 0.0 or high_p < low_p:
+        return 0.0
+    h = max(high_p, open_p, close_p)
+    lo = min(low_p, open_p, close_p)
+    rs_var = math.log(h / close_p) * math.log(h / open_p) + math.log(lo / close_p) * math.log(lo / open_p)
+    return math.sqrt(max(0.0, rs_var))
+
+
+def _extract_valid_vacuum_bars(candles: list[dict[str, Any]], window: int) -> list[dict[str, float]]:
+    """Extracts completed positive-volume OHLCV bars for vacuum estimation."""
+    valid: list[dict[str, float]] = []
+    prev_c = 0.0
+    for c in candles[-window:]:
+        o_p = float(c.get("open", 0.0) or 0.0)
+        h_p = float(c.get("high", 0.0) or 0.0)
+        l_p = float(c.get("low", 0.0) or 0.0)
+        c_p = float(c.get("close", 0.0) or 0.0)
+        vol = float(c.get("volume", 0.0) or 0.0)
+        ts = int(c.get("time", 0) or 0)
+        if vol <= 0.0 or o_p <= 0.0 or h_p <= 0.0 or l_p <= 0.0 or c_p <= 0.0 or h_p < l_p:
+            if c_p > 0.0:
+                prev_c = c_p
+            continue
+        ref_c = prev_c if prev_c > 0.0 else o_p
+        illiq = abs(math.log(c_p / ref_c)) / vol
+        rs_vol = compute_rogers_satchell_bar(o_p, h_p, l_p, c_p)
+        bar_lam = abs(c_p - o_p) / vol * 1000.0
+        valid.append({
+            "time": ts,
+            "illiq": illiq,
+            "rs": rs_vol,
+            "bar_lam": bar_lam,
+            "range": h_p - l_p,
+        })
+        prev_c = c_p
+    return valid
+
+
+def compute_dynamic_liquidity_vacuum(
+    candles: list[dict[str, Any]],
+    session_tag: str | None = None,
+    window: int = 60,
+) -> dict[str, Any]:
+    """Detects OHLCV-based Dynamic Liquidity Vacuum (ADR-026 Layer 2).
+
+    Combines High-Frequency Amihud Illiquidity, drift-independent Rogers-Satchell
+    volatility, and bar-level Kyle impact gated strictly by Volume > 0 and deep
+    CME trading sessions (LONDON_DEEP / NY_COMEX_DEEP).
+    """
+    session_name = session_tag or resolve_cme_session_liquidity()[0]
+    valid = _extract_valid_vacuum_bars(candles or [], window)
+    base_res = {
+        "vacuum_active": False,
+        "regime": ("GLOBEX_CLOSED" if session_name == "GLOBEX_CLOSED"
+                   else ("THIN_SESSION_GUARDED" if session_name == "ASIAN_THIN" else "NORMAL_DEPTH")),
+        "label_vi": "ĐỘ SÂU THỊ TRƯỜNG ỔN ĐỊNH",
+        "illiq_latest": 0.0,
+        "illiq_q95": 0.0,
+        "illiq_percentile": 0.0,
+        "rs_latest": 0.0,
+        "rs_z_score": 0.0,
+        "session_tag": session_name,
+        "vacuum_bar_times": [],
+    }
+    if len(valid) < 6:
+        return base_res
+
+    illiqs = [b["illiq"] for b in valid]
+    rs_vals = [b["rs"] for b in valid]
+    bar_lams = [b["bar_lam"] for b in valid]
+    ranges = [b["range"] for b in valid]
+
+    is_deep_session = session_name in {"LONDON_DEEP", "NY_COMEX_DEEP"}
+    vacuum_times: list[int] = []
+    last_q95_illiq = 0.0
+    last_rs_z = 0.0
+    last_is_vac = False
+
+    for i in range(5, len(valid)):
+        hist_illiq = illiqs[:i]
+        hist_rs = rs_vals[:i]
+        hist_lam = bar_lams[:i]
+        hist_rng = ranges[:i]
+
+        q95_illiq = float(np.percentile(hist_illiq, 95))
+        q95_lam = float(np.percentile(hist_lam, 95))
+        mu_rs = float(np.mean(hist_rs))
+        std_rs = max(1e-6, float(np.std(hist_rs)))
+        rs_z = (rs_vals[i] - mu_rs) / std_rs
+        atr = max(1e-4, float(np.mean(hist_rng)))
+
+        is_vac = (
+            is_deep_session
+            and illiqs[i] >= q95_illiq
+            and rs_z >= 2.0
+            and (bar_lams[i] >= q95_lam or ranges[i] >= 1.8 * atr)
+        )
+        if is_vac and valid[i]["time"] > 0:
+            vacuum_times.append(int(valid[i]["time"]))
+        if i == len(valid) - 1:
+            last_q95_illiq = q95_illiq
+            last_rs_z = rs_z
+            last_is_vac = is_vac
+
+    latest_illiq = illiqs[-1]
+    pct_rank = float(np.mean([1.0 if x <= latest_illiq else 0.0 for x in illiqs[:-1]])) * 100.0
+
+    if session_name == "GLOBEX_CLOSED":
+        regime = "GLOBEX_CLOSED"
+        label_vi = "SÀN CME ĐÓNG CỬA — KHÓA QUÉT VACUUM"
+    elif not is_deep_session:
+        regime = "THIN_SESSION_GUARDED"
+        label_vi = "PHIÊN Á THANH KHOẢN MỎNG — CHẶN CẢNH BÁO VACUUM GIẢ"
+    elif last_is_vac:
+        regime = "DYNAMIC_LIQUIDITY_VACUUM"
+        label_vi = f"CHÂN KHÔNG THANH KHOẢN ĐỘNG (Amihud Q95+ • RS Z={last_rs_z:.1f})"
+    else:
+        regime = "NORMAL_DEPTH"
+        label_vi = f"ĐỘ SÂU THỊ TRƯỜNG ỔN ĐỊNH (RS Z={last_rs_z:+.1f})"
+
+    return {
+        "vacuum_active": bool(last_is_vac and is_deep_session),
+        "regime": regime,
+        "label_vi": label_vi,
+        "illiq_latest": round(latest_illiq, 8),
+        "illiq_q95": round(last_q95_illiq, 8),
+        "illiq_percentile": round(pct_rank, 1),
+        "rs_latest": round(rs_vals[-1], 6),
+        "rs_z_score": round(last_rs_z, 2),
+        "session_tag": session_name,
+        "vacuum_bar_times": vacuum_times,
+    }
+
+
+def _is_zone_backed(
+    gap_low: float,
+    gap_high: float,
+    structural_levels: list[float],
+    air_pockets: list[dict[str, Any]],
+    tol_usd: float = 3.0,
+) -> bool:
+    """Checks whether an FVG zone overlaps a key CME Wall/Gamma level or OI Air Pocket."""
+    for lvl in structural_levels:
+        if (gap_low - tol_usd) <= float(lvl) <= (gap_high + tol_usd):
+            return True
+    for ap in air_pockets:
+        p_from = float(ap.get("from", getattr(ap, "start_strike", 0.0)) or 0.0)
+        p_to = float(ap.get("to", getattr(ap, "end_strike", 0.0)) or 0.0)
+        if p_from <= 0.0 or p_to <= 0.0:
+            continue
+        ap_lo, ap_hi = min(p_from, p_to), max(p_from, p_to)
+        if ap_lo <= gap_high + 2.0 and ap_hi >= gap_low - 2.0:
+            return True
+    return False
+
+
+def detect_institutional_fvgs(
+    candles: list[dict[str, Any]],
+    vacuum_bar_times: set[int] | list[int] | None = None,
+    structural_levels: list[float] | None = None,
+    air_pockets: list[dict[str, Any]] | None = None,
+    session_tag: str | None = None,
+    max_fvgs: int = 4,
+    min_gap_usd: float = 0.50,
+) -> list[dict[str, Any]]:
+    """Extracts unmitigated 3-bar Institutional Fair Value Gaps validated by Vacuum or Options levels."""
+    if not candles or len(candles) < 3:
+        return []
+
+    session_name = session_tag or resolve_cme_session_liquidity()[0]
+    vac_set = {int(t) for t in (vacuum_bar_times or []) if t}
+    levels = list(structural_levels or [])
+    pockets = list(air_pockets or [])
+
+    recent = candles[-120:]
+    fvgs: list[dict[str, Any]] = []
+
+    for idx in range(len(recent) - 2):
+        b1, b2, b3 = recent[idx], recent[idx + 1], recent[idx + 2]
+        b1_hi = float(b1.get("high", 0.0) or 0.0)
+        b1_lo = float(b1.get("low", 0.0) or 0.0)
+        b3_hi = float(b3.get("high", 0.0) or 0.0)
+        b3_lo = float(b3.get("low", 0.0) or 0.0)
+        if b1_hi <= 0.0 or b1_lo <= 0.0 or b3_hi <= 0.0 or b3_lo <= 0.0:
+            continue
+
+        if (b3_lo - b1_hi) >= min_gap_usd:
+            direction = "BULLISH"
+            gap_low, gap_high = round(b1_hi, 2), round(b3_lo, 2)
+        elif (b1_lo - b3_hi) >= min_gap_usd:
+            direction = "BEARISH"
+            gap_low, gap_high = round(b3_hi, 2), round(b1_lo, 2)
+        else:
+            continue
+
+        # Skip fully mitigated FVGs
+        trailing = recent[idx + 3:]
+        if direction == "BULLISH" and any(float(tb.get("low", 999999.0) or 999999.0) <= gap_low for tb in trailing):
+            continue
+        if direction == "BEARISH" and any(float(tb.get("high", 0.0) or 0.0) >= gap_high for tb in trailing):
+            continue
+
+        b2_ts = int(b2.get("time", 0) or 0)
+        vacuum_backed = (b2_ts in vac_set) and (session_name in {"LONDON_DEEP", "NY_COMEX_DEEP"})
+        level_backed = _is_zone_backed(gap_low, gap_high, levels, pockets)
+        if session_name in {"ASIAN_THIN", "GLOBEX_CLOSED"} and not level_backed:
+            continue
+        if not (vacuum_backed or level_backed):
+            continue
+
+        width = gap_high - gap_low
+        midpoint_50 = round(gap_low + 0.5 * width, 2)
+        zone_75 = round(gap_high - 0.75 * width, 2) if direction == "BULLISH" else round(gap_low + 0.75 * width, 2)
+
+        fvgs.append({
+            "direction": direction,
+            "time": b2_ts,
+            "low": gap_low,
+            "high": gap_high,
+            "midpoint_50": midpoint_50,
+            "zone_75": zone_75,
+            "vacuum_backed": vacuum_backed,
+            "level_backed": level_backed,
+        })
+
+    return fvgs[-max_fvgs:]
+
+
+def classify_post_sweep_execution(
+    candles: list[dict[str, Any]],
+    spot_price: float,
+    call_wall: float,
+    put_wall: float,
+    vpin_pct: float,
+    kyle_regime: str,
+    parity_z_score: float = 0.0,
+    vrp_spread_pct: float = 0.0,
+    active_fvgs: list[dict[str, Any]] | None = None,
+    session_tag: str | None = None,
+    delta_usd: float = 3.5,
+) -> dict[str, Any]:
+    """Classifies Post-Sweep Execution (V-Shape vs Pullback 50%-75%) on Pure CME GC=F.
+
+    Enforces Rule 8 (no Spot Basis conversion) and blocks contrarian setups
+    whenever VPIN >= 65% (Toxic Informed Flow).
+    """
+    session_name = session_tag or resolve_cme_session_liquidity()[0]
+
+    if vpin_pct >= 65.0:
+        return {
+            "post_sweep_regime": "TOXIC_CASCADE_BLOCKED",
+            "allow_reversal": False,
+            "direction": "NONE",
+            "entry_style": "BLOCKED_HIGH_VPIN",
+            "target_zone": [],
+            "label_vi": f"CẤM CẢN TÀU — VPIN ĐỘC HẠI ({vpin_pct:.1f}% >= 65%)",
+        }
+
+    default_wait = {
+        "post_sweep_regime": "MONITORING",
+        "allow_reversal": False,
+        "direction": "NONE",
+        "entry_style": "WAIT_SWEEP_CONFIRMATION",
+        "target_zone": [],
+        "label_vi": "THEO DÕI — CHỜ TÍN HIỆU QUÉT & HẤP THỤ TẠI WALL",
+    }
+    if not candles or len(candles) < 3 or spot_price <= 0.0:
+        return default_wait
+
+    bar_abs = candles[-2]
+    bar_last = candles[-1]
+    abs_o = float(bar_abs.get("open", 0.0) or 0.0)
+    abs_h = float(bar_abs.get("high", 0.0) or 0.0)
+    abs_l = float(bar_abs.get("low", 0.0) or 0.0)
+    abs_c = float(bar_abs.get("close", 0.0) or 0.0)
+    last_o = float(bar_last.get("open", 0.0) or 0.0)
+    last_c = float(bar_last.get("close", 0.0) or 0.0)
+    last_v = float(bar_last.get("volume", 0.0) or 0.0)
+
+    near_put_wall = put_wall > 0.0 and (
+        abs(spot_price - put_wall) <= delta_usd or (abs_l > 0.0 and abs_l <= put_wall + delta_usd and last_c >= put_wall - delta_usd)
+    )
+    near_call_wall = call_wall > 0.0 and (
+        abs(spot_price - call_wall) <= delta_usd or (abs_h > 0.0 and abs_h >= call_wall - delta_usd and last_c <= call_wall + delta_usd)
+    )
+
+    is_absorption_regime = kyle_regime in {"ICEBERG_ABSORPTION", "PREDATORY_SWEEP_EXHAUSTION"}
+    abs_range = max(1e-6, abs_h - abs_l)
+    bull_pinbar = (min(abs_o, abs_c) - abs_l) >= 0.40 * abs_range and abs_c >= abs_o - 0.5
+    bear_pinbar = (abs_h - max(abs_o, abs_c)) >= 0.40 * abs_range and abs_c <= abs_o + 0.5
+
+    dir_bias = "NONE"
+    if near_put_wall and (is_absorption_regime or bull_pinbar):
+        dir_bias = "BULLISH"
+    elif near_call_wall and (is_absorption_regime or bear_pinbar):
+        dir_bias = "BEARISH"
+
+    if dir_bias == "NONE":
+        return default_wait
+
+    # Compute observable post-absorption Kyle bar impact vs calm baseline
+    hist_lams: list[float] = []
+    for hb in candles[-24:-2]:
+        hv = float(hb.get("volume", 0.0) or 0.0)
+        if hv > 0.0:
+            hist_lams.append(abs(float(hb.get("close", 0.0) or 0.0) - float(hb.get("open", 0.0) or 0.0)) / hv * 1000.0)
+    avg_lam = sum(hist_lams) / len(hist_lams) if hist_lams else 0.0
+    lam_post = (abs(last_c - last_o) / last_v * 1000.0) if last_v > 0.0 else 0.0
+
+    breaks_extreme = (
+        (dir_bias == "BULLISH" and last_c > abs_h and last_c > last_o)
+        or (dir_bias == "BEARISH" and last_c < abs_l and last_c < last_o)
+    )
+    deep_or_vega = session_name in {"LONDON_DEEP", "NY_COMEX_DEEP"} or vrp_spread_pct >= 4.0
+    parity_ok = abs(parity_z_score) >= 1.2
+
+    if breaks_extreme and deep_or_vega and (lam_post >= 1.25 * max(1e-6, avg_lam) or vrp_spread_pct >= 4.0 or parity_ok):
+        return {
+            "post_sweep_regime": "POST_SWEEP_V_SHAPE",
+            "allow_reversal": True,
+            "direction": dir_bias,
+            "entry_style": "MARKET_OR_STOP_BREAK",
+            "target_zone": [round(last_c, 2), round(last_c, 2)],
+            "label_vi": f"V-SHAPE {dir_bias}: VÀO LỆNH XÁC NHẬN SAU HẤP THỤ (${last_c:,.2f})",
+        }
+
+    matching_fvgs = [f for f in (active_fvgs or []) if f.get("direction") == dir_bias]
+    if matching_fvgs:
+        fvg = matching_fvgs[-1]
+        z_lo = round(min(float(fvg["midpoint_50"]), float(fvg["zone_75"])), 2)
+        z_hi = round(max(float(fvg["midpoint_50"]), float(fvg["zone_75"])), 2)
+        return {
+            "post_sweep_regime": "POST_SWEEP_PULLBACK",
+            "allow_reversal": True,
+            "direction": dir_bias,
+            "entry_style": "LIMIT_FVG_50_75",
+            "target_zone": [z_lo, z_hi],
+            "label_vi": f"CHỜ HỒI FVG 50%–75% [${z_lo:,.2f}–${z_hi:,.2f}]",
+        }
+
+    return default_wait
