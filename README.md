@@ -90,7 +90,7 @@ Neiro-Gold-Quant/
 │   ├── FAQ_VA_XU_LY_SU_CO.md    # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
 │   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v3.0 (Single Source of Truth)
 │   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
-│   ├── decisions/               # 15 bản Architecture Decision Records (ADR-001 đến ADR-015)
+│   ├── decisions/               # 26 bản Architecture Decision Records (ADR-001 đến ADR-026)
 │   └── tailieudacta/            # Công thức toán học và tài liệu đặc tả vi mô
 ├── src/
 │   ├── collector/               # Thu thập Options Chain Barchart & yfinance GLD Proxy
@@ -100,22 +100,19 @@ Neiro-Gold-Quant/
 │   ├── quant_engine/            # Lõi tính toán Black-76, Cost of Carry, Zero Gamma, GEX
 │   │   ├── models.py            # Dataclasses & kiểu dữ liệu
 │   │   ├── loader.py            # Ingestion, cleaning pipeline & benchmark fallback
-│   │   ├── basis.py             # Cost of Carry (u=0.2%, y=1.5%), Dynamic Basis & EFP Analyzer
+│   │   ├── basis.py             # Cost of Carry (u=0.2%, y=1.5%) & Live CME M1/M5 Tape
 │   │   ├── synthetic.py         # Put-Call Parity Implied Spot & Expected Move Bands
-│   │   ├── dealer.py            # Gamma-Weighted Walls, Zero Gamma Flip (_brentq), Wall Siege
-│   │   ├── air_pocket.py        # Quét chân không thanh khoản (Air Pocket)
-│   │   ├── institutional.py     # 25Δ Skew (RR/BF), Vol-Targeted Sizing & CTA Confluence
-│   │   ├── level_state.py       # Finite State Machine cho từng Level
-│   │   ├── scenario_engine.py   # Ma trận 6 Kịch bản Hành vi Market Maker Realtime
-│   │   └── strategy.py          # Ma trận chiến lược Scalping & Swing
+│   │   ├── dealer.py            # Gamma Walls, Zero Gamma (_brentq), Kyle OLS, VPIN, Dynamic Vacuum & FVG, Post-Sweep
+│   │   ├── institutional.py     # 25Δ Skew (RR/BF), VRP, Session Filter & Bayesian SNR
+│   │   ├── level_state.py       # Finite State Machine & Static OI Air Pockets (hợp nhất)
+│   │   └── strategy.py          # Ma trận chiến lược & precompute_squeeze_ladder (O(1) HUD Lookup)
 │   ├── hud/                     # Giao diện Tactical Terminal
-│   │   ├── neiro_terminal.py    # Tab 1: NEIRO Orderflow Footprint (Canvas HTML5 60 FPS)
-│   │   ├── html_dashboard.py    # Tab 2: 3-Panel Quant Ladder, Smile SVI, Dual-View Generator
-│   │   └── chart_exporter.py    # Bộ xuất biểu đồ tĩnh 3-Panel Matplotlib PNG
+│   │   ├── neiro_terminal.py    # Canvas Orderflow Footprint 60 FPS, Institutional FVG & Floating HUD
+│   │   └── html_dashboard.py    # Dual-View Terminal Generator (NEIRO Canvas + Plotly 4-Panel)
 │   └── mt5_bridge/              # Thư mục giao tiếp MetaTrader 5 (tùy chọn)
 ├── data/
 │   └── options_prices_GCZ26.csv # Dữ liệu CME Options Chain tự động cập nhật
-├── tests/                       # 133 Unit & Integration tests (100% pass)
+├── tests/                       # Bộ kiểm thử Unit, Integration & Systematic Rig (pytest)
 ├── Chay_Live_Terminal.bat       # Bảng điều khiển trung tâm 7-trong-1 tiện lợi
 ├── AGENTS.md / GEMINI.md        # Quy tắc cốt lõi & Quy trình kích hoạt Skill
 └── README.md                    # Hướng dẫn truy cập và tổng quan dự án

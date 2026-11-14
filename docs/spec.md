@@ -40,6 +40,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
      * **Strict Lee-Ready Quote Classification:** Chỉ phân loại hướng chủ động (`w_c`, `w_p`) khi tồn tại báo giá 2 chiều `Bid` và `Ask` hợp lệ (`Bid > 0`, `Ask > Bid`), gán `0.0` cho các strike thiếu thanh khoản báo giá thay vì đoán trọng số giả định.
      * **Auto-Sync Cloud Options CSV:** Tự động đồng bộ `data/options_prices_GCZ26.csv` mới nhất từ GitHub Cloud nếu file cục bộ đã cũ quá 2 giờ.
      * **Informed Quant Trader Closed-Loop Engine (Đang đề xuất — [ADR-025](decisions/ADR-025-kyle-ols-vrp-and-predatory-flow-microstructure.md)):** Tổng hợp 5 trụ cột toán học: **(1)** Hồi quy tuyến tính trượt Kyle (1985) $\lambda_{\text{OLS}} = \text{Cov}(\Delta P, y) / \text{Var}(y)$ kèm bộ lọc thanh khoản phiên ($\sigma_u$), **(2)** Chỉ số độc tính dòng lệnh **VPIN** (Easley, López de Prado & O'Hara 2012) từ BVC Volume Buckets để lọc bẫy cản tàu tại Gamma Wall, **(3)** Định lượng Volatility Risk Premium ($VRP = IV_{\text{ATM}} - RV_{\text{GC}}$) báo hiệu Vega Crush, **(4)** Z-Score Put-Call Parity Lead-Lag ($Z_{\Delta F}$) & Predatory Sweep Exhaustion, và **(5)** Chiết khấu Bayesian $\rho_{v,s} = \sqrt{\text{SNR}/(1+\text{SNR})}$ kết hợp Ma trận Thực thi 5 Chế độ & Quản trị vốn Fractional Kelly.
+     * **Dynamic Liquidity Vacuum, Post-Sweep V-Shape/Pullback & Architecture Deduplication (Đã triển khai — [ADR-026](decisions/ADR-026-liquidity-vacuum-and-architecture-dedup.md)):** Hợp nhất hệ thống Air Pocket về `level_state.py`, bổ sung 3 tầng thuần `GC=F` OHLCV (`Static OI Vacuum` + `Dynamic High-Freq Amihud ILLIQ & Rogers-Satchell Vacuum` + `Institutional FVG 50%–75%` + `Post-Sweep V-Shape/Pullback` khóa bởi cổng an toàn `VPIN < 65%`), nối `precompute_squeeze_ladder` vào Live HUD (`updateSqueezeHud`), dọn sạch 6 file mã chết (`dead code`) và loại bỏ hoàn toàn `vTick` giả lập trên client JS.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.
    - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.
@@ -123,7 +124,7 @@ Neiro-Gold-Quant/
 │   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt Indicator
 │   ├── thuat_ngu_quant.md            # Từ điển thuật ngữ Quant Options & Vi cấu trúc
 │   ├── FAQ_VA_XU_LY_SU_CO.md         # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
-│   └── decisions/                    # 14 Architecture Decision Records (ADRs)
+│   └── decisions/                    # 26 Architecture Decision Records (ADR-001 -> ADR-026)
 ├── src/
 │   ├── collector/
 │   │   ├── scraper.py                # Playwright API Sniffer Barchart
@@ -132,24 +133,22 @@ Neiro-Gold-Quant/
 │   ├── quant_engine/
 │   │   ├── models.py                 # Dataclasses & kiểu dữ liệu
 │   │   ├── loader.py                 # Ingestion & cleaning pipeline
-│   │   ├── basis.py                  # Cost of Carry, Dynamic Basis & Live Feeds
+│   │   ├── basis.py                  # Cost of Carry & Live CME M1/M5 Tape Feeds
 │   │   ├── synthetic.py              # Put-Call Parity Implied Spot & Expected Move Bands
-│   │   ├── dealer.py                 # Call/Put Walls, Zero Gamma Solver (_brentq), Wall Siege
-│   │   ├── air_pocket.py             # Quét chân không thanh khoản (OI < 35% MA)
-│   │   ├── institutional.py          # 25Δ Skew (RR/BF), Vol-Target Sizing, CTA Confluence
-│   │   ├── level_state.py            # Level State Machine (DORMANT, TESTING, ABSORPTION, SLICED)
-│   │   ├── scenario_engine.py        # 6 Kịch bản Hành vi Market Maker Realtime
-│   │   └── strategy.py               # Ma trận chiến lược Scalping & Swing
+│   │   ├── dealer.py                 # Zero Gamma (_brentq), Wall Siege, Kyle OLS, VPIN, Dynamic Vacuum & FVG, Post-Sweep
+│   │   ├── institutional.py          # 25Δ Skew (RR/BF), Vol-Target Sizing, VRP, Session Filter, Bayesian SNR
+│   │   ├── level_state.py            # Level State Machine & Static OI Air Pocket Zones (hợp nhất)
+│   │   └── strategy.py               # Ma trận chiến lược, precompute_squeeze_ladder (O(1) HUD Lookup)
 │   └── hud/
-│       ├── neiro_terminal.py         # Tab 1: NEIRO Orderflow Footprint (Canvas HTML5 60 FPS)
-│       ├── html_dashboard.py         # Dual-View Terminal Generator (NEIRO Canvas + Plotly HUD)
-│       └── chart_exporter.py         # Bộ xuất biểu đồ tĩnh PNG
+│       ├── neiro_terminal.py         # Canvas Orderflow Footprint 60 FPS, Institutional FVG & Floating HUD
+│       └── html_dashboard.py         # Dual-View Terminal Generator (NEIRO Canvas + Plotly 4-Panel)
 ├── data/
 │   └── options_prices_GCZ26.csv      # Dataset Options Chain CME mới nhất
-├── tests/                            # Unit Tests (137 tests gốc) & Systematic Rig (125 tests mở rộng - ADR-022)
+├── tests/                            # Systematic Testing Rig & Unit/Integration Suite
 │   ├── test_data_gate.py             # Cổng kiểm định dữ liệu đầu vào & CI Guard (D1-D9)
 │   ├── test_math_core.py             # Lõi toán Black-76, Dekker-Brent _brentq, Zero Gamma Flip (M1-M11)
 │   ├── test_expiry_rollover.py       # Tính nhất quán T_floor, DTE vi mô T->0 & Rollover hợp đồng (T1-T6)
+│   ├── test_liquidity_vacuum.py      # Dynamic Vacuum (Amihud + RS), Institutional FVG & Post-Sweep Classifier
 │   └── test_hud_smoke.py             # Smoke test end-to-end Dashboard render & cờ Stale/Benchmark (H1-H3)
 ├── Chay_Live_Terminal.bat            # Trình điều khiển trung tâm Windows tiện lợi
 ├── AGENTS.md / GEMINI.md             # Bộ quy tắc cốt lõi & Quy trình kích hoạt Skill
@@ -169,4 +168,5 @@ Neiro-Gold-Quant/
 - [x] Động cơ tính toán sẵn & Chuẩn hóa Data Analyst (ADR-024): Tính sẵn 100% Ma trận Gamma Squeeze Ladder cho tra cứu O(1) thời gian thực, khử trùng lặp, ép đơn điệu, chữa lỗi chào giá chéo và tự động chữa lành `callGammaPower`/`putGammaPower` bằng Black-76 theo độ lệch Volatility Skew (`callIV`/`putIV` từng strike) khi phát hiện dummy flat gamma (`0.0037`).
 - [x] Đồng bộ Múi giờ Mùa đông Hoa Kỳ & Tự Động Hóa 3 Tầng Đáo Hạn (ADR-023): Tự động nhận diện 3 tầng đáo hạn (`WEEKLY` + `MONTHLY` + `QUARTERLY` chu kỳ chính `G, J, M, Q, Z`) kèm Lịch Nghỉ Lễ CME (`get_cme_holidays`), tự động chuyển đổi hợp đồng cơ sở (`GCZ26` -> `GCG27`), tính 13:30 Chicago Time (18:30 UTC hè / 19:30 UTC đông) và tự động làm giàu Black-76 IV theo từng kỳ hạn con trước khi gộp Multi-Expiry tại Scraper.
 - [x] Triển khai TradingView Fullscreen Zero-Tabs Realtime Terminal: Mặc định nến M1, layout tràn màn hình 100%, tích hợp Realtime Tick Engine không reload trang, Unified Greeks Matrix (GEX, VEX, CHEX, Net Delta) và Plotly 4-Panel trên cùng 1 màn hình.
+- [x] Triển khai Dynamic Liquidity Vacuum, Institutional FVG & Post-Sweep Execution Classifier (ADR-026): Hợp nhất Static Air Pocket về `level_state.py`, bổ sung High-Freq Amihud `ILLIQ` + Rogers-Satchell + FVG `50%–75%` + `Post-Sweep` khóa bởi `VPIN < 65%`, nối dây `squeeze_ladder` vào Live HUD (`updateSqueezeHud`), loại bỏ `vTick` giả tạo trong `applyLiveTick()` và dọn sạch 6 file mã chết / trùng lặp.
 - [x] Đảm bảo nghiêm ngặt Zero-Waste Mandate (< 15MB repo footprint, 0 MB rác).

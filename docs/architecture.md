@@ -66,9 +66,9 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 │  - advanced_greeks.py: Vanna ($M / 1% IV) & Charm ($M / ngày) giải tích chuẩn xác.        │
 │  - iv_solver.py: Bộ giải ngược IV lai (Newton-Raphson + Dekker-Brent bisection).           │
 │  - synthetic.py: Put-Call Parity Implied Spot & Expected Move Bands (1.0σ & 0.85σ).         │
-│  - dealer.py: Zero Gamma Solver (_brentq), Wall Siege Ratio, Gamma-Weighted Wall Scoring.   │
-│  - air_pocket.py: Quét vùng chân không thanh khoản (OI < 35% Moving Average).              │
-│  - institutional.py: 25Δ Risk Reversal (RR25), Butterfly (BF25), Vol-Target Sizing, CTA.  │
+│  - dealer.py: Zero Gamma (_brentq), Wall Siege, Kyle OLS, VPIN, Dynamic Vacuum & FVG, Post-Sweep│
+│  - level_state.py: Level State Machine & Static OI Air Pocket Zones (hợp nhất duy nhất).    │
+│  - institutional.py: 25Δ Risk Reversal (RR25), Butterfly (BF25), VRP, Vol-Target & Bayesian. │
 │  - Cost of Carry: F0 = S0 * exp((r + u - y) * T) với u = 0.2%, y = 1.5%.                   │
 └────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                              │
@@ -334,4 +334,18 @@ on:
 2. **Cửa Sổ Động `±10 Strikes` & Đồng Bộ `👉 SPOT` Realtime (`src/hud/html_dashboard.py` & `src/hud/neiro_terminal.py`):**
    - Bảng `BẢNG DỮ LIỆU ĐỊNH LƯỢNG MICROSTRUCTURE & DÒNG LỆNH TỪNG STRIKE` chỉ hiển thị đúng `±10 strikes` quanh giá `GC=F` hiện hành (tối đa 21 dòng hiển thị).
    - Hàm `applyLiveTick()` cập nhật tức thời vị trí hàng `.row-spot`, huy hiệu `.micro-spot-badge` (`👉 SPOT: $...`), cửa sổ `±10 strikes`, `#kpi-cme-price` và `#spine-current-price` ngay khi giá `GC=F` biến động.
+
+---
+
+## XIII. ĐỘNG CƠ DYNAMIC LIQUIDITY VACUUM, INSTITUTIONAL FVG & POST-SWEEP EXECUTION (ADR-026)
+
+1. **Hệ Sinh Thái Chân Không Thanh Khoản 3 Tầng Thuần CME Futures (`src/quant_engine/dealer.py` & `level_state.py`):**
+   - **Tầng 1 — Static OI Air Pocket (`level_state.detect_strike_air_pockets`):** Nguồn sự thật duy nhất về khoảng trống OI giữa các Strike COMEX (`OI < 35% MA`), dùng chung cho `strategy.py` (`precompute_squeeze_ladder`), `neiro_terminal.py` và `html_dashboard.py` (loại bỏ `src/quant_engine/air_pocket.py` và bản `AirPocket` trùng trong `strategy.py`).
+   - **Tầng 2 — Dynamic High-Frequency Liquidity Vacuum (`compute_dynamic_liquidity_vacuum` & `compute_rogers_satchell_bar`):** Kết hợp Amihud `ILLIQ` ($|\ln(C_t/C_{t-1})| / V_t$), biến động bất biến theo hướng Rogers-Satchell ($\sqrt{\max(RS_t, 0)}$) và `bar_lam` trên các nến có `Volume > 0`, khóa chặt nhiễu phiên Á mỏng (`THIN_SESSION_GUARDED`) và phiên nghỉ CME (`GLOBEX_CLOSED`), chỉ phát cảnh báo `DYNAMIC_LIQUIDITY_VACUUM` trong phiên sâu `LONDON_DEEP` / `NY_COMEX_DEEP`.
+   - **Tầng 2.5 — Institutional Vacuum FVG (`detect_institutional_fvgs`):** Chỉ giữ lại khoảng trống 3 nến (`FVG`) gắn liền với nến Vacuum hoặc hợp lưu với Wall / Zero Gamma / Static Air Pocket, tính sẵn vùng hồi quy `midpoint_50` và `zone_75` để vẽ trực tiếp lên `#neiro-canvas`.
+2. **Bộ Phân Loại Thực Thi Post-Sweep Không Giả Lập (`classify_post_sweep_execution`):**
+   - Thay thế tham số $\kappa$ ẩn bằng biến quan sát thực tế thuần `GC=F` (tuân thủ Rule 8): khóa cứng `TOXIC_CASCADE_BLOCKED` khi `VPIN >= 65%`, và phân nhánh `POST_SWEEP_V_SHAPE` (phá đỉnh/đáy nến hấp thụ trong phiên sâu hoặc `VRP >= +4.0%` kèm động lượng $\lambda_{\text{post}}$ / Parity Z-Score) so với `POST_SWEEP_PULLBACK` (chờ Limit tại `50%–75%` FVG).
+3. **Đồng Bộ Client JS & Tinh Gọn Kiến Trúc (`src/hud/neiro_terminal.py`, `html_dashboard.py`, `basis.py`):**
+   - Loại bỏ `vTick` giả lập trong `applyLiveTick()` khi `tickVol === null` và fallback `volume: 120` trong `mergeLiveCandles()`; bổ sung `evaluateBarOrderflow()` trên nến hoàn tất mang Volume thật và `updateSqueezeHud()` tra cứu nhị phân `squeeze_ladder`.
+   - Dọn bỏ 6 file mã chết (`src/main.py`, `src/hud/chart_exporter.py`, `src/quant_engine/scenario_engine.py`, `src/quant_engine/air_pocket.py`, `tests/test_scenario_engine.py`, `tests/test_air_pocket.py`) và đồng bộ nhãn khung thời gian `timeframe_label` (`M1`/`M5`) từ `basis.py`.
 
