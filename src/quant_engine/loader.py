@@ -23,7 +23,7 @@ import os
 import re
 import glob
 import math
-from typing import Optional, Union, Dict, Any, Tuple
+from typing import Optional, Union, Dict, Any
 import numpy as np
 import pandas as pd
 
@@ -31,10 +31,9 @@ from .dealer import (
     compute_exact_gamma_flip,
     compute_wall_siege_ratio,
     find_gamma_weighted_walls,
-    classify_wall_regime,
     find_walls,
 )
-from .models import OptionsSnapshot, OptionsStrike, QuantLevels, Wall
+from .models import OptionsSnapshot, OptionsStrike
 from .strategy import MarketSnapshot, OptionQuote, compute_implied_spot
 from .synthetic import compute_dynamic_dte
 
@@ -295,6 +294,13 @@ def _extract_col_array(
     return res
 
 
+def _benchmark_fallback_df() -> pd.DataFrame:
+    """Return a copy of the static benchmark dataset explicitly flagged as fallback."""
+    fb_df = pd.DataFrame(BENCHMARK_GCZ26_DATA)
+    fb_df.attrs["is_benchmark_fallback"] = True
+    return fb_df
+
+
 def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Standardizes any options DataFrame into the canonical 17-column format.
@@ -302,7 +308,7 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     Supports any clipboard headers with spaces, underscores, or abbreviations.
     """
     if df is None or len(df) == 0:
-        return pd.DataFrame(BENCHMARK_GCZ26_DATA)
+        return _benchmark_fallback_df()
 
     if _is_normalized_df(df):
         return df
@@ -331,7 +337,7 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     strikes = _series_clean_strike(df[stk_col])
     valid_mask = strikes > 0
     if not valid_mask.any():
-        return pd.DataFrame(BENCHMARK_GCZ26_DATA)
+        return _benchmark_fallback_df()
 
     df_valid = df.loc[valid_mask] if not valid_mask.all() else df
     strikes = strikes[valid_mask] if not valid_mask.all() else strikes
@@ -386,14 +392,30 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     if found_exp:
         data_dict['expirationDate'] = found_exp
 
+    superpos_cols = (
+        'callGammaPower', 'putGammaPower',
+        'callGEX', 'putGEX', 'netGEX',
+        'callVEX', 'putVEX', 'netVEX',
+        'callCHEX', 'putCHEX', 'netCHEX',
+        'totalVega', 'totalTheta',
+    )
+    extra_cols = [c for c in superpos_cols if c in df.columns]
+    for extra in extra_cols:
+        data_dict[extra] = _series_clean_val(df_valid[extra], default=0.0)
+
     out_df = pd.DataFrame(data_dict)
     out_df = out_df.drop_duplicates(subset=['strike'], keep='last').sort_values('strike').reset_index(drop=True)
     cols = [c for c in CANONICAL_COLUMNS if c in out_df.columns]
     if 'expirationDate' in out_df.columns:
         cols.append('expirationDate')
+    cols.extend(extra_cols)
     out_df = out_df[cols]
     if found_exp:
         out_df.attrs['expiration_date'] = found_exp
+    if hasattr(df, 'attrs') and df.attrs.get('is_aggregated'):
+        out_df.attrs['is_aggregated'] = True
+    if hasattr(df, 'attrs') and df.attrs.get('is_benchmark_fallback'):
+        out_df.attrs['is_benchmark_fallback'] = True
     out_df.attrs['is_normalized'] = True
     return out_df
 
@@ -665,20 +687,21 @@ def load_options_data(
         elif os.path.exists(source):
             return _load_from_path(source)
         else:
-            return pd.DataFrame(BENCHMARK_GCZ26_DATA)
+            return _benchmark_fallback_df()
 
     # 2. Search candidate directories (only when source is None)
     search_dirs = []
     if data_dir:
         search_dirs.append(data_dir)
+    env_options_dir = os.environ.get("NEIRO_OPTIONS_DATA_DIR")
+    if env_options_dir:
+        search_dirs.append(env_options_dir)
     search_dirs.extend([
         '/content',
         '/content/drive/MyDrive/Neiro-Quant/data',
         'data',
         '../data',
         '.',
-        r'H:\My Drive\Neiro-Quant\data',
-        r'H:\My Drive\Neiro-Quant',
         'docs/tailieudacta'
     ])
 
@@ -711,13 +734,13 @@ def load_options_data(
 
     # 3. Fallback Benchmark Data
     print("[NGUON DU LIEU] Khong tim thay file CSV phu hop -> Dang dung Benchmark CME GCZ26 du phong.")
-    return pd.DataFrame(BENCHMARK_GCZ26_DATA)
+    return _benchmark_fallback_df()
 
 
 def _load_from_path(file_path: str, data_dir: Optional[str] = None) -> pd.DataFrame:
     """Helper to detect file structure and load."""
     if not os.path.exists(file_path):
-        return pd.DataFrame(BENCHMARK_GCZ26_DATA)
+        return _benchmark_fallback_df()
 
     # Peek first line
     with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
@@ -1089,9 +1112,13 @@ def compute_tactical_matrix(
     Computes Net GEX matrix, Delta Flow, institutional key levels,
     and returns a structured Real-time Tactical Board (Bang tac chien dinh luong).
     """
+    was_aggregated = bool(hasattr(df, 'attrs') and df.attrs.get('is_aggregated'))
     df = normalize_options_df(df).copy()
+    if was_aggregated:
+        df.attrs['is_aggregated'] = True
     if df.empty:
         df = normalize_options_df(pd.DataFrame(BENCHMARK_GCZ26_DATA)).copy()
+        df.attrs['is_benchmark_fallback'] = True
 
     if dte_days is None:
         exp_val = df.attrs.get('expiration_date') or (df['expirationDate'].dropna().iloc[0] if 'expirationDate' in df.columns and not df['expirationDate'].dropna().empty else None)
@@ -1137,40 +1164,46 @@ def compute_tactical_matrix(
         (len(df) > 5 and df['callGamma'].nunique() <= 3)
         or bool(((df['strike'] > (spot_price + 800.0)) & (df['callGamma'] > 0.001)).any())
     )
-    if raw_unphys:
-        df['callGamma'] = gamma_b76
-        df['putGamma'] = gamma_b76
-        df['callGammaPower'] = gamma_b76 * df['callOpenInterest']
-        df['putGammaPower'] = gamma_b76 * df['putOpenInterest']
+    has_superimposed = (
+        was_aggregated
+        and all(col in df.columns for col in ('netGEX', 'netVEX', 'netCHEX'))
+        and float(df['netGEX'].abs().sum()) > 0
+    )
+    if not has_superimposed:
+        if raw_unphys:
+            df['callGamma'] = gamma_b76
+            df['putGamma'] = gamma_b76
+            df['callGammaPower'] = gamma_b76 * df['callOpenInterest']
+            df['putGammaPower'] = gamma_b76 * df['putOpenInterest']
 
-    df['callGEX'] = df['callGamma'] * df['callOpenInterest'] * MULT * scale
-    df['putGEX'] = - (df['putGamma'] * df['putOpenInterest'] * MULT * scale)
-    df['netGEX'] = df['callGEX'] + df['putGEX']
+        df['callGEX'] = df['callGamma'] * df['callOpenInterest'] * MULT * scale
+        df['putGEX'] = - (df['putGamma'] * df['putOpenInterest'] * MULT * scale)
+        df['netGEX'] = df['callGEX'] + df['putGEX']
+
+        # Vanna = -df * n(d1) * (d2 / sigma)
+        vanna = - df_discount * pdf_d1 * (d2 / sigma_atm)
+
+        # Charm (Black-76 rate of delta decay per calendar day, CNGTHCTNHTON.html)
+        # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
+        # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * (1 - cdf(d1))] / 365
+        charm_call = df_discount * (pdf_d1 * (d2 / (2.0 * T_years)) - r * cdf_d1)
+        charm_put = df_discount * (pdf_d1 * (d2 / (2.0 * T_years)) + r * (1.0 - cdf_d1))
+
+        charm_call_day = charm_call / 365.0
+        charm_put_day = charm_put / 365.0
+
+        # VEX ($M per 1% IV shift) & CHEX ($M per day of decay)
+        df['callVEX'] = vanna * df['callOpenInterest'] * MULT * spot_price * 0.01 / 1e6
+        df['putVEX'] = - (vanna * df['putOpenInterest'] * MULT * spot_price * 0.01 / 1e6)
+        df['netVEX'] = df['callVEX'] + df['putVEX']
+
+        df['callCHEX'] = charm_call_day * df['callOpenInterest'] * MULT * spot_price / 1e6
+        df['putCHEX'] = - (charm_put_day * df['putOpenInterest'] * MULT * spot_price / 1e6)
+        df['netCHEX'] = df['callCHEX'] + df['putCHEX']
 
     df['callDeltaFlow'] = df['callVolume'] * MULT * scale
     df['putDeltaFlow'] = - (df['putVolume'] * MULT * scale)
     df['netDeltaFlow'] = df['callDeltaFlow'] + df['putDeltaFlow']
-
-    # Vanna = -df * n(d1) * (d2 / sigma)
-    vanna = - df_discount * pdf_d1 * (d2 / sigma_atm)
-
-    # Charm (Black-76 rate of delta decay per calendar day, CNGTHCTNHTON.html)
-    # Charm_call = df * [pdf(d1) * d2 / (2T) - r * cdf(d1)] / 365
-    # Charm_put  = df * [pdf(d1) * d2 / (2T) + r * (1 - cdf(d1))] / 365
-    charm_call = df_discount * (pdf_d1 * (d2 / (2.0 * T_years)) - r * cdf_d1)
-    charm_put = df_discount * (pdf_d1 * (d2 / (2.0 * T_years)) + r * (1.0 - cdf_d1))
-
-    charm_call_day = charm_call / 365.0
-    charm_put_day = charm_put / 365.0
-
-    # VEX ($M per 1% IV shift) & CHEX ($M per day of decay)
-    df['callVEX'] = vanna * df['callOpenInterest'] * MULT * spot_price * 0.01 / 1e6
-    df['putVEX'] = - (vanna * df['putOpenInterest'] * MULT * spot_price * 0.01 / 1e6)
-    df['netVEX'] = df['callVEX'] + df['putVEX']
-
-    df['callCHEX'] = charm_call_day * df['callOpenInterest'] * MULT * spot_price / 1e6
-    df['putCHEX'] = - (charm_put_day * df['putOpenInterest'] * MULT * spot_price / 1e6)
-    df['netCHEX'] = df['callCHEX'] + df['putCHEX']
 
     # 3. Institutional Walls & Levels: Gamma-Weighted vs Raw OI
     snap = to_options_snapshot(df)
@@ -1241,7 +1274,7 @@ def compute_tactical_matrix(
             'Chien Luoc': '1. BAN DINH (Fade Sell)',
             'Vung Gia CME': f"{call_wall - 1.50:.2f} - {call_wall:.2f}",
             'Entry': f"{call_wall - 1.00:.2f}",
-            'Hard SL': f"{call_wall + 4.00:.2f} ($4.0)",
+            'Hard SL': f"{call_wall + 4.00:.2f} ($5.0)",
             'TP1 / TP2': f"{spot_price:.2f} / {atm_strike:.2f}",
             'Ghi Chu': call_wall_note
         },
@@ -1249,7 +1282,7 @@ def compute_tactical_matrix(
             'Chien Luoc': '2. MUA DAY (Rebound Buy)',
             'Vung Gia CME': f"{put_wall:.2f} - {put_wall + 1.50:.2f}",
             'Entry': f"{put_wall + 0.50:.2f}",
-            'Hard SL': f"{put_wall - 4.00:.2f} ($4.0)",
+            'Hard SL': f"{put_wall - 4.00:.2f} ($4.5)",
             'TP1 / TP2': f"{spot_price:.2f} / {call_wall:.2f}",
             'Ghi Chu': put_wall_note
         },

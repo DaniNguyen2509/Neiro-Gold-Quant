@@ -8,7 +8,7 @@ as specified in docs/architecture.md (Mục V - Level State Engine):
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Literal
 import numpy as np
@@ -215,8 +215,15 @@ def evaluate_tactical_level_states(
     total_gex = float(meta.get("total_net_gex", 0.0))
     is_short_gamma = total_gex < 0
 
-    strikes = df["strike"].values if "strike" in df.columns else np.array([atm_pivot])
-    step = float(np.diff(strikes).min()) if len(strikes) > 1 else 5.0
+    raw_strikes = df["strike"].dropna().values.astype(float) if "strike" in df.columns else np.array([atm_pivot])
+    strikes = np.unique(np.sort(raw_strikes)) if len(raw_strikes) > 0 else np.array([atm_pivot])
+    pos_diffs = np.diff(strikes)
+    pos_diffs = pos_diffs[pos_diffs > 0]
+    step = float(pos_diffs.min()) if len(pos_diffs) > 0 else 5.0
+
+    atr_5m = max(2.0, min(6.5, float(meta.get("atr_5m", 4.0) or 4.0)))
+    sl_rev = max(5.00, round(1.4 * atr_5m, 2))
+    sl_brk = max(5.00, round(1.5 * atr_5m, 2))
 
     strikes_above = strikes[strikes > spot_price]
     strike_above = float(strikes_above[0]) if len(strikes_above) > 0 else call_wall
@@ -267,12 +274,14 @@ def evaluate_tactical_level_states(
                     vacuum_target=target,
                     recommended_action="SELL_BREAKOUT_RUNNER",
                     entry_trigger=f"Đã thủng dứt khoát < {lvl - slice_buffer:.2f}",
-                    hard_sl=lvl + 1.50,
+                    hard_sl=round((lvl - slice_buffer) + sl_brk, 2),
                     take_profit=target + 1.00,
                     notes=f"[SLICED_VACUUM_RUN]: Thủng {lvl:.0f} trong -GEX -> CẤM BẮT ĐÁY! Trượt tự do về Major Wall {target:.0f}.",
                 ))
             elif abs_dist <= testing_range:
                 # Testing support
+                sup_entry = round(lvl + 1.00, 2)
+                sup_sl = round(sup_entry - sl_rev, 2)
                 evaluations.append(LevelEvaluation(
                     level_name=name,
                     strike=lvl,
@@ -283,9 +292,9 @@ def evaluate_tactical_level_states(
                     vacuum_target=None,
                     recommended_action="WATCH_ABSORPTION_OR_SLICING",
                     entry_trigger=f"Biên {lvl:.2f} - {lvl + 1.50:.2f}",
-                    hard_sl=lvl - 2.50,
+                    hard_sl=sup_sl,
                     take_profit=atm_pivot,
-                    notes=f"Áp sát hỗ trợ {lvl:.0f}. Ưu tiên MUA REBOUND vùng {lvl:.1f}-{lvl+1.5:.1f} (SL: {lvl-2.5:.1f}). Nếu thủng > {lvl-slice_buffer:.1f} -> CẮT LỖ, đánh SELL BREAKOUT.",
+                    notes=f"Áp sát hỗ trợ {lvl:.0f}. Ưu tiên MUA REBOUND vùng {lvl:.1f}-{lvl+1.5:.1f} (SL: {sup_sl:.2f}). Nếu thủng > {lvl-slice_buffer:.1f} -> CẮT LỖ, đánh SELL BREAKOUT.",
                 ))
             elif dist > dormant_distance:
                 evaluations.append(LevelEvaluation(
@@ -302,7 +311,7 @@ def evaluate_tactical_level_states(
                 evaluations.append(LevelEvaluation(
                     level_name=name,
                     strike=lvl,
-                    state=LevelState.WALL_DEFENDED,
+                    state=LevelState.ABSORPTION_DEFENDED if gex_at_strike > 0 else LevelState.WALL_DEFENDED,
                     distance_pts=dist,
                     net_gex_at_strike=gex_at_strike,
                     is_air_pocket_adjacent=False,
@@ -324,12 +333,14 @@ def evaluate_tactical_level_states(
                     vacuum_target=target,
                     recommended_action="BUY_BREAKOUT_RUNNER",
                     entry_trigger=f"Đã phá trần > {lvl + slice_buffer:.2f}",
-                    hard_sl=lvl - 1.50,
+                    hard_sl=round((lvl + slice_buffer) - sl_brk, 2),
                     take_profit=target - 1.00,
                     notes=f"[GAMMA_SQUEEZE_RUNNER]: Phá trần {lvl:.0f} -> CẤM CHẶN ĐẦU! Hút giá lên Major Wall {target:.0f}.",
                 ))
             elif abs_dist <= testing_range:
                 # Testing resistance
+                res_entry = round(lvl - 1.00, 2)
+                res_sl = round(res_entry + sl_rev, 2)
                 evaluations.append(LevelEvaluation(
                     level_name=name,
                     strike=lvl,
@@ -339,9 +350,9 @@ def evaluate_tactical_level_states(
                     is_air_pocket_adjacent=False,
                     recommended_action="WATCH_ABSORPTION_OR_BREAKOUT",
                     entry_trigger=f"Biên {lvl - 1.50:.2f} - {lvl:.2f}",
-                    hard_sl=lvl + 2.50,
+                    hard_sl=res_sl,
                     take_profit=atm_pivot,
-                    notes=f"Áp sát cản trần {lvl:.0f}. Ưu tiên SHORT FADE vùng {lvl-1.5:.1f}-{lvl:.1f} (SL: {lvl+2.5:.1f}). Nếu phá trần > {lvl+slice_buffer:.1f} -> HỦY SHORT, đánh BUY SQUEEZE.",
+                    notes=f"Áp sát cản trần {lvl:.0f}. Ưu tiên SHORT FADE vùng {lvl-1.5:.1f}-{lvl:.1f} (SL: {res_sl:.2f}). Nếu phá trần > {lvl+slice_buffer:.1f} -> HỦY SHORT, đánh BUY SQUEEZE.",
                 ))
             elif abs_dist > dormant_distance:
                 evaluations.append(LevelEvaluation(
@@ -358,7 +369,7 @@ def evaluate_tactical_level_states(
                 evaluations.append(LevelEvaluation(
                     level_name=name,
                     strike=lvl,
-                    state=LevelState.WALL_DEFENDED,
+                    state=LevelState.ABSORPTION_DEFENDED if gex_at_strike > 0 else LevelState.WALL_DEFENDED,
                     distance_pts=dist,
                     net_gex_at_strike=gex_at_strike,
                     is_air_pocket_adjacent=False,

@@ -404,7 +404,7 @@ def find_gamma_weighted_walls(
         if not valid_strikes:
             return [], []
 
-        spot = spot_price if (spot_price is not None and spot_price > 0) else 4100.0
+        spot = spot_price if (spot_price is not None and spot_price > 0) else float(np.median([float(s.strike) for s in valid_strikes]))
         t_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
         sigma = max(0.01, float(default_iv))
         denom = sigma * math.sqrt(t_years)
@@ -1188,7 +1188,7 @@ def compute_vpin_bvc(candles: list[dict[str, Any]], window: int = 24) -> dict[st
 
     if vpin_pct >= 65.0:
         vpin_regime = "TOXIC_INFORMED_FLOW"
-        vpin_label = f"🚨 VPIN {vpin_pct:.1f}% [ĐỘC TÍNH >90% — CẤM CHẶN TÀU]"
+        vpin_label = f"🚨 VPIN {vpin_pct:.1f}% [ĐỘC TÍNH >=65% — CẤM CHẶN TÀU]"
     elif vpin_pct >= 40.0:
         vpin_regime = "ELEVATED_IMBALANCE"
         vpin_label = f"⚠️ VPIN {vpin_pct:.1f}% [LỆCH DÒNG LỆNH — GIẢM SIZE LIMIT]"

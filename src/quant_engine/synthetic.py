@@ -199,7 +199,7 @@ def resolve_front_month_cme_option(
     fb_exp = get_cme_option_expiry_date(fb_y, fb_m)
     fb_opt_code = CME_OPTION_MONTH_CODES[fb_m]
     fb_yr_code = str(fb_y)[-2:]
-    fb_fut_m = {1: 'G', 2: 'G', 3: 'J', 4: 'J', 5: 'M', 6: 'M', 7: 'Q', 8: 'Q', 9: 'V', 10: 'V', 11: 'Z', 12: 'Z'}[fb_m]
+    fb_fut_m = {1: 'G', 2: 'G', 3: 'J', 4: 'J', 5: 'M', 6: 'M', 7: 'Q', 8: 'Q', 9: 'Z', 10: 'Z', 11: 'Z', 12: 'Z'}[fb_m]
     fb_underlying = f"GC{fb_fut_m}{fb_yr_code}"
     return {
         "option_symbol": f"OG{fb_opt_code}{fb_yr_code}",

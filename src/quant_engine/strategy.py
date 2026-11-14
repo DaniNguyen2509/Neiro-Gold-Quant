@@ -9,7 +9,7 @@ Version: 2.0.0 (10/10 Grade)
 Fixes applied vs V1 (7.0/10):
   [FIX-1] Put-Call Parity for Gold Futures (S_Implied via r, T)
   [FIX-2] Brenner-Subrahmanyam Expected Move & 1-Sigma (÷ 0.7979)
-  [FIX-3] XAUUSD Stop Loss widened to 3.5–4.5 (1.5× ATR M5)
+  [FIX-3] CME Gold Futures (GC) Stop Loss calibrated >= $5.0 (ATR M5 floored)
   [FIX-4] Gamma Squeeze / Waterfall triggers use SPOT ± 1.80 (not premium)
   [FIX-5] Breakout/Breakdown Runner gated by net_gex < 0 AND air pocket
   [FIX-6] Air Pocket clustering into continuous [K_start → K_end] zones
@@ -138,7 +138,7 @@ def compute_implied_spot(
     Put-Call Parity for European options on futures (Black-76):
         C - P = e^{-rT} * (F - K)   →   F = K + e^{rT} * (C - P)
 
-    For Gold Futures (XAUUSD), we use the forward-implied spot:
+    For CME Gold Futures (GC), we use the forward-implied futures level:
         S_Implied = K_ATM + e^{rT} * (C_mid - P_mid)
 
     Args:
@@ -600,6 +600,16 @@ def compute_m5_equivalent_atr(m5_tape: Optional[dict] = None, default_atr: float
     return round(max(2.0, min(6.5, raw_atr)), 2)
 
 
+def _r2(v: float) -> float:
+    """IEEE-754 two-decimal half-to-even rounding with bit-exact Python/JS parity."""
+    sign = -1.0 if v < 0 else 1.0
+    av = abs(v) * 100.0
+    fl = math.floor(av)
+    if (av - fl) == 0.5:
+        return sign * ((fl if int(fl) % 2 == 0 else fl + 1) / 100.0)
+    return sign * (math.floor(av + 0.5) / 100.0)
+
+
 def _format_gate_meta(active: bool, is_breakout: bool, reason: str) -> tuple[str, str]:
     if active:
         return "[KÍCH HOẠT]", reason
@@ -630,9 +640,9 @@ def compute_tactical_intraday_matrix(
 ) -> dict[str, dict[str, Any]]:
     """Compute stop-hunt-resistant Entry/SL/TP and Gamma-aligned execution gates for KHỐI 6."""
     atr5 = max(2.0, min(6.5, float(atr_5m)))
-    brk_off = max(2.80, round(0.8 * atr5, 2))
-    sl_brk = max(5.00, round(1.5 * atr5, 2), round(brk_off + 2.00, 2))
-    sl_rev = max(5.00, round(1.4 * atr5, 2))
+    brk_off = max(2.80, _r2(0.8 * atr5))
+    sl_brk = max(5.00, _r2(1.5 * atr5), _r2(brk_off + 2.00))
+    sl_rev = max(5.00, _r2(1.4 * atr5))
     front_run_tp = 1.00
 
     norm_reg = str(regime or "NEUTRAL").upper()
@@ -645,10 +655,10 @@ def compute_tactical_intraday_matrix(
     near_put_wall = (float(put_wall) > 0) and (abs(float(strike_below) - float(put_wall)) <= max(float(step), 5.0))
 
     # 1. BUY Squeeze (outside stop-hunt wick, behind-strike ATR SL, 1.5R bounded TP)
-    entry_squeeze = round(strike_above + brk_off, 2)
-    sl_squeeze = round(entry_squeeze - sl_brk, 2)
+    entry_squeeze = _r2(strike_above + brk_off)
+    sl_squeeze = _r2(entry_squeeze - sl_brk)
     raw_sq_tp = (major_up_wall - front_run_tp) if has_up_air_pocket else (next_above - front_run_tp)
-    tp_squeeze = round(min(max(entry_squeeze + 4.00, raw_sq_tp), entry_squeeze + 1.5 * sl_brk), 2)
+    tp_squeeze = _r2(min(max(entry_squeeze + 4.00, raw_sq_tp), entry_squeeze + 1.5 * sl_brk))
     sq_active = session_open and is_short_gamma and bool(has_up_air_pocket) and (
         float(vpin_pct) >= 55.0 or float(call_wall_siege) >= 0.25
     )
@@ -659,10 +669,10 @@ def compute_tactical_intraday_matrix(
     sq_badge, sq_reason = _format_gate_meta(sq_active, True, sq_reason)
 
     # 2. SELL Fade (high-precision edge below Call resistance, >= $5 ATR-floored SL)
-    entry_fade = round(strike_above - 1.00, 2)
-    sl_fade = round(entry_fade + sl_rev, 2)
+    entry_fade = _r2(strike_above - 1.00)
+    sl_fade = _r2(entry_fade + sl_rev)
     cand_fade_tp = min(float(spot), strike_below + front_run_tp) if strike_below < entry_fade - 2.00 else (entry_fade - 4.50)
-    tp_fade = round(max(entry_fade - 6.00, min(entry_fade - 3.00, cand_fade_tp)), 2)
+    tp_fade = _r2(max(entry_fade - 6.00, min(entry_fade - 3.00, cand_fade_tp)))
     fade_active = session_open and (float(vpin_pct) < 58.0) and (is_long_gamma or above_zg)
     fade_reason = (
         "MM LONG_GAMMA / Trên Zero Gamma + VPIN an toàn" if fade_active
@@ -671,9 +681,9 @@ def compute_tactical_intraday_matrix(
     fade_badge, fade_reason = _format_gate_meta(fade_active, False, fade_reason)
 
     # 3. BUY Rebound (support bounce above strike_below, Put-Wall anchored in Short Gamma)
-    entry_rebound = round(strike_below + 1.00, 2)
-    sl_rebound = round(entry_rebound - sl_rev, 2)
-    tp_rebound = round(min(entry_rebound + 7.50, max(entry_rebound + 3.00, strike_above - front_run_tp)), 2)
+    entry_rebound = _r2(strike_below + 1.00)
+    sl_rebound = _r2(entry_rebound - sl_rev)
+    tp_rebound = _r2(min(entry_rebound + 7.50, max(entry_rebound + 3.00, strike_above - front_run_tp)))
     reb_active = session_open and (float(vpin_pct) < 55.0) and (is_long_gamma or above_zg or near_put_wall)
     reb_reason = (
         ("Gần Put Wall + VPIN an toàn" if near_put_wall else "MM LONG_GAMMA / Trên Zero Gamma") if reb_active
@@ -682,10 +692,10 @@ def compute_tactical_intraday_matrix(
     reb_badge, reb_reason = _format_gate_meta(reb_active, False, reb_reason)
 
     # 4. SELL Breakdown (outside stop-hunt wick, behind-strike ATR SL, 1.5R bounded TP)
-    entry_breakdown = round(strike_below - brk_off, 2)
-    sl_breakdown = round(entry_breakdown + sl_brk, 2)
+    entry_breakdown = _r2(strike_below - brk_off)
+    sl_breakdown = _r2(entry_breakdown + sl_brk)
     raw_bd_tp = (major_down_wall + front_run_tp) if has_down_air_pocket else (next_below + front_run_tp)
-    tp_breakdown = round(max(min(entry_breakdown - 4.00, raw_bd_tp), entry_breakdown - 1.5 * sl_brk), 2)
+    tp_breakdown = _r2(max(min(entry_breakdown - 4.00, raw_bd_tp), entry_breakdown - 1.5 * sl_brk))
     bd_active = session_open and is_short_gamma and bool(has_down_air_pocket) and below_zg and (
         float(vpin_pct) >= 50.0 or float(put_wall_siege) >= 0.20
     )
@@ -700,9 +710,9 @@ def compute_tactical_intraday_matrix(
         "squeeze": {
             "entry": entry_squeeze,
             "sl": sl_squeeze,
-            "sl_dist": round(entry_squeeze - sl_squeeze, 2),
+            "sl_dist": _r2(entry_squeeze - sl_squeeze),
             "tp": tp_squeeze,
-            "tp_dist": round(tp_squeeze - entry_squeeze, 2),
+            "tp_dist": _r2(tp_squeeze - entry_squeeze),
             "active": bool(sq_active),
             "status_badge": sq_badge,
             "gate_reason": sq_reason,
@@ -710,9 +720,9 @@ def compute_tactical_intraday_matrix(
         "fade": {
             "entry": entry_fade,
             "sl": sl_fade,
-            "sl_dist": round(sl_fade - entry_fade, 2),
+            "sl_dist": _r2(sl_fade - entry_fade),
             "tp": tp_fade,
-            "tp_dist": round(entry_fade - tp_fade, 2),
+            "tp_dist": _r2(entry_fade - tp_fade),
             "active": bool(fade_active),
             "status_badge": fade_badge,
             "gate_reason": fade_reason,
@@ -720,9 +730,9 @@ def compute_tactical_intraday_matrix(
         "rebound": {
             "entry": entry_rebound,
             "sl": sl_rebound,
-            "sl_dist": round(entry_rebound - sl_rebound, 2),
+            "sl_dist": _r2(entry_rebound - sl_rebound),
             "tp": tp_rebound,
-            "tp_dist": round(tp_rebound - entry_rebound, 2),
+            "tp_dist": _r2(tp_rebound - entry_rebound),
             "active": bool(reb_active),
             "status_badge": reb_badge,
             "gate_reason": reb_reason,
@@ -730,9 +740,9 @@ def compute_tactical_intraday_matrix(
         "breakdown": {
             "entry": entry_breakdown,
             "sl": sl_breakdown,
-            "sl_dist": round(sl_breakdown - entry_breakdown, 2),
+            "sl_dist": _r2(sl_breakdown - entry_breakdown),
             "tp": tp_breakdown,
-            "tp_dist": round(entry_breakdown - tp_breakdown, 2),
+            "tp_dist": _r2(entry_breakdown - tp_breakdown),
             "active": bool(bd_active),
             "status_badge": bd_badge,
             "gate_reason": bd_reason,
