@@ -1,18 +1,18 @@
 {
-  "timestamp_utc": "2026-11-14T04:22:09.953551+00:00",
-  "synced_at_vn": "14/11/2026 11:22:09 VN",
+  "timestamp_utc": "2026-11-14T05:05:06.960285+00:00",
+  "synced_at_vn": "14/11/2026 12:05:06 VN",
   "spot_price": 3887.6,
   "atm_strike": 3890.0,
   "call_wall": 4000.0,
   "put_wall": 3700.0,
   "zero_gamma_flip": 4076.52,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -1063.9223436685163,
-  "total_net_vex": 153.7318405824128,
-  "total_net_chex": -192.81041151434758,
+  "total_net_gex": -1063.888632524252,
+  "total_net_vex": 153.53398897120078,
+  "total_net_chex": -193.3139016226786,
   "strike_above": 3890.0,
   "strike_below": 3885.0,
-  "expected_move_1s": 151.9421984896947,
+  "expected_move_1s": 151.95517879242774,
   "implied_forward_price": 3886.29,
   "forward_dislocation_usd": -1.31,
   "dealer_hedge_futures_flow": 0.0,
@@ -20,6 +20,38 @@
   "bvc_buy_pct": 65.4,
   "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
   "flip_integrity_color": "#FACC15",
+  "dynamic_vacuum": {
+    "vacuum_active": false,
+    "regime": "GLOBEX_CLOSED",
+    "label_vi": "S\u00c0N CME \u0110\u00d3NG C\u1eecA \u2014 KH\u00d3A QU\u00c9T VACUUM",
+    "illiq_latest": 1.13e-06,
+    "illiq_q95": 1.269e-05,
+    "illiq_percentile": 6.8,
+    "rs_latest": 0.000473,
+    "rs_z_score": 2.45,
+    "session_tag": "GLOBEX_CLOSED",
+    "vacuum_bar_times": []
+  },
+  "institutional_fvgs": [
+    {
+      "direction": "BULLISH",
+      "time": 1794604320,
+      "low": 3874.7,
+      "high": 3875.3,
+      "midpoint_50": 3875.0,
+      "zone_75": 3874.85,
+      "vacuum_backed": false,
+      "level_backed": true
+    }
+  ],
+  "post_sweep_execution": {
+    "post_sweep_regime": "MONITORING",
+    "allow_reversal": false,
+    "direction": "NONE",
+    "entry_style": "WAIT_SWEEP_CONFIRMATION",
+    "target_zone": [],
+    "label_vi": "THEO D\u00d5I \u2014 CH\u1edc T\u00cdN HI\u1ec6U QU\u00c9T & H\u1ea4P TH\u1ee4 T\u1ea0I WALL"
+  },
   "market_open": false,
   "recent_candles": [
     {
@@ -498,7 +530,7 @@
       "time": 1794607140,
       "open": 3888.4,
       "high": 3888.9,
-      "low": 3886.9,
+      "low": 3886.3,
       "close": 3887.6,
       "volume": 159
     }
