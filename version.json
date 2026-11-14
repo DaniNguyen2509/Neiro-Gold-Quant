@@ -1,25 +1,25 @@
 {
-  "timestamp_utc": "2026-11-14T08:39:47.875424+00:00",
-  "synced_at_vn": "14/11/2026 15:39:47 VN",
-  "spot_price": 4180.0,
-  "atm_strike": 4180.0,
-  "call_wall": 4200.0,
-  "put_wall": 3900.0,
-  "zero_gamma_flip": 4090.46,
+  "timestamp_utc": "2026-11-14T08:54:34.454980+00:00",
+  "synced_at_vn": "14/11/2026 15:54:34 VN",
+  "spot_price": 3886.3,
+  "atm_strike": 3885.0,
+  "call_wall": 4000.0,
+  "put_wall": 3700.0,
+  "zero_gamma_flip": 4076.48,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -1322.5030186761062,
-  "total_net_vex": 140.77299480536567,
-  "total_net_chex": -201.49239117305606,
-  "strike_above": 4185.0,
-  "strike_below": 4180.0,
-  "expected_move_1s": 179.21189695707912,
-  "implied_forward_price": 4180.0,
-  "forward_dislocation_usd": 0.0,
-  "dealer_hedge_futures_flow": 2011.2,
-  "bvc_cvd_contracts": 175.1,
-  "bvc_buy_pct": 59.9,
-  "flip_integrity_label": "\ud83d\udfe2 FLIP TH\u1eacT (TRUE BREAKOUT): OPTIONS + MM \u0110\u1ed2NG THU\u1eacN MUA \u0110U\u1ed4I",
-  "flip_integrity_color": "#4ADE80",
+  "total_net_gex": -1047.2029767491454,
+  "total_net_vex": 155.40951916725183,
+  "total_net_chex": -210.73710057127283,
+  "strike_above": 3890.0,
+  "strike_below": 3885.0,
+  "expected_move_1s": 152.1303356773235,
+  "implied_forward_price": 3886.29,
+  "forward_dislocation_usd": -0.01,
+  "dealer_hedge_futures_flow": 0.0,
+  "bvc_cvd_contracts": 184.4,
+  "bvc_buy_pct": 60.4,
+  "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
+  "flip_integrity_color": "#FACC15",
   "dynamic_vacuum": {
     "vacuum_active": false,
     "regime": "GLOBEX_CLOSED",
@@ -28,11 +28,22 @@
     "illiq_q95": 1.269e-05,
     "illiq_percentile": 35.6,
     "rs_latest": 0.000293,
-    "rs_z_score": 0.79,
+    "rs_z_score": 0.8,
     "session_tag": "GLOBEX_CLOSED",
     "vacuum_bar_times": []
   },
-  "institutional_fvgs": [],
+  "institutional_fvgs": [
+    {
+      "direction": "BULLISH",
+      "time": 1794604320,
+      "low": 3874.7,
+      "high": 3875.3,
+      "midpoint_50": 3875.0,
+      "zone_75": 3874.85,
+      "vacuum_backed": false,
+      "level_backed": true
+    }
+  ],
   "post_sweep_execution": {
     "post_sweep_regime": "MONITORING",
     "allow_reversal": false,
@@ -45,11 +56,11 @@
   "recent_candles": [
     {
       "time": 1794603600,
-      "open": 3881.9,
+      "open": 3881.8,
       "high": 3882.0,
       "low": 3878.6,
       "close": 3878.9,
-      "volume": 163
+      "volume": 170
     },
     {
       "time": 1794603660,
@@ -65,7 +76,7 @@
       "high": 3878.2,
       "low": 3876.2,
       "close": 3876.8,
-      "volume": 186
+      "volume": 182
     },
     {
       "time": 1794603780,
@@ -73,15 +84,15 @@
       "high": 3878.4,
       "low": 3876.9,
       "close": 3877.2,
-      "volume": 113
+      "volume": 115
     },
     {
       "time": 1794603840,
-      "open": 3877.3,
+      "open": 3877.2,
       "high": 3879.8,
       "low": 3877.0,
       "close": 3879.6,
-      "volume": 98
+      "volume": 99
     },
     {
       "time": 1794603900,
@@ -89,11 +100,11 @@
       "high": 3880.6,
       "low": 3879.0,
       "close": 3879.1,
-      "volume": 121
+      "volume": 122
     },
     {
       "time": 1794603960,
-      "open": 3879.2,
+      "open": 3879.0,
       "high": 3879.8,
       "low": 3877.7,
       "close": 3878.1,
@@ -205,7 +216,7 @@
     },
     {
       "time": 1794604800,
-      "open": 3878.9,
+      "open": 3878.7,
       "high": 3879.5,
       "low": 3878.2,
       "close": 3879.5,
@@ -213,7 +224,7 @@
     },
     {
       "time": 1794604860,
-      "open": 3879.3,
+      "open": 3879.5,
       "high": 3880.6,
       "low": 3879.3,
       "close": 3880.6,
@@ -245,7 +256,7 @@
     },
     {
       "time": 1794605100,
-      "open": 3880.9,
+      "open": 3881.0,
       "high": 3882.2,
       "low": 3880.8,
       "close": 3882.2,
@@ -384,20 +395,20 @@
       "open": 3878.2,
       "high": 3879.1,
       "low": 3877.1,
-      "close": 3877.4,
-      "volume": 77
+      "close": 3877.2,
+      "volume": 73
     },
     {
       "time": 1794606180,
-      "open": 3877.3,
+      "open": 3877.5,
       "high": 3879.2,
       "low": 3877.0,
       "close": 3879.1,
-      "volume": 55
+      "volume": 59
     },
     {
       "time": 1794606240,
-      "open": 3879.2,
+      "open": 3879.4,
       "high": 3881.4,
       "low": 3879.2,
       "close": 3880.7,
@@ -421,7 +432,7 @@
     },
     {
       "time": 1794606420,
-      "open": 3882.9,
+      "open": 3882.4,
       "high": 3884.7,
       "low": 3882.1,
       "close": 3884.0,
@@ -489,19 +500,19 @@
       "high": 3884.4,
       "low": 3883.1,
       "close": 3884.3,
-      "volume": 83
+      "volume": 82
     },
     {
       "time": 1794606960,
-      "open": 3884.0,
+      "open": 3883.9,
       "high": 3885.8,
       "low": 3883.4,
       "close": 3885.3,
-      "volume": 67
+      "volume": 68
     },
     {
       "time": 1794607020,
-      "open": 3885.3,
+      "open": 3885.0,
       "high": 3886.6,
       "low": 3884.7,
       "close": 3886.4,
