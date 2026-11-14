@@ -22,14 +22,14 @@ Chỗ nào tài liệu nói khác **mã nguồn** thì **mã nguồn đúng**.
 
 | Thành phần | Vai trò | Đường dẫn |
 |---|---|---|
-| **2TC-v10** | Indicator tín hiệu (Pine) | 	radingview/2TC-v10.pine |
+| **2TC-v10** | Indicator tín hiệu (Pine) | tradingview/2TC-v10.pine |
 | **2TC-v10** | Indicator tín hiệu (MT5) | mt5/Indicators/2TC-v10.mq5 |
-| **Neiro-Liquidity-Map-v2** | Bản đồ thanh khoản (Pine) | 	radingview/Neiro-Liquidity-Map-v2.pine |
+| **Neiro-Liquidity-Map-v2** | Bản đồ thanh khoản (Pine) | tradingview/Neiro-Liquidity-Map-v2.pine |
 | **Neiro-Liquidity-Map-v2** | Bản đồ thanh khoản (MT5) | mt5/Indicators/Neiro-Liquidity-Map-v2.mq5 |
 | **Quant Engine** | Lõi tính toán Python | src/quant_engine/ |
 | **Collector** | Thu thập Options Chain | src/collector/ |
 | **MT5 Bridge** | Cầu nối Python-MT5 | src/mt5_bridge/ |
-| **HUD** | Mini-HUD quy đổi | src/hud/ |
+| **HUD** | All-in-One Terminal & Live Bridge HUD | src/hud/ |
 
 ---
 
@@ -41,3 +41,5 @@ Chỗ nào tài liệu nói khác **mã nguồn** thì **mã nguồn đúng**.
 4. **Không tự chế luật hoặc backtest** ngoài lề. Mọi thay đổi do owner chỉ đạo.
 5. **Tuyệt đối LOẠI BỎ cột Latest** trên Barchart (stale prints).
 6. **Tuyệt đối LOẠI BỎ bảng Greeks mặc định** của Barchart trong ngày 0DTE.
+7. **CME Microstructure & Zero Gamma Invariant:** `Wall Siege Ratio = Volume / OI`; Zero Gamma Flip ($S^*$) giải liên tục bằng `_brentq` thuần Python.
+8. **100% Pure CME Gold Futures (`GC` / `GC=F`):** Mọi phân tích, HUD, chiến lược và tài liệu đồng bộ duy nhất giá CME Gold Futures; không tự ý quy đổi Spot CFD `XAUUSD`.

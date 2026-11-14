@@ -1,7 +1,7 @@
 # Neiro-Quant — CẨM NANG TÁC CHIẾN THỰC CHIẾN DÀNH CHO TRADER (TRADER PLAYBOOK)
 
-> **Phiên bản:** v1.0 — 24/10/2026  
-> **Dành cho:** Nhà giao dịch Vàng Phái sinh (CME Gold Futures `GCZ26` / `GC=F`) & Vàng Giao ngay (XAUUSD Spot).  
+> **Phiên bản:** v1.1 (ADR-028 / ADR-029 Pure CME Futures)  
+> **Dành cho:** Nhà giao dịch Vàng Phái sinh (**100% Pure CME Gold Futures `GC` / `MGC` / `GC=F`** — tuân thủ Rule 8, không quy đổi Spot `XAUUSD`).  
 > **Tài liệu nền tảng:** [docs/architecture.md](architecture.md), [docs/spec.md](spec.md) & [docs/decisions/](decisions/).  
 > **URL Tactical Web Terminal:** [https://daninguyen2509.github.io/Neiro-Gold-Quant/](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
 
@@ -17,7 +17,7 @@
 6. [Quét Túi Chân Không Thanh Khoản (Air Pocket) & Quy Tắc Cấm Đỡ Dao](#6-quét-túi-chân-không-thanh-khoản-air-pocket--quy-tắc-cấm-đỡ-dao)
 7. [Đọc Hiểu Đường Cong Nụ Cười SVI Volatility Smile & Skew (ADR-009)](#7-đọc-hiểu-đường-cong-nụ-cười-svi-volatility-smile--skew-adr-009)
 8. [Radar Xung Lực Orderflow M5: Nhận Diện Pinbar & Volume Spike](#8-radar-xung-lực-orderflow-m5-nhận-diện-pinbar--volume-spike)
-9. [Quy Tắc Quản Trị Rủi Ro, Đi Tiền (Sizing) & Quy Đổi Basis Sang XAUUSD](#9-quy-tắc-quản-trị-rủi-ro-đi-tiền-sizing--quy-đổi-basis-sang-xauusd)
+9. [Quy Tắc Quản Trị Rủi Ro, Đi Tiền (Sizing GC/MGC) & Hard SL ADR-028](#9-quy-tắc-quản-trị-rủi-ro-đi-tiền-sizing-gcmgc--hard-sl-adr-028)
 10. [Checklist Tác Chiến Mẫu Trong Ngày Cho Trader](#10-checklist-tác-chiến-mẫu-trong-ngày-cho-trader)
 
 ---
@@ -67,7 +67,7 @@ Mỗi thẻ KPI trên bảng điện đóng vai trò như một đồng hồ đo
 
 ### Thẻ 1: SPOT CME FUTURES (Giá Tương Lai Chuẩn)
 - **Ý nghĩa:** Giá giao dịch thực tế của Hợp đồng Tương lai Vàng COMEX Front-Month (`GC=F` / `GCZ26`).
-- **Lưu ý sống còn:** Toàn bộ thuật toán Neiro-Quant neo 100% vào giá CME Futures (Single Source of Truth). Giá này thường **cao hơn giá XAUUSD Spot của các sàn MT5/Forex từ 15 đến 30 USD** do chênh lệch Contango Basis (chi phí lưu kho, bảo hiểm, lãi suất).
+- **Lưu ý sống còn (Rule 8 — 100% Pure CME Futures):** Toàn bộ thuật toán, bảng kèo `KHỐI 6`, Strike Options và nến `GC=F` của Neiro-Quant neo **100% vào giá CME Gold Futures** (Single Source of Truth), khớp chuẩn `$0.01` với bảng Options COMEX mà **không** tự ý quy đổi sang Spot/CFD bên ngoài.
 
 ### Thẻ 2: NET GEX REGIME (Chế Độ Gamma Toàn Thị Trường)
 - **Positive Net GEX ($> 0$):**  
@@ -317,29 +317,22 @@ Bảng điện cập nhật trực tiếp luồng nến M5 từ sàn COMEX, giú
 
 ---
 
-## 9. QUY TẮC QUẢN TRỊ RỦI RO, ĐI TIỀN (SIZING) & QUY ĐỔI BASIS SANG XAUUSD
+## 9. QUY TẮC QUẢN TRỊ RỦI RO, ĐI TIỀN (SIZING GC/MGC) & HARD SL ADR-028
 
-### 1. Quy tắc Cắt lỗ (Stop Loss) Bất di bất dịch:
-- **Biên độ SL:** Luôn cố định từ **1.5 đến 2.5 giá** tính từ đỉnh/đáy của Bức tường phòng thủ.
-- **Tại sao lại ngắn như vậy?**  
-  Bởi vì các bức tường của Market Maker là thành trì triệu đô. Nếu một bức tường đã được xác nhận bị đâm thủng quá 2.5 giá, cấu trúc vi mô đã bị bẻ gãy hoàn toàn. Cắt lỗ 2 giá để bảo vệ 98% tài khoản, tuyệt đối không được gồng lỗ!
+### 1. Quy tắc Cắt lỗ (Stop Loss) Hiệu Chỉnh Theo M5 ATR (ADR-028):
+- **Biên độ Hard SL tiêu chuẩn (`KHỐI 6`):**
+  * **Breakout (`Squeeze` / `Breakdown`) & `Fade Reversal`:** Hard SL tối thiểu **`>= $5.00`** (tính tự động theo `M5 ATR` và cấu trúc Strike để tránh bị quét râu M5 trước khi chạy thật).
+  * **Mean-Reversion (`Rebound` tại Put Wall):** Hard SL tối thiểu **`>= $4.50`**.
+- **Tại sao không đặt SL quá chặt ($1.5–$2.5) như cũ?**  
+  Thực chiến phiên COMEX có biên độ râu quét thanh khoản M5 thường đạt `$2.50–$4.00`. Nếu SL quá sát tường sẽ dễ bị dừng lỗ non ngay tại điểm hấp thụ thanh khoản. Khi cấu trúc vượt qua vùng Hard SL hiệu chỉnh (`>= $4.50 / $5.00`), tường phòng thủ đã xác nhận vỡ thật sự.
 
-### 2. Định cỡ Vị thế (Position Sizing) theo Chế độ Gamma:
-- **Trong Positive Net GEX:** Đi khối lượng tiêu chuẩn 100% (ví dụ: 1.0 lot).
-- **Trong Negative Net GEX:** Giảm khối lượng xuống 50% - 70% (ví dụ: 0.5 lot) vì biên độ dao động nến sẽ rộng hơn gấp đôi bình thường.
+### 2. Định cỡ Vị thế (Position Sizing `GC` / `MGC`) theo Chế độ Gamma & VPIN:
+- **Trong Positive Net GEX (`VPIN < 40%`):** Đi khối lượng tiêu chuẩn `100%` theo quy mô rủi ro tài khoản (`GC = $100/pt`, `MGC = $10/pt`).
+- **Trong Negative Net GEX hoặc `VPIN 40%–65%`:** Giảm khối lượng xuống `50%–70%`.
+- **Khi `VPIN >= 65%` (`[ĐỘC TÍNH >=65% — CẤM CHẶN TÀU]`):** Ngưng hoàn toàn lệnh Limit bắt đảo chiều (`Fade`/`Rebound` bị `[TẠM KHÓA]`), chỉ theo dấu Breakout/Breakdown thuận dòng tiền.
 
-### 3. Công thức Quy đổi Mốc Cản sang XAUUSD Spot (MT5):
-Giá trên Neiro-Quant là giá CME Futures (`GCZ26` / `GC=F`). Để áp dụng mức cản này lên biểu đồ XAUUSD của các sàn môi giới (Exness, IC Markets, Pepperstone), trader thực hiện phép tính nhẩm đơn giản:
-
-$$\text{Basis Contango Spread} = \text{Giá Futures (GC=F)} - \text{Giá XAUUSD MT5}$$
-$$\text{Mốc Cản Trên MT5} = \text{Mốc Cản CME} - \text{Basis Contango Spread}$$
-
-*Ví dụ thực tế:*
-- Bảng điện Neiro-Quant báo: Call Wall = **4200.00**, Giá Futures hiện tại = **4180.00**.
-- Nhìn sang màn hình MT5: Giá XAUUSD đang là **4155.00**.
-- Chênh lệch Basis: $4180.00 - 4155.00 = 25.00 \text{ USD}$.
-- $\rightarrow$ Mức cản Call Wall tương ứng trên biểu đồ MT5 của anh sẽ là:  
-  $$4200.00 - 25.00 = \mathbf{4175.00 \text{ XAUUSD}}$$
+### 3. Quy chuẩn Thực thi Trực Tiếp Trên CME Gold Futures (Rule 8):
+Toàn bộ các mốc `Call Wall`, `Put Wall`, `Zero Gamma Flip S*`, `Entry`, `SL`, `TP` trên Terminal đã đồng bộ 100% theo **CME Gold Futures (`GC` / `GC=F` / `MGC`)**. Trader đặt lệnh trực tiếp theo đúng tọa độ giá Futures COMEX mà **không** cần quy đổi trung gian sang Spot CFD, loại bỏ hoàn toàn rủi ro trượt Contango Basis.
 
 ---
 
@@ -369,7 +362,7 @@ In checklist này ra bàn làm việc hoặc lưu vào ghi chú điện thoại 
 
 [ ] 20:30 - 23:45 VN (Phiên Mỹ Mở Cửa & London Fix 00:00 VN):
     - Giao dịch theo đúng Ma trận 6 kịch bản MM khi thẻ phát sáng.
-    - Tuân thủ nghiêm ngặt SL 1.5 - 2.5 giá.
+    - Tuân thủ nghiêm ngặt Hard SL hiệu chỉnh ADR-028 trên `KHỐI 6` (`>= $5.00` Breakout/Fade, `>= $4.50` Rebound).
     - Chốt lời các lệnh Intraday trước giờ London Fix để tránh giật giá cuối ngày.
 ```
 

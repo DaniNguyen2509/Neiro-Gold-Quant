@@ -13,14 +13,13 @@ Tài liệu của Argon tiếp cận vấn đề theo đúng tư duy **First Pri
 1. **Tìm ra Endpoint gốc của Barchart:**  
    https://www.barchart.com/proxies/core-api/v1/options/get
 2. **Phát hiện bước ngoặt (Crucial Discovery):**  
-   Hai trang **Options Prices** và **Volatility & Greeks** thực chất **gọi chung một API duy nhất**, chỉ khác nhau ở tham số ields. Nghĩa là hoàn toàn có thể lấy **CẢ GIÁ LẪN GREEKS TRONG 1 LẦN GỌI DUY NHẤT**!
+   Hai trang **Options Prices** và **Volatility & Greeks** thực chất **gọi chung một API duy nhất**, chỉ khác nhau ở tham số `fields`. Nghĩa là hoàn toàn có thể lấy **CẢ GIÁ LẪN GREEKS TRONG 1 LẦN GỌI DUY NHẤT**!
 
 ### ⚠️ Hạn chế thực chiến cần khắc phục của 3 giải pháp Argon:
 * **Giải pháp C (Python requests cào API từ ngoài):**  
-  *Thực tế:* Barchart được bảo vệ bởi **Cloudflare Bot Management / Turnstile**. Khi dùng Python 
-equests, Barchart trả về HTTP 202 / 403 Challenge và từ chối cấp Cookie. Muốn chạy từ ngoài bắt buộc phải dùng trình duyệt giả lập cồng kềnh (Playwright / Undetected Chromedriver).
+  *Thực tế:* Barchart được bảo vệ bởi **Cloudflare Bot Management / Turnstile**. Khi dùng Python `requests`, Barchart trả về HTTP 202 / 403 Challenge và từ chối cấp Cookie. Muốn chạy từ ngoài bắt buộc phải dùng trình duyệt giả lập cồng kềnh (Playwright / Undetected Chromedriver).
 * **Giải pháp A (DOM Scraping bằng Javascript):**  
-  *Thực tế:* Barchart sử dụng công nghệ bảng ảo hóa (c-data-grid). Trình duyệt chỉ render 20-30 dòng anh đang cuộn chuột nhìn thấy. Nếu chưa cuộn xuống đáy, lệnh querySelectorAll sẽ bị thiếu dữ liệu các strike bên dưới. Đồng thời DOM chỉ có các cột của trang hiện tại, anh vẫn phải mở 2 trang riêng biệt.
+  *Thực tế:* Barchart sử dụng công nghệ bảng ảo hóa (`bc-data-grid`). Trình duyệt chỉ render 20-30 dòng anh đang cuộn chuột nhìn thấy. Nếu chưa cuộn xuống đáy, lệnh querySelectorAll sẽ bị thiếu dữ liệu các strike bên dưới. Đồng thời DOM chỉ có các cột của trang hiện tại, anh vẫn phải mở 2 trang riêng biệt.
 * **Giải pháp B (Clipboard Parser):**  
   Vẫn phải bôi đen Ctrl+C bằng tay, dễ bị lệch khi cấu hình cột của trang Options (12 cột) khác với trang Greeks (10-11 cột).
 
@@ -31,7 +30,7 @@ equests, Barchart trả về HTTP 202 / 403 Challenge và từ chối cấp Cook
 Thay vì cào DOM hay gọi Python từ ngoài, ta đưa lệnh gọi **Barchart Internal API** của Argon chạy **TRỰC TIẾP TRÊN TRÌNH DUYỆT (BOOKMARKLET)**:
 
 1. **Vượt tường lửa Cloudflare 100%:** Trình duyệt của anh đã có sẵn session hợp lệ và XSRF-TOKEN cookie.
-2. **Lấy trọn vẹn cả 2 bảng trong 0.2 giây:** Tự động gửi request với toàn bộ ields (Giá, Bid/Ask, Volume, OI, IV, Delta, Gamma, Vega, Theta).
+2. **Lấy trọn vẹn cả 2 bảng trong 0.2 giây:** Tự động gửi request với toàn bộ `fields` (Giá, Bid/Ask, Volume, OI, IV, Delta, Gamma, Vega, Theta).
 3. **Không phụ thuộc giao diện:** Dù bảng trên màn hình có ảo hóa hay ẩn dòng thì API vẫn trả về 100% tất cả các mức Strike.
 4. **Tự động xuất 2 trong 1:** 
    - Tự động tải file options_prices_GCZ26.csv chuẩn về máy (đút thẳng vào Neiro-Quant).

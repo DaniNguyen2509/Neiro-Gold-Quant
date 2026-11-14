@@ -1,7 +1,7 @@
 # Spec: Neiro-Gold-Quant — Quantitative Gold Options Trading System & TradingView Fullscreen Realtime Terminal
 
 > **Bản đặc tả kỹ thuật chi tiết (System Specification)**  
-> **Tài sản mục tiêu:** COMEX Gold Futures (`GC` / `MGC`), Spot `XAUUSD` / `GOLD` (London OTC) & SPDR Gold Shares (`GLD`) Options Proxy.  
+> **Tài sản mục tiêu:** 100% Pure COMEX Gold Futures (`GC` / `MGC` / `GC=F`) & SPDR Gold Shares (`GLD`) Options Proxy *(không tự ý quy đổi Spot CFD `XAUUSD`)*.  
 > **Kiến trúc:** Cloud-Native Zero-Touch Automation (GitHub Actions + GitHub Pages, thuần Python, Zero-Waste < 15MB).  
 > **Tài liệu tham chiếu:** [docs/architecture.md](architecture.md), [docs/decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md](decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md), [config/settings.toml](../config/settings.toml).
 
@@ -43,6 +43,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
      * **Dynamic Liquidity Vacuum, Post-Sweep V-Shape/Pullback & Architecture Deduplication (Đã triển khai — [ADR-026](decisions/ADR-026-liquidity-vacuum-and-architecture-dedup.md)):** Hợp nhất hệ thống Air Pocket về `level_state.py`, bổ sung 3 tầng thuần `GC=F` OHLCV (`Static OI Vacuum` + `Dynamic High-Freq Amihud ILLIQ & Rogers-Satchell Vacuum` + `Institutional FVG 50%–75%` + `Post-Sweep V-Shape/Pullback` khóa bởi cổng an toàn `VPIN < 65%`), nối `precompute_squeeze_ladder` vào Live HUD (`updateSqueezeHud`), dọn sạch 6 file mã chết (`dead code`) và loại bỏ hoàn toàn `vTick` giả lập trên client JS.
      * **End-to-End Pipeline Latency, Threaded Live Bridge & Scalping Cockpit Optimization (Đã triển khai — [ADR-027](decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md)):** Triển khai đầy đủ 5 giai đoạn tối ưu hóa toàn trình: vector hóa `loader.py` & `dealer.py`, chữa lành IV chọn lọc, cache HTF `1h`/`1d` tải song song + nén HTTP gzip `_read_yahoo_json`, cầu nối `ThreadingHTTPServer` RAM-cached (`/api/yahoo_gc` `< 8ms`), bỏ gọi `build_plotly_figure` trên đường chạy chính (giữ nguyên hàm cho tests), tách chu kỳ tĩnh/động trong `--loop`, cắt tỉa hành lang `±$600` (`INITIAL_OPTIONS` & `squeeze_ladder`), giới hạn DOM Pinning `±35 strikes` (`<= 71` dòng) và khử trùng lặp 3 thẻ Orderflow tĩnh ở `KHỐI 5`, không xâm phạm `mt5/Indicators/*.mq5`.
      * **VPIN Background Dispersion & KHỐI 6 Strategy Calibration (Đã triển khai — [ADR-028](decisions/ADR-028-vpin-and-tactical-strategy-calibration.md)):** Hiệu chỉnh `compute_vpin_bvc` (chuẩn hóa phân tán nền `candles[:-6]` + chia đều 5 equal-volume buckets), đẩy Entry Breakout `Squeeze`/`Breakdown` ra ngoài vùng quét râu (`>= ±2.80`), nâng Hard SL tối thiểu `\$5.00` theo ATR `M5`, giới hạn TP `<= 1.5x Risk` và bổ sung huy hiệu `[KÍCH HOẠT]` / `[CHỜ XÁC NHẬN]` / `[TẠM KHÓA]` theo Gamma Regime / Zero Gamma / Put Wall / Air Pocket / VPIN trên `KHỐI 6`.
+     * **Cockpit Tác chiến 3 Giây & Đồng bộ 100% Realtime JS/Python (Đã triển khai — [ADR-029](decisions/ADR-029-simplified-3sec-cockpit-and-full-realtime-sync.md)):** Sửa triệt để lỗi `currentTfKey` chặn polling, bổ sung thanh `#tactical-3s-command-bar` (4 ô ngay dưới chart), bố cục 2 tầng CSS Flexbox `order` (đẩy `KHỐI 4 Spine` & `KHỐI 6` mở sẵn lên ngay dưới Command Bar và thu gọn các bảng kiểm toán vào `<details>` giữ nguyên thứ tự landmark), cổng hóa 1:1 `computeLiveVpinBvcJs` & `computeTacticalMatrixJs` với Python ADR-028, thu gọn HUD 5 dòng, gỡ Canvas Gauge đè hình và thêm chế độ `Lớp phủ: Tinh gọn / Đầy đủ` + payload `_compute_live_microstructure_payload` trên `/api/yahoo_gc`.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.
    - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.
@@ -58,7 +59,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
 | **Hệ số nhân Chuẩn (Multiplier)** | **$100.0** / điểm | $1.0 biến động = $100.0 PnL / hợp đồng. |
 | **Mã HĐTL Micro (Micro Futures)** | **`MGC`** | 10 troy ounces / hợp đồng, Multiplier = $10.0 / điểm. |
 | **Mã TradingView liên tục** | `GC1!` | Continuous Front Month Futures. |
-| **Tài sản Cơ sở Spot / Sàn Quỹ CFD** | **`XAUUSD`** / **`GOLD`** | Báo giá Spot London OTC qua tỷ giá USD. |
+| **Chuẩn giá Tham chiếu Terminal** | **100% Pure CME Gold Futures (`GC` / `GC=F`)** | Đồng bộ tuyệt đối chuẩn COMEX USD/oz theo Rule 8 (không quy đổi Spot `XAUUSD`). |
 | **Proxy Quyền chọn Thanh khoản** | **`GLD`** (SPDR Gold Shares) / **`IAU`** | ETF vàng lớn nhất thế giới, chuỗi Options dồi dào và có Weekly Options. |
 | **Tỷ lệ Ánh xạ Proxy (Basis Ratio)** | $GC \approx 10.8 \times GLD$ | Khi Gold $GC = 2,700$, ETF $GLD \approx 250$ USD/cp $\rightarrow$ Tỷ lệ $\approx 10.8$. |
 | **Chỉ số Biến động Hàm ý (IV)** | **`GVZ`** (`^GVZ`) | CBOE Gold Volatility Index (đo lường IV kỳ hạn 30 ngày của GLD). |
@@ -100,7 +101,7 @@ python -m src.hud.html_dashboard --loop 15
 # 5. Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM (< 15MB)
 python -m src.hud.html_dashboard --clear-cache
 
-# 6. Kiểm thử tự động (Unit Test & Math Verification - 137 Tests)
+# 6. Kiểm thử tự động (Unit, Math, Parity & Playwright E2E Suite)
 python -m pytest tests/ -v --tb=short
 
 # 7. Kiểm tra chuẩn mã nguồn
@@ -126,7 +127,7 @@ Neiro-Gold-Quant/
 │   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt Indicator
 │   ├── thuat_ngu_quant.md            # Từ điển thuật ngữ Quant Options & Vi cấu trúc
 │   ├── FAQ_VA_XU_LY_SU_CO.md         # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
-│   └── decisions/                    # 28 Architecture Decision Records (ADR-001 -> ADR-028)
+│   └── decisions/                    # 29 Architecture Decision Records (ADR-001 -> ADR-029)
 ├── src/
 │   ├── collector/
 │   │   ├── scraper.py                # Playwright API Sniffer Barchart
@@ -142,8 +143,8 @@ Neiro-Gold-Quant/
 │   │   ├── level_state.py            # Level State Machine & Static OI Air Pocket Zones (hợp nhất)
 │   │   └── strategy.py               # Ma trận chiến lược KHỐI 6, compute_tactical_intraday_matrix, precompute_squeeze_ladder
 │   └── hud/
-│       ├── neiro_terminal.py         # Canvas Orderflow Footprint 60 FPS, Institutional FVG & Floating HUD
-│       └── html_dashboard.py         # Dual-View Terminal Generator (NEIRO Canvas + Plotly 4-Panel)
+│       ├── neiro_terminal.py         # Canvas 60 FPS, 5-line HUD, Lớp phủ Tinh gọn/Đầy đủ & JS ADR-028 Live Engine
+│       └── html_dashboard.py         # 3s Command Bar, 2-tier Flex Cockpit Generator & Live Bridge Micro-Payload
 ├── data/
 │   └── options_prices_GCZ26.csv      # Dataset Options Chain CME mới nhất
 ├── tests/                            # Systematic Testing Rig & Unit/Integration Suite
@@ -165,12 +166,12 @@ Neiro-Gold-Quant/
 - [x] Lõi toán Black-76 giải tích bậc 1 & bậc 2 chính xác, bộ giải ngược IV lai (Newton-Raphson + Dekker-Brent `_brentq`), loại bỏ triệt để NaN.
 - [x] Bất biến Zero Gamma Flip ($S^*$) giải liên tục bằng Dekker-Brent `_brentq` thuần Python, đo lường Wall Siege Ratio ($Volume / OI$).
 - [x] Hoàn thiện tài liệu kiến trúc và đặc tả chuyên biệt cho Vàng (`docs/spec.md` & `docs/architecture.md`).
-- [x] Bộ kiểm thử 137 unit test chạy sạch sẽ 100% không lỗi.
-- [x] Khung kiểm thử toàn diện ADR-022, ADR-023 & ADR-024: 277 test suite toàn diện (258 passed, 19 skipped, 0 failed), bao phủ cổng dữ liệu (D1-D10), lõi toán (M1-M11), Rollover & Múi giờ mùa đông (T1-T7), Smoke render Dashboard (H1-H3), Quy trình Data Analyst (`test_data_analyst_pipeline.py`), Ma trận Squeeze tính sẵn (`test_precomputed_squeeze.py`) và Chữa lành Gamma Power Black-76 + Tự động nhận diện 3 tầng kỳ hạn (`test_gamma_weighted_walls.py`).
+- [x] Bộ kiểm thử tự động toàn hệ thống (`pytest tests/` — bao gồm ADR-022..029: Data Gate D1-D10, Math Core M1-M11, Rollover & Múi giờ mùa đông T1-T7, Dashboard Smoke H1-H3, Data Analyst Pipeline, Precomputed Squeeze, Black-76 Gamma Healing + 3-tier Auto-Discovery, JS/Python `r2`/VPIN Parity, và Playwright E2E Desktop/Mobile) pass sạch sẽ không lỗi.
 - [x] Động cơ tính toán sẵn & Chuẩn hóa Data Analyst (ADR-024): Tính sẵn 100% Ma trận Gamma Squeeze Ladder cho tra cứu O(1) thời gian thực, khử trùng lặp, ép đơn điệu, chữa lỗi chào giá chéo và tự động chữa lành `callGammaPower`/`putGammaPower` bằng Black-76 theo độ lệch Volatility Skew (`callIV`/`putIV` từng strike) khi phát hiện dummy flat gamma (`0.0037`).
 - [x] Đồng bộ Múi giờ Mùa đông Hoa Kỳ & Tự Động Hóa 3 Tầng Đáo Hạn (ADR-023): Tự động nhận diện 3 tầng đáo hạn (`WEEKLY` + `MONTHLY` + `QUARTERLY` chu kỳ chính `G, J, M, Q, Z`) kèm Lịch Nghỉ Lễ CME (`get_cme_holidays`), tự động chuyển đổi hợp đồng cơ sở (`GCZ26` -> `GCG27`), tính 13:30 Chicago Time (18:30 UTC hè / 19:30 UTC đông) và tự động làm giàu Black-76 IV theo từng kỳ hạn con trước khi gộp Multi-Expiry tại Scraper.
 - [x] Triển khai TradingView Fullscreen Zero-Tabs Realtime Terminal: Mặc định nến M1, layout tràn màn hình 100%, tích hợp Realtime Tick Engine không reload trang, Unified Greeks Matrix (GEX, VEX, CHEX, Net Delta) và Plotly 4-Panel trên cùng 1 màn hình.
 - [x] Triển khai Dynamic Liquidity Vacuum, Institutional FVG & Post-Sweep Execution Classifier (ADR-026): Hợp nhất Static Air Pocket về `level_state.py`, bổ sung High-Freq Amihud `ILLIQ` + Rogers-Satchell + FVG `50%–75%` + `Post-Sweep` khóa bởi `VPIN < 65%`, nối dây `squeeze_ladder` vào Live HUD (`updateSqueezeHud`), loại bỏ `vTick` giả tạo trong `applyLiveTick()` và dọn sạch 6 file mã chết / trùng lặp.
 - [x] Triển khai Tối ưu hóa Độ trễ Toàn trình, Cầu nối Đa luồng & Tinh gọn Cockpit (ADR-027): Vector hóa `loader.py`/`dealer.py`, giải IV chọn lọc, song song hóa HTF + RAM cache + HTTP gzip (`_read_yahoo_json`), `ThreadingHTTPServer` bridge, `run_pipeline(..., no_mt5=True)` bỏ Plotly 4-Panel dư thừa, tách chu kỳ tĩnh/động trong `--loop`, cắt tỉa hành lang `±$600` & giới hạn DOM Pinning `<= 71` dòng (`±35 strikes`), khử trùng lặp thẻ Orderflow tĩnh ở `KHỐI 5`.
 - [x] Hiệu chỉnh VPIN BVC & Tối ưu Ma trận Tác Chiến `KHỐI 6` (ADR-028): chuẩn hóa $\sigma_{\Delta P}$ theo phân tán nền `candles[:-6]` + chia đều 5 equal-volume buckets, nới Entry Breakout tránh quét râu (`>= ±2.80`), nâng sàn Hard SL `\$5.00` theo ATR `M5`, đồng bộ `precompute_squeeze_ladder` và gắn cổng trạng thái Gamma/Zero-Gamma/Air-Pocket/VPIN trên `KHỐI 6`.
+- [x] Tinh gọn Cockpit Tác chiến 3 Giây & Đồng bộ 100% Realtime JS/Python (ADR-029): sửa lỗi `currentTfKey`, triển khai `#tactical-3s-command-bar`, bố cục 2 tầng Flexbox `order`, thu gọn khối kiểm toán vào `<details>`, gỡ Canvas Gauge đè hình, HUD 5 dòng, chế độ `Lớp phủ: Tinh gọn / Đầy đủ`, và động cơ JS `computeLiveVpinBvcJs`/`computeTacticalMatrixJs` khớp 1:1 với Python ADR-028 qua payload `/api/yahoo_gc`.
 - [x] Đảm bảo nghiêm ngặt Zero-Waste Mandate (< 15MB repo footprint, 0 MB rác).

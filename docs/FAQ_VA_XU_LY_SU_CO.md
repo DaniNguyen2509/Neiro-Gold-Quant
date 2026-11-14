@@ -8,11 +8,10 @@
 
 ## PHẦN I: CÂU HỎI THƯỜNG GẶP (FAQ)
 
-### Q1: Tại sao giá Vàng trên Terminal của Neiro-Quant lại cao hơn giá XAUUSD trên MT5 (Exness, IC Markets) từ 20 đến 30 USD?
+### Q1: Tại sao hệ thống Neiro-Quant chỉ sử dụng giá Hợp đồng Tương lai Vàng COMEX (`GC` / `GC=F`) mà không quy đổi sang giá Spot hay CFD khác?
 * **Trả lời:**  
-  * Giá trên Terminal là **Giá Hợp đồng Tương lai Vàng COMEX (CME Gold Futures `GCZ26` / `GC=F`)**, trong khi MT5 của các sàn bán lẻ là **Giá Vàng Giao Ngay (XAUUSD Spot)**.
-  * Trong thị trường tài chính, giá Futures luôn cao hơn giá Spot một khoảng chênh lệch gọi là **Contango Basis Spread** (phản ánh lãi suất vốn, chi phí bảo hiểm và lưu kho thỏi vàng vật chất tại kho của sàn CME).
-  * **Cách quy đổi:** Khi Terminal báo mức cản Call Wall ví dụ `4200.00`, anh chỉ cần lấy giá Futures trừ giá MT5 (ví dụ lệch 25 USD) thì mức cản tương ứng trên MT5 của anh sẽ là: $4200.00 - 25.00 = 4175.00 \text{ XAUUSD}$.
+  * **Tuân thủ 100% Pure CME Gold Futures Quote Invariant (Rule 8):** Toàn bộ mức Strike Quyền chọn (Call Wall, Put Wall, Zero Gamma Flip $S^*$), bảng lệnh `KHỐI 6`, nến M1/M5 và GEX đều được tính trực tiếp trên sàn COMEX (`GC` / `GC=F`).
+  * Hệ thống **tuyệt đối không tự ý quy đổi sang giá Spot/CFD bên ngoài** để tránh sai lệch Contango Basis và bảo toàn độ chính xác tuyệt đối đến từng `$0.01` tại các chốt chặn Options COMEX. Hợp đồng Front-Month được tự động rollover theo CME Rule 120102.E (`underlying_futures="AUTO"`).
 
 ---
 
@@ -69,7 +68,7 @@
 * **Giải pháp độc quyền của Neiro-Quant:**
   * Neiro-Quant sử dụng cơ chế `location.replace()` triệt tiêu hoàn toàn History Stack.
   * Đồng thời trên thanh tác chiến của Dashboard đã trang bị sẵn nút **"Dọn RAM & Cache"**.
-  * Anh cũng có thể chọn mục `[3] DON SACH CACHE & GIAI PHONG BO NHO` trong file `Chay_Live_Terminal.bat`.
+  * Anh cũng có thể chọn mục `[5] DON SACH CACHE & GIAI PHONG BO NHO` trong file `Chay_Live_Terminal.bat`.
 
 ---
 
@@ -93,5 +92,5 @@
 * **Nguyên nhân:** Đây là tính năng bảo vệ vi mô (Stale Data Guard - ADR-011). Khi dữ liệu Options Chain của CME Gold (`GCZ26`) được cào cách đây hơn 6 tiếng, hệ thống sẽ cảnh báo trader rằng có thể các Strike Options mới trong phiên hiện tại chưa được cập nhật đầy đủ vào cấu trúc GEX/Walls.
 * **Cách khắc phục:**
   1. Mở file [Chay_Live_Terminal.bat](file:///c:/Users/Daniel/Documents/My-Projects/Neiro-Gold-Quant/Chay_Live_Terminal.bat).
-  2. Chọn mục **`[4] CAO DU LIEU OPTIONS CHAIN CME THU CONG`** hoặc **`[3] CHAY LIVE TERMINAL NOI BO`**. Hệ thống sẽ tự động bật Playwright cào chuỗi Options mới nhất và tự động biên dịch lại giao diện Dashboard.
+  2. Chọn mục **`[4] CAO & DONG BO DU LIEU LEN CLOUD`** hoặc **`[3] CHAY LIVE TERMINAL NOI BO`**. Hệ thống sẽ tự động bật Playwright cào chuỗi Options mới nhất và tự động biên dịch lại giao diện Dashboard.
   3. Sau khi hoàn tất, tải lại trang web (ấn `Ctrl + F5`) để xóa cache, cảnh báo sẽ biến mất hoàn toàn.

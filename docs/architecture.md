@@ -9,7 +9,7 @@
 
 ## I. MỤC TIÊU CỐT LÕI & TRIẾT LÝ VẬN HÀNH (FIRST PRINCIPLES)
 
-Thị trường Vàng quốc tế (COMEX Gold Futures & London OTC Spot) được chi phối bởi các Ngân hàng Vàng (Bullion Banks - HSBC, JPMorgan, UBS...), các Nhà tạo lập thị trường Quyền chọn (Options Market Makers - MMs / Dealers) và các quỹ vĩ mô (Macro Hedge Funds).  
+Thị trường Vàng phái sinh quốc tế (**COMEX Gold Futures `GC` / `GC=F`**) được chi phối bởi các Ngân hàng Vàng (Bullion Banks - HSBC, JPMorgan, UBS...), các Nhà tạo lập thị trường Quyền chọn (Options Market Makers - MMs / Dealers) và các quỹ vĩ mô (Macro Hedge Funds).  
 Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượng cấu trúc vi mô độc nhất của thị trường Vàng:
 
 1. **Định vị chính xác các chốt chặn dòng tiền thực tế:**
@@ -21,9 +21,9 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 2. **Mô hình Định giá Cost of Carry & Cơ Chế EFP (Exchange for Physical):**
    - Giá tương lai lý thuyết của Vàng không có cổ tức mà chịu chi phí lưu kho, kiểm định, bảo hiểm vật chất tại kho COMEX ($u \approx 0.2\%$/năm) và bù trừ bởi lợi suất cho thuê vàng liên ngân hàng (Gold Lease Rate $y \approx 1.5\%$/năm):
      $$F_{0, \text{lý thuyết}} = S_0 \times e^{(r + u - y)T}$$
-   - **Độ lệch Basis:** $\text{Basis} = F_{0, \text{thực tế}} - S_{0, \text{Spot}}$ phản ánh cơ chế EFP:
-     - Khi $F_{0, \text{thực tế}} \gg F_{0, \text{lý thuyết}}$: Lực mua áp đảo trên sàn COMEX New York kích hoạt nghiệp vụ EFP: Bullion Banks bán khống GC Futures và mua gom vàng giao ngay London (XAUUSD), kéo giá Spot tăng đuổi theo.
-     - Khi $F_{0, \text{thực tế}} \ll F_{0, \text{lý thuyết}}$: Áp lực bán phòng hộ của các mỏ khai thác vàng kéo giá Spot suy yếu.
+   - **Độ lệch Cost-of-Carry & Term Structure:** Hệ thống neo 100% giá giao dịch và vị thế theo **COMEX Gold Futures (`GC` / `GC=F`)** (Rule 8). Chỉ sử dụng mô hình Cost-of-Carry nội tại khi phân tích chênh lệch Forward-Implied theo `F_0 = S_0 * exp((r + u - y)T)`:
+     - Khi $F_{0, \text{thực tế}} \gg F_{0, \text{lý thuyết}}$: Lực mua áp đảo trên sàn COMEX New York phản ánh nhu cầu phòng hộ/đầu cơ Futures tăng mạnh (`GC` premium).
+     - Khi $F_{0, \text{thực tế}} \ll F_{0, \text{lý thuyết}}$: Áp lực bán phòng hộ từ khai thác mỏ kéo kỳ hạn gần chiết khấu.
 3. **Bất biến Zero Gamma Flip ($S^*$) & Tỷ lệ Công thành (Wall Siege Ratio):**
    - Mốc đảo pha $S^*$ được giải liên tục bằng phương trình $\sum_k \text{NetGEX}_k(S^*) = 0$ thông qua thuật toán Dekker-Brent (`_brentq` thuần Python, không dùng xấp xỉ strike thô để tránh sai lệch Jensen).
    - Áp lực tấn công thành trì trong ngày được đo lường bằng tỷ lệ tốc độ dòng tiền:
@@ -121,7 +121,7 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 ### 1. Cost of Carry & Chênh lệch EFP cho Vàng
 $$F_{0, \text{lý thuyết}} = S_0 \times e^{(r + u - y)T}$$
 Trong đó:
-- $S_0$: Giá vàng giao ngay London OTC ($XAUUSD$).
+- $S_0$: Giá quy chiếu nội tại theo Cost-of-Carry ($F_{0, \text{Forward}} \cdot e^{-(r + u - y)T}$). *(Lưu ý Rule 8: Terminal chỉ hiển thị duy nhất giá `GC=F` CME Futures).*
 - $r$: Lãi suất phi rủi ro USD ($SOFR \approx 4.5\%$).
 - $u$: Chi phí lưu kho và bảo hiểm vật chất kho COMEX ($u \approx 0.2\%$).
 - $y$: Gold Lease Rate giữa các ngân hàng thanh toán bù trừ vàng ($y \approx 1.5\%$).
@@ -224,7 +224,7 @@ on:
 
 3. **Chuẩn Hóa Nến M1 & Khử Nhiễu Settlement Spike Artifact:**
    - **Màu sắc TradingView chuẩn:** Nến tăng Xanh lá (#22C55E) và nến giảm Đỏ tươi (#EF4444) với viền và râu đồng màu, tối ưu độ tương phản trên nền đen sâu #000000.
-   - **Khử nhiễu CME Settlement Fix:** Bộ lọc asis.py tự động nhận diện và gọt bỏ hiện tượng Yahoo Finance chèn giá chốt ngày ,898.90 vào cây nến 1 phút cuối (gây ra cây nến râu dài 14 USD dị thường). Thân nến M1 được giữ nguyên giá khớp thực tế (~,885.50), trong khi mốc thanh toán ,898.90 được biểu diễn qua đường ngang livePriceLine (F0 LIVE / CME SETTLE).
+   - **Khử nhiễu CME Settlement Fix:** Bộ lọc `basis.py` tự động nhận diện và gọt bỏ hiện tượng Yahoo Finance chèn giá chốt ngày `$4,898.90` vào cây nến 1 phút cuối (gây ra cây nến râu dài 14 USD dị thường). Thân nến M1 được giữ nguyên giá khớp thực tế (`~$4,885.50`), trong khi mốc thanh toán `$4,898.90` được biểu diễn qua đường ngang livePriceLine (F0 LIVE / CME SETTLE).
    - **Độ sâu nến lịch sử:** Mở rộng lên 400 nến M1 liên tục, cho phép trader cuộn xem trọn vẹn diễn biến phiên giao dịch.
 
 
@@ -235,7 +235,7 @@ on:
 1. **Khắc phục điểm mù Vanna/Charm quá nhỏ (Dynamic Visible Normalization & Sublinear Boost):**
    - Loại bỏ cơ chế chuẩn hóa toàn cầu theo cực đại toàn chuỗi (`globalMaxAbs = 26M`), vốn làm tê liệt các mốc Vanna/Charm quanh vùng ATM (chỉ rộng ~0.02 pixel).
    - Áp dụng **Dynamic Visible Normalization**: Chỉ chuẩn hóa theo cực trị của các Strike đang hiển thị trong viewport hiện tại (`visibleMaxAbs`).
-   - Kết hợp **Perceptual Sublinear Scaling**: $	ext{scaled} = (|v| / 	ext{visibleMaxAbs})^{0.50}$ và ép `minLen = 3.5px`, giúp các thanh bar VEX và CHEX luôn bung đều, đậm nét và có viền tương phản cao.
+   - Kết hợp **Perceptual Sublinear Scaling**: $\text{scaled} = (|v| / \text{visibleMaxAbs})^{0.50}$ và ép `minLen = 3.5px`, giúp các thanh bar VEX và CHEX luôn bung đều, đậm nét và có viền tương phản cao.
    - Bổ sung chỉ số biên độ thang đo động dưới tiêu đề cột (ví dụ: `VEX: ±2.8M`, `CHEX: ±1.1M/d`).
 
 2. **Cross-Canvas Air Pocket Matrix (Tích hợp túi chân không vào cột Greeks):**
@@ -372,5 +372,20 @@ on:
    - `compute_m5_equivalent_atr()` ước lượng ATR `M5` từ dữ liệu nến đóng cửa (`[2.0, 6.5]`, fallback `4.0`).
    - `compute_tactical_intraday_matrix()` nâng khoảng đệm Breakout `Squeeze`/`Breakdown` tối thiểu `±$2.80` (`max(2.80, 0.8 * ATR)`), nâng Hard SL tối thiểu `\$5.00` cho cả Breakout lẫn Mean-Reversion (`Fade`/`Rebound`), giới hạn TP thực tế (`1.5x Risk` cho Breakout, `[\$3.00, \$6.00]` cho `Fade`, `[\$3.00, \$7.50]` cho `Rebound`) và gắn nhãn trạng thái `[KÍCH HOẠT]` / `[CHỜ XÁC NHẬN]` / `[TẠM KHÓA]` dựa trên GEX Regime, Zero Gamma Flip ($S^*$), neo Put Wall, Air Pocket, Wall Siege và VPIN.
    - `precompute_squeeze_ladder()` được đồng bộ ngưỡng kích hoạt tối thiểu `±2.80` và SL tối thiểu `\$5.00` sau strike, bảo toàn cơ chế mở rộng TP theo Air Pocket cho Live HUD.
+
+---
+
+## XVI. COCKPIT TÁC CHIẾN 3 GIÂY & ĐỒNG BỘ 100% REALTIME BRIDGE / JS (ADR-029)
+
+1. **Thanh Chỉ Huy 3 Giây & Bố Cục 2 Tầng Flexbox (`src/hud/html_dashboard.py`):**
+   - Thanh `#tactical-3s-command-bar` (4 thẻ: `cmd-regime-card`, `cmd-wall-card`, `cmd-flow-card`, `cmd-action-card`) nằm ngay dưới `.cockpit-stage` (`order: 1` -> `order: 2`), giải đáp tức thời Regime Gamma, tường gần nhất + Air Pocket, áp lực VPIN/BVC/Siege và kèo `[KÍCH HOẠT]` tối ưu.
+   - CSS Flexbox `order` trên `.container` đưa `KHỐI 4 Spine` (`order: 3`) và `KHỐI 6` mở sẵn (`<details open>`, `order: 4`) lên ngay dưới Command Bar, trong khi gói gọn `Pinning` (`order: 6`), `KHỐI 1 Smile` (`order: 7`), `KHỐI 3 KPI` (`order: 8`), `KHỐI 5 Orderflow` (`order: 9`), `KHỐI 7 Glossary` (`order: 10`) vào `<details class="table-box drawer-box">` đóng mặc định mà vẫn bảo toàn bất biến thứ tự HTML (`pos_smile < pos_micro < pos_kpi < pos_orderflow < pos_strategy < pos_glossary`).
+2. **Động cơ JS Parity 100% ADR-028 & Sửa Lỗi Live Polling (`src/hud/neiro_terminal.py`):**
+   - Sửa 4 tham chiếu `currentTfKey` -> `currentTf` trong vòng polling `pollLiveYahooChart` để khôi phục đồng bộ realtime `GC=F`.
+   - Triển khai các hàm JS thuần đồng bộ 1:1 với lõi Python: `computeLiveVpinBvcJs` (phân tán nền `candles[:-6]` + 5 equal-volume buckets có triệt tiêu dấu và nội suy `percentileSortedJs`), `computeM5AtrJs`, `resolveAdaptiveStrikesJs`, `sizeXauusdJs`, `computeTacticalMatrixJs`, `updateRealtimeTacticalCockpit` và `updateSyncBadgeHonest` (`LIVE BRIDGE (2.5s)` / `CLOUD SYNC (LIVE)` / `OFFLINE SNAPSHOT` / `CME GLOBEX: CLOSED (SETTLED)`).
+   - Mỗi tick/nến mới tự động cập nhật lại Command Bar 3s, các khoảng cách trên `KHỐI 4 Spine`, 4 dòng `KHỐI 6` (`k6-row-{sq,fd,rb,bd}`), HUD nổi 5 dòng (`540px` / `.expanded 700px`), gỡ Top-Center Gauge đè chart và hỗ trợ toggle `Lớp phủ: Tinh gọn / Đầy đủ` (`#btn-overlay-mode` & `syncSecondaryPriceLines()`).
+3. **Mở Rộng Payload Cầu Nối Realtime (`src/hud/html_dashboard.py`):**
+   - Helper dùng chung `_compute_live_microstructure_payload(tape)` cấp trực tiếp `vpin_pct`, `vpin_label`, `bvc_buy_pct`, `bvc_cvd_contracts`, `kyle_lambda_label`, `atr_5m` cho `/api/yahoo_gc`, `_run_lightweight_live_tick()` và `version.json`, kết hợp trường adaptive strike mới trong `meta` (`next_above`, `next_below`, `step`, `major_up_wall`, `major_down_wall`, `has_up_air_pocket`, `has_down_air_pocket`, `atr_5m`).
+
 
 

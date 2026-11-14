@@ -94,9 +94,9 @@ Vì đối tượng là Quyền chọn trên Hợp đồng Tương lai Vàng (Op
 
 ## D. CÁC THUẬT NGỮ THỊ TRƯỜNG PHÁI SINH QUAN TRỌNG
 
-### 1. Contango Basis (Độ lệch Tương lai - Giao ngay)
-- Giá Hợp đồng Tương lai (`GC=F`) cao hơn giá Vàng Giao ngay XAUUSD Spot do phản ánh chi phí vốn, lưu kho, bảo hiểm và thời gian đáo hạn.
-- Độ lệch chuẩn thông thường: từ **15 đến 30 USD/oz**.
+### 1. Contango Basis (Cấu trúc Kỳ hạn Tương lai CME)
+- Trong cấu trúc kỳ hạn COMEX Gold Futures (`GC`), giá hợp đồng kỳ hạn xa thường cao hơn kỳ hạn gần (hoặc giá quy chiếu Spot-Implied theo Cost-of-Carry) phản ánh lãi suất vốn ($r$), chi phí lưu kho/bảo hiểm ($u \approx 0.2\%$) trừ Gold Lease Rate ($y \approx 1.5\%$).
+- Theo quy chuẩn **Rule 8 (Pure CME Gold Futures)**, mọi chỉ số, Strike Options, VPIN và ma trận lệnh trên Terminal chỉ sử dụng **100% giá CME Gold Futures (`GC` / `GC=F`)**.
 
 ### 2. SVI (Stochastic Volatility Inspired) & Volatility Smile (ADR-009)
 - Mô hình tham số hóa đường cong nụ cười biến động ngầm định (IV), đảm bảo tính trơn tru và không tạo ra cơ hội kinh doanh chênh lệch giá (No-Arbitrage Invariants).

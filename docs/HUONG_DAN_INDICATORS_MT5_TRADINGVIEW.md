@@ -1,7 +1,7 @@
 # Neiro-Quant — HƯỚNG DẪN CÀI ĐẶT & SỬ DỤNG BỘ ĐÔI INDICATOR MT5 & TRADINGVIEW
 
-> **Phiên bản:** v1.0 — 24/10/2026  
-> **Áp dụng cho:** Hệ sinh thái phân tích kỹ thuật và định lượng Vàng (XAUUSD & CME Gold Futures).  
+> **Phiên bản:** v1.1  
+> **Áp dụng cho:** Hệ sinh thái phân tích kỹ thuật và định lượng Vàng COMEX (**100% Pure CME Gold Futures `GC` / `GC1!` / `GC=F`**).  
 > **Bộ chỉ báo bao gồm:**  
 > 1. `2TC-v10` (Tín hiệu Judas Swing + Turtle Soup + CRB Sweep & Engulf + Slope Meter + OLHC Candlestick Structure).  
 > 2. `Neiro-Liquidity-Map-v2` (Bản đồ thanh khoản ICT Macros + Session Ranges + Daily/Weekly Extremes + Equal Highs/Lows + Swept Memory).  
@@ -23,7 +23,7 @@
 
 ## 1. TỔNG QUAN VAI TRÒ TRONG HỆ SINH THÁI NEIRO-QUANT
 
-Để đạt được tỷ lệ thắng cao và tỷ lệ Risk:Reward tối ưu (SL ngắn 1.5 - 2.5 giá, TP 15 - 40 giá), trader cần sự phối hợp nhịp nhàng giữa **3 tầng công cụ**:
+Để đạt được tỷ lệ thắng cao và tỷ lệ Risk:Reward tối ưu (SL theo ma trận `KHỐI 6` ADR-028 `>= $5.00` calibrated theo `M5 ATR`, TP 15 - 40 giá theo vùng tường/Air Pocket), trader cần sự phối hợp nhịp nhàng giữa **3 tầng công cụ**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -69,7 +69,7 @@ Thư mục mã nguồn trong kho lưu trữ:
    - Copy 4 file: `2TC-v10.mq5`, `2TC-v10.ex5`, `Neiro-Liquidity-Map-v2.mq5`, `Neiro-Liquidity-Map-v2.ex5` vào `MQL5\Indicators\`.
 4. **Bước 4: Tải lại và gắn lên biểu đồ:**
    - Quay lại giao diện MT5, tại cửa sổ **Navigator** (phím tắt `Ctrl + N`), chuột phải vào mục **Indicators** chọn **Refresh**.
-   - Kéo thả `Neiro-Liquidity-Map-v2` và `2TC-v10` vào biểu đồ XAUUSD (khung M5 hoặc M15).
+   - Kéo thả `Neiro-Liquidity-Map-v2` và `2TC-v10` vào biểu đồ Vàng Futures (`GC` / Gold Futures của broker) khung M5 hoặc M15.
    - Trong tab **Common**, tích chọn ô **Allow DLL imports** (nếu có yêu cầu) và nhấn **OK**.
 
 ---
@@ -82,7 +82,7 @@ Mã nguồn được viết bằng ngôn ngữ Pine Script v6 chuẩn mực:
 
 ### Quy trình cài đặt:
 
-1. Mở trình duyệt và truy cập biểu đồ Vàng trên [TradingView](https://www.tradingview.com/chart/) (mã `XAUUSD` hoặc `GC1!`).
+1. Mở trình duyệt và truy cập biểu đồ Vàng trên [TradingView](https://www.tradingview.com/chart/) (mã CME Futures `GC1!`).
 2. Nhìn xuống thanh công cụ dưới đáy màn hình, nhấp vào tab **Pine Editor**.
 3. Mở file `tradingview/2TC-v10.pine` trong dự án bằng trình soạn thảo văn bản (Notepad, VS Code), nhấn `Ctrl + A` để copy toàn bộ nội dung.
 4. Xóa sạch mọi code cũ trong khung Pine Editor của TradingView, dán toàn bộ mã vừa copy vào.
@@ -166,7 +166,7 @@ Hệ thống tự động đóng khung và làm nổi bật 5 cửa sổ thời 
 │                      hoặc JUDAS (JD) + Nến M5 rút chân xanh.                 │
 │                                    │                                        │
 │                                    ▼                                        │
-│ ===> KÍCH HOẠT LỆNH BUY REBOUND NGAY TỨC THÌ (STOP LOSS 1.5 - 2.5 GIÁ) <=== │
+│ ===> KÍCH HOẠT LỆNH BUY REBOUND NGAY TỨC THÌ (SL >= $4.50 / $5.00 THEO ADR-028) <=== │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -184,4 +184,4 @@ Hệ thống tự động đóng khung và làm nổi bật 5 cửa sổ thời 
    - Phiên bản MT5 (`.mq5`, `.mqh`): Toàn bộ chú thích viết bằng tiếng Việt không dấu chuẩn ASCII thấu suốt, tuyệt đối không dùng emoji trang trí trong code.
    - Phiên bản TradingView (`.pine`): Dùng tiếng Việt có dấu trong giao diện cài đặt và tooltip để người dùng dễ đọc.
 3. **Kỷ luật Stop Loss:**
-   - Dù có tín hiệu hợp lưu đẹp đến đâu, luôn đặt Stop Loss tối đa từ 1.5 đến 2.5 giá (với Vàng). Không bao giờ gồng lỗ khi cấu trúc vi mô bị bẻ gãy.
+   - Tuân thủ nghiêm ngặt Hard SL đã hiệu chỉnh theo `M5 ATR` trên `KHỐI 6` (`>= $5.00` cho Breakout/Fade, `>= $4.50` cho Rebound theo ADR-028) để tránh bị quét râu M5 mà vẫn bảo vệ tài khoản khi cấu trúc vi mô bị bẻ gãy.
