@@ -519,6 +519,7 @@ def fetch_live_cme_m5_tape(
 
                             return {
                                 "available": True,
+                                "timeframe_label": ("M1" if "interval=1m" in url else "M5"),
                                 "candles": processed,
                                 "chart_candles": chart_candles,
                                 "tf_candles": tf_candles,
@@ -534,6 +535,7 @@ def fetch_live_cme_m5_tape(
 
     return {
         "available": False,
+        "timeframe_label": "M1",
         "candles": [],
         "chart_candles": [],
         "tf_candles": {},
@@ -704,55 +706,4 @@ def compute_gold_cost_of_carry(
     t = max(1.0 / 365.0, dte_days / 365.0)
     net_carry = risk_free_rate + storage_cost - lease_rate
     return round(spot_price * math.exp(net_carry * t), 2)
-
-
-def analyze_efp_spread(
-    futures_price: float,
-    spot_price: float,
-    dte_days: float = 30.0,
-    risk_free_rate: float = 0.045,
-    storage_cost: float = 0.002,
-    lease_rate: float = 0.015,
-    threshold: float = 3.0,
-) -> dict[str, Any]:
-    """Analyzes Exchange for Physical (EFP) basis spread between London OTC Spot and NY COMEX.
-
-    Returns:
-        dict containing:
-            'f0_theoretical': float
-            'delta_f': float (futures - theoretical)
-            'status': str ('PREMIUM', 'DISCOUNT', 'FAIR_VALUE')
-            'label': str (Vietnamese descriptive label)
-            'color': str (HEX color code)
-            'efp_arbitrage_signal': str
-    """
-    f0_theo = compute_gold_cost_of_carry(
-        spot_price, dte_days, risk_free_rate, storage_cost, lease_rate
-    )
-    delta_f = round(futures_price - f0_theo, 2)
-
-    if delta_f > threshold:
-        status = "PREMIUM"
-        label = "PREMIUM &bull; MUA ĐUỔI COMEX"
-        color = "#4ADE80"
-        arb_signal = "EFP BUY SPOT / SELL FUTURES (Lực mua New York áp đảo, kéo Spot tăng)"
-    elif delta_f < -threshold:
-        status = "DISCOUNT"
-        label = "DISCOUNT &bull; BÁN XẢ COMEX"
-        color = "#F87171"
-        arb_signal = "EFP SELL SPOT / BUY FUTURES (Áp lực mỏ vàng phòng hộ xả hàng)"
-    else:
-        status = "FAIR_VALUE"
-        label = "FAIR VALUE &bull; CÂN BẰNG"
-        color = "#FACC15"
-        arb_signal = "MARKET IN EQUILIBRIUM (Cung cầu vật chất và phái sinh cân bằng)"
-
-    return {
-        "f0_theoretical": f0_theo,
-        "delta_f": delta_f,
-        "status": status,
-        "label": label,
-        "color": color,
-        "efp_arbitrage_signal": arb_signal,
-    }
 

@@ -431,48 +431,6 @@ def test_compute_gold_cost_of_carry():
     assert compute_gold_cost_of_carry(-100.0) == 0.0
 
 
-def test_analyze_efp_spread():
-    from src.quant_engine.basis import analyze_efp_spread
-
-    # Case 1: Premium / Bullish NY Buying (Futures > Theoretical by > 3.0 USD)
-    res_prem = analyze_efp_spread(
-        futures_price=2720.0,
-        spot_price=2700.0,
-        dte_days=30.0,
-        risk_free_rate=0.045,
-        storage_cost=0.002,
-        lease_rate=0.015,
-    )
-    assert res_prem["status"] == "PREMIUM"
-    assert "MUA ĐUỔI" in res_prem["label"]
-    assert res_prem["delta_f"] > 3.0
-
-    # Case 2: Discount / Producer Hedging (Futures < Theoretical by > 3.0 USD)
-    res_disc = analyze_efp_spread(
-        futures_price=2695.0,
-        spot_price=2700.0,
-        dte_days=30.0,
-        risk_free_rate=0.045,
-        storage_cost=0.002,
-        lease_rate=0.015,
-    )
-    assert res_disc["status"] == "DISCOUNT"
-    assert "BÁN XẢ" in res_disc["label"]
-    assert res_disc["delta_f"] < -3.0
-
-    # Case 3: Fair Value Equilibrium (|delta_f| <= 3.0 USD)
-    res_fair = analyze_efp_spread(
-        futures_price=2708.0,
-        spot_price=2700.0,
-        dte_days=30.0,
-        risk_free_rate=0.045,
-        storage_cost=0.002,
-        lease_rate=0.015,
-    )
-    assert res_fair["status"] == "FAIR_VALUE"
-    assert "CÂN BẰNG" in res_fair["label"]
-
-
 def test_is_cme_globex_market_open_schedule():
     """Verify CME Globex Gold Futures schedule including daily 17:00-18:00 ET maintenance break."""
     from zoneinfo import ZoneInfo

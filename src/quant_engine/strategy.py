@@ -20,6 +20,7 @@ Fixes applied vs V1 (7.0/10):
 from __future__ import annotations
 
 import math
+from .level_state import AirPocketZone, detect_strike_air_pockets
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Literal
 from datetime import datetime, timedelta
@@ -33,18 +34,9 @@ MIN_T_YEARS: float = 1.0 / (365.0 * 1440.0)    # 1 minute floor
 BRENNER_SUBRAHMANYAM_K: float = 0.7979         # E[|Z|] for standard normal
 SIGMA_MULTIPLIER: float = 1.0 / BRENNER_SUBRAHMANYAM_K  # ≈ 1.2533
 
-# XAUUSD-specific calibration
-XAUUSD_STOP_LOSS_MIN: float = 3.5              # USD
-XAUUSD_STOP_LOSS_MAX: float = 4.5              # USD
-XAUUSD_STOP_LOSS_DEFAULT: float = 4.0          # USD (mid of 3.5–4.5)
-XAUUSD_ATR_M5_MULTIPLIER: float = 1.5          # 1.5 × ATR(M5)
-
-# Gamma trigger offsets (in SPOT price, NOT premium)
+# Gamma trigger offsets (in CME Futures price, NOT premium)
 GAMMA_TRIGGER_OFFSET: float = 1.80             # USD
-
-# Air pocket detection
-AIR_POCKET_OI_RATIO: float = 0.35              # OI < 0.35 × Mean_OI
-AIR_POCKET_MIN_STRIKES: int = 1                # min strikes to form a zone
+GC_STOP_LOSS_DEFAULT: float = 4.0              # USD (Pure CME Futures default)
 
 # Institutional prohibitions
 NEWS_BLACKOUT_MINUTES: int = 5                 # ±5 min around High Impact
@@ -92,22 +84,6 @@ class MarketSnapshot:
     def T(self) -> float:
         """Time to expiry in years, floored at 1 minute."""
         return max(MIN_T_YEARS, self.dte_days / 365.0)
-
-
-@dataclass(frozen=True, slots=True)
-class AirPocket:
-    """Continuous zone of low OI (liquidity vacuum)."""
-    k_start: float
-    k_end: float
-    mean_oi_in_zone: float
-    strike_count: int
-
-    @property
-    def width(self) -> float:
-        return self.k_end - self.k_start
-
-    def contains(self, price: float) -> bool:
-        return self.k_start <= price <= self.k_end
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,36 +194,7 @@ def compute_expected_move(
 
 
 # ==============================================================================
-# [FIX-3] XAUUSD STOP LOSS — Institutional Calibration
-# ==============================================================================
-
-def compute_xauusd_stop_loss(
-    entry: float,
-    direction: Literal["LONG", "SHORT"],
-    atr_m5: Optional[float] = None,
-) -> float:
-    """
-    XAUUSD stop loss calibrated to survive M5 wick sweeps.
-
-    V1 used 2.0 USD → whipsawed by stop-hunters.
-    V2 uses 3.5–4.5 USD (≈ 1.5 × ATR M5 of Gold).
-
-    If ATR_M5 is provided, use 1.5 × ATR clamped to [3.5, 4.5].
-    Otherwise, use 4.0 USD (mid of institutional band).
-    """
-    if atr_m5 is not None and atr_m5 > 0:
-        sl_distance = 1.5 * atr_m5
-        sl_distance = max(XAUUSD_STOP_LOSS_MIN, min(XAUUSD_STOP_LOSS_MAX, sl_distance))
-    else:
-        sl_distance = XAUUSD_STOP_LOSS_DEFAULT
-
-    if direction == "LONG":
-        return entry - sl_distance
-    return entry + sl_distance
-
-
-# ==============================================================================
-# [FIX-4] GAMMA SQUEEZE / WATERFALL TRIGGERS — SPOT-BASED
+# [FIX-4] GAMMA SQUEEZE / WATERFALL TRIGGERS — FUTURES-BASED
 # ==============================================================================
 
 def compute_gamma_levels(
@@ -312,70 +259,6 @@ def compute_gamma_levels(
 
 
 # ==============================================================================
-# [FIX-6] AIR POCKET CLUSTERING
-# ==============================================================================
-
-def detect_air_pockets(
-    quotes: Tuple[OptionQuote, ...],
-    oi_ratio_threshold: float = AIR_POCKET_OI_RATIO,
-) -> Tuple[AirPocket, ...]:
-    """
-    Cluster consecutive strikes with OI < threshold × Mean_OI into continuous zones.
-
-    V1 bug: printed each strike individually → noise.
-    V2 fix: merge adjacent low-OI strikes into [K_start → K_end] zones.
-    """
-    if not quotes:
-        return ()
-
-    sorted_quotes = sorted(quotes, key=lambda q: q.strike)
-    mean_oi = sum(q.total_oi for q in sorted_quotes) / len(sorted_quotes)
-    if mean_oi <= 0:
-        return ()
-
-    threshold = oi_ratio_threshold * mean_oi
-
-    pockets: List[AirPocket] = []
-    zone_start: Optional[float] = None
-    zone_end: Optional[float] = None
-    zone_oi_sum: float = 0.0
-    zone_count: int = 0
-
-    for q in sorted_quotes:
-        if q.total_oi < threshold:
-            if zone_start is None:
-                zone_start = q.strike
-                zone_oi_sum = 0.0
-                zone_count = 0
-            zone_end = q.strike
-            zone_oi_sum += q.total_oi
-            zone_count += 1
-        else:
-            if zone_start is not None and zone_count >= AIR_POCKET_MIN_STRIKES:
-                pockets.append(AirPocket(
-                    k_start=zone_start,
-                    k_end=zone_end,  # type: ignore[arg-type]
-                    mean_oi_in_zone=zone_oi_sum / zone_count,
-                    strike_count=zone_count,
-                ))
-            zone_start = None
-            zone_end = None
-            zone_oi_sum = 0.0
-            zone_count = 0
-
-    # Flush trailing zone
-    if zone_start is not None and zone_count >= AIR_POCKET_MIN_STRIKES:
-        pockets.append(AirPocket(
-            k_start=zone_start,
-            k_end=zone_end,  # type: ignore[arg-type]
-            mean_oi_in_zone=zone_oi_sum / zone_count,
-            strike_count=zone_count,
-        ))
-
-    return tuple(pockets)
-
-
-# ==============================================================================
 # [FIX-7] INSTITUTIONAL PROHIBITIONS
 # ==============================================================================
 
@@ -397,16 +280,18 @@ def check_news_blackout(
 def check_waterfall_knife_catch(
     current_price: float,
     waterfall_trigger: float,
-    air_pockets: Tuple[AirPocket, ...],
+    air_pockets: Tuple[AirPocketZone, ...],
 ) -> Optional[str]:
     """Prohibit buying dips when price is free-falling through waterfall into air pocket."""
     if current_price >= waterfall_trigger:
         return None
     for pocket in air_pockets:
-        if pocket.contains(current_price):
+        lo_k = min(pocket.start_strike, pocket.end_strike)
+        hi_k = max(pocket.start_strike, pocket.end_strike)
+        if lo_k <= current_price <= hi_k:
             return (
                 f"KNIFE_CATCH_PROHIBITED: price {current_price:.2f} inside "
-                f"air pocket [{pocket.k_start:.2f}–{pocket.k_end:.2f}] "
+                f"air pocket [{lo_k:.2f}–{hi_k:.2f}] "
                 f"below waterfall {waterfall_trigger:.2f}"
             )
     return None
@@ -433,17 +318,10 @@ def check_gamma_squeeze_train_block(
 def evaluate_breakout_runner(
     current_price: float,
     gamma: GammaLevels,
-    air_pockets: Tuple[AirPocket, ...],
+    air_pockets: Tuple[AirPocketZone, ...],
     direction: Literal["UP", "DOWN"],
 ) -> Optional[TradeSignal]:
-    """
-    Breakout/Breakdown Runner ONLY fires when:
-      1. total_net_gex < 0 (SHORT_GAMMA — dealers forced to chase)
-      2. AND an air pocket is adjacent in the breakout direction
-
-    V1 bug: fired runners indiscriminately even in LONG_GAMMA → losses.
-    V2 fix: hard gate on both conditions.
-    """
+    """Breakout/Breakdown Runner ONLY fires when SHORT_GAMMA and adjacent AirPocketZone exists."""
     # Gate 1: SHORT_GAMMA only
     if gamma.total_net_gex >= 0:
         return None
@@ -453,12 +331,12 @@ def evaluate_breakout_runner(
         trigger = gamma.squeeze_trigger
         if current_price <= trigger:
             return None
-        adjacent = any(p.k_start >= trigger - 5.0 and p.k_start <= trigger + 20.0
+        adjacent = any(min(p.start_strike, p.end_strike) >= trigger - 5.0 and min(p.start_strike, p.end_strike) <= trigger + 20.0
                        for p in air_pockets)
         if not adjacent:
             return None
         entry = current_price
-        sl = compute_xauusd_stop_loss(entry, "LONG")
+        sl = entry - GC_STOP_LOSS_DEFAULT
         tp = entry + 2.0 * (entry - sl)
         return TradeSignal(
             action="BUY",
@@ -477,12 +355,12 @@ def evaluate_breakout_runner(
     trigger = gamma.waterfall_trigger
     if current_price >= trigger:
         return None
-    adjacent = any(p.k_end <= trigger + 5.0 and p.k_end >= trigger - 20.0
+    adjacent = any(max(p.start_strike, p.end_strike) <= trigger + 5.0 and max(p.start_strike, p.end_strike) >= trigger - 20.0
                    for p in air_pockets)
     if not adjacent:
         return None
     entry = current_price
-    sl = compute_xauusd_stop_loss(entry, "SHORT")
+    sl = entry + GC_STOP_LOSS_DEFAULT
     tp = entry - 2.0 * (sl - entry)
     return TradeSignal(
         action="SELL",
@@ -504,9 +382,11 @@ def evaluate_breakout_runner(
 
 def generate_signals(snapshot: MarketSnapshot) -> Dict[str, object]:
     """
-    Full pipeline: parity → expected move → gamma levels → air pockets → signals.
-    Runs in < 0.01s for typical chains (≤ 200 strikes).
+    Full pipeline: parity -> expected move -> gamma levels -> canonical air pockets -> signals.
+    Runs in < 0.01s for typical chains (<= 200 strikes).
     """
+    import pandas as pd
+
     # 1. Gamma levels (includes implied spot via parity)
     gamma = compute_gamma_levels(snapshot)
 
@@ -518,8 +398,25 @@ def generate_signals(snapshot: MarketSnapshot) -> Dict[str, object]:
         put_mid=atm_quote.put_mid,
     )
 
-    # 3. Air pockets (clustered)
-    pockets = detect_air_pockets(snapshot.quotes)
+    # 3. Canonical Air Pockets (via level_state.detect_strike_air_pockets)
+    df_q = pd.DataFrame([
+        {
+            "strike": q.strike,
+            "callOpenInterest": q.call_oi,
+            "putOpenInterest": q.put_oi,
+            "callVolume": 0.0,
+            "putVolume": 0.0,
+        }
+        for q in snapshot.quotes
+    ])
+    if not df_q.empty:
+        k_min = float(df_q["strike"].min())
+        k_max = float(df_q["strike"].max())
+        up_pockets = detect_strike_air_pockets(df_q, snapshot.spot, k_max)
+        dn_pockets = detect_strike_air_pockets(df_q, snapshot.spot, k_min)
+        pockets: Tuple[AirPocketZone, ...] = tuple(up_pockets + dn_pockets)
+    else:
+        pockets = ()
 
     # 4. Institutional prohibitions
     prohibitions: List[str] = []
