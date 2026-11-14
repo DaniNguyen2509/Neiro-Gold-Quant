@@ -41,6 +41,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
      * **Auto-Sync Cloud Options CSV:** Tự động đồng bộ `data/options_prices_GCZ26.csv` mới nhất từ GitHub Cloud nếu file cục bộ đã cũ quá 2 giờ.
      * **Informed Quant Trader Closed-Loop Engine (Đang đề xuất — [ADR-025](decisions/ADR-025-kyle-ols-vrp-and-predatory-flow-microstructure.md)):** Tổng hợp 5 trụ cột toán học: **(1)** Hồi quy tuyến tính trượt Kyle (1985) $\lambda_{\text{OLS}} = \text{Cov}(\Delta P, y) / \text{Var}(y)$ kèm bộ lọc thanh khoản phiên ($\sigma_u$), **(2)** Chỉ số độc tính dòng lệnh **VPIN** (Easley, López de Prado & O'Hara 2012) từ BVC Volume Buckets để lọc bẫy cản tàu tại Gamma Wall, **(3)** Định lượng Volatility Risk Premium ($VRP = IV_{\text{ATM}} - RV_{\text{GC}}$) báo hiệu Vega Crush, **(4)** Z-Score Put-Call Parity Lead-Lag ($Z_{\Delta F}$) & Predatory Sweep Exhaustion, và **(5)** Chiết khấu Bayesian $\rho_{v,s} = \sqrt{\text{SNR}/(1+\text{SNR})}$ kết hợp Ma trận Thực thi 5 Chế độ & Quản trị vốn Fractional Kelly.
      * **Dynamic Liquidity Vacuum, Post-Sweep V-Shape/Pullback & Architecture Deduplication (Đã triển khai — [ADR-026](decisions/ADR-026-liquidity-vacuum-and-architecture-dedup.md)):** Hợp nhất hệ thống Air Pocket về `level_state.py`, bổ sung 3 tầng thuần `GC=F` OHLCV (`Static OI Vacuum` + `Dynamic High-Freq Amihud ILLIQ & Rogers-Satchell Vacuum` + `Institutional FVG 50%–75%` + `Post-Sweep V-Shape/Pullback` khóa bởi cổng an toàn `VPIN < 65%`), nối `precompute_squeeze_ladder` vào Live HUD (`updateSqueezeHud`), dọn sạch 6 file mã chết (`dead code`) và loại bỏ hoàn toàn `vTick` giả lập trên client JS.
+     * **End-to-End Pipeline Latency, Threaded Live Bridge & Scalping Cockpit Optimization (Đã lập kế hoạch thực thi — [ADR-027](decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md)):** Đặc tả 5 giai đoạn tối ưu hóa toàn trình giảm thời gian chạy lạnh từ `14.25s` xuống `< 1.65s`, chu kỳ `--loop` từ `~29.2s` xuống `< 300ms` (nhờ cache chuỗi quyền chọn tĩnh theo `mtime`), cầu nối `/api/yahoo_gc` đa luồng RAM-cached (`< 8ms`), cắt bỏ biểu đồ Plotly 4-Panel bóng ma (`3.35s` CPU) và tinh gọn `40%` dung lượng DOM/JSON mà không xâm phạm ranh giới công cụ MT5 `Neiro-Liquidity-Map-v2.mq5`.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.
    - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.
@@ -124,7 +125,7 @@ Neiro-Gold-Quant/
 │   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt Indicator
 │   ├── thuat_ngu_quant.md            # Từ điển thuật ngữ Quant Options & Vi cấu trúc
 │   ├── FAQ_VA_XU_LY_SU_CO.md         # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
-│   └── decisions/                    # 26 Architecture Decision Records (ADR-001 -> ADR-026)
+│   └── decisions/                    # 27 Architecture Decision Records (ADR-001 -> ADR-027)
 ├── src/
 │   ├── collector/
 │   │   ├── scraper.py                # Playwright API Sniffer Barchart
