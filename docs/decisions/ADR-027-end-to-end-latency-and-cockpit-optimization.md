@@ -38,8 +38,23 @@ Qua kiểm toán mã nguồn [`Neiro-Liquidity-Map-v2.mq5`](../../mt5/Indicators
 
 **Hệ quả Kiến trúc:**
 - **TUYỆT ĐỐI KHÔNG** đưa các tính năng Session Box Á/Âu/Mỹ, PDH/PDL, PWH/PWL, Midnight Open, EQH/EQL, hay nến phóng chiếu HTF vào Web Quant Terminal (`neiro_terminal.py` / `html_dashboard.py`).
-- **TUYỆT ĐỐI KHÔNG** chỉnh sửa bất kỳ tham số hay dòng code nào của [`mt5/Indicators/Neiro-Liquidity-Map-v2.mq5`](../../mt5/Indicators/Neiro-Liquidity-Map-v2.mq5) và [`mt5/Indicators/2TC-v10.mq5`](../../mt5/Indicators/2TC-v10.mq5).
+- **TUYỆT ĐỐI KHÔNG** chỉnh sửa bất kỳ tham số hay dòng code nào của [`mt5/Indicators/Neiro-Liquidity-Map-v2.mq5`](../../mt5/Indicators/Neiro-Liquidity-Map-v2.mq5) và [`mt5/Indicators/2TC-v10.mq5`](../../mt5/Indicators/Neiro-Liquidity-Map-v2.mq5).
 - Web Quant Terminal tập trung **100% tài nguyên CPU và diện tích hiển thị** vào **Định lượng Vi cấu trúc Quyền chọn & Dòng lệnh Tổ chức COMEX (`GC=F`)**: GEX/VEX/CHEX/DEX, Zero Gamma Flip ($S^*$), Wall Siege, Put-Call Parity $\delta F$, Lee-Ready Options Flow, BVC CVD/VPIN, Kyle $\lambda_{\text{OLS}}$, VRP, Bayesian Sizing và Dynamic Liquidity Vacuum FVG.
+
+---
+
+### 1.3. Bất Biến 100% Pure CME Futures (`GC=F` / `GCZ26`) — Bỏ Qua Hoàn Toàn Giá Spot (`XAUUSD`)
+
+> [!IMPORTANT]
+> **CHỈ ĐẠO TRỰC TIẾP CỦA OWNER & AGENTS.md RULE 8 (100% PURE CME GOLD FUTURES QUOTE INVARIANT):**
+> Chủ sở hữu **chỉ giao dịch Hợp đồng Tương lai Vàng CME (`GC` / `GC=F` / `GCZ26`)**, hoàn toàn **KHÔNG cần giá Spot (`XAUUSD`)** hay quy đổi Basis sang MT5 Spot. Nếu giá Spot không lấy được tự động thì bỏ qua hoàn toàn, tuyệt đối không cào, không hỏi, không cảnh báo lỗi (`WARNING`) và không quy đổi.
+
+**Quy tắc bắt buộc cho AI thực thi:**
+1. **Giải thích tên biến lịch sử:** Trong mã nguồn Python (`html_dashboard.py`, `loader.py`, `dealer.py`), biến mang tên `spot` / `spot_price` / `meta["spot_price"]` thực chất lưu **100% giá Hợp đồng Tương lai CME Gold Futures (`GC=F`)** (hoặc giá Implied Forward $F_{\text{chain}} = K_{\text{ATM}} + e^{rT}(C_{\text{ATM}} - P_{\text{ATM}})$ nội suy từ chuỗi quyền chọn COMEX khi mất mạng). AI thực thi không được nhầm biến này với giá Spot `XAUUSD`.
+2. **Đặt mặc định `no_mt5: bool = True` trong `run_pipeline()` ([`src/hud/html_dashboard.py:2420`](../../src/hud/html_dashboard.py#L2420)):**
+   - Hiện tại `run_pipeline()` đang để `no_mt5: bool | None = None`, khiến khi gọi `run_pipeline()` trực tiếp (không qua CLI `main()`), hàm `load_and_preprocess_options` (`L566`) vẫn chạy vào nhánh `resolve_dynamic_basis_with_source()` để tìm giá Spot và bắn `logger.warning("Live spot quote unavailable...")`.
+   - **Cách sửa:** Đổi chữ ký `run_pipeline(..., no_mt5: bool = True)` để mặc định luôn chạy ở chế độ `CME_ONLY` (`basis = 0.0`, bỏ qua hoàn toàn việc tìm giá Spot và quy đổi Basis).
+   - **Lưu ý bảo toàn Unit Test:** Giữ nguyên giá trị mặc định `no_mt5: bool = False` ở hàm cấp thấp `load_and_preprocess_options(csv_path, basis=None, no_mt5=False)` (`L122`) để bài test cũ `test_load_and_preprocess_options_with_basis` trong [`tests/test_html_dashboard.py:26-60`](../../tests/test_html_dashboard.py#L26-L60) (vốn dùng `mock.patch` để test hàm tính basis) vẫn pass 100%. Đồng thời hạ `logger.warning` tại [`src/quant_engine/basis.py:608`](../../src/quant_engine/basis.py#L608) xuống `logger.debug` để không bao giờ in cảnh báo thừa khi không có giá Spot.
 
 ---
 
