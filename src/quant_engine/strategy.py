@@ -510,8 +510,9 @@ def precompute_squeeze_ladder(
         buf_up = min(step_up * 0.10, 2.50) if step_up > 0 else 2.50
         buf_down = min(step_down * 0.10, 2.50) if step_down > 0 else 2.50
 
-        sq_trig = round(k + buf_up + 0.50, 2)
-        sq_sl = round(k - 1.50, 2)
+        sq_brk = max(2.80, buf_up + 0.50)
+        sq_trig = round(k + sq_brk, 2)
+        sq_sl = round(sq_trig - max(5.00, sq_brk + 2.00), 2)
 
         tp_target = next_k - 1.00
         for p_from, p_to in pocket_ranges:
@@ -520,8 +521,9 @@ def precompute_squeeze_ladder(
                 break
         sq_tp = round(max(sq_trig + 2.00, tp_target), 2)
 
-        wf_trig = round(k - buf_down - 0.50, 2)
-        wf_sl = round(k + 1.50, 2)
+        wf_brk = max(2.80, buf_down + 0.50)
+        wf_trig = round(k - wf_brk, 2)
+        wf_sl = round(wf_trig + max(5.00, wf_brk + 2.00), 2)
 
         wf_target = prev_k + 1.00
         for p_from, p_to in pocket_ranges:
@@ -565,6 +567,177 @@ def lookup_precomputed_squeeze(
     level_above = ladder[sorted_k[idx]] if idx < len(sorted_k) else ladder[sorted_k[-1]]
 
     return level_above, level_below
+
+
+# ==============================================================================
+# [FIX-9] CALIBRATED INTRADAY TACTICAL MATRIX (V2.1 STOP-HUNT & REGIME GATE)
+# ==============================================================================
+
+def compute_m5_equivalent_atr(m5_tape: Optional[dict] = None, default_atr: float = 4.0) -> float:
+    """Estimate M5-equivalent bar range ATR (bounded [2.0, 6.5]) from closed PIT tape bars."""
+    if not isinstance(m5_tape, dict):
+        return default_atr
+    tf_map = m5_tape.get("tf_candles") or {}
+    bars_5m = tf_map.get("5m") or []
+    if len(bars_5m) >= 6:
+        sample = bars_5m[-14:]
+        scale = 1.0
+    else:
+        candles = m5_tape.get("chart_candles") or m5_tape.get("candles") or []
+        if not candles:
+            return default_atr
+        sample = candles[-14:]
+        bar_sec = int(m5_tape.get("bar_seconds", 300) or 300)
+        scale = 2.2 if bar_sec <= 90 else 1.0
+    ranges = [
+        max(0.0, float(b.get("high", 0.0)) - float(b.get("low", 0.0)))
+        for b in sample
+        if b.get("high") is not None and b.get("low") is not None
+    ]
+    if not ranges:
+        return default_atr
+    raw_atr = (sum(ranges) / len(ranges)) * scale
+    return round(max(2.0, min(6.5, raw_atr)), 2)
+
+
+def _format_gate_meta(active: bool, is_breakout: bool, reason: str) -> tuple[str, str]:
+    if active:
+        return "[KÍCH HOẠT]", reason
+    return ("[CHỜ XÁC NHẬN]" if is_breakout else "[TẠM KHÓA]"), reason
+
+
+def compute_tactical_intraday_matrix(
+    *,
+    spot: float,
+    strike_above: float,
+    next_above: float,
+    strike_below: float,
+    next_below: float,
+    step: float,
+    call_wall: float,
+    put_wall: float,
+    zero_gamma: Optional[float],
+    major_up_wall: float,
+    major_down_wall: float,
+    has_up_air_pocket: bool,
+    has_down_air_pocket: bool,
+    regime: str,
+    vpin_pct: float = 32.0,
+    call_wall_siege: float = 0.0,
+    put_wall_siege: float = 0.0,
+    session_tag: str = "NY_COMEX_DEEP",
+    atr_5m: float = 4.0,
+) -> dict[str, dict[str, Any]]:
+    """Compute stop-hunt-resistant Entry/SL/TP and Gamma-aligned execution gates for KHỐI 6."""
+    atr5 = max(2.0, min(6.5, float(atr_5m)))
+    brk_off = max(2.80, round(0.8 * atr5, 2))
+    sl_brk = max(5.00, round(1.5 * atr5, 2), round(brk_off + 2.00, 2))
+    sl_rev = max(5.00, round(1.4 * atr5, 2))
+    front_run_tp = 1.00
+
+    norm_reg = str(regime or "NEUTRAL").upper()
+    is_long_gamma = "LONG" in norm_reg
+    is_short_gamma = "SHORT" in norm_reg
+    z_flip = float(zero_gamma) if (zero_gamma is not None and float(zero_gamma) > 0) else float(spot)
+    above_zg = float(spot) >= z_flip
+    below_zg = float(spot) < z_flip
+    session_open = str(session_tag or "").upper() != "GLOBEX_CLOSED"
+    near_put_wall = (float(put_wall) > 0) and (abs(float(strike_below) - float(put_wall)) <= max(float(step), 5.0))
+
+    # 1. BUY Squeeze (outside stop-hunt wick, behind-strike ATR SL, 1.5R bounded TP)
+    entry_squeeze = round(strike_above + brk_off, 2)
+    sl_squeeze = round(entry_squeeze - sl_brk, 2)
+    raw_sq_tp = (major_up_wall - front_run_tp) if has_up_air_pocket else (next_above - front_run_tp)
+    tp_squeeze = round(min(max(entry_squeeze + 4.00, raw_sq_tp), entry_squeeze + 1.5 * sl_brk), 2)
+    sq_active = session_open and is_short_gamma and bool(has_up_air_pocket) and (
+        float(vpin_pct) >= 55.0 or float(call_wall_siege) >= 0.25
+    )
+    sq_reason = (
+        "SHORT_GAMMA + Air Pocket + Áp lực phá trần" if sq_active
+        else ("GLOBEX ĐÓNG CỬA" if not session_open else "Chờ SHORT_GAMMA + Air Pocket + VPIN/Siege")
+    )
+    sq_badge, sq_reason = _format_gate_meta(sq_active, True, sq_reason)
+
+    # 2. SELL Fade (high-precision edge below Call resistance, >= $5 ATR-floored SL)
+    entry_fade = round(strike_above - 1.00, 2)
+    sl_fade = round(entry_fade + sl_rev, 2)
+    cand_fade_tp = min(float(spot), strike_below + front_run_tp) if strike_below < entry_fade - 2.00 else (entry_fade - 4.50)
+    tp_fade = round(max(entry_fade - 6.00, min(entry_fade - 3.00, cand_fade_tp)), 2)
+    fade_active = session_open and (float(vpin_pct) < 58.0) and (is_long_gamma or above_zg)
+    fade_reason = (
+        "MM LONG_GAMMA / Trên Zero Gamma + VPIN an toàn" if fade_active
+        else ("GLOBEX ĐÓNG CỬA" if not session_open else ("VPIN CAO (>=58%)" if float(vpin_pct) >= 58.0 else "Dưới Zero Gamma (Cấm chặn tàu)"))
+    )
+    fade_badge, fade_reason = _format_gate_meta(fade_active, False, fade_reason)
+
+    # 3. BUY Rebound (support bounce above strike_below, Put-Wall anchored in Short Gamma)
+    entry_rebound = round(strike_below + 1.00, 2)
+    sl_rebound = round(entry_rebound - sl_rev, 2)
+    tp_rebound = round(min(entry_rebound + 7.50, max(entry_rebound + 3.00, strike_above - front_run_tp)), 2)
+    reb_active = session_open and (float(vpin_pct) < 55.0) and (is_long_gamma or above_zg or near_put_wall)
+    reb_reason = (
+        ("Gần Put Wall + VPIN an toàn" if near_put_wall else "MM LONG_GAMMA / Trên Zero Gamma") if reb_active
+        else ("GLOBEX ĐÓNG CỬA" if not session_open else ("VPIN ĐỘC HẠI (>=55%)" if float(vpin_pct) >= 55.0 else "SHORT_GAMMA xa Put Wall (Tránh bắt dao)"))
+    )
+    reb_badge, reb_reason = _format_gate_meta(reb_active, False, reb_reason)
+
+    # 4. SELL Breakdown (outside stop-hunt wick, behind-strike ATR SL, 1.5R bounded TP)
+    entry_breakdown = round(strike_below - brk_off, 2)
+    sl_breakdown = round(entry_breakdown + sl_brk, 2)
+    raw_bd_tp = (major_down_wall + front_run_tp) if has_down_air_pocket else (next_below + front_run_tp)
+    tp_breakdown = round(max(min(entry_breakdown - 4.00, raw_bd_tp), entry_breakdown - 1.5 * sl_brk), 2)
+    bd_active = session_open and is_short_gamma and bool(has_down_air_pocket) and below_zg and (
+        float(vpin_pct) >= 50.0 or float(put_wall_siege) >= 0.20
+    )
+    bd_reason = (
+        "SHORT_GAMMA dưới ZG + Air Pocket + Áp lực xả" if bd_active
+        else ("GLOBEX ĐÓNG CỬA" if not session_open else "Chờ SHORT_GAMMA dưới ZG + Air Pocket + VPIN/Siege")
+    )
+    bd_badge, bd_reason = _format_gate_meta(bd_active, True, bd_reason)
+
+    return {
+        "atr_5m": atr5,
+        "squeeze": {
+            "entry": entry_squeeze,
+            "sl": sl_squeeze,
+            "sl_dist": round(entry_squeeze - sl_squeeze, 2),
+            "tp": tp_squeeze,
+            "tp_dist": round(tp_squeeze - entry_squeeze, 2),
+            "active": bool(sq_active),
+            "status_badge": sq_badge,
+            "gate_reason": sq_reason,
+        },
+        "fade": {
+            "entry": entry_fade,
+            "sl": sl_fade,
+            "sl_dist": round(sl_fade - entry_fade, 2),
+            "tp": tp_fade,
+            "tp_dist": round(entry_fade - tp_fade, 2),
+            "active": bool(fade_active),
+            "status_badge": fade_badge,
+            "gate_reason": fade_reason,
+        },
+        "rebound": {
+            "entry": entry_rebound,
+            "sl": sl_rebound,
+            "sl_dist": round(entry_rebound - sl_rebound, 2),
+            "tp": tp_rebound,
+            "tp_dist": round(tp_rebound - entry_rebound, 2),
+            "active": bool(reb_active),
+            "status_badge": reb_badge,
+            "gate_reason": reb_reason,
+        },
+        "breakdown": {
+            "entry": entry_breakdown,
+            "sl": sl_breakdown,
+            "sl_dist": round(sl_breakdown - entry_breakdown, 2),
+            "tp": tp_breakdown,
+            "tp_dist": round(entry_breakdown - tp_breakdown, 2),
+            "active": bool(bd_active),
+            "status_badge": bd_badge,
+            "gate_reason": bd_reason,
+        },
+    }
 
 
 # ==============================================================================

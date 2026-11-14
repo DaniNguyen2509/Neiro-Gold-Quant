@@ -71,6 +71,25 @@ CANONICAL_COLUMNS = [
     'putBid', 'putAsk', 'putMid', 'putLatest', 'putVolume', 'putOpenInterest', 'putGamma', 'putIV'
 ]
 
+# Vectorized pure-Python erf ufunc (avoids np.vectorize overhead without requiring scipy)
+_ERF_VEC = np.frompyfunc(math.erf, 1, 1)
+
+
+def _is_normalized_df(df: Optional[pd.DataFrame]) -> bool:
+    """Checks whether df is already normalized to canonical 17-column schema."""
+    return (
+        df is not None
+        and not df.empty
+        and hasattr(df, 'attrs')
+        and df.attrs.get('is_normalized') is True
+        and all(c in df.columns for c in CANONICAL_COLUMNS)
+    )
+
+
+def _norm_cdf_array(x: np.ndarray) -> np.ndarray:
+    """Vectorized standard normal CDF using pure-Python math.erf ufunc."""
+    return 0.5 * (1.0 + _ERF_VEC(x / math.sqrt(2.0)).astype(np.float64))
+
 
 # ==============================================================================
 # 2. AUTO CLEANING & NORMALIZATION FUNCTIONS
@@ -169,6 +188,113 @@ def clean_strike(v: Any) -> float:
 # 3. MULTI-FORMAT DATA INGESTION PIPELINE
 # ==============================================================================
 
+def _series_clean_val(s: pd.Series, default: float = 0.0) -> np.ndarray:
+    """Vectorized equivalent of clean_val() over a pandas Series."""
+    if pd.api.types.is_numeric_dtype(s.dtype):
+        arr = s.to_numpy(dtype=np.float64, copy=False)
+        bad = ~np.isfinite(arr)
+        if bad.any():
+            arr = np.where(bad, default, arr)
+        return arr
+
+    s_str = s.fillna('').astype(str).str.strip()
+    empty_mask = (s_str == '').to_numpy()
+    cleaned = (
+        s_str.str.replace('"', '', regex=False)
+        .str.replace("'", "", regex=False)
+        .str.replace('$', '', regex=False)
+        .str.lstrip('=+ ')
+        .str.replace(r'(?<=[\d.])[sS]$', '', regex=True)
+        .str.rstrip('%')
+        .str.replace(',', '', regex=False)
+        .str.replace(' ', '', regex=False)
+    )
+    num = pd.to_numeric(cleaned, errors='coerce').to_numpy(dtype=np.float64, copy=True)
+    bad_idx = np.flatnonzero(~np.isfinite(num) & (~empty_mask))
+    if len(bad_idx) > 0:
+        # Memoize unique dirty tokens (e.g. 'unch', '-', '#N/A') across the column
+        cache: Dict[Any, float] = {}
+        raw_vals = s.iloc[bad_idx].tolist()
+        for pos, rv in zip(bad_idx, raw_vals):
+            if rv in cache:
+                num[pos] = cache[rv]
+            else:
+                v_clean = clean_val(rv, default=default)
+                try:
+                    cache[rv] = v_clean
+                except TypeError:
+                    pass
+                num[pos] = v_clean
+    if empty_mask.any():
+        num[empty_mask] = default
+    return num
+
+
+def _series_clean_strike(s: pd.Series) -> np.ndarray:
+    """Vectorized equivalent of clean_strike() over a pandas Series."""
+    if pd.api.types.is_numeric_dtype(s.dtype):
+        arr = s.to_numpy(dtype=np.float64, copy=False)
+        bad = ~np.isfinite(arr)
+        if bad.any():
+            arr = np.where(bad, 0.0, arr)
+        return arr
+
+    s_str = s.fillna('').astype(str).str.strip()
+    empty_mask = (s_str == '').to_numpy()
+    cleaned = (
+        s_str.str.replace('"', '', regex=False)
+        .str.replace("'", "", regex=False)
+        .str.lstrip('=+ ')
+        .str.replace(r'[cCpP]$', '', regex=True)
+        .str.replace(',', '', regex=False)
+        .str.replace(' ', '', regex=False)
+    )
+    num = pd.to_numeric(cleaned, errors='coerce').to_numpy(dtype=np.float64, copy=True)
+    bad_idx = np.flatnonzero(~np.isfinite(num) & (~empty_mask))
+    if len(bad_idx) > 0:
+        raw_vals = s.iloc[bad_idx].tolist()
+        for pos, rv in zip(bad_idx, raw_vals):
+            num[pos] = clean_strike(rv)
+    if empty_mask.any():
+        num[empty_mask] = 0.0
+    return num
+
+
+def _extract_col_array(
+    df: pd.DataFrame,
+    norm_col: Dict[str, Any],
+    *keys: str,
+    default: float = 0.0,
+) -> np.ndarray:
+    """Extracts the first non-empty matching column array across alias keys."""
+    matched_cols = []
+    for k in keys:
+        norm_k = re.sub(r'[\s_\-]+', '', k.lower())
+        if norm_k in norm_col:
+            c = norm_col[norm_k]
+            if c not in matched_cols:
+                matched_cols.append(c)
+    if not matched_cols:
+        return np.full(len(df), default, dtype=np.float64)
+    if len(matched_cols) == 1:
+        return _series_clean_val(df[matched_cols[0]], default=default)
+
+    res = np.full(len(df), default, dtype=np.float64)
+    filled = np.zeros(len(df), dtype=bool)
+    for c in matched_cols:
+        s = df[c]
+        valid = s.notna().to_numpy()
+        if not pd.api.types.is_numeric_dtype(s.dtype):
+            valid = valid & (s.fillna('').astype(str).str.strip() != '').to_numpy()
+        take = valid & (~filled)
+        if take.any():
+            res[take] = _series_clean_val(s.loc[take], default=default)
+            filled |= take
+        if filled.all():
+            break
+    return res
+
+
 def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Standardizes any options DataFrame into the canonical 17-column format.
@@ -177,6 +303,9 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     if df is None or len(df) == 0:
         return pd.DataFrame(BENCHMARK_GCZ26_DATA)
+
+    if _is_normalized_df(df):
+        return df
 
     norm_col = {re.sub(r'[\s_\-]+', '', str(c).lower()): c for c in df.columns}
 
@@ -198,104 +327,75 @@ def normalize_options_df(df: pd.DataFrame) -> pd.DataFrame:
     if not found_exp and hasattr(df, 'attrs') and df.attrs.get('expiration_date'):
         found_exp = str(df.attrs['expiration_date']).strip()
 
-    def get_num(r, *keys, default=0.0):
-        for k in keys:
-            norm_k = re.sub(r'[\s_\-]+', '', k.lower())
-            if norm_k in norm_col:
-                orig_c = norm_col[norm_k]
-                v = r.get(orig_c)
-                if pd.notna(v) and str(v).strip() != '':
-                    return clean_val(v, default=default)
-        return default
-
     stk_col = norm_col.get('strike', norm_col.get('k', df.columns[0]))
-
-    rows = []
-    for _, r in df.iterrows():
-        stk = clean_strike(r.get(stk_col))
-        if stk <= 0:
-            continue
-
-        c_bid = get_num(r, 'callbid', 'call_bid', 'cbid', default=0.0)
-        c_ask = get_num(r, 'callask', 'call_ask', 'cask', default=0.0)
-        c_last = get_num(r, 'calllatest', 'call_latest', 'calllast', 'clast', default=0.0)
-        c_mid_raw = get_num(r, 'callmid', 'call_mid', 'cmid', default=0.0)
-
-        if c_bid > 0 and c_ask > 0:
-            c_mid = (c_bid + c_ask) / 2.0
-        elif c_mid_raw > 0:
-            c_mid = c_mid_raw
-        else:
-            c_mid = c_last
-
-        c_vol = get_num(r, 'callvolume', 'callvol', 'call_vol', 'call_volume', 'cvol', default=0.0)
-        c_oi = get_num(r, 'callopeninterest', 'calloi', 'call_oi', 'call_open_interest', 'coi', default=0.0)
-        c_gamma = get_num(r, 'callgamma', 'call_gamma', 'cgamma', 'gamma', default=0.0037)
-        if c_gamma <= 0:
-            c_gamma = 0.0037
-
-        c_iv = get_num(r, 'calliv', 'call_iv', 'civ', 'iv', default=0.215)
-        if c_iv > 1.0:
-            c_iv = c_iv / 100.0
-
-        p_bid = get_num(r, 'putbid', 'put_bid', 'pbid', default=0.0)
-        p_ask = get_num(r, 'putask', 'put_ask', 'pask', default=0.0)
-        p_last = get_num(r, 'putlatest', 'put_latest', 'putlast', 'plast', default=0.0)
-        p_mid_raw = get_num(r, 'putmid', 'put_mid', 'pmid', default=0.0)
-
-        if p_bid > 0 and p_ask > 0:
-            p_mid = (p_bid + p_ask) / 2.0
-        elif p_mid_raw > 0:
-            p_mid = p_mid_raw
-        else:
-            p_mid = p_last
-
-        p_vol = get_num(r, 'putvolume', 'putvol', 'put_vol', 'put_volume', 'pvol', default=0.0)
-        p_oi = get_num(r, 'putopeninterest', 'putoi', 'put_oi', 'put_open_interest', 'poi', default=0.0)
-        p_gamma = get_num(r, 'putgamma', 'put_gamma', 'pgamma', 'gamma', default=0.0037)
-        if p_gamma <= 0:
-            p_gamma = 0.0037
-
-        p_iv = get_num(r, 'putiv', 'put_iv', 'piv', 'iv', default=0.215)
-        if p_iv > 1.0:
-            p_iv = p_iv / 100.0
-
-        r_dict = {
-            'strike': stk,
-            'callBid': c_bid if c_bid > 0 else (c_mid - 0.20 if c_mid > 0 else 0.0),
-            'callAsk': c_ask if c_ask > 0 else (c_mid + 0.20 if c_mid > 0 else 0.0),
-            'callMid': c_mid,
-            'callLatest': c_last if c_last > 0 else c_mid,
-            'callVolume': c_vol,
-            'callOpenInterest': c_oi,
-            'callGamma': c_gamma,
-            'callIV': c_iv,
-            'putBid': p_bid if p_bid > 0 else (p_mid - 0.20 if p_mid > 0 else 0.0),
-            'putAsk': p_ask if p_ask > 0 else (p_mid + 0.20 if p_mid > 0 else 0.0),
-            'putMid': p_mid,
-            'putLatest': p_last if p_last > 0 else p_mid,
-            'putVolume': p_vol,
-            'putOpenInterest': p_oi,
-            'putGamma': p_gamma,
-            'putIV': p_iv
-        }
-        if found_exp:
-            r_dict['expirationDate'] = found_exp
-        rows.append(r_dict)
-
-
-    out_df = pd.DataFrame(rows)
-    if len(out_df) == 0:
+    strikes = _series_clean_strike(df[stk_col])
+    valid_mask = strikes > 0
+    if not valid_mask.any():
         return pd.DataFrame(BENCHMARK_GCZ26_DATA)
 
+    df_valid = df.loc[valid_mask] if not valid_mask.all() else df
+    strikes = strikes[valid_mask] if not valid_mask.all() else strikes
+
+    c_bid = _extract_col_array(df_valid, norm_col, 'callbid', 'call_bid', 'cbid', default=0.0)
+    c_ask = _extract_col_array(df_valid, norm_col, 'callask', 'call_ask', 'cask', default=0.0)
+    c_last = _extract_col_array(df_valid, norm_col, 'calllatest', 'call_latest', 'calllast', 'clast', default=0.0)
+    c_mid_raw = _extract_col_array(df_valid, norm_col, 'callmid', 'call_mid', 'cmid', default=0.0)
+    c_mid = np.where((c_bid > 0) & (c_ask > 0), (c_bid + c_ask) / 2.0, np.where(c_mid_raw > 0, c_mid_raw, c_last))
+
+    c_vol = _extract_col_array(df_valid, norm_col, 'callvolume', 'callvol', 'call_vol', 'call_volume', 'cvol', default=0.0)
+    c_oi = _extract_col_array(df_valid, norm_col, 'callopeninterest', 'calloi', 'call_oi', 'call_open_interest', 'coi', default=0.0)
+    c_gamma_raw = _extract_col_array(df_valid, norm_col, 'callgamma', 'call_gamma', 'cgamma', 'gamma', default=0.0037)
+    c_gamma = np.where(c_gamma_raw <= 0, 0.0037, c_gamma_raw)
+
+    c_iv_raw = _extract_col_array(df_valid, norm_col, 'calliv', 'call_iv', 'civ', 'iv', default=0.215)
+    c_iv = np.where(c_iv_raw > 1.0, c_iv_raw / 100.0, c_iv_raw)
+
+    p_bid = _extract_col_array(df_valid, norm_col, 'putbid', 'put_bid', 'pbid', default=0.0)
+    p_ask = _extract_col_array(df_valid, norm_col, 'putask', 'put_ask', 'pask', default=0.0)
+    p_last = _extract_col_array(df_valid, norm_col, 'putlatest', 'put_latest', 'putlast', 'plast', default=0.0)
+    p_mid_raw = _extract_col_array(df_valid, norm_col, 'putmid', 'put_mid', 'pmid', default=0.0)
+    p_mid = np.where((p_bid > 0) & (p_ask > 0), (p_bid + p_ask) / 2.0, np.where(p_mid_raw > 0, p_mid_raw, p_last))
+
+    p_vol = _extract_col_array(df_valid, norm_col, 'putvolume', 'putvol', 'put_vol', 'put_volume', 'pvol', default=0.0)
+    p_oi = _extract_col_array(df_valid, norm_col, 'putopeninterest', 'putoi', 'put_oi', 'put_open_interest', 'poi', default=0.0)
+    p_gamma_raw = _extract_col_array(df_valid, norm_col, 'putgamma', 'put_gamma', 'pgamma', 'gamma', default=0.0037)
+    p_gamma = np.where(p_gamma_raw <= 0, 0.0037, p_gamma_raw)
+
+    p_iv_raw = _extract_col_array(df_valid, norm_col, 'putiv', 'put_iv', 'piv', 'iv', default=0.215)
+    p_iv = np.where(p_iv_raw > 1.0, p_iv_raw / 100.0, p_iv_raw)
+
+    data_dict: Dict[str, Any] = {
+        'strike': strikes,
+        'callBid': np.where(c_bid > 0, c_bid, np.where(c_mid > 0, c_mid - 0.20, 0.0)),
+        'callAsk': np.where(c_ask > 0, c_ask, np.where(c_mid > 0, c_mid + 0.20, 0.0)),
+        'callMid': c_mid,
+        'callLatest': np.where(c_last > 0, c_last, c_mid),
+        'callVolume': c_vol,
+        'callOpenInterest': c_oi,
+        'callGamma': c_gamma,
+        'callIV': c_iv,
+        'putBid': np.where(p_bid > 0, p_bid, np.where(p_mid > 0, p_mid - 0.20, 0.0)),
+        'putAsk': np.where(p_ask > 0, p_ask, np.where(p_mid > 0, p_mid + 0.20, 0.0)),
+        'putMid': p_mid,
+        'putLatest': np.where(p_last > 0, p_last, p_mid),
+        'putVolume': p_vol,
+        'putOpenInterest': p_oi,
+        'putGamma': p_gamma,
+        'putIV': p_iv,
+    }
+    if found_exp:
+        data_dict['expirationDate'] = found_exp
+
+    out_df = pd.DataFrame(data_dict)
     out_df = out_df.drop_duplicates(subset=['strike'], keep='last').sort_values('strike').reset_index(drop=True)
     cols = [c for c in CANONICAL_COLUMNS if c in out_df.columns]
     if 'expirationDate' in out_df.columns:
         cols.append('expirationDate')
+    out_df = out_df[cols]
+    if found_exp:
         out_df.attrs['expiration_date'] = found_exp
-    elif found_exp:
-        out_df.attrs['expiration_date'] = found_exp
-    return out_df[cols]
+    out_df.attrs['is_normalized'] = True
+    return out_df
 
 
 def _parse_stacked_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -381,7 +481,9 @@ def _parse_stacked_df(df: pd.DataFrame) -> pd.DataFrame:
             'putIV': p['iv']
         })
 
-    return pd.DataFrame(rows)
+    out_df = pd.DataFrame(rows)
+    out_df.attrs['is_normalized'] = True
+    return out_df
 
 
 def parse_bookmarklet_csv(content_or_path: Union[str, io.StringIO]) -> pd.DataFrame:
@@ -521,7 +623,9 @@ def parse_dual_files(prices_path: str, greeks_path: Optional[str] = None) -> pd.
             'putIV': interp_iv,
         })
 
-    return pd.DataFrame(rows)
+    out_df = pd.DataFrame(rows)
+    out_df.attrs['is_normalized'] = True
+    return out_df
 
 
 def load_options_data(
@@ -659,7 +763,11 @@ def _load_from_path(file_path: str, data_dir: Optional[str] = None) -> pd.DataFr
     return parse_dual_files(file_path, greeks_file if os.path.exists(greeks_file) else None)
 
 
-def _resolve_safe_spot_and_atm(df: pd.DataFrame, spot: float | None = None) -> tuple[float, int]:
+def _resolve_safe_spot_and_atm(
+    df: pd.DataFrame,
+    spot: float | None = None,
+    allow_network: bool = True,
+) -> tuple[float, int]:
     """Resolves ATM index and spot price anchored to market price or median strike.
 
     Guarantees against 0-0 difference collapsing to extreme strike (e.g. $1,350)
@@ -672,14 +780,15 @@ def _resolve_safe_spot_and_atm(df: pd.DataFrame, spot: float | None = None) -> t
         atm_idx = int((df["strike"] - spot).abs().idxmin())
         return float(spot), atm_idx
 
-    try:
-        from src.quant_engine.basis import fetch_live_cme_futures_price
-        lp = fetch_live_cme_futures_price()
-        if lp and lp > 500.0:
-            atm_idx = int((df["strike"] - lp).abs().idxmin())
-            return float(lp), atm_idx
-    except Exception:
-        pass
+    if allow_network:
+        try:
+            from src.quant_engine.basis import fetch_live_cme_futures_price
+            lp = fetch_live_cme_futures_price()
+            if lp and lp > 500.0:
+                atm_idx = int((df["strike"] - lp).abs().idxmin())
+                return float(lp), atm_idx
+        except Exception:
+            pass
 
     # Check two-sided liquid strikes
     liq = (df["callMid"] > 0) & (df["putMid"] > 0)
@@ -723,7 +832,7 @@ def aggregate_options_dataframes(
     valid_dfs = []
     for d in dfs:
         if d is not None and not d.empty:
-            norm_d = normalize_options_df(d).copy()
+            norm_d = d.copy() if _is_normalized_df(d) else normalize_options_df(d).copy()
             if not norm_d.empty and "strike" in norm_d.columns:
                 valid_dfs.append(norm_d)
 
@@ -741,7 +850,7 @@ def aggregate_options_dataframes(
 
     valid_dfs.sort(key=get_dte)
 
-    spot, atm_idx = _resolve_safe_spot_and_atm(valid_dfs[0], spot=spot_price)
+    spot, atm_idx = _resolve_safe_spot_and_atm(valid_dfs[0], spot=spot_price, allow_network=False)
 
     MULT = 100.0
     scale = (spot ** 2) * 0.01 / 1e6
@@ -806,10 +915,10 @@ def aggregate_options_dataframes(
         # Multi-Expiry Greeks: Vanna (VEX), Charm (CHEX), Vega & Theta
         d2_c = d1_c - denom_c
         d2_p = d1_p - denom_p
-        cdf_d1_c = 0.5 * (1.0 + np.vectorize(math.erf)(d1_c / np.sqrt(2.0)))
-        cdf_d2_c = 0.5 * (1.0 + np.vectorize(math.erf)(d2_c / np.sqrt(2.0)))
-        cdf_neg_d1_p = 1.0 - (0.5 * (1.0 + np.vectorize(math.erf)(d1_p / np.sqrt(2.0))))
-        cdf_neg_d2_p = 1.0 - (0.5 * (1.0 + np.vectorize(math.erf)(d2_p / np.sqrt(2.0))))
+        cdf_d1_c = _norm_cdf_array(d1_c)
+        cdf_d2_c = _norm_cdf_array(d2_c)
+        cdf_neg_d1_p = 1.0 - _norm_cdf_array(d1_p)
+        cdf_neg_d2_p = 1.0 - _norm_cdf_array(d2_p)
 
         vanna_c = - df_disc * pdf_d1_c * (d2_c / sigma_c)
         vanna_p = - df_disc * pdf_d1_p * (d2_p / sigma_p)
@@ -897,6 +1006,7 @@ def aggregate_options_dataframes(
     if nearest_exp != "MULTI-EXPIRY":
         agg_df["expirationDate"] = nearest_exp
     agg_df.attrs["is_aggregated"] = True
+    agg_df.attrs["is_normalized"] = True
     agg_df.attrs["aggregated_count"] = len(processed_dfs)
     agg_df.attrs["expiration_date"] = nearest_exp
     agg_df.attrs["dte_days"] = get_dte(valid_dfs[0])
@@ -927,6 +1037,7 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
 
     # If individual sub-expiry files exist (e.g. options_prices_*_OG*.csv), aggregate ONLY valid sub-expiry files
     # to prevent double-counting against the master options_prices_GCZ26.csv
+    preloaded_dfs: Dict[str, pd.DataFrame] = {}
     valid_sub_files = []
     for f in matched_files:
         fname = os.path.basename(f).lower()
@@ -934,6 +1045,7 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
             try:
                 d_check = _load_from_path(f, data_dir=search_dir)
                 if _is_valid_gold_chain(d_check):
+                    preloaded_dfs[f] = d_check
                     valid_sub_files.append(f)
             except Exception:
                 pass
@@ -944,23 +1056,18 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
         files_to_load = []
         for f in matched_files:
             try:
-                d_check = _load_from_path(f, data_dir=search_dir)
+                d_check = preloaded_dfs[f] if f in preloaded_dfs else _load_from_path(f, data_dir=search_dir)
                 if _is_valid_gold_chain(d_check):
+                    preloaded_dfs[f] = d_check
                     files_to_load.append(f)
             except Exception:
                 pass
 
     if len(files_to_load) == 1:
-        return _load_from_path(files_to_load[0], data_dir=search_dir)
+        f0 = files_to_load[0]
+        return preloaded_dfs[f0] if f0 in preloaded_dfs else _load_from_path(f0, data_dir=search_dir)
 
-    dfs = []
-    for f in files_to_load:
-        try:
-            d = _load_from_path(f, data_dir=search_dir)
-            if _is_valid_gold_chain(d):
-                dfs.append(d)
-        except Exception:
-            continue
+    dfs = [preloaded_dfs[f] for f in files_to_load if f in preloaded_dfs]
 
     if not dfs:
         return load_options_data(data_dir=data_dir)
@@ -1226,17 +1333,27 @@ def to_options_snapshot(
 
     strikes = tuple(
         OptionsStrike(
-            strike=float(r['strike']),
-            call_bid=float(r['callBid']),
-            call_ask=float(r['callAsk']),
-            call_oi=int(r['callOpenInterest']),
-            call_volume=int(r['callVolume']),
-            put_bid=float(r['putBid']),
-            put_ask=float(r['putAsk']),
-            put_oi=int(r['putOpenInterest']),
-            put_volume=int(r['putVolume'])
+            strike=float(stk),
+            call_bid=float(cb),
+            call_ask=float(ca),
+            call_oi=int(coi),
+            call_volume=int(cvol),
+            put_bid=float(pb),
+            put_ask=float(pa),
+            put_oi=int(poi),
+            put_volume=int(pvol),
         )
-        for _, r in df.iterrows()
+        for stk, cb, ca, coi, cvol, pb, pa, poi, pvol in zip(
+            df['strike'].to_numpy(),
+            df['callBid'].to_numpy(),
+            df['callAsk'].to_numpy(),
+            df['callOpenInterest'].to_numpy(),
+            df['callVolume'].to_numpy(),
+            df['putBid'].to_numpy(),
+            df['putAsk'].to_numpy(),
+            df['putOpenInterest'].to_numpy(),
+            df['putVolume'].to_numpy(),
+        )
     )
     return OptionsSnapshot(symbol=symbol, expiry=expiry_val, timestamp=timestamp, strikes=strikes)
 
@@ -1257,17 +1374,27 @@ def to_market_snapshot(
 
     quotes = tuple(
         OptionQuote(
-            strike=float(r['strike']),
-            call_mid=float(r['callMid']),
-            put_mid=float(r['putMid']),
-            call_oi=float(r['callOpenInterest']),
-            put_oi=float(r['putOpenInterest']),
-            call_gamma=float(r['callGamma']),
-            put_gamma=float(r['putGamma']),
-            call_iv=float(r['callIV']),
-            put_iv=float(r['putIV'])
+            strike=float(stk),
+            call_mid=float(cmid),
+            put_mid=float(pmid),
+            call_oi=float(coi),
+            put_oi=float(poi),
+            call_gamma=float(cg),
+            put_gamma=float(pg),
+            call_iv=float(civ),
+            put_iv=float(piv),
         )
-        for _, r in df.iterrows()
+        for stk, cmid, pmid, coi, poi, cg, pg, civ, piv in zip(
+            df['strike'].to_numpy(),
+            df['callMid'].to_numpy(),
+            df['putMid'].to_numpy(),
+            df['callOpenInterest'].to_numpy(),
+            df['putOpenInterest'].to_numpy(),
+            df['callGamma'].to_numpy(),
+            df['putGamma'].to_numpy(),
+            df['callIV'].to_numpy(),
+            df['putIV'].to_numpy(),
+        )
     )
 
     spot_price, atm_idx = _resolve_safe_spot_and_atm(df, spot=spot)

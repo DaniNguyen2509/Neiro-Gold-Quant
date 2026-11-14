@@ -107,8 +107,8 @@ def clean_and_sanitize_options_dataset(
         return clean_df
 
     # 2. Sanitize strike column
-    from src.quant_engine.loader import clean_val
-    clean_df["strike"] = clean_df["strike"].apply(clean_val)
+    from src.quant_engine.loader import _series_clean_val
+    clean_df["strike"] = _series_clean_val(clean_df["strike"], default=0.0)
     clean_df = clean_df[clean_df["strike"] > 0]
     clean_df = clean_df[(clean_df["strike"] >= 1000.0) & (clean_df["strike"] <= 10000.0)]
 
@@ -128,7 +128,7 @@ def clean_and_sanitize_options_dataset(
     ]
     for col in numeric_cols:
         if col in clean_df.columns:
-            clean_df[col] = clean_df[col].apply(clean_val)
+            clean_df[col] = _series_clean_val(clean_df[col], default=0.0)
 
     # 6. Spread sanity (Ask >= Bid)
     if "callBid" in clean_df.columns and "callAsk" in clean_df.columns:

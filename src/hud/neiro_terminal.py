@@ -82,24 +82,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         else ("#4ADE80" if post_sweep_regime == "POST_SWEEP_V_SHAPE"
               else ("#38BDF8" if post_sweep_regime == "POST_SWEEP_PULLBACK" else "#94A3B8"))
     )
-    compact_ladder = []
-    for k_raw, lvl in sorted((meta.get("squeeze_ladder") or {}).items(), key=lambda kv: float(kv[0])):
-        sq_tr = getattr(lvl, "squeeze_trigger", lvl.get("squeeze_trigger") if isinstance(lvl, dict) else 0.0)
-        sq_tp = getattr(lvl, "squeeze_tp", lvl.get("squeeze_tp") if isinstance(lvl, dict) else 0.0)
-        wf_tr = getattr(lvl, "waterfall_trigger", lvl.get("waterfall_trigger") if isinstance(lvl, dict) else 0.0)
-        wf_tp = getattr(lvl, "waterfall_tp", lvl.get("waterfall_tp") if isinstance(lvl, dict) else 0.0)
-        compact_ladder.append({
-            "k": round(float(k_raw), 2),
-            "sq_tr": round(float(sq_tr), 2),
-            "sq_tp": round(float(sq_tp), 2),
-            "wf_tr": round(float(wf_tr), 2),
-            "wf_tp": round(float(wf_tp), 2),
-        })
     disloc_color = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
     hedge_color = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
     cvd_color = "#4ADE80" if bvc_cvd_val >= 0 else "#F87171"
 
-    # Identify Peak Vanna & Peak Charm strikes
+    # Identify Peak Vanna & Peak Charm strikes before corridor pruning
     vanna_peak_strike = float(meta.get("vanna_peak_strike") or 0.0)
     vanna_peak_val = float(meta.get("vanna_peak_val") or 0.0)
     charm_peak_strike = float(meta.get("charm_peak_strike") or 0.0)
@@ -118,6 +105,37 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 ch_idx = chex_s.idxmax()
                 charm_peak_strike = float(df.loc[ch_idx, "strike"])
                 charm_peak_val = float(df.loc[ch_idx, "netCHEX"])
+
+    key_landmarks = (
+        call_wall,
+        put_wall,
+        zero_gamma,
+        atm_strike,
+        vanna_peak_strike,
+        charm_peak_strike,
+        float(meta.get("major_call_oi_wall") or 0.0),
+        float(meta.get("major_put_oi_wall") or 0.0),
+    )
+
+    def _in_active_corridor(k_val: float) -> bool:
+        return abs(k_val - spot) <= 600.0 or any(lm > 0.0 and abs(k_val - lm) <= 25.0 for lm in key_landmarks)
+
+    compact_ladder = []
+    for k_raw, lvl in sorted((meta.get("squeeze_ladder") or {}).items(), key=lambda kv: float(kv[0])):
+        k_flt = float(k_raw)
+        if not _in_active_corridor(k_flt):
+            continue
+        sq_tr = getattr(lvl, "squeeze_trigger", lvl.get("squeeze_trigger") if isinstance(lvl, dict) else 0.0)
+        sq_tp = getattr(lvl, "squeeze_tp", lvl.get("squeeze_tp") if isinstance(lvl, dict) else 0.0)
+        wf_tr = getattr(lvl, "waterfall_trigger", lvl.get("waterfall_trigger") if isinstance(lvl, dict) else 0.0)
+        wf_tp = getattr(lvl, "waterfall_tp", lvl.get("waterfall_tp") if isinstance(lvl, dict) else 0.0)
+        compact_ladder.append({
+            "k": round(k_flt, 2),
+            "sq_tr": round(float(sq_tr), 2),
+            "sq_tp": round(float(sq_tp), 2),
+            "wf_tr": round(float(wf_tr), 2),
+            "wf_tp": round(float(wf_tp), 2),
+        })
 
     # 1. CSS styling cloned 1:1 from Neiro-NQ-Quant Tactical Cockpit
     neiro_css = """
@@ -303,58 +321,62 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     </div>
     """
 
-    # 4. JSON metadata & strikes for JavaScript engine (compatible with NQ 4-column profile)
+    # 4. JSON metadata & strikes for JavaScript engine (trimmed to active corridor + landmarks)
     js_options_data = []
-    for _, r in df.sort_values("strike").iterrows():
-        try:
-            c_oi_val = int(r.get("callOpenInterest", 0) or 0)
-            p_oi_val = int(r.get("putOpenInterest", 0) or 0)
-            c_vol_val = int(r.get("callVolume", 0) or 0)
-            p_vol_val = int(r.get("putVolume", 0) or 0)
-            c_delta_val = float(r.get("callDelta", 0.0) or 0.0)
-            p_delta_val = float(r.get("putDelta", 0.0) or 0.0)
-            net_delta_val = float(r.get("netDeltaContracts", 0.0) or (c_oi_val * c_delta_val + p_oi_val * p_delta_val))
-            gex_val = float(r.get("netGEX", 0.0) or 0.0)
-            vex_val = float(r.get("netVEX", 0.0) or 0.0)
-            chex_val = float(r.get("netCHEX", 0.0) or 0.0)
-            theta_val = float(r.get("totalTheta", 0.0) or 0.0)
+    if not df.empty and "strike" in df.columns:
+        df_sorted_js = df.sort_values("strike")
+        for r in df_sorted_js.to_dict("records"):
+            try:
+                stk_num = float(r["strike"])
+                if not _in_active_corridor(stk_num):
+                    continue
+                c_oi_val = int(r.get("callOpenInterest", 0) or 0)
+                p_oi_val = int(r.get("putOpenInterest", 0) or 0)
+                c_vol_val = int(r.get("callVolume", 0) or 0)
+                p_vol_val = int(r.get("putVolume", 0) or 0)
+                c_delta_val = float(r.get("callDelta", 0.0) or 0.0)
+                p_delta_val = float(r.get("putDelta", 0.0) or 0.0)
+                net_delta_val = float(r.get("netDeltaContracts", 0.0) or (c_oi_val * c_delta_val + p_oi_val * p_delta_val))
+                gex_val = float(r.get("netGEX", 0.0) or 0.0)
+                vex_val = float(r.get("netVEX", 0.0) or 0.0)
+                chex_val = float(r.get("netCHEX", 0.0) or 0.0)
+                theta_val = float(r.get("totalTheta", 0.0) or 0.0)
 
-            stk_num = float(r["strike"])
-            sf = per_strike_flow.get(round(stk_num, 1)) or {}
-            dh_gc_val = float(sf.get("dealer_hedge_gc", 0.0) or 0.0)
-            s_call_val = float(sf.get("signed_call", 0.0) or 0.0)
-            s_put_val = float(sf.get("signed_put", 0.0) or 0.0)
-            is_whale_val = bool(sf.get("is_whale_new_oi", False))
-            dom_flow_val = str(sf.get("dominant_flow", ""))
+                sf = per_strike_flow.get(round(stk_num, 1)) or {}
+                dh_gc_val = float(sf.get("dealer_hedge_gc", 0.0) or 0.0)
+                s_call_val = float(sf.get("signed_call", 0.0) or 0.0)
+                s_put_val = float(sf.get("signed_put", 0.0) or 0.0)
+                is_whale_val = bool(sf.get("is_whale_new_oi", False))
+                dom_flow_val = str(sf.get("dominant_flow", ""))
 
-            js_options_data.append({
-                "strike": round(stk_num, 1),
-                "c_oi": c_oi_val,
-                "p_oi": p_oi_val,
-                "c_vol": c_vol_val,
-                "p_vol": p_vol_val,
-                "c_iv": round(float(r.get("callIV", 0.18) or 0.18), 4),
-                "p_iv": round(float(r.get("putIV", 0.18) or 0.18), 4),
-                "c_delta": round(c_delta_val, 4),
-                "p_delta": round(p_delta_val, 4),
-                "c_gamma": round(float(r.get("callGamma", 0.0) or 0.0), 6),
-                "p_gamma": round(float(r.get("putGamma", 0.0) or 0.0), 6),
-                "netGEX": round(gex_val, 3),
-                "netDelta": round(net_delta_val, 3),
-                "netVEX": round(vex_val, 3),
-                "netCHEX": round(chex_val, 3),
-                "currentNetFLOW": round(dh_gc_val, 3),
-                "signedCall": round(s_call_val, 3),
-                "signedPut": round(s_put_val, 3),
-                "isWhale": is_whale_val,
-                "dominantFlow": dom_flow_val,
-                "currentNetGEX": round(gex_val, 3),
-                "currentNetVEX": round(vex_val, 3),
-                "currentNetCHEX": round(chex_val, 3),
-                "currentNetTEX": round(theta_val, 3),
-            })
-        except Exception:
-            continue
+                js_options_data.append({
+                    "strike": round(stk_num, 1),
+                    "c_oi": c_oi_val,
+                    "p_oi": p_oi_val,
+                    "c_vol": c_vol_val,
+                    "p_vol": p_vol_val,
+                    "c_iv": round(float(r.get("callIV", 0.18) or 0.18), 4),
+                    "p_iv": round(float(r.get("putIV", 0.18) or 0.18), 4),
+                    "c_delta": round(c_delta_val, 4),
+                    "p_delta": round(p_delta_val, 4),
+                    "c_gamma": round(float(r.get("callGamma", 0.0) or 0.0), 6),
+                    "p_gamma": round(float(r.get("putGamma", 0.0) or 0.0), 6),
+                    "netGEX": round(gex_val, 3),
+                    "netDelta": round(net_delta_val, 3),
+                    "netVEX": round(vex_val, 3),
+                    "netCHEX": round(chex_val, 3),
+                    "currentNetFLOW": round(dh_gc_val, 3),
+                    "signedCall": round(s_call_val, 3),
+                    "signedPut": round(s_put_val, 3),
+                    "isWhale": is_whale_val,
+                    "dominantFlow": dom_flow_val,
+                    "currentNetGEX": round(gex_val, 3),
+                    "currentNetVEX": round(vex_val, 3),
+                    "currentNetCHEX": round(chex_val, 3),
+                    "currentNetTEX": round(theta_val, 3),
+                })
+            except Exception:
+                continue
 
     m5_tape = meta.get("m5_tape") or {}
     chart_candles = m5_tape.get("chart_candles") or []
@@ -1536,8 +1558,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
     }}
 
+    let lastYahooPollEpoch = 0;
+
     async function pollLiveYahooChart(tf = currentTfKey) {{
         const ts = Date.now();
+        lastYahooPollEpoch = ts;
         try {{
             const res = await fetch('http://127.0.0.1:8765/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts, {{ cache: 'no-store' }});
             if (res && res.ok) {{
@@ -1647,7 +1672,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const badge = document.getElementById('cloud-sync-badge');
         try {{
             if (badge && isManual) badge.innerText = '⟳ SYNCING...';
-            await pollLiveYahooChart(currentTfKey);
+            if (isManual || (Date.now() - lastYahooPollEpoch > 4000)) {{
+                await pollLiveYahooChart(currentTfKey);
+            }}
             const data = await fetchCloudVersionJson();
             if (data && data.timestamp_utc) {{
                 lastCloudTimestamp = data.timestamp_utc;
@@ -1683,13 +1710,20 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     }}
 
     // 100% Pure CME Gold Futures (GC=F) Real-Time Stream (No Crypto PAXG Proxy Contamination)
+    const isLocalBridgeMode = (
+        window.location.protocol === 'file:'
+        || window.location.hostname === '127.0.0.1'
+        || window.location.hostname === 'localhost'
+    );
+    const YAHOO_POLL_INTERVAL_MS = isLocalBridgeMode ? 2500 : 5000;
+
     function connectLiveGoldOrderflowStream() {{
         if (!isCmeGlobexMarketOpen()) {{
             setTimeout(connectLiveGoldOrderflowStream, 30000);
             return;
         }}
         pollLiveYahooChart(currentTfKey);
-        setTimeout(connectLiveGoldOrderflowStream, 5000);
+        setTimeout(connectLiveGoldOrderflowStream, YAHOO_POLL_INTERVAL_MS);
     }}
 
     // Tự động kiểm tra Yahoo GC=F & Cloud mỗi 10s hoàn toàn tự động (Zero-Touch, Zero-Reload)

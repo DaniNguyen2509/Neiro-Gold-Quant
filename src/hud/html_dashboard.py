@@ -28,7 +28,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.quant_engine.synthetic import compute_dynamic_dte
+from src.quant_engine.loader import _norm_cdf_array, _series_clean_val
 from src.quant_engine import basis as basis_engine
+
+# Static options chain & cloud sync caches (invalidated automatically by file mtime_ns + size)
+_STATIC_CHAIN_CACHE: dict[str, tuple[tuple[Any, ...], pd.DataFrame, Any, bool, float, bool]] = {}
+_CLOUD_CSV_SYNC_TS: dict[tuple[str, float], float] = {}
+_CLOUD_CSV_SYNC_COOLDOWN_S = 60.0
 from src.quant_engine.basis import (
     fetch_live_cme_m5_tape,
     resolve_dynamic_basis_with_source,
@@ -51,6 +57,10 @@ from src.quant_engine.dealer import (
 )
 from src.quant_engine.loader import clean_val, to_options_snapshot, load_multi_expiry_options
 from src.hud.neiro_terminal import render_neiro_orderflow_component
+from src.quant_engine.strategy import (
+    compute_m5_equivalent_atr,
+    compute_tactical_intraday_matrix,
+)
 
 
 def resolve_adaptive_tactical_strikes(
@@ -116,6 +126,25 @@ def resolve_adaptive_tactical_strikes(
     return strike_above, next_above, strike_below, next_below, step, is_micro_guarded
 
 
+def _build_csv_cache_signature(csv_path: Path) -> tuple[Any, ...]:
+    """Builds a deterministic filesystem signature (name, mtime_ns, size) for CSV invalidation."""
+    if not csv_path.exists():
+        return ()
+    entries: list[tuple[str, int, int]] = []
+    seen_names: set[str] = set()
+    try:
+        for f in sorted(csv_path.parent.glob("options_prices*.csv")):
+            st = f.stat()
+            entries.append((f.name, st.st_mtime_ns, st.st_size))
+            seen_names.add(f.name)
+        if csv_path.name not in seen_names:
+            st = csv_path.stat()
+            entries.append((csv_path.name, st.st_mtime_ns, st.st_size))
+    except Exception:
+        return ()
+    return tuple(entries)
+
+
 def load_and_preprocess_options(
     csv_path: str,
     basis: float | None = None,
@@ -125,72 +154,102 @@ def load_and_preprocess_options(
     p_path = Path(csv_path)
     file_age_hours = 0.0
     is_data_stale = False
+    saved_exp_attr = None
+    was_multi_expiry_aggregated = False
+    df: pd.DataFrame | None = None
+
+    cache_key = ""
+    csv_sig: tuple[Any, ...] = ()
     if p_path.exists():
-        try:
-            mtime = p_path.stat().st_mtime
-            file_age_hours = (time.time() - mtime) / 3600.0
-            is_data_stale = (file_age_hours > 6.0)
-            if is_data_stale:
-                now_str = datetime.datetime.now().strftime("%H:%M:%S")
-                print(f"[{now_str}] ⚠️ [CẢNH BÁO NGUY HIỂM] File Options CSV ({csv_path}) đã cũ {file_age_hours:.1f} giờ! Chuỗi options có thể chưa nạp các strike mới trong ngày.")
-        except Exception:
-            pass
+        cache_key = str(p_path.resolve())
+        csv_sig = _build_csv_cache_signature(p_path)
+        cached_entry = _STATIC_CHAIN_CACHE.get(cache_key) if csv_sig else None
+        if cached_entry is not None and cached_entry[0] == csv_sig:
+            _, cached_df, saved_exp_attr, was_multi_expiry_aggregated, file_age_hours, is_data_stale = cached_entry
+            df = cached_df.copy(deep=True)
+            if saved_exp_attr:
+                df.attrs["expiration_date"] = saved_exp_attr
+            if was_multi_expiry_aggregated:
+                df.attrs["is_aggregated"] = True
 
-        data_parent = str(p_path.parent)
-        df_multi = load_multi_expiry_options(data_parent)
-        if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
-            df_raw = df_multi
-        else:
-            df_raw = pd.read_csv(csv_path)
-    else:
-        df_raw = pd.read_csv(csv_path)
-
-    # D7: Check embedded timestamp if present (takes precedence over OS mtime)
-    if "scraped_at_utc" in df_raw.columns:
-        s_ts = df_raw["scraped_at_utc"].dropna()
-        if not s_ts.empty:
+    if df is None:
+        if p_path.exists():
             try:
-                scraped_dt = datetime.datetime.fromisoformat(str(s_ts.iloc[0]).strip())
-                if scraped_dt.tzinfo is None:
-                    scraped_dt = scraped_dt.replace(tzinfo=datetime.timezone.utc)
-                age_ts = (datetime.datetime.now(datetime.timezone.utc) - scraped_dt).total_seconds() / 3600.0
-                if age_ts >= 0:
-                    file_age_hours = age_ts
-                    is_data_stale = (file_age_hours > 6.0)
+                mtime = p_path.stat().st_mtime
+                file_age_hours = (time.time() - mtime) / 3600.0
+                is_data_stale = (file_age_hours > 6.0)
+                if is_data_stale:
+                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    print(f"[{now_str}] ⚠️ [CẢNH BÁO NGUY HIỂM] File Options CSV ({csv_path}) đã cũ {file_age_hours:.1f} giờ! Chuỗi options có thể chưa nạp các strike mới trong ngày.")
             except Exception:
                 pass
 
-    # Preserve multi-expiry superposition metadata before sanitization
-    was_multi_expiry_aggregated = bool(hasattr(df_raw, "attrs") and df_raw.attrs.get("is_aggregated"))
-    saved_exp_attr = df_raw.attrs.get("expiration_date") if hasattr(df_raw, "attrs") else None
-
-    # Data Analyst cleaning & sanitization pipeline
-    from src.collector.validator import clean_and_sanitize_options_dataset
-    df_raw = clean_and_sanitize_options_dataset(df_raw)
-    if saved_exp_attr:
-        df_raw.attrs["expiration_date"] = saved_exp_attr
-    if was_multi_expiry_aggregated:
-        df_raw.attrs["is_aggregated"] = True
-
-    # Normalize column names
-    col_clean = {c: c.strip() for c in df_raw.columns}
-    df_raw.rename(columns=col_clean, inplace=True)
-
-    # Standardize expected columns
-    for col in [
-        "callMid", "callBid", "callAsk", "callLatest", "callVolume", "callOpenInterest", "callGamma", "callIV",
-        "putMid", "putBid", "putAsk", "putLatest", "putVolume", "putOpenInterest", "putGamma", "putIV"
-    ]:
-        if col not in df_raw.columns:
-            df_raw[col] = 0.0
+            data_parent = str(p_path.parent)
+            df_multi = load_multi_expiry_options(data_parent)
+            if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
+                df_raw = df_multi
+            else:
+                df_raw = pd.read_csv(csv_path)
         else:
-            df_raw[col] = df_raw[col].apply(clean_val)
+            df_raw = pd.read_csv(csv_path)
 
-    if "strike" in df_raw.columns:
-        df_raw["strike"] = df_raw["strike"].apply(clean_val)
-    else:
-        df_raw["strike"] = pd.Series(dtype=float)
-    df = df_raw[df_raw["strike"] > 0].sort_values("strike").reset_index(drop=True)
+        # D7: Check embedded timestamp if present (takes precedence over OS mtime)
+        if "scraped_at_utc" in df_raw.columns:
+            s_ts = df_raw["scraped_at_utc"].dropna()
+            if not s_ts.empty:
+                try:
+                    scraped_dt = datetime.datetime.fromisoformat(str(s_ts.iloc[0]).strip())
+                    if scraped_dt.tzinfo is None:
+                        scraped_dt = scraped_dt.replace(tzinfo=datetime.timezone.utc)
+                    age_ts = (datetime.datetime.now(datetime.timezone.utc) - scraped_dt).total_seconds() / 3600.0
+                    if age_ts >= 0:
+                        file_age_hours = age_ts
+                        is_data_stale = (file_age_hours > 6.0)
+                except Exception:
+                    pass
+
+        # Preserve multi-expiry superposition metadata before sanitization
+        was_multi_expiry_aggregated = bool(hasattr(df_raw, "attrs") and df_raw.attrs.get("is_aggregated"))
+        saved_exp_attr = df_raw.attrs.get("expiration_date") if hasattr(df_raw, "attrs") else None
+
+        # Data Analyst cleaning & sanitization pipeline
+        from src.collector.validator import clean_and_sanitize_options_dataset
+        df_raw = clean_and_sanitize_options_dataset(df_raw)
+        if saved_exp_attr:
+            df_raw.attrs["expiration_date"] = saved_exp_attr
+        if was_multi_expiry_aggregated:
+            df_raw.attrs["is_aggregated"] = True
+
+        # Normalize column names
+        col_clean = {c: c.strip() for c in df_raw.columns}
+        df_raw.rename(columns=col_clean, inplace=True)
+
+        # Standardize expected columns
+        for col in [
+            "callMid", "callBid", "callAsk", "callLatest", "callVolume", "callOpenInterest", "callGamma", "callIV",
+            "putMid", "putBid", "putAsk", "putLatest", "putVolume", "putOpenInterest", "putGamma", "putIV"
+        ]:
+            if col not in df_raw.columns:
+                df_raw[col] = 0.0
+            elif not pd.api.types.is_numeric_dtype(df_raw[col].dtype):
+                df_raw[col] = _series_clean_val(df_raw[col], default=0.0)
+
+        if "strike" in df_raw.columns:
+            if not pd.api.types.is_numeric_dtype(df_raw["strike"].dtype):
+                df_raw["strike"] = _series_clean_val(df_raw["strike"], default=0.0)
+        else:
+            df_raw["strike"] = pd.Series(dtype=float)
+        df = df_raw[df_raw["strike"] > 0].sort_values("strike").reset_index(drop=True)
+        if cache_key and csv_sig and not df.empty:
+            _STATIC_CHAIN_CACHE[cache_key] = (
+                csv_sig,
+                df.copy(deep=True),
+                saved_exp_attr,
+                was_multi_expiry_aggregated,
+                file_age_hours,
+                is_data_stale,
+            )
+
     is_benchmark_fallback = False
     if df.empty:
         from src.quant_engine.loader import load_options_data
@@ -231,6 +290,8 @@ def load_and_preprocess_options(
     r = 0.045
 
     # 1. CME Futures Price Resolution & ATM Strike Lock
+    # Pre-warm tape + futures spot in a single parallel batch before scalar fallback
+    m5_tape = fetch_live_cme_m5_tape(limit=8, include_htf=True)
     live_futures = basis_engine.fetch_live_cme_futures_price()
     if live_futures is not None and live_futures > 500.0:
         spot_price = live_futures
@@ -337,20 +398,16 @@ def load_and_preprocess_options(
     needs_p_iv = (df["putIV"] <= 0.01) & (df["putMid"] > 0)
 
     if needs_c_iv.any():
-        solved_c = [
-            solve_black76_iv(f_chain, row["strike"], T_years, row["callMid"], is_call=True, r=r)
-            if row["callIV"] <= 0.01 and row["callMid"] > 0 else row["callIV"]
-            for _, row in df.iterrows()
-        ]
-        df["callIV"] = solved_c
+        for idx in df.index[needs_c_iv]:
+            df.at[idx, "callIV"] = solve_black76_iv(
+                f_chain, float(df.at[idx, "strike"]), T_years, float(df.at[idx, "callMid"]), is_call=True, r=r
+            )
 
     if needs_p_iv.any():
-        solved_p = [
-            solve_black76_iv(f_chain, row["strike"], T_years, row["putMid"], is_call=False, r=r)
-            if row["putIV"] <= 0.01 and row["putMid"] > 0 else row["putIV"]
-            for _, row in df.iterrows()
-        ]
-        df["putIV"] = solved_p
+        for idx in df.index[needs_p_iv]:
+            df.at[idx, "putIV"] = solve_black76_iv(
+                f_chain, float(df.at[idx, "strike"]), T_years, float(df.at[idx, "putMid"]), is_call=False, r=r
+            )
 
     # 2. Greeks via Black-76 & Volatility Model
     MULT = 100.0
@@ -404,11 +461,11 @@ def load_and_preprocess_options(
 
     pdf_d1_c = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1_c ** 2))
     pdf_d1_p = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * (d1_p ** 2))
-    cdf_d1_c = 0.5 * (1.0 + np.vectorize(math.erf)(d1_c / np.sqrt(2.0)))
-    cdf_d2_c = 0.5 * (1.0 + np.vectorize(math.erf)(d2_c / np.sqrt(2.0)))
-    cdf_d1_p = 0.5 * (1.0 + np.vectorize(math.erf)(d1_p / np.sqrt(2.0)))
+    cdf_d1_c = _norm_cdf_array(d1_c)
+    cdf_d2_c = _norm_cdf_array(d2_c)
+    cdf_d1_p = _norm_cdf_array(d1_p)
     cdf_neg_d1_p = 1.0 - cdf_d1_p
-    cdf_neg_d2_p = 1.0 - (0.5 * (1.0 + np.vectorize(math.erf)(d2_p / np.sqrt(2.0))))
+    cdf_neg_d2_p = 1.0 - _norm_cdf_array(d2_p)
     df_disc = np.exp(-r * T_years)
 
     # Black-76 Gamma: e^(-rT) * n(d1) / (F * sigma * sqrt(T))
@@ -572,8 +629,7 @@ def load_and_preprocess_options(
     else:
         basis_source = "MANUAL"
 
-    # 6. Real-Time M5 Orderflow Tape & Multi-Timeframe Yahoo GC=F Candles
-    m5_tape = fetch_live_cme_m5_tape(limit=8, include_htf=True)
+    # 6. Real-Time M5 Orderflow Tape & Multi-Timeframe Yahoo GC=F Candles (reused from step 1)
     if isinstance(m5_tape, dict) and m5_tape.get("available") and m5_tape.get("chart_candles"):
         tape_price = float(m5_tape.get("latest_price", spot_price))
         if abs(spot_price - tape_price) <= 25.0:
@@ -1506,7 +1562,10 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     vrp_col = "#38BDF8" if vrp_spread_pct >= 4.0 else ("#F87171" if vrp_spread_pct <= -2.0 else "#CBD5E1")
 
     table_rows_html = []
-    for row_idx, row in df_sorted.iterrows():
+    # Cap rendered DOM rows at +/-35 strikes around spot (keeps +/-10 visible + generous slide headroom)
+    for row_idx, row in enumerate(df_sorted.to_dict("records")):
+        if abs(int(row_idx) - int(spot_row_idx)) > 35:
+            continue
         stk_val = float(row["strike"])
         gex_val = float(row.get("netGEX", 0.0))
         c_oi_val = int(row.get("callOpenInterest", 0))
@@ -1675,7 +1734,7 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
 def generate_html_terminal(
     df: pd.DataFrame,
     meta: dict[str, Any],
-    fig: go.Figure,
+    fig: go.Figure | None = None,
     fig_smile: go.Figure | None = None,
 ) -> str:
     if fig_smile is None:
@@ -1818,20 +1877,78 @@ def generate_html_terminal(
     buffer_up = min(step * 0.10, 2.50)
     buffer_down = min(step * 0.10, 2.50)
 
-    # 1. Squeeze TP (BUY: must be strictly > entry_squeeze)
-    raw_squeeze_tp = major_up_wall - front_run_tp if has_up_air_pocket else next_above - front_run_tp
-    squeeze_tp = max(entry_squeeze + 2.00, raw_squeeze_tp)
+    # Calibrated KHỐI 6 Strategy Matrix (V2.1 Stop-Hunt Clearance + Gamma-Aligned Gate)
+    _k6_tape = meta.get("m5_tape") or {}
+    _k6_flow = meta.get("institutional_orderflow") or {}
+    _k6_vpin = float(_k6_flow.get("vpin_pct", 32.0))
+    _k6_sess = str(
+        _k6_flow.get("session_name")
+        or _k6_flow.get("session_tag")
+        or ("GLOBEX_CLOSED" if _k6_tape and not _k6_tape.get("market_open", True) else "NY_COMEX_DEEP")
+    )
+    _k6_atr5 = compute_m5_equivalent_atr(_k6_tape)
+    _k6_mat = compute_tactical_intraday_matrix(
+        spot=spot,
+        strike_above=strike_above,
+        next_above=next_above,
+        strike_below=strike_below,
+        next_below=next_below,
+        step=step,
+        call_wall=call_wall,
+        put_wall=put_wall,
+        zero_gamma=zero_gamma,
+        major_up_wall=major_up_wall,
+        major_down_wall=major_down_wall,
+        has_up_air_pocket=has_up_air_pocket,
+        has_down_air_pocket=has_down_air_pocket,
+        regime=regime,
+        vpin_pct=_k6_vpin,
+        call_wall_siege=call_wall_siege,
+        put_wall_siege=put_wall_siege,
+        session_tag=_k6_sess,
+        atr_5m=_k6_atr5,
+    )
 
-    # 2. Fade TP (SELL: must be strictly < entry_fade)
-    candidate_fade_tp = min(spot, strike_below + front_run_tp) if strike_below < entry_fade - 2.00 else entry_fade - 3.50
-    tp_fade = min(entry_fade - 2.00, candidate_fade_tp)
+    entry_squeeze = _k6_mat["squeeze"]["entry"]
+    sl_squeeze = _k6_mat["squeeze"]["sl"]
+    sl_dist_squeeze = _k6_mat["squeeze"]["sl_dist"]
+    squeeze_tp = _k6_mat["squeeze"]["tp"]
 
-    # 3. Rebound TP (BUY: must be strictly > entry_rebound)
-    tp_rebound = max(entry_rebound + 2.50, strike_above - front_run_tp)
+    entry_fade = _k6_mat["fade"]["entry"]
+    sl_fade = _k6_mat["fade"]["sl"]
+    sl_dist_fade = _k6_mat["fade"]["sl_dist"]
+    tp_fade = _k6_mat["fade"]["tp"]
 
-    # 4. Breakdown TP (SELL: must be strictly < entry_breakdown)
-    raw_breakdown_tp = major_down_wall + front_run_tp if has_down_air_pocket else next_below + front_run_tp
-    breakdown_tp = min(entry_breakdown - 2.00, raw_breakdown_tp)
+    entry_rebound = _k6_mat["rebound"]["entry"]
+    sl_rebound = _k6_mat["rebound"]["sl"]
+    sl_dist_rebound = _k6_mat["rebound"]["sl_dist"]
+    tp_rebound = _k6_mat["rebound"]["tp"]
+
+    entry_breakdown = _k6_mat["breakdown"]["entry"]
+    sl_breakdown = _k6_mat["breakdown"]["sl"]
+    sl_dist_breakdown = _k6_mat["breakdown"]["sl_dist"]
+    breakdown_tp = _k6_mat["breakdown"]["tp"]
+
+    size_squeeze = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_squeeze, gex_regime=regime)
+    size_fade = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_fade, gex_regime=regime)
+    size_rebound = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_rebound, gex_regime=regime)
+    size_breakdown = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_breakdown, gex_regime=regime)
+
+    def _k6_gate_pill(item: dict[str, Any]) -> str:
+        col = "#4ADE80" if item["active"] else "#94A3B8"
+        bg = "rgba(34,197,94,0.14)" if item["active"] else "rgba(100,116,139,0.16)"
+        return (
+            f" <span style='display:inline-block; margin-left:6px; padding:1px 6px; "
+            f"border-radius:4px; font-size:10px; font-weight:700; color:{col}; "
+            f"background:{bg}; border:1px solid {col};' title='{item['gate_reason']}'>"
+            f"{item['status_badge']}</span>"
+            f"<div style='font-size:10px; color:#64748B; font-weight:400; margin-top:2px;'>{item['gate_reason']}</div>"
+        )
+
+    sq_gate_html = _k6_gate_pill(_k6_mat["squeeze"])
+    fd_gate_html = _k6_gate_pill(_k6_mat["fade"])
+    rb_gate_html = _k6_gate_pill(_k6_mat["rebound"])
+    bd_gate_html = _k6_gate_pill(_k6_mat["breakdown"])
 
     # 5. Call Wall Fade TP (SELL: must be strictly < entry_call_wall)
     tp_call_wall = min(entry_call_wall - 3.00, atm_strike)
@@ -1945,11 +2062,6 @@ def generate_html_terminal(
         config={"responsive": True, "displayModeBar": True},
         div_id="plotly-smile-chart",
     )
-    plotly_div = fig.to_html(
-        full_html=False,
-        include_plotlyjs=False,
-        config={"responsive": True, "displayModeBar": True},
-    )
 
     # Prepare Micro-Guard & Stale Data Badges
     stale_badge_html = ""
@@ -2048,10 +2160,10 @@ def generate_html_terminal(
     {pinning_table_html}
 
     <!-- KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW (PANEL LỚN HẲN MALZ 1997 SVI) -->
-    <div class="chart-box" style="margin-bottom: 16px; padding: 14px 16px;">
-        <div style="margin-bottom:6px; border-bottom:1px solid #1E293B; padding-bottom:10px;">
+    <details class="chart-box" style="margin-bottom: 16px; padding: 14px 16px;" ontoggle="if(this.open){{window.dispatchEvent(new Event('resize'));}}">
+        <summary style="cursor:pointer; list-style:none; border-bottom:1px solid #1E293B; padding-bottom:10px;">
             <div style="font-size:14.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.3px; font-family:'JetBrains Mono', monospace;">
-                CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW)
+                CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span>
             </div>
             <div style="font-size:11.5px; color:#94A3B8; margin-top:4px; font-family:'JetBrains Mono', monospace;">
                 Mô hình Malz SVI • ATM IV: <b style="color:#FACC15;">{sigma_atm*100:.2f}%</b> • 
@@ -2060,9 +2172,11 @@ def generate_html_terminal(
                 <span style="color:#EF4444; font-weight:700;">Call Wall: ${call_wall:,.0f}</span> • 
                 <span style="color:#F59E0B; font-weight:700;">Zero Gamma: {f'${zero_gamma:,.1f}' if zero_gamma else 'N/A'}</span>
             </div>
+        </summary>
+        <div style="margin-top:8px;">
+            {smile_plotly_div}
         </div>
-        {smile_plotly_div}
-    </div>
+    </details>
 
     <!-- KHỐI 2: 3 PANEL BIỂU ĐỒ VI MÔ GEX, VOLUME/OI, GREEKS BẬC 2 (ĐÃ TÍCH HỢP TRỰC TIẾP VÀO UNIFIED GREEKS & ORDERFLOW MATRIX & CANVAS TERMINAL TAB 1) -->
 
@@ -2174,29 +2288,6 @@ def generate_html_terminal(
                 {m5_header_summary}
             </div>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; margin-bottom:12px;">
-            <div style="background:#0F172A; border:1px solid #1E293B; border-radius:6px; padding:10px 12px;">
-                <div style="font-size:10.5px; color:#94A3B8; text-transform:uppercase;">Options Implied Forward (F_opt vs GC=F)</div>
-                <div style="font-size:16px; font-weight:800; color:{disloc_color}; font-family:'JetBrains Mono', monospace; margin-top:2px;">
-                    ${f_opt_val:,.2f} <span style="font-size:12px;">({delta_f_val:+.2f}$)</span>
-                </div>
-                <div style="font-size:10.5px; color:{disloc_color}; margin-top:2px; font-weight:700;">{disloc_label}</div>
-            </div>
-            <div style="background:#0F172A; border:1px solid #1E293B; border-radius:6px; padding:10px 12px;">
-                <div style="font-size:10.5px; color:#94A3B8; text-transform:uppercase;">Lee-Ready Signed Options Hedging Pressure</div>
-                <div style="font-size:16px; font-weight:800; color:{hedge_color}; font-family:'JetBrains Mono', monospace; margin-top:2px;">
-                    {dealer_hedge_val:+,.1f} HĐ GC
-                </div>
-                <div style="font-size:10.5px; color:{hedge_color}; margin-top:2px; font-weight:700;">{opt_flow_label}</div>
-            </div>
-            <div style="background:#0F172A; border:1px solid #1E293B; border-radius:6px; padding:10px 12px;">
-                <div style="font-size:10.5px; color:#94A3B8; text-transform:uppercase;">BVC Cumulative Volume Delta &amp; Kyle's λ</div>
-                <div style="font-size:16px; font-weight:800; color:{cvd_color}; font-family:'JetBrains Mono', monospace; margin-top:2px;">
-                    CVD: {bvc_cvd_val:+,.0f} HĐ <span style="font-size:12px; color:#94A3B8;">(Buy: {bvc_buy_pct:.1f}%)</span>
-                </div>
-                <div style="font-size:10.5px; color:#38BDF8; margin-top:2px; font-weight:700;">{kyle_label}</div>
-            </div>
-        </div>
         {whale_html_bar}
         <div style="overflow-x:auto; margin-top:10px; margin-bottom:12px;">
             <table>
@@ -2238,8 +2329,8 @@ def generate_html_terminal(
     </div>
 
     <!-- KHỐI 6: BẢNG CHIẾN LƯỢC TÁC CHIẾN RÚT GỌN (100% PURE CME FUTURES) -->
-    <div class="table-box">
-        <div class="section-header">BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - 100% PURE CME FUTURES)</div>
+    <details class="table-box">
+        <summary class="section-header" style="cursor:pointer; list-style:none;">BẢNG TÁC CHIẾN LƯỚT SÓNG TRONG NGÀY (INTRADAY SCALPING - 100% PURE CME FUTURES) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span></summary>
         <table>
             <thead>
                 <tr>
@@ -2254,8 +2345,8 @@ def generate_html_terminal(
             </thead>
             <tbody>
                 <tr>
-                    <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f})</td>
-                    <td>Vượt > {strike_above + buffer_up:.2f}</td>
+                    <td class="tag-buy">1. BUY MUA ĐUỔI (Squeeze {strike_above:.0f}){sq_gate_html}</td>
+                    <td>Vượt &gt; {entry_squeeze - 0.50:.2f}</td>
                     <td>{entry_squeeze:.2f}</td>
                     <td style="color:#F87171;">{sl_squeeze:.2f} (${sl_dist_squeeze:.1f})</td>
                     <td style="color:#4ADE80;">{squeeze_tp:.2f}</td>
@@ -2263,7 +2354,7 @@ def generate_html_terminal(
                     <td>MM vỡ trần Short -> Buộc mua Futures cover đẩy giá phóng lên trạm tiếp theo</td>
                 </tr>
                 <tr>
-                    <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f})</td>
+                    <td class="tag-sell">2. SELL CHẶN TIỀN TUYẾN (Fade {strike_above:.0f}){fd_gate_html}</td>
                     <td>{strike_above - 1.50:.2f} - {strike_above:.2f}</td>
                     <td>{entry_fade:.2f}</td>
                     <td style="color:#F87171;">{sl_fade:.2f} (${sl_dist_fade:.1f})</td>
@@ -2272,7 +2363,7 @@ def generate_html_terminal(
                     <td>Cản Vol cực đại -> MM tung lệnh bán chặn đầu ghìm giá quay lại ATM</td>
                 </tr>
                 <tr>
-                    <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f})</td>
+                    <td class="tag-buy">3. BUY BẮT SÀN ATM (Rebound {strike_below:.0f}){rb_gate_html}</td>
                     <td>{strike_below:.2f} - {strike_below + 1.50:.2f}</td>
                     <td>{entry_rebound:.2f}</td>
                     <td style="color:#F87171;">{sl_rebound:.2f} (${sl_dist_rebound:.1f})</td>
@@ -2281,8 +2372,8 @@ def generate_html_terminal(
                     <td>Đệm Put đỡ kỹ thuật -> MM gom mua đẩy giá phục hồi (vào khi có rút chân)</td>
                 </tr>
                 <tr>
-                    <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f})</td>
-                    <td>Thủng < {strike_below - buffer_down:.2f}</td>
+                    <td class="tag-sell">4. SELL THỦNG SÀN & VACUUM RUN (Breakdown {strike_below:.0f}){bd_gate_html}</td>
+                    <td>Thủng &lt; {entry_breakdown + 0.50:.2f}</td>
                     <td>{entry_breakdown:.2f}</td>
                     <td style="color:#F87171;">{sl_breakdown:.2f} (${sl_dist_breakdown:.1f})</td>
                     <td style="color:#4ADE80;">{breakdown_tp:.2f}</td>
@@ -2291,14 +2382,14 @@ def generate_html_terminal(
                 </tr>
             </tbody>
         </table>
-    </div>
+    </details>
 
     <!-- KHỐI 7: TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (QUICK GLOSSARY - 1 DÒNG DỄ HIỂU, KHÔNG ICON) -->
-    <div class="table-box">
-        <div class="section-header">
-            <div>TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (GIẢI THÍCH 1 DÒNG ĐƠN GIẢN)</div>
+    <details class="table-box">
+        <summary class="section-header" style="cursor:pointer; list-style:none;">
+            <div>TỪ ĐIỂN THUẬT NGỮ BỎ TÚI (GIẢI THÍCH 1 DÒNG ĐƠN GIẢN) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span></div>
             <div style="font-size:11.5px; font-weight:400; color:#94A3B8;">Ngôn từ dễ hiểu, không rườm rà, hỗ trợ ra quyết định nhanh</div>
-        </div>
+        </summary>
         <div class="glossary-grid">
             <div class="glossary-item">
                 <div class="glossary-term">Net GEX (Gamma Exposure)</div>
@@ -2345,7 +2436,7 @@ def generate_html_terminal(
                 <div>Điểm cắt lỗ tuyệt đối và chốt lời tối ưu được tính toán chính xác dựa theo độ dày của các bức tường nhà cái.</div>
             </div>
         </div>
-    </div>
+    </details>
 
     <div class="footer">
         NEIRO-QUANT HEDGE FUND QUANTITATIVE SYSTEM &bull; 100% PURE CME GOLD FUTURES &bull; ZERO TOUCH CLOUD AUTOMATION
@@ -2393,6 +2484,12 @@ def sync_latest_cloud_options_csv(csv_path: str = "data/options_prices_GCZ26.csv
     p = Path(csv_path)
     if p.name != "options_prices_GCZ26.csv":
         return False
+    sync_key = (str(p.resolve()), float(max_age_hours))
+    now_mono = time.monotonic()
+    last_check = _CLOUD_CSV_SYNC_TS.get(sync_key)
+    if last_check is not None and (now_mono - last_check) < _CLOUD_CSV_SYNC_COOLDOWN_S:
+        return False
+    _CLOUD_CSV_SYNC_TS[sync_key] = now_mono
     try:
         if p.exists():
             age_h = (time.time() - p.stat().st_mtime) / 3600.0
@@ -2413,23 +2510,65 @@ def sync_latest_cloud_options_csv(csv_path: str = "data/options_prices_GCZ26.csv
     return False
 
 
+def _write_live_json_artifacts(version_data: dict[str, Any]) -> list[str]:
+    """Writes version.json and tactical_levels.json mirrors cleanly."""
+    version_json_str = json.dumps(version_data, indent=2)
+    written: list[str] = []
+    for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:
+        jp = Path(json_out)
+        jp.parent.mkdir(parents=True, exist_ok=True)
+        jp.write_text(version_json_str, encoding="utf-8")
+        written.append(str(jp))
+    return written
+
+
+def _run_lightweight_live_tick() -> list[str]:
+    """Lightweight JSON-only live update (< 250ms) when static options chain CSV is unchanged."""
+    base_path = Path("exports/version.json")
+    if not base_path.exists():
+        base_path = Path("version.json")
+    if not base_path.exists():
+        return []
+
+    version_data = json.loads(base_path.read_text(encoding="utf-8"))
+    tape = fetch_live_cme_m5_tape(limit=8, include_htf=False)
+    live_p = float(tape.get("latest_price", 0.0)) if isinstance(tape, dict) else 0.0
+    if live_p <= 500.0:
+        lp = basis_engine.fetch_live_cme_futures_price()
+        if lp is not None and lp > 500.0:
+            live_p = float(lp)
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_vn = now_utc.astimezone(datetime.timezone(datetime.timedelta(hours=7)))
+    version_data["timestamp_utc"] = now_utc.isoformat()
+    version_data["synced_at_vn"] = now_vn.strftime("%d/%m/%Y %H:%M:%S VN")
+    if live_p > 500.0:
+        version_data["spot_price"] = round(live_p, 2)
+    if isinstance(tape, dict) and tape.get("available"):
+        version_data["market_open"] = bool(tape.get("market_open", True))
+        if tape.get("chart_candles"):
+            version_data["recent_candles"] = (tape.get("chart_candles") or [])[-60:]
+    return _write_live_json_artifacts(version_data)
+
+
 def run_pipeline(
     input_csv: str = "data/options_prices_GCZ26.csv",
-    output_files: list[str] | None = None,
+    output_files: list[str] | str | Path | None = None,
     basis: float | None = None,
-    no_mt5: bool | None = None,
+    no_mt5: bool = True,
 ) -> list[str]:
     if output_files is None:
         output_files = [
             "exports/latest_gold_dashboard.html",
             "exports/index.html",
         ]
+    elif isinstance(output_files, (str, Path)):
+        output_files = [str(output_files)]
 
     sync_latest_cloud_options_csv(input_csv, max_age_hours=2.0)
     df_raw, meta = load_and_preprocess_options(input_csv, basis=basis, no_mt5=no_mt5)
-    fig = build_plotly_figure(df_raw, meta)
     fig_smile = build_volatility_smile_figure(df_raw, meta)
-    html_content = generate_html_terminal(df_raw, meta, fig, fig_smile=fig_smile)
+    html_content = generate_html_terminal(df_raw, meta, None, fig_smile=fig_smile)
 
     saved_paths = []
     for out_str in output_files:
@@ -2469,12 +2608,7 @@ def run_pipeline(
         "market_open": bool((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("market_open", True)),
         "recent_candles": ((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("chart_candles") or [])[-60:],
     }
-    version_json_str = json.dumps(version_data, indent=2)
-    for json_out in ["exports/version.json", "version.json", "exports/tactical_levels.json", "tactical_levels.json"]:
-        jp = Path(json_out)
-        jp.parent.mkdir(parents=True, exist_ok=True)
-        jp.write_text(version_json_str, encoding="utf-8")
-        saved_paths.append(str(jp))
+    saved_paths.extend(_write_live_json_artifacts(version_data))
 
     # Optional mirror to Google Drive Desktop if available locally
     drive_target = Path("H:/My Drive/Neiro-Quant/latest_gold_dashboard.html")
@@ -2486,7 +2620,7 @@ def run_pipeline(
             pass
 
     # Zero-Waste Memory Cleanup: Giai phong doi tuong lon khoi RAM
-    del df_raw, meta, fig, fig_smile, html_content
+    del df_raw, meta, fig_smile, html_content
     gc.collect()
 
     return saved_paths
@@ -2529,6 +2663,8 @@ def get_process_memory_mb() -> float:
 def clear_workspace_cache() -> int:
     """Clear memory, Python garbage, and temporary cache files."""
     basis_engine.clear_spot_cache()
+    _STATIC_CHAIN_CACHE.clear()
+    _CLOUD_CSV_SYNC_TS.clear()
     gc.collect()
     repo_root = Path(__file__).resolve().parent.parent.parent
     removed = 0
@@ -2546,10 +2682,14 @@ def clear_workspace_cache() -> int:
 
 
 def start_local_live_bridge_server(port: int = 8765) -> None:
-    """Starts a zero-waste background HTTP JSON bridge with CORS for local file:// and live Yahoo GC=F polling."""
+    """Starts a zero-waste multithreaded HTTP JSON bridge with RAM caching and CORS."""
     import threading
-    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from urllib.parse import parse_qs, urlparse
+
+    _bridge_cache_lock = threading.Lock()
+    _bridge_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+    _bridge_cache_ttl_s = 1.8
 
     class _YahooBridgeHandler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -2582,26 +2722,37 @@ def start_local_live_bridge_server(port: int = 8765) -> None:
             if parsed.path == "/api/yahoo_gc":
                 qs = parse_qs(parsed.query)
                 tf = (qs.get("tf", ["1m"])[0] or "1m").lower()
+                now_mono = time.monotonic()
+                with _bridge_cache_lock:
+                    cached = _bridge_cache.get(tf)
+                    if cached and (now_mono - cached[0]) < _bridge_cache_ttl_s:
+                        self._send_json(cached[1])
+                        return
+
                 tape = fetch_live_cme_m5_tape(limit=8, include_htf=(tf != "1m"))
                 candles = (
                     tape.get("chart_candles", [])
                     if tf == "1m"
                     else (tape.get("tf_candles") or {}).get(tf, tape.get("chart_candles", []))
                 )
-                self._send_json({
+                payload = {
                     "available": bool(tape.get("available", False)),
                     "market_open": bool(tape.get("market_open", True)),
                     "latest_price": float(tape.get("latest_price", 0.0)),
                     "tf": tf,
                     "candles": candles[-180:],
-                })
+                }
+                with _bridge_cache_lock:
+                    _bridge_cache[tf] = (time.monotonic(), payload)
+                self._send_json(payload)
                 return
 
             self._send_json({"status": "ok", "service": "neiro-yahoo-gc-bridge"})
 
     def _serve():
         try:
-            server = HTTPServer(("127.0.0.1", port), _YahooBridgeHandler)
+            server = ThreadingHTTPServer(("127.0.0.1", port), _YahooBridgeHandler)
+            server.daemon_threads = True
             server.serve_forever()
         except Exception:
             pass
@@ -2638,24 +2789,40 @@ def main():
         print(f"[LIVE RUNNER] Started local Yahoo GC=F CORS bridge at http://127.0.0.1:8765/api/yahoo_gc")
         print(f"[LIVE RUNNER] Starting continuous dashboard update loop (Interval: {args.loop}s)... Press Ctrl+C to stop.")
         iteration = 0
+        last_csv_sig: tuple[Any, ...] | None = None
+        last_full_html_mono = 0.0
         while True:
             iteration += 1
             now_vn = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%H:%M:%S")
             try:
-                saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
-                
-                # Zero-Waste Memory Cleanup: Thu hoi ram, don sach cache sau moi chu ky
+                cur_csv_sig = _build_csv_cache_signature(Path(args.input))
+                need_full_rebuild = (
+                    iteration == 1
+                    or cur_csv_sig != last_csv_sig
+                    or (time.monotonic() - last_full_html_mono) >= 300.0
+                )
+                if need_full_rebuild:
+                    saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
+                    last_csv_sig = cur_csv_sig
+                    last_full_html_mono = time.monotonic()
+                    mode_tag = "Full Rebuild"
+                else:
+                    saved = _run_lightweight_live_tick()
+                    mode_tag = "Live JSON Tick"
+
+                # Clear ephemeral quote caches for fresh next cycle without discarding unchanged static CSV
                 basis_engine.clear_spot_cache()
                 gc.collect()
 
                 if iteration % 20 == 0:
                     removed_count = clear_workspace_cache()
+                    last_csv_sig = None
                     if removed_count > 0:
                         print(f"[{now_vn}] [Zero-Waste] Cleaned {removed_count} temporary cache files.")
 
                 ram_mb = get_process_memory_mb()
                 ram_str = f" | RAM: {ram_mb:.1f} MB" if ram_mb > 0 else ""
-                print(f"[{now_vn}] Iteration #{iteration}{ram_str}: Updated {len(saved)} files. Sleeping {args.loop}s...")
+                print(f"[{now_vn}] Iteration #{iteration} ({mode_tag}){ram_str}: Updated {len(saved)} files. Sleeping {args.loop}s...")
             except Exception as e:
                 print(f"[{now_vn}] Warning during iteration #{iteration}: {e}. Retrying in {args.loop}s...")
                 gc.collect()

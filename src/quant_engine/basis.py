@@ -14,6 +14,9 @@ All conversion functions and callers MUST adhere to this signed convention.
 """
 from __future__ import annotations
 
+import concurrent.futures
+import copy
+import gzip
 import json
 import logging
 import math
@@ -75,16 +78,22 @@ _cached_quote: Optional[SpotQuote] = None
 _last_fetch_mono: float = 0.0
 _cached_futures: Optional[float] = None
 _last_fetch_futures_mono: float = 0.0
+_HTF_TAPE_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+_HTF_CACHE_TTL_S: Final[float] = 60.0
+_M5_TAPE_CACHE: dict[tuple[int, bool], tuple[float, dict[str, Any]]] = {}
+_M5_CACHE_TTL_S: Final[float] = 3.0
 
 
 def clear_spot_cache() -> None:
-    """Clears in-memory quote and futures cache (useful for testing and manual resets)."""
+    """Clears in-memory quote, futures, and HTF tape cache (useful for testing)."""
     global _cached_quote, _last_fetch_mono, _cached_futures, _last_fetch_futures_mono
     with _cache_lock:
         _cached_quote = None
         _last_fetch_mono = 0.0
         _cached_futures = None
         _last_fetch_futures_mono = 0.0
+        _HTF_TAPE_CACHE.clear()
+        _M5_TAPE_CACHE.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +183,25 @@ def fetch_live_spot_gold_price(
     return None
 
 
+def _read_yahoo_json(url: str, timeout: float = 4.0) -> Optional[dict[str, Any]]:
+    """Fetches JSON payload from Yahoo Finance with gzip compression for low cold-run latency."""
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        if resp.status == 200:
+            raw_bytes = resp.read()
+            if raw_bytes[:2] == b"\x1f\x8b":
+                raw_bytes = gzip.decompress(raw_bytes)
+            return json.loads(raw_bytes.decode("utf-8"))
+    return None
+
+
 def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
     """Fetches real-time CME Gold Futures price (GC=F) directly from COMEX endpoints.
 
@@ -194,26 +222,18 @@ def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
     ]
     for url in chart_urls:
         try:
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
-                    "Accept": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    result = data.get("chart", {}).get("result", [])
-                    if result:
-                        meta = result[0].get("meta", {})
-                        price = meta.get("regularMarketPrice")
-                        if price is not None and float(price) > 500.0:
-                            p = round(float(price), 2)
-                            with _cache_lock:
-                                _cached_futures = p
-                                _last_fetch_futures_mono = time.monotonic()
-                            return p
+            data = _read_yahoo_json(url, timeout=timeout)
+            if data:
+                result = data.get("chart", {}).get("result", [])
+                if result:
+                    meta = result[0].get("meta", {})
+                    price = meta.get("regularMarketPrice")
+                    if price is not None and float(price) > 500.0:
+                        p = round(float(price), 2)
+                        with _cache_lock:
+                            _cached_futures = p
+                            _last_fetch_futures_mono = time.monotonic()
+                        return p
         except Exception as e:
             logger.debug("Direct HTTP fetch from %s failed: %s", url, e)
 
@@ -305,18 +325,10 @@ def _fetch_yahoo_tf_bars(
     ]
     for url in urls:
         try:
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
-                    "Accept": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    result = data.get("chart", {}).get("result", [])
-                    if result:
+            data = _read_yahoo_json(url, timeout=timeout)
+            if data:
+                result = data.get("chart", {}).get("result", [])
+                if result:
                         res0 = result[0]
                         meta = res0.get("meta", {})
                         timestamps = res0.get("timestamp", [])
@@ -381,157 +393,219 @@ def fetch_live_cme_m5_tape(
             'avg_m5_volume': float
             'latest_price': float
     """
+    global _cached_futures, _last_fetch_futures_mono
+
+    now_mono = time.monotonic()
+    tape_key = (int(limit), bool(include_htf))
+    with _cache_lock:
+        cached_tape = _M5_TAPE_CACHE.get(tape_key)
+        if cached_tape and (now_mono - cached_tape[0]) < _M5_CACHE_TTL_S:
+            return copy.deepcopy(cached_tape[1])
+
+    cached_1h: Optional[list[dict[str, Any]]] = None
+    cached_1d: Optional[list[dict[str, Any]]] = None
+    if include_htf:
+        with _cache_lock:
+            e1h = _HTF_TAPE_CACHE.get("1h")
+            if e1h and (now_mono - e1h[0]) < _HTF_CACHE_TTL_S:
+                cached_1h = [dict(b) for b in e1h[1]]
+            e1d = _HTF_TAPE_CACHE.get("1d")
+            if e1d and (now_mono - e1d[0]) < _HTF_CACHE_TTL_S:
+                cached_1d = [dict(b) for b in e1d[1]]
+
+    pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
+    h1_fut: Optional[concurrent.futures.Future] = None
+    d1_fut: Optional[concurrent.futures.Future] = None
+    if include_htf and (cached_1h is None or cached_1d is None):
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        if cached_1h is None:
+            h1_fut = pool.submit(_fetch_yahoo_tf_bars, "60m", "1mo", timeout, 160)
+        if cached_1d is None:
+            d1_fut = pool.submit(_fetch_yahoo_tf_bars, "1d", "6mo", timeout, 120)
+
     chart_urls = [
         "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=5d",
         "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=5d",
         "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d",
         "https://query2.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d",
     ]
-    for url in chart_urls:
-        try:
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Neiro-Quant/2.0",
-                    "Accept": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode("utf-8"))
+    try:
+        for url in chart_urls:
+            try:
+                data = _read_yahoo_json(url, timeout=timeout)
+                if data:
                     result = data.get("chart", {}).get("result", [])
                     if result:
-                        res0 = result[0]
-                        meta = res0.get("meta", {})
-                        timestamps = res0.get("timestamp", [])
-                        quote = res0.get("indicators", {}).get("quote", [{}])[0]
-                        opens = quote.get("open", [])
-                        highs = quote.get("high", [])
-                        lows = quote.get("low", [])
-                        closes = quote.get("close", [])
-                        volumes = quote.get("volume", [])
+                            res0 = result[0]
+                            meta = res0.get("meta", {})
+                            timestamps = res0.get("timestamp", [])
+                            quote = res0.get("indicators", {}).get("quote", [{}])[0]
+                            opens = quote.get("open", [])
+                            highs = quote.get("high", [])
+                            lows = quote.get("low", [])
+                            closes = quote.get("close", [])
+                            volumes = quote.get("volume", [])
 
-                        raw_candles = []
-                        for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
-                            if None in (t, o, h, l, c) or o <= 0:
-                                continue
-                            raw_candles.append({
-                                "t": int(t),
-                                "open": round(float(o), 2),
-                                "high": round(float(h), 2),
-                                "low": round(float(l), 2),
-                                "close": round(float(c), 2),
-                                "volume": int(v) if v is not None else 0,
-                            })
-
-                        # Discard Yahoo Finance trailing live tick snapshot (0 volume and zero spread)
-                        if len(raw_candles) > 1 and raw_candles[-1]["volume"] <= 0 and (raw_candles[-1]["high"] - raw_candles[-1]["low"]) < 0.05:
-                            raw_candles.pop()
-
-                        # Ensure strictly ascending unique timestamps for Lightweight Charts
-                        deduped = []
-                        seen_ts = set()
-                        for rc in raw_candles:
-                            if rc["t"] not in seen_ts:
-                                seen_ts.add(rc["t"])
-                                deduped.append(rc)
-                        raw_candles = deduped
-
-                        if raw_candles:
-                            last_p = round(float(meta.get("regularMarketPrice") or raw_candles[-1]["close"]), 2)
-                            # Align final candle close to live Yahoo regularMarketPrice to prevent spot/candle desync
-                            if last_p > 500.0 and abs(last_p - raw_candles[-1]["close"]) <= 25.0:
-                                raw_candles[-1]["close"] = last_p
-                                raw_candles[-1]["high"] = round(max(raw_candles[-1]["high"], last_p), 2)
-                                raw_candles[-1]["low"] = round(min(raw_candles[-1]["low"], last_p), 2)
-
-                            valid_vols = [rc["volume"] for rc in raw_candles if rc["volume"] > 0]
-                            window = valid_vols[-20:] if len(valid_vols) >= 5 else valid_vols
-                            avg_vol = float(sum(window) / len(window)) if window else 200.0
-
-                            selected = raw_candles[-limit:]
-                            processed = []
-                            for sc in selected:
-                                dt_vn = datetime.fromtimestamp(sc["t"], timezone.utc).astimezone(timezone(timedelta(hours=7)))
-                                time_str = dt_vn.strftime("%H:%M")
-                                vol = sc["volume"]
-                                ratio = round(vol / avg_vol, 2) if avg_vol > 0 else 1.0
-                                is_spike = ratio >= 1.4 and vol >= 350
-                                spread = max(0.1, sc["high"] - sc["low"])
-                                lower_wick = min(sc["open"], sc["close"]) - sc["low"]
-                                upper_wick = sc["high"] - max(sc["open"], sc["close"])
-                                is_bull_rebound = (sc["close"] > sc["open"]) and ((sc["close"] - sc["low"]) >= spread * 0.60)
-                                is_bear_rejection = (sc["close"] < sc["open"]) and ((sc["high"] - sc["close"]) >= spread * 0.60)
-                                is_pinbar_bull = lower_wick >= spread * 0.38
-                                is_pinbar_bear = upper_wick >= spread * 0.38
-                                is_churn = lower_wick >= spread * 0.30 and upper_wick >= spread * 0.30
-
-                                if is_spike and is_churn:
-                                    note = "[ĐỘT BIẾN GIẰNG CO]"
-                                    signal_class = "spike-neutral"
-                                elif is_spike and (is_bull_rebound or is_pinbar_bull):
-                                    note = "[HẤP THỤ ĐÁY RÚT CHÂN]"
-                                    signal_class = "spike-absorption"
-                                elif is_spike and (is_bear_rejection or is_pinbar_bear):
-                                    note = "[CHẶN BÁN ĐÈ ĐỈNH]"
-                                    signal_class = "spike-rejection"
-                                elif is_spike:
-                                    note = "[ĐỘT BIẾN KHỐI LƯỢNG]"
-                                    signal_class = "spike-neutral"
-                                elif ratio <= 0.6:
-                                    note = "[THANH KHOẢN CẠN KIỆT]"
-                                    signal_class = "low-vol"
-                                else:
-                                    note = "[BÌNH THƯỜNG]"
-                                    signal_class = "normal"
-
-                                processed.append({
-                                    "time_vn": time_str,
-                                    "open": sc["open"],
-                                    "high": sc["high"],
-                                    "low": sc["low"],
-                                    "close": sc["close"],
-                                    "volume": vol,
-                                    "ratio": ratio,
-                                    "is_spike": is_spike,
-                                    "note": note,
-                                    "signal_class": signal_class,
+                            raw_candles = []
+                            for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
+                                if None in (t, o, h, l, c) or o <= 0:
+                                    continue
+                                raw_candles.append({
+                                    "t": int(t),
+                                    "open": round(float(o), 2),
+                                    "high": round(float(h), 2),
+                                    "low": round(float(l), 2),
+                                    "close": round(float(c), 2),
+                                    "volume": int(v) if v is not None else 0,
                                 })
 
-                            day_high = float(meta.get("regularMarketDayHigh") or max(rc["high"] for rc in raw_candles))
-                            day_low = float(meta.get("regularMarketDayLow") or min(rc["low"] for rc in raw_candles))
+                            # Discard Yahoo Finance trailing live tick snapshot (0 volume and zero spread)
+                            if len(raw_candles) > 1 and raw_candles[-1]["volume"] <= 0 and (raw_candles[-1]["high"] - raw_candles[-1]["low"]) < 0.05:
+                                raw_candles.pop()
 
-                            chart_candles = _resample_ohlcv(raw_candles, 60, max_bars=360)
-                            tf_candles: dict[str, list[dict[str, Any]]] = {
-                                "1m": chart_candles,
-                                "5m": _resample_ohlcv(raw_candles, 300, max_bars=200),
-                                "15m": _resample_ohlcv(raw_candles, 900, max_bars=150),
-                                "1h": _resample_ohlcv(raw_candles, 3600, max_bars=120),
-                                "1d": _resample_ohlcv(raw_candles, 86400, max_bars=90),
-                            }
-                            if include_htf:
-                                h1_bars = _fetch_yahoo_tf_bars("60m", "1mo", timeout=timeout, max_bars=160)
-                                if h1_bars:
-                                    tf_candles["1h"] = h1_bars
-                                d1_bars = _fetch_yahoo_tf_bars("1d", "6mo", timeout=timeout, max_bars=120)
-                                if d1_bars:
-                                    tf_candles["1d"] = d1_bars
+                            # Ensure strictly ascending unique timestamps for Lightweight Charts
+                            deduped = []
+                            seen_ts = set()
+                            for rc in raw_candles:
+                                if rc["t"] not in seen_ts:
+                                    seen_ts.add(rc["t"])
+                                    deduped.append(rc)
+                            raw_candles = deduped
 
-                            return {
-                                "available": True,
-                                "timeframe_label": ("M1" if "interval=1m" in url else "M5"),
-                                "candles": processed,
-                                "chart_candles": chart_candles,
-                                "tf_candles": tf_candles,
-                                "market_open": is_cme_globex_market_open(),
-                                "day_high": round(day_high, 2),
-                                "day_low": round(day_low, 2),
-                                "day_range": round(day_high - day_low, 2),
-                                "avg_m5_volume": round(avg_vol, 1),
-                                "latest_price": round(last_p, 2),
-                            }
-        except Exception as e:
-            logger.debug("Live M5 tape fetch from %s failed: %s", url, e)
+                            if raw_candles:
+                                last_p = round(float(meta.get("regularMarketPrice") or raw_candles[-1]["close"]), 2)
+                                # Align final candle close to live Yahoo regularMarketPrice to prevent spot/candle desync
+                                if last_p > 500.0 and abs(last_p - raw_candles[-1]["close"]) <= 25.0:
+                                    raw_candles[-1]["close"] = last_p
+                                    raw_candles[-1]["high"] = round(max(raw_candles[-1]["high"], last_p), 2)
+                                    raw_candles[-1]["low"] = round(min(raw_candles[-1]["low"], last_p), 2)
+                                if last_p > 500.0:
+                                    with _cache_lock:
+                                        _cached_futures = last_p
+                                        _last_fetch_futures_mono = time.monotonic()
+
+                                valid_vols = [rc["volume"] for rc in raw_candles if rc["volume"] > 0]
+                                window = valid_vols[-20:] if len(valid_vols) >= 5 else valid_vols
+                                avg_vol = float(sum(window) / len(window)) if window else 200.0
+
+                                selected = raw_candles[-limit:]
+                                processed = []
+                                for sc in selected:
+                                    dt_vn = datetime.fromtimestamp(sc["t"], timezone.utc).astimezone(timezone(timedelta(hours=7)))
+                                    time_str = dt_vn.strftime("%H:%M")
+                                    vol = sc["volume"]
+                                    ratio = round(vol / avg_vol, 2) if avg_vol > 0 else 1.0
+                                    is_spike = ratio >= 1.4 and vol >= 350
+                                    spread = max(0.1, sc["high"] - sc["low"])
+                                    lower_wick = min(sc["open"], sc["close"]) - sc["low"]
+                                    upper_wick = sc["high"] - max(sc["open"], sc["close"])
+                                    is_bull_rebound = (sc["close"] > sc["open"]) and ((sc["close"] - sc["low"]) >= spread * 0.60)
+                                    is_bear_rejection = (sc["close"] < sc["open"]) and ((sc["high"] - sc["close"]) >= spread * 0.60)
+                                    is_pinbar_bull = lower_wick >= spread * 0.38
+                                    is_pinbar_bear = upper_wick >= spread * 0.38
+                                    is_churn = lower_wick >= spread * 0.30 and upper_wick >= spread * 0.30
+
+                                    if is_spike and is_churn:
+                                        note = "[ĐỘT BIẾN GIẰNG CO]"
+                                        signal_class = "spike-neutral"
+                                    elif is_spike and (is_bull_rebound or is_pinbar_bull):
+                                        note = "[HẤP THỤ ĐÁY RÚT CHÂN]"
+                                        signal_class = "spike-absorption"
+                                    elif is_spike and (is_bear_rejection or is_pinbar_bear):
+                                        note = "[CHẶN BÁN ĐÈ ĐỈNH]"
+                                        signal_class = "spike-rejection"
+                                    elif is_spike:
+                                        note = "[ĐỘT BIẾN KHỐI LƯỢNG]"
+                                        signal_class = "spike-neutral"
+                                    elif ratio <= 0.6:
+                                        note = "[THANH KHOẢN CẠN KIỆT]"
+                                        signal_class = "low-vol"
+                                    else:
+                                        note = "[BÌNH THƯỜNG]"
+                                        signal_class = "normal"
+
+                                    processed.append({
+                                        "time_vn": time_str,
+                                        "open": sc["open"],
+                                        "high": sc["high"],
+                                        "low": sc["low"],
+                                        "close": sc["close"],
+                                        "volume": vol,
+                                        "ratio": ratio,
+                                        "is_spike": is_spike,
+                                        "note": note,
+                                        "signal_class": signal_class,
+                                    })
+
+                                day_high = float(meta.get("regularMarketDayHigh") or max(rc["high"] for rc in raw_candles))
+                                day_low = float(meta.get("regularMarketDayLow") or min(rc["low"] for rc in raw_candles))
+
+                                chart_candles = _resample_ohlcv(raw_candles, 60, max_bars=360)
+                                tf_candles: dict[str, list[dict[str, Any]]] = {
+                                    "1m": chart_candles,
+                                    "5m": _resample_ohlcv(raw_candles, 300, max_bars=200),
+                                    "15m": _resample_ohlcv(raw_candles, 900, max_bars=150),
+                                    "1h": _resample_ohlcv(raw_candles, 3600, max_bars=120),
+                                    "1d": _resample_ohlcv(raw_candles, 86400, max_bars=90),
+                                }
+                                if include_htf:
+                                    h1_bars = cached_1h
+                                    if h1_bars is None and h1_fut is not None:
+                                        try:
+                                            h1_bars = h1_fut.result(timeout=max(1.0, timeout + 0.5))
+                                            if h1_bars:
+                                                with _cache_lock:
+                                                    _HTF_TAPE_CACHE["1h"] = (time.monotonic(), [dict(b) for b in h1_bars])
+                                        except Exception:
+                                            h1_bars = []
+                                    if h1_bars:
+                                        if last_p > 500.0 and abs(last_p - h1_bars[-1]["close"]) <= 25.0:
+                                            h1_bars[-1]["close"] = last_p
+                                            h1_bars[-1]["high"] = round(max(h1_bars[-1]["high"], last_p), 2)
+                                            h1_bars[-1]["low"] = round(min(h1_bars[-1]["low"], last_p), 2)
+                                        tf_candles["1h"] = h1_bars
+
+                                    d1_bars = cached_1d
+                                    if d1_bars is None and d1_fut is not None:
+                                        try:
+                                            d1_bars = d1_fut.result(timeout=max(1.0, timeout + 0.5))
+                                            if d1_bars:
+                                                with _cache_lock:
+                                                    _HTF_TAPE_CACHE["1d"] = (time.monotonic(), [dict(b) for b in d1_bars])
+                                        except Exception:
+                                            d1_bars = []
+                                    if d1_bars:
+                                        if last_p > 500.0 and abs(last_p - d1_bars[-1]["close"]) <= 25.0:
+                                            d1_bars[-1]["close"] = last_p
+                                            d1_bars[-1]["high"] = round(max(d1_bars[-1]["high"], last_p), 2)
+                                            d1_bars[-1]["low"] = round(min(d1_bars[-1]["low"], last_p), 2)
+                                        tf_candles["1d"] = d1_bars
+
+                                result_tape = {
+                                    "available": True,
+                                    "timeframe_label": ("M1" if "interval=1m" in url else "M5"),
+                                    "candles": processed,
+                                    "chart_candles": chart_candles,
+                                    "tf_candles": tf_candles,
+                                    "market_open": is_cme_globex_market_open(),
+                                    "day_high": round(day_high, 2),
+                                    "day_low": round(day_low, 2),
+                                    "day_range": round(day_high - day_low, 2),
+                                    "avg_m5_volume": round(avg_vol, 1),
+                                    "latest_price": round(last_p, 2),
+                                }
+                                with _cache_lock:
+                                    _M5_TAPE_CACHE[tape_key] = (time.monotonic(), copy.deepcopy(result_tape))
+                                return result_tape
+            except Exception as e:
+                logger.debug("Live M5 tape fetch from %s failed: %s", url, e)
+    finally:
+        if h1_fut is not None and not h1_fut.done():
+            h1_fut.cancel()
+        if d1_fut is not None and not d1_fut.done():
+            d1_fut.cancel()
+        if pool is not None:
+            pool.shutdown(wait=False)
 
     return {
         "available": False,
@@ -605,7 +679,7 @@ def resolve_dynamic_basis_with_source(
     # Guard 2: Fetch Live Quote
     quote = fetch_live_spot_gold_price()
     if quote is None or quote.price <= 0:
-        logger.warning(
+        logger.debug(
             "Live spot quote unavailable. Falling back to calibrated contango basis: %s",
             fallback_basis,
         )

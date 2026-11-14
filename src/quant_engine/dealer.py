@@ -5,6 +5,8 @@ import numpy as np
 from .models import OptionsSnapshot, Wall
 from .institutional import resolve_cme_session_liquidity
 
+_ERF_VEC = np.frompyfunc(math.erf, 1, 1)
+
 
 def _brentq(f, a: float, b: float, xtol: float = 0.01, maxiter: int = 100) -> float:
     """Self-contained Dekker-Brent root finder.
@@ -325,8 +327,15 @@ def find_gamma_weighted_walls(
     total_net_gex = 0.0
 
     if isinstance(data, pd.DataFrame):
-        df = data.copy()
-        spot = spot_price if (spot_price is not None and spot_price > 0) else float(df["strike"].median())
+        if data.empty or "strike" not in data.columns:
+            return [], []
+
+        strikes_raw = data["strike"].to_numpy(dtype=np.float64)
+        valid = strikes_raw > 0
+        if not valid.any():
+            return [], []
+
+        spot = spot_price if (spot_price is not None and spot_price > 0) else float(data["strike"].median())
         t_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
         sigma = max(0.01, float(default_iv))
         denom = sigma * math.sqrt(t_years)
@@ -336,64 +345,65 @@ def find_gamma_weighted_walls(
         scale = (spot ** 2) * 0.01 / 1e6
 
         raw_unphys = (
-            ("callGamma" in df.columns and len(df) > 5 and df["callGamma"].nunique() <= 3)
-            or ("callGamma" in df.columns and bool(((df["strike"] > (spot + 800.0)) & (df["callGamma"] > 0.001)).any()))
+            ("callGamma" in data.columns and len(data) > 5 and data["callGamma"].nunique() <= 3)
+            or ("callGamma" in data.columns and bool(((data["strike"] > (spot + 800.0)) & (data["callGamma"] > 0.001)).any()))
             or (
-                "callGammaPower" in df.columns
-                and "callOpenInterest" in df.columns
+                "callGammaPower" in data.columns
+                and "callOpenInterest" in data.columns
                 and bool(
                     (
-                        (df["strike"] > (spot + 800.0))
-                        & (df["callOpenInterest"] > 0)
-                        & ((df["callGammaPower"] / np.maximum(1, df["callOpenInterest"])) > 0.001)
+                        (data["strike"] > (spot + 800.0))
+                        & (data["callOpenInterest"] > 0)
+                        & ((data["callGammaPower"] / np.maximum(1, data["callOpenInterest"])) > 0.001)
                     ).any()
                 )
             )
         )
 
-        for _, row in df.iterrows():
-            k = float(row.get("strike", 0.0))
-            if k <= 0:
-                continue
-            c_oi = int(row.get("callOpenInterest", 0))
-            p_oi = int(row.get("putOpenInterest", 0))
-            c_vol = int(row.get("callVolume", 0))
-            p_vol = int(row.get("putVolume", 0))
+        strikes = strikes_raw if valid.all() else strikes_raw[valid]
+        n_rows = len(strikes)
 
-            # Gamma resolution: use pre-existing or compute Black-76
-            c_gamma = 0.0 if raw_unphys else float(row.get("callGamma", 0.0))
-            p_gamma = 0.0 if raw_unphys else float(row.get("putGamma", 0.0))
-            if c_gamma <= 0.0 or p_gamma <= 0.0:
-                d1 = (math.log(max(1e-4, spot / k)) + half_sig2_t) / denom
-                pdf = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * (d1 ** 2))
-                b76_gamma = (df_disc * pdf) / max(1e-4, spot * denom)
-                if c_gamma <= 0.0:
-                    c_gamma = b76_gamma
-                if p_gamma <= 0.0:
-                    p_gamma = b76_gamma
+        def _col_arr(name: str, dtype: Any = np.float64) -> np.ndarray:
+            if name not in data.columns:
+                return np.zeros(n_rows, dtype=dtype)
+            arr = data[name].to_numpy(dtype=np.float64)
+            if not valid.all():
+                arr = arr[valid]
+            return arr.astype(dtype, copy=False)
 
-            c_power = (c_oi * c_gamma) if raw_unphys else float(row.get("callGammaPower", c_oi * c_gamma))
-            p_power = (p_oi * p_gamma) if raw_unphys else float(row.get("putGammaPower", p_oi * p_gamma))
+        c_oi_arr = _col_arr("callOpenInterest", np.int64)
+        p_oi_arr = _col_arr("putOpenInterest", np.int64)
+        c_vol_arr = _col_arr("callVolume", np.int64)
+        p_vol_arr = _col_arr("putVolume", np.int64)
 
-            c_gex = (c_gamma * c_oi * mult * scale) if raw_unphys else float(row.get("callGEX", c_gamma * c_oi * mult * scale))
-            p_gex = (-(p_gamma * p_oi * mult * scale)) if raw_unphys else float(row.get("putGEX", - (p_gamma * p_oi * mult * scale)))
-            net_gex = (c_gex + p_gex) if raw_unphys else float(row.get("netGEX", c_gex + p_gex))
-            total_net_gex += net_gex
+        c_gamma_arr = np.zeros(n_rows, dtype=np.float64) if raw_unphys else _col_arr("callGamma")
+        p_gamma_arr = np.zeros(n_rows, dtype=np.float64) if raw_unphys else _col_arr("putGamma")
+        need_b76 = (c_gamma_arr <= 0.0) | (p_gamma_arr <= 0.0)
+        if need_b76.any():
+            d1 = (np.log(np.maximum(1e-4, spot / strikes)) + half_sig2_t) / denom
+            pdf = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1 ** 2))
+            b76_gamma = (df_disc * pdf) / max(1e-4, spot * denom)
+            c_gamma_arr = np.where(c_gamma_arr <= 0.0, b76_gamma, c_gamma_arr)
+            p_gamma_arr = np.where(p_gamma_arr <= 0.0, b76_gamma, p_gamma_arr)
 
-            records.append({
-                "strike": k,
-                "call_oi": c_oi,
-                "put_oi": p_oi,
-                "call_vol": c_vol,
-                "put_vol": p_vol,
-                "call_gamma": c_gamma,
-                "put_gamma": p_gamma,
-                "call_power": c_power,
-                "put_power": p_power,
-                "net_gex": net_gex,
-            })
+        use_raw_c_pow = (not raw_unphys) and ("callGammaPower" in data.columns)
+        use_raw_p_pow = (not raw_unphys) and ("putGammaPower" in data.columns)
+        c_power_arr = _col_arr("callGammaPower") if use_raw_c_pow else (c_oi_arr * c_gamma_arr)
+        p_power_arr = _col_arr("putGammaPower") if use_raw_p_pow else (p_oi_arr * p_gamma_arr)
+
+        use_raw_c_gex = (not raw_unphys) and ("callGEX" in data.columns)
+        use_raw_p_gex = (not raw_unphys) and ("putGEX" in data.columns)
+        c_gex_arr = _col_arr("callGEX") if use_raw_c_gex else (c_gamma_arr * c_oi_arr * mult * scale)
+        p_gex_arr = _col_arr("putGEX") if use_raw_p_gex else (-(p_gamma_arr * p_oi_arr * mult * scale))
+        use_raw_net = (not raw_unphys) and ("netGEX" in data.columns)
+        net_gex_arr = _col_arr("netGEX") if use_raw_net else (c_gex_arr + p_gex_arr)
+        total_net_gex = float(np.sum(net_gex_arr))
     elif isinstance(data, OptionsSnapshot) or hasattr(data, "strikes"):
         snapshot = data
+        valid_strikes = [s for s in snapshot.strikes if s.strike > 0]
+        if not valid_strikes:
+            return [], []
+
         spot = spot_price if (spot_price is not None and spot_price > 0) else 4100.0
         t_years = max(float(dte_days) / 365.0, 1.0 / 365.0)
         sigma = max(0.01, float(default_iv))
@@ -403,92 +413,87 @@ def find_gamma_weighted_walls(
         mult = 100.0
         scale = (spot ** 2) * 0.01 / 1e6
 
-        for s in snapshot.strikes:
-            if s.strike <= 0:
-                continue
-            d1 = (math.log(max(1e-4, spot / s.strike)) + half_sig2_t) / denom
-            pdf = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * (d1 ** 2))
-            gamma = (df_disc * pdf) / max(1e-4, spot * denom)
+        strikes = np.array([float(s.strike) for s in valid_strikes], dtype=np.float64)
+        c_oi_arr = np.array([int(s.call_oi) for s in valid_strikes], dtype=np.int64)
+        p_oi_arr = np.array([int(s.put_oi) for s in valid_strikes], dtype=np.int64)
+        c_vol_arr = np.array([int(s.call_volume) for s in valid_strikes], dtype=np.int64)
+        p_vol_arr = np.array([int(s.put_volume) for s in valid_strikes], dtype=np.int64)
 
-            c_power = s.call_oi * gamma
-            p_power = s.put_oi * gamma
-            c_gex = gamma * s.call_oi * mult * scale
-            p_gex = - (gamma * s.put_oi * mult * scale)
-            net_gex = c_gex + p_gex
-            total_net_gex += net_gex
+        d1 = (np.log(np.maximum(1e-4, spot / strikes)) + half_sig2_t) / denom
+        pdf = (1.0 / math.sqrt(2.0 * math.pi)) * np.exp(-0.5 * (d1 ** 2))
+        gamma_arr = (df_disc * pdf) / max(1e-4, spot * denom)
 
-            records.append({
-                "strike": float(s.strike),
-                "call_oi": int(s.call_oi),
-                "put_oi": int(s.put_oi),
-                "call_vol": int(s.call_volume),
-                "put_vol": int(s.put_volume),
-                "call_gamma": gamma,
-                "put_gamma": gamma,
-                "call_power": c_power,
-                "put_power": p_power,
-                "net_gex": net_gex,
-            })
+        c_power_arr = c_oi_arr * gamma_arr
+        p_power_arr = p_oi_arr * gamma_arr
+        c_gex_arr = gamma_arr * c_oi_arr * mult * scale
+        p_gex_arr = -(gamma_arr * p_oi_arr * mult * scale)
+        net_gex_arr = c_gex_arr + p_gex_arr
+        total_net_gex = float(np.sum(net_gex_arr))
     else:
         return [], []
 
-    if not records:
+    n_valid = len(strikes)
+    if n_valid == 0:
         return [], []
 
     spot_val = spot_price if (spot_price is not None and spot_price > 0) else None
+    all_idx = list(range(n_valid))
     if spot_val is not None:
-        call_cands = [r for r in records if r["strike"] > spot_val and r["call_power"] > 0]
-        if not call_cands:
-            call_cands = [r for r in records if r["strike"] >= spot_val and r["call_power"] > 0]
-        put_cands = [r for r in records if r["strike"] < spot_val and r["put_power"] > 0]
-        if not put_cands:
-            put_cands = [r for r in records if r["strike"] <= spot_val and r["put_power"] > 0]
-        call_sorted = sorted(call_cands or records, key=lambda x: x["call_power"], reverse=True)
-        put_sorted = sorted(put_cands or records, key=lambda x: x["put_power"], reverse=True)
+        c_mask = (strikes > spot_val) & (c_power_arr > 0)
+        if not c_mask.any():
+            c_mask = (strikes >= spot_val) & (c_power_arr > 0)
+        p_mask = (strikes < spot_val) & (p_power_arr > 0)
+        if not p_mask.any():
+            p_mask = (strikes <= spot_val) & (p_power_arr > 0)
+        c_cand_idx = np.flatnonzero(c_mask).tolist() or all_idx
+        p_cand_idx = np.flatnonzero(p_mask).tolist() or all_idx
     else:
-        call_sorted = sorted(records, key=lambda x: x["call_power"], reverse=True)
-        put_sorted = sorted(records, key=lambda x: x["put_power"], reverse=True)
+        c_cand_idx = all_idx
+        p_cand_idx = all_idx
+
+    call_sorted_idx = sorted(c_cand_idx, key=lambda idx: float(c_power_arr[idx]), reverse=True)[:top_n]
+    put_sorted_idx = sorted(p_cand_idx, key=lambda idx: float(p_power_arr[idx]), reverse=True)[:top_n]
 
     call_walls = [
         Wall(
-            strike=rec["strike"],
-            oi=rec["call_oi"],
-            volume=rec["call_vol"],
+            strike=float(strikes[idx]),
+            oi=int(c_oi_arr[idx]),
+            volume=int(c_vol_arr[idx]),
             side="call",
             rank=i + 1,
-            siege_ratio=compute_wall_siege_ratio(rec["call_vol"], rec["call_oi"]),
-            is_under_siege=compute_wall_siege_ratio(rec["call_vol"], rec["call_oi"]) >= 0.8,
-            gamma_power=round(rec["call_power"], 4),
+            siege_ratio=compute_wall_siege_ratio(int(c_vol_arr[idx]), int(c_oi_arr[idx])),
+            is_under_siege=compute_wall_siege_ratio(int(c_vol_arr[idx]), int(c_oi_arr[idx])) >= 0.8,
+            gamma_power=round(float(c_power_arr[idx]), 4),
             regime=classify_wall_regime(
                 side="call",
-                net_gex_at_strike=rec["net_gex"],
-                siege_ratio=compute_wall_siege_ratio(rec["call_vol"], rec["call_oi"]),
+                net_gex_at_strike=float(net_gex_arr[idx]),
+                siege_ratio=compute_wall_siege_ratio(int(c_vol_arr[idx]), int(c_oi_arr[idx])),
                 total_net_gex=total_net_gex,
             ),
-            net_gex=round(rec["net_gex"], 2),
+            net_gex=round(float(net_gex_arr[idx]), 2),
         )
-        for i, rec in enumerate(call_sorted[:top_n])
+        for i, idx in enumerate(call_sorted_idx)
     ]
 
     put_walls = [
         Wall(
-            strike=rec["strike"],
-            oi=rec["put_oi"],
-            volume=rec["put_vol"],
+            strike=float(strikes[idx]),
+            oi=int(p_oi_arr[idx]),
+            volume=int(p_vol_arr[idx]),
             side="put",
             rank=i + 1,
-            siege_ratio=compute_wall_siege_ratio(rec["put_vol"], rec["put_oi"]),
-            is_under_siege=compute_wall_siege_ratio(rec["put_vol"], rec["put_oi"]) >= 0.8,
-            gamma_power=round(rec["put_power"], 4),
+            siege_ratio=compute_wall_siege_ratio(int(p_vol_arr[idx]), int(p_oi_arr[idx])),
+            is_under_siege=compute_wall_siege_ratio(int(p_vol_arr[idx]), int(p_oi_arr[idx])) >= 0.8,
+            gamma_power=round(float(p_power_arr[idx]), 4),
             regime=classify_wall_regime(
                 side="put",
-                net_gex_at_strike=rec["net_gex"],
-                siege_ratio=compute_wall_siege_ratio(rec["put_vol"], rec["put_oi"]),
+                net_gex_at_strike=float(net_gex_arr[idx]),
+                siege_ratio=compute_wall_siege_ratio(int(p_vol_arr[idx]), int(p_oi_arr[idx])),
                 total_net_gex=total_net_gex,
             ),
-            net_gex=round(rec["net_gex"], 2),
+            net_gex=round(float(net_gex_arr[idx]), 2),
         )
-        for i, rec in enumerate(put_sorted[:top_n])
+        for i, idx in enumerate(put_sorted_idx)
     ]
 
     return call_walls, put_walls
@@ -798,23 +803,36 @@ def reconstruct_institutional_orderflow(
     # 1. Put-Call Parity Implied Forward Dislocation (delta_F = F_opt - F_GC)
     near_mask = (df["strike"].astype(float) - spot_price).abs() <= 60.0
     near_df = df[near_mask] if near_mask.any() else df
-    implied_forwards: list[tuple[float, float]] = []
-    for _, row in near_df.iterrows():
-        k = float(row.get("strike", 0.0))
-        c_mid = float(row.get("callMid", 0.0))
-        p_mid = float(row.get("putMid", 0.0))
-        c_bid = float(row.get("callBid", 0.0))
-        p_bid = float(row.get("putBid", 0.0))
-        if k > 0 and c_mid > 0 and p_mid > 0 and (c_bid > 0 or p_bid > 0):
-            f_k = k + exp_rt * (c_mid - p_mid)
-            if abs(f_k - spot_price) <= 80.0:
-                weight = max(1.0, float(row.get("callVolume", 0) + row.get("putVolume", 0) + 10)) / (1.0 + abs(k - spot_price))
-                implied_forwards.append((f_k, weight))
+    n_near = len(near_df)
 
-    if implied_forwards:
-        w_sum = sum(w for _, w in implied_forwards)
-        f_opt = sum(f * w for f, w in implied_forwards) / max(1e-9, w_sum)
-        f_spreads = [f - spot_price for f, _ in implied_forwards]
+    def _near_arr(col: str) -> np.ndarray:
+        return near_df[col].to_numpy(dtype=np.float64) if col in near_df.columns else np.zeros(n_near, dtype=np.float64)
+
+    k_n = _near_arr("strike")
+    c_mid_n = _near_arr("callMid")
+    p_mid_n = _near_arr("putMid")
+    c_bid_n = _near_arr("callBid")
+    p_bid_n = _near_arr("putBid")
+    c_vol_n = _near_arr("callVolume")
+    p_vol_n = _near_arr("putVolume")
+
+    valid_n = (k_n > 0) & (c_mid_n > 0) & (p_mid_n > 0) & ((c_bid_n > 0) | (p_bid_n > 0))
+    if valid_n.any():
+        k_v = k_n[valid_n]
+        f_k = k_v + exp_rt * (c_mid_n[valid_n] - p_mid_n[valid_n])
+        in_rng = np.abs(f_k - spot_price) <= 80.0
+        f_sel = f_k[in_rng]
+    else:
+        f_sel = np.empty(0, dtype=np.float64)
+        k_v = f_sel
+        in_rng = np.empty(0, dtype=bool)
+
+    if len(f_sel) > 0:
+        vol_v = (c_vol_n[valid_n] + p_vol_n[valid_n])[in_rng]
+        w_sel = np.maximum(1.0, vol_v + 10.0) / (1.0 + np.abs(k_v[in_rng] - spot_price))
+        w_sum = float(np.sum(w_sel))
+        f_opt = float(np.sum(f_sel * w_sel)) / max(1e-9, w_sum)
+        f_spreads = f_sel - spot_price
         std_spread = float(np.std(f_spreads)) if len(f_spreads) > 1 else 1.25
         std_spread = max(0.75, std_spread)
     else:
@@ -849,108 +867,125 @@ def reconstruct_institutional_orderflow(
     flow_candidates: list[dict[str, Any]] = []
     per_strike_flow: dict[float, dict[str, Any]] = {}
 
-    for _, row in df.iterrows():
-        k = float(row.get("strike", 0.0))
-        if k <= 0:
-            continue
-        in_band = abs(k - spot_price) <= 400.0
-        c_vol = int(float(row.get("callVolume", 0)))
-        p_vol = int(float(row.get("putVolume", 0)))
-        c_oi = int(float(row.get("callOpenInterest", 0)))
-        p_oi = int(float(row.get("putOpenInterest", 0)))
-        if c_vol <= 0 and p_vol <= 0:
-            continue
+    n_df = len(df)
+    k_all = df["strike"].to_numpy(dtype=np.float64) if "strike" in df.columns else np.zeros(n_df, dtype=np.float64)
+    c_vol_all = df["callVolume"].to_numpy(dtype=np.float64).astype(np.int64) if "callVolume" in df.columns else np.zeros(n_df, dtype=np.int64)
+    p_vol_all = df["putVolume"].to_numpy(dtype=np.float64).astype(np.int64) if "putVolume" in df.columns else np.zeros(n_df, dtype=np.int64)
+    active_mask = (k_all > 0) & ((c_vol_all > 0) | (p_vol_all > 0))
 
-        c_bid = float(row.get("callBid", 0.0))
-        c_ask = float(row.get("callAsk", 0.0))
-        c_last = float(row.get("callLatest", row.get("callMid", 0.0)))
-        c_iv = float(row.get("callIV", atm_c_iv))
-        if c_iv > 2.0:
-            c_iv /= 100.0
-        c_iv = max(0.05, min(1.50, c_iv))
+    if active_mask.any():
+        act_idx = np.flatnonzero(active_mask)
 
-        p_bid = float(row.get("putBid", 0.0))
-        p_ask = float(row.get("putAsk", 0.0))
-        p_last = float(row.get("putLatest", row.get("putMid", 0.0)))
-        p_iv = float(row.get("putIV", atm_p_iv))
-        if p_iv > 2.0:
-            p_iv /= 100.0
-        p_iv = max(0.05, min(1.50, p_iv))
+        def _act_arr(col: str, default: float = 0.0) -> np.ndarray:
+            if col not in df.columns:
+                return np.full(len(act_idx), default, dtype=np.float64)
+            return df[col].to_numpy(dtype=np.float64)[act_idx]
 
-        # Lee-Ready Location-in-Spread [-1, +1] for Call (Zero-BS: require real two-sided Bid/Ask quote)
-        if c_bid > 0 and c_ask > c_bid and c_last > 0:
-            w_c = max(-1.0, min(1.0, (2.0 * c_last - (c_bid + c_ask)) / (c_ask - c_bid)))
-        else:
-            w_c = 0.0
+        k_act = k_all[act_idx]
+        c_vol_act = c_vol_all[act_idx]
+        p_vol_act = p_vol_all[act_idx]
+        c_oi_act = df["callOpenInterest"].to_numpy(dtype=np.float64)[act_idx].astype(np.int64) if "callOpenInterest" in df.columns else np.zeros(len(act_idx), dtype=np.int64)
+        p_oi_act = df["putOpenInterest"].to_numpy(dtype=np.float64)[act_idx].astype(np.int64) if "putOpenInterest" in df.columns else np.zeros(len(act_idx), dtype=np.int64)
 
-        # Lee-Ready Location-in-Spread [-1, +1] for Put (Zero-BS: require real two-sided Bid/Ask quote)
-        if p_bid > 0 and p_ask > p_bid and p_last > 0:
-            w_p = max(-1.0, min(1.0, (2.0 * p_last - (p_bid + p_ask)) / (p_ask - p_bid)))
-        else:
-            w_p = 0.0
+        c_bid = _act_arr("callBid")
+        c_ask = _act_arr("callAsk")
+        c_last = _act_arr("callLatest") if "callLatest" in df.columns else _act_arr("callMid")
+        c_iv = np.where(_act_arr("callIV", atm_c_iv) > 2.0, _act_arr("callIV", atm_c_iv) / 100.0, _act_arr("callIV", atm_c_iv))
+        c_iv = np.clip(c_iv, 0.05, 1.50)
 
-        d1_c = (math.log(spot_price / k) + 0.5 * (c_iv ** 2) * t_years) / max(1e-5, c_iv * sqrt_t)
-        d1_p = (math.log(spot_price / k) + 0.5 * (p_iv ** 2) * t_years) / max(1e-5, p_iv * sqrt_t)
-        delta_c = df_disc * 0.5 * (1.0 + math.erf(d1_c / math.sqrt(2.0)))
-        delta_p = abs(df_disc * (0.5 * (1.0 + math.erf(d1_p / math.sqrt(2.0))) - 1.0))
+        p_bid = _act_arr("putBid")
+        p_ask = _act_arr("putAsk")
+        p_last = _act_arr("putLatest") if "putLatest" in df.columns else _act_arr("putMid")
+        p_iv = np.where(_act_arr("putIV", atm_p_iv) > 2.0, _act_arr("putIV", atm_p_iv) / 100.0, _act_arr("putIV", atm_p_iv))
+        p_iv = np.clip(p_iv, 0.05, 1.50)
 
-        s_c = c_vol * w_c
-        s_p = p_vol * w_p
+        c_spread = np.where(c_ask > c_bid, c_ask - c_bid, 1.0)
+        w_c = np.where(
+            (c_bid > 0) & (c_ask > c_bid) & (c_last > 0),
+            np.clip((2.0 * c_last - (c_bid + c_ask)) / c_spread, -1.0, 1.0),
+            0.0,
+        )
+        p_spread = np.where(p_ask > p_bid, p_ask - p_bid, 1.0)
+        w_p = np.where(
+            (p_bid > 0) & (p_ask > p_bid) & (p_last > 0),
+            np.clip((2.0 * p_last - (p_bid + p_ask)) / p_spread, -1.0, 1.0),
+            0.0,
+        )
+
+        log_sk = np.log(spot_price / k_act)
+        d1_c = (log_sk + 0.5 * (c_iv ** 2) * t_years) / np.maximum(1e-5, c_iv * sqrt_t)
+        d1_p = (log_sk + 0.5 * (p_iv ** 2) * t_years) / np.maximum(1e-5, p_iv * sqrt_t)
+        inv_sqrt2 = 1.0 / math.sqrt(2.0)
+        delta_c = df_disc * 0.5 * (1.0 + _ERF_VEC(d1_c * inv_sqrt2).astype(np.float64))
+        delta_p = np.abs(df_disc * (0.5 * (1.0 + _ERF_VEC(d1_p * inv_sqrt2).astype(np.float64)) - 1.0))
+
+        s_c_arr = c_vol_act * w_c
+        s_p_arr = p_vol_act * w_p
         # Customer buys Call (+s_c) -> Dealer short Call -> Dealer MUST BUY Futures (+s_c * delta_c)
         # Customer buys Put (+s_p)  -> Dealer short Put  -> Dealer MUST SELL Futures (-s_p * delta_p)
-        strike_hedge = (s_c * delta_c) - (s_p * delta_p)
-        if in_band:
-            signed_call_flow += s_c
-            signed_put_flow += s_p
-            dealer_hedge_flow += strike_hedge
+        hedge_arr = (s_c_arr * delta_c) - (s_p_arr * delta_p)
+        in_band_arr = np.abs(k_act - spot_price) <= 400.0
 
-        is_whale_call = c_vol > c_oi and c_vol >= 30
-        is_whale_put = p_vol > p_oi and p_vol >= 30
+        signed_call_flow = float(np.sum(s_c_arr[in_band_arr]))
+        signed_put_flow = float(np.sum(s_p_arr[in_band_arr]))
+        dealer_hedge_flow = float(np.sum(hedge_arr[in_band_arr]))
 
-        # Guaranteed New Intraday Whale Initiation: Volume > Open Interest
-        if in_band and is_whale_call:
-            whale_initiations.append({
+        for (
+            k, c_vol, p_vol, c_oi, p_oi,
+            w_ci, w_pi, s_c, s_p, strike_hedge, in_band
+        ) in zip(
+            k_act.tolist(), c_vol_act.tolist(), p_vol_act.tolist(),
+            c_oi_act.tolist(), p_oi_act.tolist(),
+            w_c.tolist(), w_p.tolist(), s_c_arr.tolist(), s_p_arr.tolist(),
+            hedge_arr.tolist(), in_band_arr.tolist(),
+        ):
+            is_whale_call = c_vol > c_oi and c_vol >= 30
+            is_whale_put = p_vol > p_oi and p_vol >= 30
+
+            # Guaranteed New Intraday Whale Initiation: Volume > Open Interest
+            if in_band and is_whale_call:
+                whale_initiations.append({
+                    "strike": k,
+                    "side": "CALL",
+                    "volume": c_vol,
+                    "oi": c_oi,
+                    "new_contracts_min": c_vol - c_oi,
+                    "siege_ratio": round(c_vol / max(1, c_oi), 2),
+                    "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_ci >= 0 else "SELL_TO_OPEN (HIT BID)",
+                })
+            if in_band and is_whale_put:
+                whale_initiations.append({
+                    "strike": k,
+                    "side": "PUT",
+                    "volume": p_vol,
+                    "oi": p_oi,
+                    "new_contracts_min": p_vol - p_oi,
+                    "siege_ratio": round(p_vol / max(1, p_oi), 2),
+                    "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_pi >= 0 else "SELL_TO_OPEN (HIT BID)",
+                })
+
+            item_dict = {
                 "strike": k,
-                "side": "CALL",
-                "volume": c_vol,
-                "oi": c_oi,
-                "new_contracts_min": c_vol - c_oi,
-                "siege_ratio": round(c_vol / max(1, c_oi), 2),
-                "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_c >= 0 else "SELL_TO_OPEN (HIT BID)",
-            })
-        if in_band and is_whale_put:
-            whale_initiations.append({
-                "strike": k,
-                "side": "PUT",
-                "volume": p_vol,
-                "oi": p_oi,
-                "new_contracts_min": p_vol - p_oi,
-                "siege_ratio": round(p_vol / max(1, p_oi), 2),
-                "aggressor": "BUY_TO_OPEN (LIFT ASK)" if w_p >= 0 else "SELL_TO_OPEN (HIT BID)",
-            })
-
-        item_dict = {
-            "strike": k,
-            "call_vol": c_vol,
-            "put_vol": p_vol,
-            "total_vol": c_vol + p_vol,
-            "call_oi": c_oi,
-            "put_oi": p_oi,
-            "signed_call": round(s_c, 1),
-            "signed_put": round(s_p, 1),
-            "dealer_hedge_gc": round(strike_hedge, 1),
-            "is_whale_new_oi": bool(is_whale_call or is_whale_put),
-            "whale_side": "CALL" if is_whale_call else ("PUT" if is_whale_put else ""),
-            "dominant_flow": (
-                "MUA CALL CHỦ ĐỘNG (Ép MM Mua GC)" if strike_hedge > 15.0
-                else ("MUA PUT / XẢ CALL (Ép MM Bán GC)" if strike_hedge < -15.0
-                      else ("MUA NHẸ (MM Mua GC)" if strike_hedge > 2.0
-                            else ("BÁN NHẸ (MM Bán GC)" if strike_hedge < -2.0 else "CÂN BẰNG / HAI CHIỀU")))
-            ),
-        }
-        per_strike_flow[round(k, 1)] = item_dict
-        if in_band:
-            flow_candidates.append(item_dict)
+                "call_vol": c_vol,
+                "put_vol": p_vol,
+                "total_vol": c_vol + p_vol,
+                "call_oi": c_oi,
+                "put_oi": p_oi,
+                "signed_call": round(s_c, 1),
+                "signed_put": round(s_p, 1),
+                "dealer_hedge_gc": round(strike_hedge, 1),
+                "is_whale_new_oi": bool(is_whale_call or is_whale_put),
+                "whale_side": "CALL" if is_whale_call else ("PUT" if is_whale_put else ""),
+                "dominant_flow": (
+                    "MUA CALL CHỦ ĐỘNG (Ép MM Mua GC)" if strike_hedge > 15.0
+                    else ("MUA PUT / XẢ CALL (Ép MM Bán GC)" if strike_hedge < -15.0
+                          else ("MUA NHẸ (MM Mua GC)" if strike_hedge > 2.0
+                                else ("BÁN NHẸ (MM Bán GC)" if strike_hedge < -2.0 else "CÂN BẰNG / HAI CHIỀU")))
+                ),
+            }
+            per_strike_flow[round(k, 1)] = item_dict
+            if in_band:
+                flow_candidates.append(item_dict)
 
     whale_initiations.sort(key=lambda x: x["new_contracts_min"], reverse=True)
     flow_candidates.sort(key=lambda x: x["total_vol"], reverse=True)
@@ -1071,10 +1106,24 @@ def compute_vpin_bvc(candles: list[dict[str, Any]], window: int = 24) -> dict[st
             "vpin_label": "VPIN 32.0% [AN TOÀN FADE WALL]",
         }
 
-    recent_c = candles[-window:]
-    dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
-    std_dp = float(np.std(dp_list)) if len(dp_list) > 1 else 1.0
-    std_dp = max(0.25, std_dp)
+    if len(candles) >= window + 20:
+        # Estimate normal market dispersion from background history so directional bursts
+        # do not self-inflate std_dp and suppress VPIN below toxic detection thresholds.
+        bg_dp = np.asarray(
+            [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in candles[:-6]],
+            dtype=float,
+        )
+        q60 = float(np.percentile(np.abs(bg_dp), 60.0))
+        med_bg = float(np.median(bg_dp))
+        mad_bg = float(np.median(np.abs(bg_dp - med_bg))) * 1.4826
+        std_dp = max(0.25, 0.5 * (q60 / 0.8416) + 0.5 * mad_bg)
+        recent_c = candles[-12:]
+        dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
+    else:
+        recent_c = candles[-window:]
+        dp_list = [float(c.get("close", 0.0)) - float(c.get("open", 0.0)) for c in recent_c]
+        std_dp = float(np.std(dp_list)) if len(dp_list) > 1 else 1.0
+        std_dp = max(0.25, std_dp)
 
     bvc_cvd = 0.0
     bvc_buy_vol = 0.0
@@ -1106,7 +1155,8 @@ def compute_vpin_bvc(candles: list[dict[str, Any]], window: int = 24) -> dict[st
         }
 
     bvc_buy_pct = round((bvc_buy_vol / bvc_total_vol) * 100.0, 1)
-    # Volume-Synchronized Bucket aggregation (partition total volume into 5 equal-volume buckets if possible)
+    # Volume-Synchronized Bucket aggregation: partition total volume evenly across buckets,
+    # splitting bar volume proportionally across bucket boundaries (Easley-Lopez de Prado-O'Hara).
     n_buckets = min(5, len(abs_imbalances))
     target_bucket_vol = max(1.0, bvc_total_vol / n_buckets)
     bucket_imbalances: list[float] = []
@@ -1118,14 +1168,19 @@ def compute_vpin_bvc(candles: list[dict[str, Any]], window: int = 24) -> dict[st
             continue
         dp = float(c.get("close", 0.0)) - float(c.get("open", 0.0))
         buy_frac = 0.5 * (1.0 + math.erf((dp / std_dp) / math.sqrt(2.0)))
-        signed_y = vol * (2.0 * buy_frac - 1.0)
-        cur_signed += signed_y
-        cur_vol += vol
-        if cur_vol >= target_bucket_vol * 0.85:
-            bucket_imbalances.append(abs(cur_signed) / max(1.0, cur_vol))
-            cur_signed = 0.0
-            cur_vol = 0.0
-    if cur_vol > 0:
+        signed_ratio = 2.0 * buy_frac - 1.0
+        rem = vol
+        while rem > 1e-9:
+            need = target_bucket_vol - cur_vol
+            take = min(rem, need) if need > 1e-9 else rem
+            cur_signed += take * signed_ratio
+            cur_vol += take
+            rem -= take
+            if cur_vol >= target_bucket_vol - 1e-6 and len(bucket_imbalances) < n_buckets:
+                bucket_imbalances.append(abs(cur_signed) / max(1.0, cur_vol))
+                cur_signed = 0.0
+                cur_vol = 0.0
+    if cur_vol > 1e-6 and len(bucket_imbalances) < n_buckets:
         bucket_imbalances.append(abs(cur_signed) / max(1.0, cur_vol))
 
     vpin_raw = float(np.mean(bucket_imbalances)) if bucket_imbalances else (abs(bvc_cvd) / bvc_total_vol)
