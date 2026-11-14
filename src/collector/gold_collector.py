@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import datetime
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
-import numpy as np
 import pandas as pd
 
 

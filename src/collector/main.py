@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import time
 
 from pathlib import Path
 
@@ -29,7 +28,7 @@ def run_one_shot(
     try:
         if multi_expiry:
             out_dir = str(Path(output_path).parent)
-            saved_files = scrape_multi_expiry_and_save(output_dir=out_dir, underlying_futures="GCZ26")
+            saved_files = scrape_multi_expiry_and_save(output_dir=out_dir, underlying_futures="AUTO")
             logger.info("Multi-expiry collection complete: %d files saved (%s)", len(saved_files), saved_files)
         else:
             saved_file = scrape_and_save(output_path=output_path)

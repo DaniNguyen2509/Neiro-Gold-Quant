@@ -210,3 +210,85 @@ class TestScraperWorkflow:
         with mock.patch("src.collector.scraper.fetch_barchart_options_playwright", side_effect=RuntimeError("Network down")):
             saved = scrape_multi_expiry_and_save(output_dir=str(tmp_path), underlying_futures="GCZ26", weekly_count=1)
             assert isinstance(saved, list)
+
+    def test_scrape_multi_expiry_cache_preserves_old_timestamp(self, tmp_path):
+        from src.collector.scraper import scrape_multi_expiry_and_save
+        from src.quant_engine.synthetic import resolve_active_expirations
+
+        exps = resolve_active_expirations(
+            underlying_futures="GCZ26", weekly_count=1, include_quarterly=True
+        )
+        old_ts = "2025-01-01T00:00:00+00:00"
+        rows = [
+            {
+                "strike": float(k),
+                "callMid": 50.0,
+                "callBid": 49.0,
+                "callAsk": 51.0,
+                "callLatest": 50.0,
+                "callVolume": 10,
+                "callOpenInterest": 200,
+                "callGamma": 0.001,
+                "callIV": 0.18,
+                "putMid": 50.0,
+                "putBid": 49.0,
+                "putAsk": 51.0,
+                "putLatest": 50.0,
+                "putVolume": 10,
+                "putOpenInterest": 200,
+                "putGamma": 0.001,
+                "putIV": 0.18,
+                "scraped_at_utc": old_ts,
+            }
+            for k in range(3700, 4301, 25)
+        ]
+        for exp in exps:
+            sub = tmp_path / f"options_prices_GCZ26_{exp['option_symbol']}.csv"
+            pd.DataFrame(rows).to_csv(sub, index=False)
+
+        with (
+            mock.patch(
+                "src.collector.scraper.fetch_barchart_options_playwright",
+                side_effect=RuntimeError("Network down"),
+            ),
+            mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4000.0),
+        ):
+            scrape_multi_expiry_and_save(
+                output_dir=str(tmp_path), underlying_futures="GCZ26", weekly_count=1
+            )
+
+        master = tmp_path / "options_prices_GCZ26.csv"
+        assert master.exists()
+        df_master = pd.read_csv(master)
+        assert str(df_master["scraped_at_utc"].iloc[0]).startswith("2025-01-01")
+
+    def test_enrich_options_iv_handles_partial_zeros(self):
+        from src.collector.scraper import _enrich_options_iv_and_greeks
+
+        df_in = pd.DataFrame(
+            {
+                "strike": [3950.0, 4000.0, 4050.0],
+                "callMid": [75.0, 42.0, 18.0],
+                "putMid": [25.0, 41.0, 67.0],
+                "callIV": [0.22, 0.0, 0.0],
+                "putIV": [0.23, 0.0, 0.0],
+                "callOpenInterest": [100, 200, 150],
+                "putOpenInterest": [120, 180, 140],
+            }
+        )
+        with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4000.0):
+            out = _enrich_options_iv_and_greeks(df_in, dte_days=20.0)
+        assert abs(float(out["callIV"].iloc[0]) - 0.22) < 1e-4
+        assert float(out["callIV"].iloc[1]) > 0.05
+        assert float(out["putIV"].iloc[2]) > 0.05
+
+    def test_parse_barchart_json_skips_unknown_option_type(self):
+        bad_payload = {
+            "data": [
+                {"raw": {"strikePrice": "4000", "optionType": "UNKNOWN", "bidPrice": "10", "askPrice": "12"}},
+                {"raw": {"strikePrice": "4025", "optionType": "Call", "bidPrice": "20", "askPrice": "22"}},
+            ]
+        }
+        df = parse_barchart_json(bad_payload)
+        assert list(df["strike"]) == [4025.0]
+

@@ -10,7 +10,6 @@ Enforces structural invariants before data is accepted into the engine:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 import pandas as pd
 
 

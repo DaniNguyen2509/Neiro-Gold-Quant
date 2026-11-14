@@ -94,8 +94,6 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
         if k < 500:  # CME Gold strikes are typically 3,000 - 5,000 USD
             continue
 
-        all_strikes.add(k)
-
         # Option type (Call or Put)
         opt_type = str(raw.get("optionType") or raw.get("type") or "").strip().upper()
         if not opt_type and "symbol" in raw:
@@ -106,9 +104,14 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
                 opt_type = "CALL"
 
         if opt_type.startswith("P"):
+            all_strikes.add(k)
             put_map[k] = raw
-        else:
+        elif opt_type.startswith("C"):
+            all_strikes.add(k)
             call_map[k] = raw
+        else:
+            logger.debug("Skipping unrecognized optionType=%r at strike=%s", opt_type, k)
+            continue
 
     if not all_strikes:
         raise ValueError("No valid strike prices found in records")

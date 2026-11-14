@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import datetime
-import json
 import logging
 import os
 import sys
@@ -136,8 +135,8 @@ async def fetch_barchart_options_playwright(
                     active_sym = parts[idx + 1]
                 elif idx - 1 >= 0:
                     active_sym = parts[idx - 1]
-        except Exception:
-            pass
+        except Exception as sym_err:
+            logger.debug("Could not parse symbol from URL %s: %s", page_url, sym_err)
         js_code = f"""
         async () => {{
             function getCookie(n) {{
@@ -234,31 +233,27 @@ def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = Non
     except Exception:
         pass
 
-    if "callIV" in df.columns and (df["callIV"] <= 0.01).all():
-        solved_c = []
+    def _fill_side_iv(iv_col: str, mid_col: str, bid_col: str, ask_col: str, last_col: str, is_call: bool) -> None:
+        if iv_col not in df.columns or not (df[iv_col] <= 0.01).any():
+            return
+        solved: list[float] = []
         for _, row in df.iterrows():
-            k = float(row.get("strike", 0))
-            mid = float(row.get("callMid", 0))
+            cur_iv = float(row.get(iv_col, 0) or 0)
+            if cur_iv > 0.01:
+                solved.append(round(cur_iv, 4))
+                continue
+            mid = float(row.get(mid_col, 0) or 0)
             if mid <= 0:
-                bid = float(row.get("callBid", 0))
-                ask = float(row.get("callAsk", 0))
-                mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get("callLatest", 0))
-            iv = solve_black76_iv(f_chain, k, t_years, mid, is_call=True, r=r) if mid > 0 else 0.20
-            solved_c.append(round(iv, 4))
-        df["callIV"] = solved_c
+                bid = float(row.get(bid_col, 0) or 0)
+                ask = float(row.get(ask_col, 0) or 0)
+                mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get(last_col, 0) or 0)
+            k = float(row.get("strike", 0) or 0)
+            iv = solve_black76_iv(f_chain, k, t_years, mid, is_call=is_call, r=r) if mid > 0 else 0.20
+            solved.append(round(iv, 4))
+        df[iv_col] = solved
 
-    if "putIV" in df.columns and (df["putIV"] <= 0.01).all():
-        solved_p = []
-        for _, row in df.iterrows():
-            k = float(row.get("strike", 0))
-            mid = float(row.get("putMid", 0))
-            if mid <= 0:
-                bid = float(row.get("putBid", 0))
-                ask = float(row.get("putAsk", 0))
-                mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else float(row.get("putLatest", 0))
-            iv = solve_black76_iv(f_chain, k, t_years, mid, is_call=False, r=r) if mid > 0 else 0.20
-            solved_p.append(round(iv, 4))
-        df["putIV"] = solved_p
+    _fill_side_iv("callIV", "callMid", "callBid", "callAsk", "callLatest", is_call=True)
+    _fill_side_iv("putIV", "putMid", "putBid", "putAsk", "putLatest", is_call=False)
 
     return df
 
@@ -278,14 +273,16 @@ def scrape_and_save(
     except Exception as e:
         if out_file.exists():
             logger.warning("Live scrape notice (%s). Preserving existing active dataset at %s", e, out_file)
-            drive_data_dir = Path("H:/My Drive/Neiro-Quant/data")
-            if drive_data_dir.exists():
-                try:
-                    import shutil
-                    shutil.copy2(out_file, drive_data_dir / out_file.name)
-                    logger.info("Synced existing valid data to Google Drive: %s", drive_data_dir / out_file.name)
-                except Exception:
-                    pass
+            mirror_dir = os.environ.get("NEIRO_DRIVE_MIRROR_DIR")
+            if mirror_dir:
+                drive_data_dir = Path(mirror_dir) / "data"
+                if drive_data_dir.exists():
+                    try:
+                        import shutil
+                        shutil.copy2(out_file, drive_data_dir / out_file.name)
+                        logger.info("Synced existing valid data to cloud drive mirror: %s", drive_data_dir / out_file.name)
+                    except Exception as mirror_err:
+                        logger.warning("Could not sync fallback CSV to cloud drive mirror: %s", mirror_err)
             return str(out_file)
         raise e
 
@@ -301,8 +298,8 @@ def scrape_and_save(
             lp = fetch_live_cme_futures_price()
             if lp and lp > 500.0:
                 ref_price = lp
-        except Exception:
-            pass
+        except Exception as ref_err:
+            logger.debug("Live futures reference price unavailable (%s); using default %s", ref_err, ref_price)
         val = validate_options_frame(df, reference_price=ref_price)
         if not val.ok and out_file.exists():
             logger.warning(
@@ -319,15 +316,17 @@ def scrape_and_save(
     df.to_csv(out_file, index=False)
     logger.info("Saved %d strikes to %s (file size: %d bytes)", len(df), out_file, out_file.stat().st_size)
 
-    # Mirror to Google Drive Desktop if folder exists
-    drive_data_dir = Path("H:/My Drive/Neiro-Quant/data")
-    if drive_data_dir.exists():
-        try:
-            drive_file = drive_data_dir / out_file.name
-            df.to_csv(drive_file, index=False)
-            logger.info("Mirrored to Google Drive Desktop: %s", drive_file)
-        except Exception as e:
-            logger.warning("Could not mirror to Google Drive: %s", e)
+    # Optional mirror to local cloud-sync folder if explicitly configured
+    mirror_dir = os.environ.get("NEIRO_DRIVE_MIRROR_DIR")
+    if mirror_dir:
+        drive_data_dir = Path(mirror_dir) / "data"
+        if drive_data_dir.exists():
+            try:
+                drive_file = drive_data_dir / out_file.name
+                df.to_csv(drive_file, index=False)
+                logger.info("Mirrored to cloud drive mirror: %s", drive_file)
+            except Exception as e:
+                logger.warning("Could not mirror to cloud drive: %s", e)
 
     return str(out_file)
 
@@ -362,6 +361,7 @@ def scrape_multi_expiry_and_save(
 
     saved_files = []
     scraped_dfs = []
+    source_timestamps: list[str] = []
     out_dir_path = Path(output_dir)
     out_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -392,6 +392,10 @@ def scrape_multi_expiry_and_save(
                 resolved_dte = compute_dynamic_dte(resolved_exp, default_dte=float(exp.get("dte", 15.0)))
 
                 df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
+                fresh_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                if "scraped_at_utc" not in df.columns:
+                    df["scraped_at_utc"] = fresh_ts
+                source_timestamps.append(str(df["scraped_at_utc"].dropna().iloc[0]))
                 df.attrs["expiration_date"] = resolved_exp
                 df.attrs["dte_days"] = resolved_dte
                 df.attrs["option_symbol"] = sym
@@ -407,6 +411,16 @@ def scrape_multi_expiry_and_save(
                 try:
                     df = pd.read_csv(sub_csv)
                     if df is not None and not df.empty and validate_options_frame(df, reference_price=ref_price).ok:
+                        cached_ts = ""
+                        if "scraped_at_utc" in df.columns:
+                            s_ts = df["scraped_at_utc"].dropna()
+                            if not s_ts.empty:
+                                cached_ts = str(s_ts.iloc[0]).strip()
+                        if not cached_ts:
+                            cached_ts = datetime.datetime.fromtimestamp(
+                                sub_csv.stat().st_mtime, tz=datetime.timezone.utc
+                            ).isoformat()
+                        source_timestamps.append(cached_ts)
                         resolved_dte = float(exp.get("dte", 15.0))
                         df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
                         df.attrs["expiration_date"] = exp["expiration_date"]
@@ -414,9 +428,9 @@ def scrape_multi_expiry_and_save(
                         df.attrs["option_symbol"] = sym
                         df.attrs["expiry_tier"] = exp.get("type", "MONTHLY")
                         scraped_dfs.append(df)
-                        logger.info("Loaded cached dataset for %s: %s", sym, sub_csv)
-                except Exception:
-                    pass
+                        logger.info("Loaded cached dataset for %s: %s (ts=%s)", sym, sub_csv, cached_ts)
+                except Exception as cache_exc:
+                    logger.warning("Failed reading cached dataset %s: %s", sub_csv, cache_exc)
 
     # Aggregate all scraped chains into the master options_prices_GCZ26.csv
     if scraped_dfs:
@@ -431,8 +445,8 @@ def scrape_multi_expiry_and_save(
                 live_p = fetch_live_cme_futures_price()
                 if live_p and live_p > 500.0:
                     ref_price = live_p
-            except Exception:
-                pass
+            except Exception as ref_exc:
+                logger.debug("Live futures ref fetch skipped: %s", ref_exc)
 
             val = validate_options_frame(agg_df, reference_price=ref_price)
             if not val.ok and master_path.exists():
@@ -443,7 +457,11 @@ def scrape_multi_expiry_and_save(
                 )
             else:
                 if "scraped_at_utc" not in agg_df.columns:
-                    agg_df["scraped_at_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    agg_df["scraped_at_utc"] = (
+                        min(source_timestamps)
+                        if source_timestamps
+                        else datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    )
                 agg_df = _enrich_options_iv_and_greeks(agg_df)
                 agg_df.to_csv(master_path, index=False)
                 saved_files.append(str(master_path))
@@ -469,7 +487,7 @@ def main():
             out_dir = str(Path(args.output).parent)
             scrape_multi_expiry_and_save(
                 output_dir=out_dir,
-                underlying_futures="GCZ26",
+                underlying_futures="AUTO",
                 weekly_count=args.weekly_count,
                 dry_run=args.dry_run,
             )
