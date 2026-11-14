@@ -71,6 +71,30 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     vpin_col = "#F87171" if vpin_pct >= 65.0 else ("#FACC15" if vpin_pct >= 40.0 else "#4ADE80")
     flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
     flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
+    dyn_vac = inst_flow.get("dynamic_vacuum") or {}
+    inst_fvgs = inst_flow.get("institutional_fvgs") or []
+    post_sweep = inst_flow.get("post_sweep_execution") or {}
+    post_sweep_regime = str(post_sweep.get("post_sweep_regime", "MONITORING"))
+    post_sweep_label = str(post_sweep.get("label_vi", "THEO DÕI — CHỜ QUÉT & HẤP THỤ TẠI WALL"))
+    vac_label = str(dyn_vac.get("label_vi", "ĐỘ SÂU THỊ TRƯỜNG ỔN ĐỊNH"))
+    post_sweep_col = (
+        "#F87171" if post_sweep_regime == "TOXIC_CASCADE_BLOCKED"
+        else ("#4ADE80" if post_sweep_regime == "POST_SWEEP_V_SHAPE"
+              else ("#38BDF8" if post_sweep_regime == "POST_SWEEP_PULLBACK" else "#94A3B8"))
+    )
+    compact_ladder = []
+    for k_raw, lvl in sorted((meta.get("squeeze_ladder") or {}).items(), key=lambda kv: float(kv[0])):
+        sq_tr = getattr(lvl, "squeeze_trigger", lvl.get("squeeze_trigger") if isinstance(lvl, dict) else 0.0)
+        sq_tp = getattr(lvl, "squeeze_tp", lvl.get("squeeze_tp") if isinstance(lvl, dict) else 0.0)
+        wf_tr = getattr(lvl, "waterfall_trigger", lvl.get("waterfall_trigger") if isinstance(lvl, dict) else 0.0)
+        wf_tp = getattr(lvl, "waterfall_tp", lvl.get("waterfall_tp") if isinstance(lvl, dict) else 0.0)
+        compact_ladder.append({
+            "k": round(float(k_raw), 2),
+            "sq_tr": round(float(sq_tr), 2),
+            "sq_tp": round(float(sq_tp), 2),
+            "wf_tr": round(float(wf_tr), 2),
+            "wf_tp": round(float(wf_tp), 2),
+        })
     disloc_color = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
     hedge_color = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
     cvd_color = "#4ADE80" if bvc_cvd_val >= 0 else "#F87171"
@@ -251,8 +275,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <!-- Floating Quant HUD Card at Top-Left of Chart -->
             <div class="neiro-floating-hud">
                 <div class="hud-item"><span class="hud-label">NET GEX (Trục ATM):</span> <b id="hud-gex-val" style="color:{regime_color};">${total_gex:+.1f}M</b></div>
-                <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &uarr;:</span> <b style="color:#4ADE80;">&gt; ${strike_above:,.0f} &rarr; TP ${next_above:,.0f}</b></div>
-                <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &darr;:</span> <b style="color:#F87171;">&lt; ${strike_below:,.0f} &rarr; TP ${next_below:,.0f}</b></div>
+                <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &uarr;:</span> <b id="hud-sqz-up" style="color:#4ADE80;">&gt; ${strike_above:,.0f} &rarr; TP ${next_above:,.0f}</b></div>
+                <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &darr;:</span> <b id="hud-sqz-down" style="color:#F87171;">&lt; ${strike_below:,.0f} &rarr; TP ${next_below:,.0f}</b></div>
                 <div class="hud-item"><span class="hud-label">VANNA (VEX):</span> <b id="hud-vanna-val" style="color:#22D3EE;">${total_vex:+.1f}M</b></div>
                 <div class="hud-item"><span class="hud-label">CHARM (CHEX):</span> <b id="hud-charm-val" style="color:#C084FC;">${total_chex:+.1f}M/d</b></div>
                 <div class="hud-item"><span class="hud-label">THETA (TEX):</span> <b id="hud-theta-val" style="color:#FB923C;">{total_thex_display}</b></div>
@@ -267,6 +291,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 <div class="hud-item"><span class="hud-label">KYLE'S LAMBDA (&lambda;):</span> <b id="hud-kyle-val" style="color:#38BDF8; font-size:10px;">{kyle_label}</b></div>
                 <div class="hud-item"><span class="hud-label">VPIN TOXICITY:</span> <b id="hud-vpin-val" style="color:{vpin_col}; font-size:10px;">{vpin_label}</b></div>
                 <div class="hud-item"><span class="hud-label">INFORMED ACTION:</span> <b id="hud-informed-val" style="color:{informed_col}; font-size:10px;">{informed_badge} (&rho;={rho_vs:.2f}, Kelly {kelly_mult:.2f}x)</b></div>
+                <div class="hud-item"><span class="hud-label">POST-SWEEP / VACUUM:</span> <b id="hud-post-sweep-val" style="color:{post_sweep_col}; font-size:10px;" title="{vac_label}">{post_sweep_label}</b></div>
                 <div id="hud-flip-verdict-box" style="margin-top:3px; padding:4px 7px; border-radius:4px; background:rgba(15,23,42,0.95); border:1px solid {flip_verdict_col}; border-left:3px solid {flip_verdict_col};">
                     <div style="font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;">BỘ LỌC GAMMA FLIP (THẬT vs. FAKEOUT TRAP):</div>
                     <b id="hud-flip-verdict" style="color:{flip_verdict_col}; font-size:10.5px;">{flip_verdict_lbl}</b>
@@ -376,6 +401,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "informed_action_color": informed_col,
         "flip_integrity_label": flip_verdict_lbl,
         "flip_integrity_color": flip_verdict_col,
+        "squeeze_ladder": compact_ladder,
+        "dynamic_vacuum": dyn_vac,
+        "institutional_fvgs": inst_fvgs,
+        "post_sweep_execution": post_sweep,
     })
 
     json_candles_str = json.dumps(chart_candles)
@@ -623,6 +652,47 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return x > 0 ? 1 - p : p;
     }}
 
+    function updateSqueezeHud(price) {{
+        const ladder = (window.INITIAL_META && window.INITIAL_META.squeeze_ladder) || [];
+        if (!ladder.length || !price) return;
+        let lo = 0, hi = ladder.length - 1, idxAbove = ladder.length - 1;
+        while (lo <= hi) {{
+            const mid = (lo + hi) >> 1;
+            if (ladder[mid].k > price) {{
+                idxAbove = mid;
+                hi = mid - 1;
+            }} else {{
+                lo = mid + 1;
+            }}
+        }}
+        const above = ladder[idxAbove];
+        const below = ladder[Math.max(0, lo - 1)];
+        const upEl = document.getElementById('hud-sqz-up');
+        const dnEl = document.getElementById('hud-sqz-down');
+        if (upEl && above) {{
+            upEl.innerText = '> $' + Math.round(above.sq_tr).toLocaleString('en-US') + ' -> TP $' + Math.round(above.sq_tp).toLocaleString('en-US');
+        }}
+        if (dnEl && below) {{
+            dnEl.innerText = '< $' + Math.round(below.wf_tr).toLocaleString('en-US') + ' -> TP $' + Math.round(below.wf_tp).toLocaleString('en-US');
+        }}
+    }}
+
+    function evaluateBarOrderflow(candles) {{
+        if (!Array.isArray(candles) || candles.length < 5) return;
+        const valid = candles.slice(-24).filter(b => b && Number(b.volume || 0) > 0);
+        if (valid.length < 5) return;
+        const lams = valid.map(b => Math.abs(Number(b.close) - Number(b.open)) / Number(b.volume) * 1000.0);
+        const avgLam = lams.reduce((a, b) => a + b, 0) / lams.length;
+        const avgVol = valid.reduce((a, b) => a + Number(b.volume), 0) / valid.length;
+        const lastLam = lams[lams.length - 1];
+        const lastVol = Number(valid[valid.length - 1].volume);
+        if (lastVol >= 1.3 * avgVol && lastLam <= 0.55 * Math.max(1e-6, avgLam)) {{
+            liveKyleLabel = 'HẤP THỤ TẢNG BĂNG (BAR REAL VOL)';
+        }} else if (lastLam >= 1.75 * Math.max(1e-6, avgLam)) {{
+            liveKyleLabel = 'TRƯỢT GIÁ RỖNG SỔ LỆNH (BAR VACUUM)';
+        }}
+    }}
+
     function applyLiveTick(newPrice, tickVol = null, isAuthoritativeYahoo = false) {{
         if (!newPrice || isNaN(newPrice) || !candleSeries) return;
         const marketOpen = isCmeGlobexMarketOpen();
@@ -649,14 +719,18 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const barTime = marketOpen
             ? (nowSec - (nowSec % currentPeriodSec))
             : (activeCandle ? activeCandle.time : (nowSec - (nowSec % currentPeriodSec)));
-        const vTick = tickVol !== null ? tickVol : Math.max(1, Math.round(2 + Math.abs(dp) * 25));
+        const hasRealTickVol = (tickVol !== null && Number(tickVol) > 0);
+        const realVTick = hasRealTickVol ? Number(tickVol) : 0;
 
-        // 1. Zero-Latency (<1ms) BVC Orderflow Classification & Active Candle Update
-        const zScore = dp / 0.18;
-        const buyFrac = normCdf(zScore);
-        const tickDelta = vTick * (2.0 * buyFrac - 1.0);
-        liveCvdContracts += tickDelta;
-        liveBuyPct = Math.max(5.0, Math.min(95.0, 0.92 * liveBuyPct + 0.08 * (buyFrac * 100.0)));
+        // 1. Real-Volume BVC Update (never synthesize fake vTick when tickVol === null)
+        let tickDelta = 0.0;
+        if (hasRealTickVol) {{
+            const zScore = dp / 0.18;
+            const buyFrac = normCdf(zScore);
+            tickDelta = realVTick * (2.0 * buyFrac - 1.0);
+            liveCvdContracts += tickDelta;
+            liveBuyPct = Math.max(5.0, Math.min(95.0, 0.92 * liveBuyPct + 0.08 * (buyFrac * 100.0)));
+        }}
 
         if (!activeCandle || (marketOpen && activeCandle.time < barTime)) {{
             activeCandle = {{
@@ -665,17 +739,19 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 high: Math.max(prevPrice, currentGoldPrice),
                 low: Math.min(prevPrice, currentGoldPrice),
                 close: currentGoldPrice,
-                volume: vTick,
+                volume: realVTick,
                 delta: tickDelta
             }};
         }} else {{
             activeCandle.high = Math.max(activeCandle.high, currentGoldPrice);
             activeCandle.low = Math.min(activeCandle.low, currentGoldPrice);
             activeCandle.close = currentGoldPrice;
-            activeCandle.volume += vTick;
-            activeCandle.delta += tickDelta;
+            if (hasRealTickVol) {{
+                activeCandle.volume += realVTick;
+                activeCandle.delta += tickDelta;
+            }}
         }}
-        liveCandleDelta = activeCandle.delta;
+        liveCandleDelta = activeCandle.delta || 0.0;
 
         candleSeries.update({{
             time: activeCandle.time,
@@ -687,22 +763,21 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         // 2. Zero-Latency Dealer Gamma Hedge Flow & Put-Call Parity Lead-Lag (delta_F)
         const netGexM = window.INITIAL_META.total_net_gex || -17.2;
-        // Net Gamma contracts per $1 move ~ (netGexM * 1e6) / (spot^2 * 0.01 * 100)
         const gammaContractsPerUsd = (netGexM * 1e6) / Math.max(1e6, currentGoldPrice * currentGoldPrice);
-        // When MM is Short Gamma (netGexM < 0), price up (dp > 0) forces MM to BUY (+dp * |gamma|)
         const instantGammaHedge = -dp * gammaContractsPerUsd * 0.35;
         liveDealerHedgeGC += instantGammaHedge;
         liveForwardDisloc = Math.round((liveImpliedForward - currentGoldPrice) * 100) / 100;
 
-        // 3. Zero-Latency Kyle's Lambda Microstructure Regime
-        const kyleLambda = Math.abs(dp) / Math.max(1, vTick);
-        if (vTick >= 12 && Math.abs(dp) <= 0.08) {{
-            liveKyleLabel = '⚡ HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)';
-        }} else if (kyleLambda >= 0.045 && Math.abs(dp) >= 0.22) {{
-            liveKyleLabel = '⚡ TRƯỢT RỖNG SỔ LỆNH (VACUUM MARKET SWEEP)';
-        }} else {{
-            liveKyleLabel = window.INITIAL_META.kyle_lambda_label || 'THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG';
+        // 3. Real-Volume Kyle's Lambda Regime (never evaluate on synthetic tick volume)
+        if (hasRealTickVol) {{
+            const kyleLambda = Math.abs(dp) / Math.max(1, realVTick);
+            if (realVTick >= 12 && Math.abs(dp) <= 0.08) {{
+                liveKyleLabel = 'HẤP THỤ TẢNG BĂNG (ICEBERG LIMIT ABSORPTION)';
+            }} else if (kyleLambda >= 0.045 && Math.abs(dp) >= 0.22) {{
+                liveKyleLabel = 'TRƯỢT RỖNG SỔ LỆNH (VACUUM MARKET SWEEP)';
+            }}
         }}
+        updateSqueezeHud(currentGoldPrice);
 
         // 4. Synchronize all DOM HUD & Microstructure Badges in <1ms
         const cvdCol = liveCvdContracts >= 0 ? '#4ADE80' : '#F87171';
@@ -904,6 +979,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }});
 
         buildHistoricalGoldBars(60, '1m');
+        updateSqueezeHud(currentGoldPrice);
 
         livePriceLine = candleSeries.createPriceLine({{
             price: currentGoldPrice,
@@ -1144,6 +1220,49 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
                     ctx.textAlign = 'center';
                     ctx.fillText('⚠️ AIR POCKET [CẤM ĐỠ] $' + Math.min(pFrom, pTo).toFixed(0) + '-' + Math.max(pFrom, pTo).toFixed(0), bX + bW / 2, bY + 11);
+                }}
+            }}
+        }});
+
+        // 2b. Draw Validated Institutional FVG Zones (ADR-026: Bullish Green / Bearish Red + 50% Retrace Line)
+        const instFvgs = m.institutional_fvgs || [];
+        instFvgs.forEach(fvg => {{
+            const gLo = parseFloat(fvg.low || 0);
+            const gHi = parseFloat(fvg.high || 0);
+            const mid50 = parseFloat(fvg.midpoint_50 || 0);
+            if (!gLo || !gHi) return;
+            const yHi = candleSeries.priceToCoordinate(gHi);
+            const yLo = candleSeries.priceToCoordinate(gLo);
+            if (yHi !== null && yLo !== null) {{
+                const topY = Math.min(yHi, yLo);
+                const botY = Math.max(yHi, yLo);
+                const bandH = Math.max(10, botY - topY);
+                if (topY <= h && botY >= 0) {{
+                    const isBull = fvg.direction === 'BULLISH';
+                    const fCol = isBull ? '#22C55E' : '#EF4444';
+                    ctx.fillStyle = isBull ? 'rgba(34, 197, 94, 0.09)' : 'rgba(239, 68, 68, 0.09)';
+                    ctx.fillRect(0, topY, chartW, bandH);
+                    ctx.strokeStyle = fCol;
+                    ctx.setLineDash([2, 3]);
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(0, topY, chartW, bandH);
+                    ctx.setLineDash([]);
+                    if (mid50) {{
+                        const yMid = candleSeries.priceToCoordinate(mid50);
+                        if (yMid !== null && yMid >= 0 && yMid <= h) {{
+                            ctx.strokeStyle = fCol;
+                            ctx.setLineDash([4, 2]);
+                            ctx.beginPath();
+                            ctx.moveTo(0, yMid);
+                            ctx.lineTo(chartW, yMid);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        }}
+                    }}
+                    ctx.font = 'bold 9px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = fCol;
+                    ctx.fillText('INSTITUTIONAL FVG 50% $' + mid50.toFixed(1) + ' | 75% $' + parseFloat(fvg.zone_75 || mid50).toFixed(1), 20, topY + Math.min(bandH - 2, 11));
                 }}
             }}
         }});
@@ -1402,9 +1521,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 high: lastBar.high,
                 low: lastBar.low,
                 close: lastBar.close,
-                volume: lastBar.volume || 120,
+                volume: Number(lastBar.volume || 0),
                 delta: lastBar.delta || 0,
             }};
+            evaluateBarOrderflow(merged);
             candleSeries.update({{
                 time: lastBar.time,
                 open: lastBar.open,
@@ -1478,6 +1598,31 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (data.dealer_hedge_futures_flow !== undefined) liveDealerHedgeGC = data.dealer_hedge_futures_flow;
         if (data.bvc_cvd_contracts !== undefined) liveCvdContracts = data.bvc_cvd_contracts;
         if (data.bvc_buy_pct !== undefined) liveBuyPct = data.bvc_buy_pct;
+        if (data.dynamic_vacuum && typeof data.dynamic_vacuum === 'object') {{
+            m.dynamic_vacuum = data.dynamic_vacuum;
+        }}
+        if (Array.isArray(data.institutional_fvgs)) {{
+            m.institutional_fvgs = data.institutional_fvgs;
+        }}
+        if (data.post_sweep_execution && typeof data.post_sweep_execution === 'object') {{
+            m.post_sweep_execution = data.post_sweep_execution;
+            const psRegime = String(data.post_sweep_execution.post_sweep_regime || 'MONITORING');
+            const psLabel = String(data.post_sweep_execution.label_vi || 'THEO DÕI');
+            const psCol = psRegime === 'TOXIC_CASCADE_BLOCKED'
+                ? '#F43F5E'
+                : (psRegime === 'POST_SWEEP_V_SHAPE'
+                    ? '#4ADE80'
+                    : (psRegime === 'POST_SWEEP_PULLBACK' ? '#38BDF8' : '#94A3B8'));
+            const vacTitle = String((m.dynamic_vacuum && m.dynamic_vacuum.vacuum_label) || '');
+            ['hud-post-sweep-val', 'micro-post-sweep-val'].forEach((id) => {{
+                const el = document.getElementById(id);
+                if (el) {{
+                    el.innerText = psLabel;
+                    el.style.color = psCol;
+                    if (vacTitle) el.title = vacTitle;
+                }}
+            }});
+        }}
         if (Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
             mergeLiveCandles(data.recent_candles, '1m');
         }}

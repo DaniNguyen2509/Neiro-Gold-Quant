@@ -17,7 +17,6 @@ import datetime
 import gc
 import json
 import math
-import os
 import sys
 import time
 from pathlib import Path
@@ -31,9 +30,7 @@ from plotly.subplots import make_subplots
 from src.quant_engine.synthetic import compute_dynamic_dte
 from src.quant_engine import basis as basis_engine
 from src.quant_engine.basis import (
-    fetch_live_cme_futures_price,
     fetch_live_cme_m5_tape,
-    resolve_dynamic_basis,
     resolve_dynamic_basis_with_source,
 )
 from src.quant_engine.institutional import (
@@ -44,8 +41,6 @@ from src.quant_engine.institutional import (
     evaluate_informed_trader_regime,
 )
 from src.quant_engine.level_state import (
-    LevelState,
-    evaluate_tactical_level_states,
     find_next_major_wall,
     detect_strike_air_pockets,
 )
@@ -53,28 +48,9 @@ from src.quant_engine.dealer import (
     compute_exact_gamma_flip,
     compute_wall_siege_ratio,
     find_gamma_weighted_walls,
-    classify_wall_regime,
 )
-from src.quant_engine.loader import to_options_snapshot, load_multi_expiry_options
+from src.quant_engine.loader import clean_val, to_options_snapshot, load_multi_expiry_options
 from src.hud.neiro_terminal import render_neiro_orderflow_component
-
-
-def clean_val(v: Any, default: float = 0.0) -> float:
-    if v is None:
-        return default
-    if isinstance(v, (int, float)):
-        return default if (math.isnan(v) or math.isinf(v)) else float(v)
-    s = str(v).strip().replace('"', '').replace("'", "").replace("$", "")
-    for ch in ("=", "+"):
-        if s.startswith(ch):
-            s = s[1:].strip()
-    if s.endswith(("%", "s", "S")):
-        s = s[:-1].strip()
-    s = s.replace(",", "").replace(" ", "")
-    try:
-        return float(s)
-    except Exception:
-        return default
 
 
 def resolve_adaptive_tactical_strikes(
@@ -637,6 +613,43 @@ def load_and_preprocess_options(
         snap, spot_price=spot_price, r=r, dte_days=dte_days, default_iv=sigma_atm
     )
 
+    strike_above_res, _, strike_below_res, _, step_res, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
+        df["strike"].values, spot_price, dte_days=dte_days, call_wall=call_wall, put_wall=put_wall
+    )
+    major_down_w, _ = find_next_major_wall(df, strike_below_res, direction="DOWN", oi_percentile=60.0)
+    major_up_w, _ = find_next_major_wall(df, strike_above_res, direction="UP", oi_percentile=60.0)
+    static_raw_pockets = (
+        detect_strike_air_pockets(df, strike_below_res, major_down_w, threshold_ratio=0.40)
+        + detect_strike_air_pockets(df, major_down_w - 80.0, major_down_w, threshold_ratio=0.40)
+        + detect_strike_air_pockets(df, strike_above_res, major_up_w, threshold_ratio=0.40)
+        + detect_strike_air_pockets(df, major_up_w, min(major_up_w + 80.0, call_wall), threshold_ratio=0.40)
+    )
+    static_air_pockets: list[dict[str, Any]] = []
+    seen_ap_zones: set[tuple[float, float]] = set()
+    for p in static_raw_pockets:
+        p_from = float(getattr(p, "start_strike", 0.0) or 0.0)
+        p_to = float(getattr(p, "end_strike", 0.0) or 0.0)
+        gap = abs(p_to - p_from)
+        z_key = (round(min(p_from, p_to), 1), round(max(p_from, p_to), 1))
+        if gap >= 5.0 and z_key not in seen_ap_zones:
+            seen_ap_zones.add(z_key)
+            avg_oi = float(getattr(p, "avg_oi", 0.0))
+            static_air_pockets.append({
+                "from": z_key[0],
+                "to": z_key[1],
+                "avg_oi": avg_oi,
+                "gap": gap,
+                "severity": "HIGH" if avg_oi < 150.0 else "MEDIUM",
+            })
+
+    intraday_candles = (m5_tape.get("chart_candles") or []) if isinstance(m5_tape, dict) else None
+    vrp_metrics = compute_vrp_metrics(
+        sigma_atm=sigma_atm,
+        daily_candles=daily_1d_candles,
+        intraday_candles=intraday_candles,
+        spot=spot_price,
+    )
+
     from src.quant_engine.dealer import reconstruct_institutional_orderflow
     inst_orderflow = reconstruct_institutional_orderflow(
         df,
@@ -645,14 +658,10 @@ def load_and_preprocess_options(
         dte_days=dte_days,
         m5_tape=m5_tape,
         zero_gamma_flip=exact_gamma_flip,
-    )
-
-    intraday_candles = (m5_tape.get("chart_candles") or []) if isinstance(m5_tape, dict) else None
-    vrp_metrics = compute_vrp_metrics(
-        sigma_atm=sigma_atm,
-        daily_candles=daily_1d_candles,
-        intraday_candles=intraday_candles,
-        spot=spot_price,
+        call_wall=call_wall,
+        put_wall=put_wall,
+        air_pockets=static_air_pockets,
+        vrp_spread_pct=vrp_metrics.vrp_vol_spread_pct,
     )
     informed_regime = evaluate_informed_trader_regime(
         spot=spot_price,
@@ -743,12 +752,10 @@ def load_and_preprocess_options(
         "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "synced_at_vn": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%d/%m/%Y %H:%M:%S VN"),
     }
-    strike_above_res, _, strike_below_res, _, _, is_micro_guarded_res = resolve_adaptive_tactical_strikes(
-        df["strike"].values, spot_price, dte_days=dte_days, call_wall=call_wall, put_wall=put_wall
-    )
     meta["strike_above"] = strike_above_res
     meta["strike_below"] = strike_below_res
     meta["is_micro_guarded"] = is_micro_guarded_res
+    meta["air_pockets"] = static_air_pockets
 
     # Pre-computed Squeeze Ladder for O(1) realtime execution
     from src.quant_engine.strategy import precompute_squeeze_ladder
@@ -758,6 +765,7 @@ def load_and_preprocess_options(
         call_wall=call_wall,
         put_wall=put_wall,
         net_gex_by_strike=net_gex_map,
+        air_pockets=static_air_pockets,
     )
     return df, meta
 
@@ -1480,6 +1488,16 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
     sigma_u = float(inst_flow.get("sigma_u_depth_score", 0.80))
     flip_verdict_lbl = str(inst_flow.get("flip_integrity_label", "⚖️ ĐANG KIỂM ĐỊNH TRỤC GAMMA FLIP"))
     flip_verdict_col = str(inst_flow.get("flip_integrity_color", "#FACC15"))
+    dyn_vac = inst_flow.get("dynamic_vacuum") or {}
+    post_sweep = inst_flow.get("post_sweep_execution") or {}
+    post_sweep_lbl = str(post_sweep.get("label_vi", "THEO DÕI — CHỜ QUÉT & HẤP THỤ TẠI WALL"))
+    post_sweep_reg = str(post_sweep.get("post_sweep_regime", "MONITORING"))
+    vac_lbl = str(dyn_vac.get("label_vi", "ĐỘ SÂU THỊ TRƯỜNG ỔN ĐỊNH"))
+    post_sweep_col = (
+        "#F87171" if post_sweep_reg == "TOXIC_CASCADE_BLOCKED"
+        else ("#4ADE80" if post_sweep_reg == "POST_SWEEP_V_SHAPE"
+              else ("#38BDF8" if post_sweep_reg == "POST_SWEEP_PULLBACK" else "#94A3B8"))
+    )
 
     disloc_col = "#4ADE80" if delta_f_val >= 1.50 else ("#F87171" if delta_f_val <= -1.50 else "#38BDF8")
     hedge_col = "#4ADE80" if dealer_hedge_val > 50.0 else ("#F87171" if dealer_hedge_val < -50.0 else "#FACC15")
@@ -1593,6 +1611,10 @@ def build_microstructure_pinning_table_html(df: pd.DataFrame, meta: dict[str, An
                 <div style="background:rgba(2,6,23,0.75); border:1px solid #334155; border-radius:5px; padding:5px 10px; text-align:right;">
                     <div style="font-size:9.5px; color:#94A3B8;">BAYESIAN SNR (&rho;) &amp; KELLY SIZE</div>
                     <div id="micro-kelly-val" style="font-size:12px; font-weight:800; color:#FACC15;">&rho;={rho_vs:.2f} &bull; Kelly {kelly_mult:.2f}x ({session_name} &sigma;_u={sigma_u:.2f})</div>
+                </div>
+                <div style="background:rgba(2,6,23,0.75); border:1px solid {post_sweep_col}; border-radius:5px; padding:5px 10px; text-align:right;">
+                    <div style="font-size:9.5px; color:#94A3B8;">POST-SWEEP / LIQUIDITY VACUUM</div>
+                    <div id="micro-post-sweep-val" style="font-size:12px; font-weight:800; color:{post_sweep_col};" title="{vac_lbl}">{post_sweep_lbl}</div>
                 </div>
             </div>
         </div>
@@ -1756,7 +1778,7 @@ def generate_html_terminal(
     size_breakdown = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_breakdown, gex_regime=regime)
     size_call_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_cw, gex_regime=regime)
     size_put_wall = size_xauusd(equity_usd=10000.0, risk_pct=1.0, sl_usd=sl_dist_pw, gex_regime=regime)
-    # Major walls & air pockets
+    # Reuse precomputed static OI pockets when available; fallback only for synthetic tests
     major_down_wall, major_down_oi = find_next_major_wall(df, strike_below, direction="DOWN", oi_percentile=60.0)
     major_up_wall, major_up_oi = find_next_major_wall(df, strike_above, direction="UP", oi_percentile=60.0)
 
@@ -1766,30 +1788,28 @@ def generate_html_terminal(
     up_pockets = detect_strike_air_pockets(df, strike_above, major_up_wall, threshold_ratio=0.40)
     has_up_air_pocket = len(up_pockets) > 0 or (abs(major_up_wall - strike_above) > step * 1.5)
 
-    # Prepare Air Pockets & Wall Siege Ratios for All-in-One Orderflow Canvas
-    # Scan both immediately adjacent pockets and structural pockets below Put Wall / above Call Wall
-    down_beyond = detect_strike_air_pockets(df, major_down_wall - 80.0, major_down_wall, threshold_ratio=0.40)
-    up_beyond = detect_strike_air_pockets(df, major_up_wall, min(major_up_wall + 80.0, call_wall), threshold_ratio=0.40)
-
-    all_raw_pockets = down_pockets + down_beyond + up_pockets + up_beyond
-    all_air_pockets = []
-    seen_zones = set()
-    for p in all_raw_pockets:
-        p_from = float(getattr(p, "start_strike", getattr(p, "low_strike", getattr(p, "from_strike", 0.0))))
-        p_to = float(getattr(p, "end_strike", getattr(p, "high_strike", getattr(p, "to_strike", 0.0))))
-        gap = abs(p_to - p_from)
-        zone_key = (round(min(p_from, p_to), 1), round(max(p_from, p_to), 1))
-        if gap >= 5.0 and zone_key not in seen_zones:
-            seen_zones.add(zone_key)
-            avg_oi = float(getattr(p, "avg_oi", 0.0))
-            all_air_pockets.append({
-                "from": min(p_from, p_to),
-                "to": max(p_from, p_to),
-                "avg_oi": avg_oi,
-                "gap": gap,
-                "severity": "HIGH" if avg_oi < 150.0 else "MEDIUM",
-            })
-    meta["air_pockets"] = all_air_pockets
+    if not meta.get("air_pockets"):
+        down_beyond = detect_strike_air_pockets(df, major_down_wall - 80.0, major_down_wall, threshold_ratio=0.40)
+        up_beyond = detect_strike_air_pockets(df, major_up_wall, min(major_up_wall + 80.0, call_wall), threshold_ratio=0.40)
+        all_raw_pockets = down_pockets + down_beyond + up_pockets + up_beyond
+        all_air_pockets = []
+        seen_zones = set()
+        for p in all_raw_pockets:
+            p_from = float(getattr(p, "start_strike", getattr(p, "low_strike", getattr(p, "from_strike", 0.0))))
+            p_to = float(getattr(p, "end_strike", getattr(p, "high_strike", getattr(p, "to_strike", 0.0))))
+            gap = abs(p_to - p_from)
+            zone_key = (round(min(p_from, p_to), 1), round(max(p_from, p_to), 1))
+            if gap >= 5.0 and zone_key not in seen_zones:
+                seen_zones.add(zone_key)
+                avg_oi = float(getattr(p, "avg_oi", 0.0))
+                all_air_pockets.append({
+                    "from": min(p_from, p_to),
+                    "to": max(p_from, p_to),
+                    "avg_oi": avg_oi,
+                    "gap": gap,
+                    "severity": "HIGH" if avg_oi < 150.0 else "MEDIUM",
+                })
+        meta["air_pockets"] = all_air_pockets
     meta["call_wall_siege"] = call_wall_siege
     meta["put_wall_siege"] = put_wall_siege
 
@@ -1819,9 +1839,10 @@ def generate_html_terminal(
     # 6. Put Wall Rebound TP (BUY: must be strictly > entry_put_wall)
     tp_put_wall = max(entry_put_wall + 3.00, atm_strike)
 
-    # M5 Orderflow Tape & Volume Pulse processing
+    # Intraday Orderflow Tape & Volume Pulse processing
     m5_tape = meta.get("m5_tape") or {}
     m5_available = bool(m5_tape.get("available", False))
+    m5_tf_label = str(m5_tape.get("timeframe_label") or "M1")
     m5_candles = m5_tape.get("candles") or []
     m5_high = float(m5_tape.get("day_high") or (spot + 10.0))
     m5_low = float(m5_tape.get("day_low") or (spot - 10.0))
@@ -1829,7 +1850,7 @@ def generate_html_terminal(
     m5_avg_vol = float(m5_tape.get("avg_m5_volume") or 300.0)
 
     if m5_available:
-        m5_header_summary = f"Đỉnh ngày: <b style='color:#F87171;'>${m5_high:,.2f}</b> &bull; Đáy ngày: <b style='color:#4ADE80;'>${m5_low:,.2f}</b> &bull; Biên độ: <b style='color:#FACC15;'>${m5_range:.2f}$</b> &bull; TB Vol M5: <b style='color:#38BDF8;'>{m5_avg_vol:.0f} HĐ</b>"
+        m5_header_summary = f"Đỉnh ngày: <b style='color:#F87171;'>${m5_high:,.2f}</b> &bull; Đáy ngày: <b style='color:#4ADE80;'>${m5_low:,.2f}</b> &bull; Biên độ: <b style='color:#FACC15;'>${m5_range:.2f}$</b> &bull; TB Vol {m5_tf_label}: <b style='color:#38BDF8;'>{m5_avg_vol:.0f} HĐ</b>"
     else:
         m5_header_summary = "<span style='color:#64748B;'>Đang đồng bộ dữ liệu Orderflow trực tiếp từ sàn COMEX...</span>"
 
@@ -1867,7 +1888,7 @@ def generate_html_terminal(
             <td><span class="badge" style="{badge_style}">{c['note']}</span></td>
         </tr>""")
 
-    m5_table_rows_html = "".join(m5_rows) if m5_rows else "<tr><td colspan='8' style='text-align:center; color:#64748B; padding:16px;'>Dữ liệu Orderflow M5 đang cập nhật từ COMEX...</td></tr>"
+    m5_table_rows_html = "".join(m5_rows) if m5_rows else f"<tr><td colspan='8' style='text-align:center; color:#64748B; padding:16px;'>Dữ liệu Orderflow {m5_tf_label} đang cập nhật từ COMEX...</td></tr>"
 
     # Prepare Institutional Orderflow Reconstruction Strip & Active Strike Flow Rows
     inst_flow = meta.get("institutional_orderflow") or {}
@@ -2199,7 +2220,7 @@ def generate_html_terminal(
             <table>
                 <thead>
                     <tr>
-                        <th style="text-align:left;">Giờ VN (M5)</th>
+                        <th style="text-align:left;">Giờ VN ({m5_tf_label})</th>
                         <th style="text-align:right;">Giá Mở</th>
                         <th style="text-align:right;">Giá Cao</th>
                         <th style="text-align:right;">Giá Thấp</th>
@@ -2442,6 +2463,9 @@ def run_pipeline(
         "bvc_buy_pct": float((meta.get("institutional_orderflow") or {}).get("bvc_buy_pct", 50.0)),
         "flip_integrity_label": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_label", "")),
         "flip_integrity_color": str((meta.get("institutional_orderflow") or {}).get("flip_integrity_color", "#FACC15")),
+        "dynamic_vacuum": (meta.get("institutional_orderflow") or {}).get("dynamic_vacuum") or {},
+        "institutional_fvgs": (meta.get("institutional_orderflow") or {}).get("institutional_fvgs") or [],
+        "post_sweep_execution": (meta.get("institutional_orderflow") or {}).get("post_sweep_execution") or {},
         "market_open": bool((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("market_open", True)),
         "recent_candles": ((meta.get("m5_tape") if isinstance(meta.get("m5_tape"), dict) else {}).get("chart_candles") or [])[-60:],
     }
