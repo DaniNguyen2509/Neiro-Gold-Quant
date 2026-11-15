@@ -721,7 +721,10 @@ def load_options_data(
         if not os.path.exists(d):
             continue
         for pat in file_patterns:
-            matches = glob.glob(os.path.join(d, pat))
+            matches = sorted(
+                glob.glob(os.path.join(d, pat)),
+                key=lambda p: (len(os.path.basename(p)), os.path.basename(p).lower()),
+            )
             if matches:
                 target = matches[0]
                 try:
@@ -754,7 +757,7 @@ def _load_from_path(file_path: str, data_dir: Optional[str] = None) -> pd.DataFr
         parent_dir = data_dir or os.path.dirname(file_path) or 'data'
         if os.path.exists(parent_dir):
             try:
-                for gf_name in os.listdir(parent_dir):
+                for gf_name in sorted(os.listdir(parent_dir)):
                     if 'greek' in gf_name.lower() and gf_name.lower().endswith('.csv') and os.path.abspath(os.path.join(parent_dir, gf_name)) != os.path.abspath(file_path):
                         gdf = pd.read_csv(os.path.join(parent_dir, gf_name))
                         col_gamma = next((c for c in gdf.columns if 'gamma' in c.lower() and 'call' in c.lower()), None) or next((c for c in gdf.columns if 'gamma' in c.lower()), None)
@@ -1044,7 +1047,7 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
         return load_options_data()
 
     pattern = os.path.join(search_dir, "options_prices*.csv")
-    matched_files = glob.glob(pattern)
+    matched_files = sorted(glob.glob(pattern))
     # Exclude near_the_money slice if full file exists
     matched_files = [f for f in matched_files if "near_the_money" not in os.path.basename(f).lower()]
 
@@ -1052,7 +1055,7 @@ def load_multi_expiry_options(data_dir: Optional[str] = None) -> pd.DataFrame:
         return load_options_data(data_dir=data_dir)
 
     def _is_valid_gold_chain(df_cand: pd.DataFrame) -> bool:
-        if df_cand is None or df_cand.empty or len(df_cand) < 5 or "strike" not in df_cand.columns:
+        if df_cand is None or df_cand.empty or len(df_cand) < 2 or "strike" not in df_cand.columns:
             return False
         k_min = float(df_cand["strike"].min())
         k_max = float(df_cand["strike"].max())

@@ -253,7 +253,7 @@ on:
 ## IX. KHUNG KIỂM THỬ TOÀN DIỆN & CÁC BẤT BIẾN VI CẤU TRÚC (ADR-022)
 
 1. **Thiết kế 4 trụ cột kiểm thử chuyên biệt (125 tests mở rộng):**
-   - **Cổng dữ liệu & CI Invariant (`tests/test_data_gate.py`):** Kiểm định độ bao phủ Strike quanh giá GC hiện tại, cờ Stale độc lập với mtime, cơ chế chặn rò rỉ rác (`clean_val`), và yêu cầu CI verify step phải báo lỗi minh bạch thay vì lặng lẽ revert.
+   - **Cổng dữ liệu & CI Invariant (`tests/test_data_gate.py`, `src/quant_engine/loader.py`):** Kiểm định độ bao phủ Strike quanh giá GC hiện tại, cờ Stale độc lập với mtime, cơ chế chặn rò rỉ rác (`clean_val`), yêu cầu CI verify step phải báo lỗi minh bạch thay vì lặng lẽ revert, bất biến cấu hình `pytest` không phụ thuộc đường dẫn OS (D11), và sắp xếp tất định danh sách tệp CSV trong `load_options_data`/`load_multi_expiry_options` (ngưỡng chuỗi hợp lệ `>= 2` strikes) để tương thích hoàn toàn giữa Windows NTFS và Linux ext4.
    - **Lõi toán định lượng thuần Python (`tests/test_math_core.py`):** Kiểm định độ chính xác của Dekker-Brent `_brentq`, tính bất biến tỷ lệ OI của Zero Gamma Flip ($S^*$), xử lý biên độ biến động Black-76 IV.
    - **Tính nhất quán $T_{\text{floor}}$ & Rollover vi mô (`tests/test_expiry_rollover.py`):** Kiểm tra tính hữu hạn của Greeks khi $T \to 0$ (1 phút), logic tự động chuyển đổi hợp đồng cơ sở (`underlying_futures`), và loại bỏ ngày hết hạn trong quá khứ ở nhánh fallback.
    - **Smoke test render Dashboard end-to-end (`tests/test_hud_smoke.py`):** Xác minh toàn trình chuyển hóa CSV $\to$ HTML, kiểm tra hiển thị mốc tường/flip, bắt lỗi biến `stale_badge_html` bị bỏ quên và cờ fallback benchmark.

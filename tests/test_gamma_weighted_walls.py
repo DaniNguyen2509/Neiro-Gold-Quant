@@ -314,4 +314,59 @@ def test_three_tier_auto_discovery_weekly_monthly_quarterly_and_holidays():
             assert is_cme_business_day(exp_dt, adjust_holidays=True), f"2027 expiry {e} fell on holiday/weekend!"
 
 
+def test_load_options_and_multi_expiry_invariant_to_glob_order(tmp_path, monkeypatch):
+    """Simulate Linux ext4 unsorted glob order and verify master/sub-expiry determinism."""
+    import glob as glob_mod
+    from src.quant_engine import loader as loader_mod
 
+    sub1 = pd.DataFrame({
+        "strike": [4085.0, 4100.0],
+        "callOpenInterest": [5, 20],
+        "putOpenInterest": [400, 100],
+        "callVolume": [1, 2],
+        "putVolume": [20, 10],
+        "callGamma": [0.005, 0.005],
+        "putGamma": [0.005, 0.005],
+        "callBid": [105.0, 92.0],
+        "callAsk": [107.0, 94.0],
+        "putBid": [5.0, 8.0],
+        "putAsk": [6.0, 9.0],
+    })
+    sub2 = pd.DataFrame({
+        "strike": [4085.0, 4100.0],
+        "callOpenInterest": [10, 45],
+        "putOpenInterest": [20, 1706],
+        "callVolume": [0, 1],
+        "putVolume": [2, 40],
+        "callGamma": [0.002, 0.0021],
+        "putGamma": [0.002, 0.0021],
+        "callBid": [106.0, 93.0],
+        "callAsk": [108.0, 95.0],
+        "putBid": [6.0, 9.5],
+        "putAsk": [7.0, 10.5],
+    })
+    master = sub1.copy()
+    master.loc[master["strike"] == 4085.0, "putOpenInterest"] = 999
+
+    sub1.to_csv(tmp_path / "options_prices_GCZ26_OG4V26.csv", index=False)
+    sub2.to_csv(tmp_path / "options_prices_GCZ26_OGX26.csv", index=False)
+    master.to_csv(tmp_path / "options_prices_GCZ26.csv", index=False)
+
+    orig_glob = glob_mod.glob
+
+    def _reversed_glob(pattern: str):
+        # Force sub-files before master file to emulate non-lexicographic Linux filesystem order.
+        items = sorted(orig_glob(pattern), key=lambda p: len(p), reverse=True)
+        return items
+
+    monkeypatch.setattr(loader_mod.glob, "glob", _reversed_glob)
+
+    # 1. Single-file loader must still choose master file over longer _OG* sub-files.
+    loaded_single = loader_mod.load_options_data(data_dir=str(tmp_path))
+    assert loaded_single.loc[loaded_single["strike"] == 4085.0, "putOpenInterest"].iloc[0] == 999
+
+    # 2. Multi-expiry loader must aggregate the two _OG* sub-files directly and exclude master decoy.
+    loaded_multi = loader_mod.load_multi_expiry_options(str(tmp_path))
+    assert loaded_multi.attrs.get("aggregated_count") == 2
+    assert loaded_multi.loc[loaded_multi["strike"] == 4085.0, "putOpenInterest"].iloc[0] == 420
+    assert loaded_multi.loc[loaded_multi["strike"] == 4100.0, "putOpenInterest"].iloc[0] == 1806
