@@ -2696,92 +2696,6 @@ def _compute_live_microstructure_payload(tape: Any) -> dict[str, Any]:
     }
 
 
-def _load_strikes_fast(input_csv: str) -> np.ndarray | None:
-    """Reads only positive numeric strikes quickly from CSV without full DF parse."""
-    p = Path(input_csv)
-    if not p.exists():
-        return None
-    try:
-        import csv as _csv
-
-        vals: list[float] = []
-        with p.open("r", encoding="utf-8", errors="replace", newline="") as fh:
-            reader = _csv.DictReader(fh)
-            for row in reader:
-                raw_k = row.get("strike")
-                if raw_k is None:
-                    continue
-                k = clean_val(raw_k, default=0.0)
-                if k > 0.0:
-                    vals.append(k)
-        return np.array(vals, dtype=float) if vals else None
-    except Exception as err:
-        _logger.debug("Fast strike scan failed for %s: %s", input_csv, err)
-        return None
-
-
-def _run_lightweight_live_tick(input_csv: str = "data/options_prices_GCZ26.csv") -> list[str]:
-    """Lightweight JSON-only live update (< 250ms) when static options chain CSV is unchanged."""
-    base_path = Path("exports/version.json")
-    if not base_path.exists():
-        base_path = Path("version.json")
-    if not base_path.exists():
-        return []
-
-    version_data = json.loads(base_path.read_text(encoding="utf-8"))
-    tape = fetch_live_cme_m5_tape(limit=8, include_htf=False)
-    live_p = float(tape.get("latest_price", 0.0)) if isinstance(tape, dict) else 0.0
-    if live_p <= 500.0:
-        lp = basis_engine.fetch_live_cme_futures_price()
-        if lp is not None and lp > 500.0:
-            live_p = float(lp)
-
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
-    now_vn = now_utc.astimezone(datetime.timezone(datetime.timedelta(hours=7)))
-    version_data["timestamp_utc"] = now_utc.isoformat()
-    version_data["synced_at_vn"] = now_vn.strftime("%d/%m/%Y %H:%M:%S VN")
-    if live_p > 500.0:
-        version_data["spot_price"] = round(live_p, 2)
-        imp_f = float(version_data.get("implied_forward_price", 0.0) or 0.0)
-        if imp_f > 500.0:
-            version_data["forward_dislocation_usd"] = round(imp_f - live_p, 2)
-        strikes_arr = _load_strikes_fast(input_csv)
-        if strikes_arr is not None and len(strikes_arr) > 0:
-            s_up, s_next_up, s_dn, s_next_dn, s_step, _ = resolve_adaptive_tactical_strikes(
-                strikes_arr,
-                live_p,
-                dte_days=float(version_data.get("dte_days", 8.0) or 8.0),
-                call_wall=float(version_data.get("call_wall", 0.0) or 0.0),
-                put_wall=float(version_data.get("put_wall", 0.0) or 0.0),
-            )
-            version_data["strike_above"] = s_up
-            version_data["next_above"] = s_next_up
-            version_data["strike_below"] = s_dn
-            version_data["next_below"] = s_next_dn
-            version_data["step"] = s_step
-
-    if isinstance(tape, dict) and tape.get("available"):
-        version_data["market_open"] = bool(tape.get("market_open", True))
-        if tape.get("chart_candles"):
-            version_data["recent_candles"] = (tape.get("chart_candles") or [])[-60:]
-            micro = _compute_live_microstructure_payload(tape)
-            version_data.update(micro)
-            eff_spot = float(version_data.get("spot_price", 0.0) or 0.0)
-            eff_flip = float(version_data.get("zero_gamma_flip", 0.0) or 0.0)
-            if eff_spot > 500.0 and eff_flip > 0.0:
-                fi = evaluate_gamma_flip_integrity(
-                    spot_price=eff_spot,
-                    zero_gamma_flip=eff_flip,
-                    dealer_hedge_flow=float(version_data.get("dealer_hedge_futures_flow", 0.0) or 0.0),
-                    forward_dislocation_usd=float(version_data.get("forward_dislocation_usd", 0.0) or 0.0),
-                    bvc_buy_pct=float(micro.get("bvc_buy_pct", 50.0)),
-                    kyle_lambda_regime=str(micro.get("kyle_lambda_regime", "NORMAL_LIQUIDITY")),
-                )
-                version_data["flip_integrity_label"] = str(fi.get("flip_integrity_label", ""))
-                version_data["flip_integrity_color"] = str(fi.get("flip_integrity_color", "#FACC15"))
-    return _write_live_json_artifacts(version_data)
-
-
 def run_pipeline(
     input_csv: str = "data/options_prices_GCZ26.csv",
     output_files: list[str] | str | Path | None = None,
@@ -2939,94 +2853,6 @@ def clear_workspace_cache() -> int:
     return removed
 
 
-def start_local_live_bridge_server(port: int = 8765) -> None:
-    """Starts a zero-waste multithreaded HTTP JSON bridge with RAM caching and CORS."""
-    import threading
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-    from urllib.parse import parse_qs, urlparse
-
-    _bridge_cache_lock = threading.Lock()
-    _bridge_cache: dict[str, tuple[float, dict[str, Any]]] = {}
-    _bridge_cache_ttl_s = 1.8
-
-    class _YahooBridgeHandler(BaseHTTPRequestHandler):
-        def log_message(self, format, *args):
-            pass  # Silent zero-waste logging
-
-        def _send_json(self, payload: dict, status: int = 200) -> None:
-            body = json.dumps(payload).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            origin = self.headers.get("Origin") if self.headers else None
-            if origin is None:
-                self.send_header("Access-Control-Allow-Origin", "*")
-            elif origin == "null" or origin.startswith(("http://127.0.0.1", "http://localhost")):
-                self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_GET(self):
-            parsed = urlparse(self.path)
-            if parsed.path.endswith("/version.json"):
-                v_path = Path("version.json")
-                if v_path.exists():
-                    try:
-                        data = json.loads(v_path.read_text(encoding="utf-8"))
-                        self._send_json(data)
-                        return
-                    except Exception as ver_err:
-                        _logger.warning("Failed reading version.json in bridge handler: %s", ver_err)
-                self._send_json({"error": "version.json not found"}, status=404)
-                return
-
-            if parsed.path == "/api/yahoo_gc":
-                qs = parse_qs(parsed.query)
-                tf = (qs.get("tf", ["1m"])[0] or "1m").lower()
-                now_mono = time.monotonic()
-                with _bridge_cache_lock:
-                    cached = _bridge_cache.get(tf)
-                    if cached and (now_mono - cached[0]) < _bridge_cache_ttl_s:
-                        self._send_json(cached[1])
-                        return
-
-                tape = fetch_live_cme_m5_tape(limit=8, include_htf=(tf != "1m"))
-                candles: list[dict[str, Any]] = []
-                if isinstance(tape, dict):
-                    candles = (
-                        tape.get("chart_candles", [])
-                        if tf == "1m"
-                        else (tape.get("tf_candles") or {}).get(tf, tape.get("chart_candles", []))
-                    ) or []
-                micro_live = _compute_live_microstructure_payload(tape)
-                payload = {
-                    "available": bool(tape.get("available", False)) if isinstance(tape, dict) else False,
-                    "market_open": bool(tape.get("market_open", True)) if isinstance(tape, dict) else True,
-                    "latest_price": float(tape.get("latest_price", 0.0)) if isinstance(tape, dict) else 0.0,
-                    "tf": tf,
-                    "candles": candles[-180:],
-                    **micro_live,
-                }
-                with _bridge_cache_lock:
-                    _bridge_cache[tf] = (time.monotonic(), payload)
-                self._send_json(payload)
-                return
-
-            self._send_json({"status": "ok", "service": "neiro-yahoo-gc-bridge"})
-
-    def _serve():
-        try:
-            server = ThreadingHTTPServer(("127.0.0.1", port), _YahooBridgeHandler)
-            server.daemon_threads = True
-            server.serve_forever()
-        except Exception as exc:
-            print(f"[BRIDGE WARNING] Local bridge port {port} unavailable: {exc}")
-
-    t = threading.Thread(target=_serve, daemon=True)
-    t.start()
-
-
 def main():
     parser = argparse.ArgumentParser(description="Neiro-Quant Tactical HTML Dashboard Generator")
     parser.add_argument("--input", default="data/options_prices_GCZ26.csv", help="Input options CSV")
@@ -3034,7 +2860,6 @@ def main():
     parser.add_argument("--basis", type=float, default=None, help="Dynamic Basis (Optional)")
     parser.add_argument("--no-mt5", action="store_true", default=True, help="Disable MT5 Spot conversion and display pure CME Futures levels only (Default: True)")
     parser.add_argument("--with-mt5", dest="no_mt5", action="store_false", help="Enable MT5 Spot conversion column")
-    parser.add_argument("--loop", type=int, default=0, help="Continuous update interval in seconds (e.g. 60 for live 1-minute loop). Default: 0 (run once)")
     parser.add_argument("--clear-cache", action="store_true", help="Clear temporary cache files, garbage collection, and spot cache")
     args = parser.parse_args()
 
@@ -3050,54 +2875,10 @@ def main():
         ram_mb = get_process_memory_mb()
         print(f"[CACHE CLEANUP] Flushed spot and memory caches. Removed {removed_count} temporary files. Current RAM: {ram_mb:.1f} MB.")
 
-    if args.loop > 0:
-        start_local_live_bridge_server(port=8765)
-        print(f"[LIVE RUNNER] Started local Yahoo GC=F CORS bridge at http://127.0.0.1:8765/api/yahoo_gc")
-        print(f"[LIVE RUNNER] Starting continuous dashboard update loop (Interval: {args.loop}s)... Press Ctrl+C to stop.")
-        iteration = 0
-        last_csv_sig: tuple[Any, ...] | None = None
-        last_full_html_mono = 0.0
-        while True:
-            iteration += 1
-            now_vn = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%H:%M:%S")
-            try:
-                cur_csv_sig = _build_csv_cache_signature(Path(args.input))
-                need_full_rebuild = (
-                    iteration == 1
-                    or cur_csv_sig != last_csv_sig
-                    or (time.monotonic() - last_full_html_mono) >= 300.0
-                )
-                if need_full_rebuild:
-                    saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
-                    last_csv_sig = cur_csv_sig
-                    last_full_html_mono = time.monotonic()
-                    mode_tag = "Full Rebuild"
-                else:
-                    saved = _run_lightweight_live_tick(input_csv=args.input)
-                    mode_tag = "Live JSON Tick"
-
-                # Clear ephemeral quote caches for fresh next cycle without discarding unchanged static CSV
-                basis_engine.clear_spot_cache()
-                gc.collect()
-
-                if iteration % 20 == 0:
-                    removed_count = clear_workspace_cache()
-                    last_csv_sig = None
-                    if removed_count > 0:
-                        print(f"[{now_vn}] [Zero-Waste] Cleaned {removed_count} temporary cache files.")
-
-                ram_mb = get_process_memory_mb()
-                ram_str = f" | RAM: {ram_mb:.1f} MB" if ram_mb > 0 else ""
-                print(f"[{now_vn}] Iteration #{iteration} ({mode_tag}){ram_str}: Updated {len(saved)} files. Sleeping {args.loop}s...")
-            except Exception as e:
-                print(f"[{now_vn}] Warning during iteration #{iteration}: {e}. Retrying in {args.loop}s...")
-                gc.collect()
-            time.sleep(args.loop)
-    else:
-        saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
-        print(f"[SUCCESS] Generated {len(saved)} dashboard files:")
-        for s in saved:
-            print(f"   -> {s}")
+    saved = run_pipeline(input_csv=args.input, output_files=args.output, basis=args.basis, no_mt5=args.no_mt5)
+    print(f"[SUCCESS] Generated {len(saved)} dashboard files:")
+    for s in saved:
+        print(f"   -> {s}")
 
 
 if __name__ == "__main__":

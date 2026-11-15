@@ -582,8 +582,24 @@ export class CTraderFeedDO extends DurableObject {
 
         this.lastClientPollMs = Date.now();
         const tf = normalizeTf(url.searchParams.get("tf"));
+        const feedMode = String((this.env && this.env.FEED_MODE) || "auto").trim().toLowerCase();
+        const targetSym = (this.symbolInfo && this.symbolInfo.symbolName) || String((this.env && this.env.CTRADER_SYMBOL) || "XAUUSDF");
+        const targetSource = `ctrader_${String((this.env && this.env.CTRADER_ENV) || "demo").toLowerCase()}_xauusdf`;
         const tok = await this.loadTokens();
         if (!tok || (!tok.accessToken && !tok.refreshToken)) {
+            if (feedMode === "ctrader_only") {
+                return jsonResponse({
+                    available: false,
+                    market_open: isCmeGlobexOpenUtc(Date.now()),
+                    latest_price: 0.0,
+                    tf,
+                    symbol: targetSym,
+                    source: targetSource,
+                    basis_offset: 0.0,
+                    candles: [],
+                    error: "cTrader OAuth token not authorized yet (ctrader_only mode)",
+                }, this.env, 503, origin);
+            }
             return jsonResponse(await fetchYahooGcPayload(tf), this.env, 200, origin);
         }
         const cached = this.tfCache.get(tf);
@@ -648,9 +664,19 @@ export class CTraderFeedDO extends DurableObject {
             return jsonResponse(payload, this.env, 200, origin);
         } catch (err) {
             this.lastError = String(err && err.message ? err.message : err);
-            const fallback = await fetchYahooGcPayload(tf);
-            fallback.ctrader_fallback_reason = this.lastError;
-            return jsonResponse(fallback, this.env, 200, origin);
+            // Zero-Mixing Guard: Once OAuth token exists (Pepperstone mode active),
+            // never fall back to -10m delayed Yahoo candles on a transient WS hiccup.
+            return jsonResponse({
+                available: false,
+                market_open: isCmeGlobexOpenUtc(Date.now()),
+                latest_price: this.liveSpotPrice || 0.0,
+                tf,
+                symbol: targetSym,
+                source: targetSource,
+                basis_offset: 0.0,
+                candles: [],
+                error: this.lastError,
+            }, this.env, 503, origin);
         }
     }
 }
@@ -717,6 +743,19 @@ export default {
 
         if (url.pathname === "/api/yahoo_gc" || url.pathname === "/") {
             const tf = normalizeTf(url.searchParams.get("tf"));
+            if (feedMode === "ctrader_only" && !hasCTraderAppSecrets) {
+                return jsonResponse({
+                    available: false,
+                    market_open: isCmeGlobexOpenUtc(Date.now()),
+                    latest_price: 0.0,
+                    tf,
+                    symbol: String((env && env.CTRADER_SYMBOL) || "XAUUSDF"),
+                    source: `ctrader_${String((env && env.CTRADER_ENV) || "demo").toLowerCase()}_xauusdf`,
+                    basis_offset: 0.0,
+                    candles: [],
+                    error: "cTrader secrets or FEED_DO binding missing in ctrader_only mode",
+                }, env, 503, origin);
+            }
             if (feedMode !== "yahoo" && hasCTraderAppSecrets) {
                 const stub = env.FEED_DO.get(env.FEED_DO.idFromName("gold-feed"));
                 return stub.fetch(request);

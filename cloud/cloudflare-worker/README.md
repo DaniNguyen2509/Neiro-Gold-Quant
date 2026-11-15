@@ -2,8 +2,8 @@
 
 Worker này giúp Dashboard trên **GitHub Pages** và **điện thoại** nhận nến vàng liên tục 24/7 với chi phí **$0/tháng** (không cần thuê VPS), hỗ trợ 2 chế độ:
 
-1. **Giai đoạn 1 (Chạy ngay trong 3 phút — Yahoo `GC=F`):** Không cần khóa API nào, bật lên là điện thoại tự cập nhật nến & VPIN/BVC/Air Pocket qua HTTPS CORS.
-2. **Giai đoạn 2 (0 giây Real-Time — Pepperstone cTrader Demo `XAUUSDF`):** Dùng tài khoản **cTrader Demo** + scope **`accounts` (chỉ đọc)** qua cổng WebSocket JSON chính thức `wss://demo.ctraderapi.com:5036`. Giữ nguyên giá thô `XAUUSD-F` (**basis_offset = 0.0**, không cộng bù `+$3`). Tự động gia hạn Access Token 30 ngày vĩnh viễn và tự ngắt nghỉ sau 5 phút không ai xem để bảo toàn gói Cloudflare Free (ước tính ~17% giới hạn 100k req/ngày).
+1. **Giai đoạn 1 (Chạy ngay trong lúc chờ Spotware duyệt App — Yahoo `GC=F`):** Không cần khóa API nào, bật lên là cả điện thoại và máy tính tự cập nhật nến & VPIN/BVC/Air Pocket mỗi 3 giây qua Cloudflare Worker (không cần bật cầu nối `--loop` trên laptop).
+2. **Giai đoạn 2 (0 giây Real-Time & Chống Trộn Nến — Pepperstone cTrader Demo `XAUUSDF`):** Dùng tài khoản **cTrader Demo** + scope **`accounts` (chỉ đọc)** qua cổng WebSocket JSON chính thức `wss://demo.ctraderapi.com:5036`. Giữ nguyên giá thô `XAUUSD-F` (**basis_offset = 0.0**, không cộng bù `+$3`). Tự động gia hạn Access Token 30 ngày vĩnh viễn và tự ngắt nghỉ sau 5 phút không ai xem để bảo toàn gói Cloudflare Free (ước tính ~17% giới hạn 100k req/ngày). **Chống trộn dữ liệu (Zero-Mixing Guarantee):** ngay sau khi cấp quyền OAuth xong (`tok` đã lưu trong Durable Object) hoặc đặt `FEED_MODE = "ctrader_only"`, Worker **tuyệt đối không fallback về nến Yahoo `-10m`** nếu WS cTrader chập chờn — trả HTTP `503` (`available: false`) để giao diện giữ nguyên nến Pepperstone gần nhất và tránh làm nhiễu `VPIN` / `KHỐI 6`.
 
 ---
 

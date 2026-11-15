@@ -497,7 +497,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     let overlayCompactMode = true;
     let chartExpanded = false;
     let liveTacticalMatrix = null;
-    let lastBridgeSuccessEpoch = 0;
     let lastCloudWorkerEpoch = 0;
     let lastCloudFeedSource = '';
     let lastCloudSuccessEpoch = 0;
@@ -1297,13 +1296,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             badge.style.borderColor = 'rgba(148, 163, 184, 0.4)';
             badge.style.color = '#CBD5E1';
             badge.innerText = '● CME GLOBEX: CLOSED (SETTLED)';
-            return;
-        }}
-        if (lastBridgeSuccessEpoch && (now - lastBridgeSuccessEpoch) < 12000) {{
-            badge.style.background = 'rgba(34, 197, 94, 0.18)';
-            badge.style.borderColor = 'rgba(34, 197, 94, 0.45)';
-            badge.style.color = '#4ADE80';
-            badge.innerText = '● LIVE BRIDGE (2.5s)';
             return;
         }}
         if (lastCloudWorkerEpoch && (now - lastCloudWorkerEpoch) < 15000) {{
@@ -2245,14 +2237,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
     async function fetchCloudVersionJson() {{
         const ts = Date.now();
-        const urls = [
-            'http://127.0.0.1:8765/version.json?_t=' + ts,
-            'version.json?_t=' + ts,
-            'https://raw.githubusercontent.com/DaniNguyen2509/Neiro-Gold-Quant/main/version.json?_t=' + ts
-        ];
-        if (window.location.protocol === 'file:') {{
-            urls.splice(1, 1); // Skip relative file:// fetch to avoid CORS error in console
+        const urls = [];
+        if (window.location.protocol !== 'file:') {{
+            urls.push('version.json?_t=' + ts);
         }}
+        urls.push('https://raw.githubusercontent.com/DaniNguyen2509/Neiro-Gold-Quant/main/version.json?_t=' + ts);
         for (let i = 0; i < urls.length; i++) {{
             try {{
                 const res = await fetch(urls[i], {{ cache: 'no-store' }});
@@ -2336,13 +2325,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const ts = Date.now();
         lastYahooPollEpoch = ts;
         const candidates = [];
-        if (isLocalBridgeMode) {{
-            candidates.push({{
-                kind: 'bridge',
-                timeoutMs: 1500,
-                url: 'http://127.0.0.1:8765/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts,
-            }});
-        }}
         const workerUrl = getCloudFeedWorkerUrl();
         if (workerUrl) {{
             candidates.push({{
@@ -2359,11 +2341,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 if (!payload || (!payload.available && !(Array.isArray(payload.candles) && payload.candles.length > 0))) {{
                     continue;
                 }}
-                if (cand.kind === 'bridge') {{
-                    lastBridgeSuccessEpoch = Date.now();
-                }} else {{
-                    lastCloudWorkerEpoch = Date.now();
-                }}
+                lastCloudWorkerEpoch = Date.now();
                 const nextSrc = String(payload.source || '');
                 const sourceSwitched = Boolean(nextSrc && lastCloudFeedSource && nextSrc !== lastCloudFeedSource)
                     || Boolean(!lastCloudFeedSource && nextSrc.startsWith('ctrader_'));
@@ -2418,8 +2396,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const m = window.INITIAL_META;
         const nowMs = Date.now();
         const streamLive = Boolean(
-            (lastBridgeSuccessEpoch && (nowMs - lastBridgeSuccessEpoch) < 15000)
-            || (lastCloudWorkerEpoch && (nowMs - lastCloudWorkerEpoch) < 15000)
+            lastCloudWorkerEpoch && (nowMs - lastCloudWorkerEpoch) < 15000
         );
         const allowLiveMarketState = Boolean(opts.forceLive || !streamLive);
 
@@ -2539,13 +2516,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     }}
 
     // 100% Pure CME Gold Futures (GC=F) Real-Time Stream (No Crypto PAXG Proxy Contamination)
-    const isLocalBridgeMode = (
-        window.location.protocol === 'file:'
-        || window.location.hostname === '127.0.0.1'
-        || window.location.hostname === 'localhost'
-    );
     function getLivePollIntervalMs() {{
-        if (isLocalBridgeMode) return 2500;
         return getCloudFeedWorkerUrl() ? 3000 : 10000;
     }}
 

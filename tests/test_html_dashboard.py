@@ -704,57 +704,12 @@ def test_sync_latest_cloud_options_csv_rejects_corrupt_payload(
     assert target.read_text(encoding="utf-8") == valid_seed
 
 
-def test_lightweight_live_tick_updates_tactical_strikes_and_forward_dislocation(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """_run_lightweight_live_tick refreshes tactical strikes and delta-F cleanly."""
-    import json
+def test_legacy_local_loop_bridge_removed() -> None:
+    """Confirms the legacy --loop and 127.0.0.1:8765 local bridge path was retired."""
     from src.hud import html_dashboard as hd
 
-    exports_dir = tmp_path / "exports"
-    exports_dir.mkdir()
-    csv_path = tmp_path / "options_prices_GCZ26.csv"
-    pd.DataFrame(
-        [
-            {"strike": 4000.0},
-            {"strike": 4025.0},
-            {"strike": 4050.0},
-        ]
-    ).to_csv(csv_path, index=False)
-
-    seed = {
-        "spot_price": 4010.0,
-        "implied_forward_price": 4035.5,
-        "forward_dislocation_usd": 25.5,
-        "call_wall": 4050.0,
-        "put_wall": 4000.0,
-        "zero_gamma_flip": 4020.0,
-        "dte_days": 30.0,
-        "strike_above": 4025.0,
-        "strike_below": 4000.0,
-        "dealer_hedge_futures_flow": 120.0,
-    }
-    (exports_dir / "version.json").write_text(json.dumps(seed), encoding="utf-8")
-
-    fake_tape = {
-        "available": True,
-        "latest_price": 4031.25,
-        "market_open": True,
-        "chart_candles": [
-            {"open": 4029.0, "high": 4032.0, "low": 4028.5, "close": 4031.25, "volume": 150}
-            for _ in range(30)
-        ],
-    }
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(hd, "fetch_live_cme_m5_tape", lambda limit=8, include_htf=False: fake_tape)
-
-    written = hd._run_lightweight_live_tick(input_csv=str(csv_path))
-    assert written
-    updated = json.loads((exports_dir / "version.json").read_text(encoding="utf-8"))
-    assert updated["spot_price"] == 4031.25
-    assert updated["strike_above"] == 4050.0
-    assert updated["strike_below"] == 4025.0
-    assert updated["forward_dislocation_usd"] == 4.25
-    assert updated["flip_integrity_label"] != ""
+    assert not hasattr(hd, "_run_lightweight_live_tick")
+    assert not hasattr(hd, "start_local_live_bridge_server")
+    assert not hasattr(hd, "_load_strikes_fast")
 
 

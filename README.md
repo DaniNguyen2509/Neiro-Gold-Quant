@@ -28,26 +28,25 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 ---
 
-## 🚀 KHỞI CHẠY LIVE TERMINAL CỤC BỘ (1-CLICK LOCAL LIVE RUNNER)
+## 🚀 KHỞI CHẠY & VẬN HÀNH TERMINAL (DESKTOP & MOBILE 1 LUỒNG DUY NHẤT)
 
-Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật liên tục 60 giây/lần trực tiếp trên máy:
-- **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 9-trong-1:
+Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đều kết nối **1 luồng trực tiếp duy nhất** qua Cloudflare Worker mỗi 3 giây (tự động nâng cấp lên Pepperstone cTrader `XAUUSDF` 0 giây sau khi OAuth, không cần chạy server `--loop` nền trên laptop):
+- **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 8-trong-1:
   - `[1]` Mở Terminal Online 100% (GitHub Pages Cloud)
   - `[2]` Đồng bộ dữ liệu & code mới nhất từ GitHub Cloud (`git pull origin main`)
-  - `[3]` Chạy Live Terminal nội bộ (cập nhật 15s/lần + tự động dọn RAM)
-  - `[4]` Cào & đồng bộ dữ liệu Options Chain mới nhất lên Cloud
-  - `[5]` Dọn sạch Cache & giải phóng bộ nhớ RAM
-  - `[6]` Cập nhật Snapshot 1 lần (`exports/index.html`)
-  - `[7]` Kiểm thử hệ thống toàn diện (`pytest`)
-  - `[8]` Mở thư mục `data/` để thả file CSV thủ công
-  - `[9]` Thoát
+  - `[3]` Cào & đồng bộ dữ liệu CME Options Chain mới nhất lên Cloud
+  - `[4]` Dọn sạch Cache & giải phóng bộ nhớ RAM
+  - `[5]` Cập nhật Snapshot 1 lần (`exports/index.html`)
+  - `[6]` Kiểm thử hệ thống toàn diện (`pytest`)
+  - `[7]` Mở thư mục `data/` để thả file CSV thủ công
+  - `[8]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
-  # Chạy Live Loop 15s/lần (Tự động giám sát RAM và giải phóng bộ nhớ)
-  python -m src.hud.html_dashboard --loop 15
-
-  # Cào dữ liệu Options Chain đa kỳ hạn từ CME Barchart
+  # Cào dữ liệu CME Options Chain đa kỳ hạn từ Barchart
   python -m src.collector.scraper --output data/options_prices_GCZ26.csv
+
+  # Tạo lại Snapshot 1 lần (HTML + version.json + tactical_levels.json)
+  python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html index.html --no-mt5
 
   # Thu thập chuỗi Options Proxy GLD & tính Cost of Carry
   python -m src.collector.gold_collector

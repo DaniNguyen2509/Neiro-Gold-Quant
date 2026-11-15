@@ -35,7 +35,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
      * Khối 1: Canvas Lightweight Charts 60 FPS tích hợp Air Pocket Vacuum Zones (hiển thị xuyên suốt cả biểu đồ nến và cột Greeks Profile với nhãn cảnh báo [CẤM ĐỠ DAO]), 4-Column Greeks Profile (GEX, VEX, CHEX, THETA với Dynamic Visible Normalization & Sublinear Boost giúp hiển thị sắc nét Vanna/Charm ở mọi khung zoom, kèm Tooltip trực quan khi rê chuột), Wall Lines, Floating HUD, Live Price Line.
      * Khối 2: Unified Greeks & Orderflow Matrix (tích hợp đầy đủ Net GEX, Net VEX, Net CHEX, Net Delta, OI, Volume, Pinning Pressure).
      * Khối 3: Plotly 4-Panel Quant Ladder (GEX, Volume/OI, VEX, CHEX) hiển thị song song ngay phía dưới.
-   - **Realtime Tick Engine & Local/Cloud Bridge (Zero Reload & Zero Proxy Contamination):** Gỡ bỏ hoàn toàn `window.location.reload()`, bộ sinh nến ngẫu nhiên (`Math.random()`) và luồng WebSocket proxy `paxgusdt@aggTrade`. Giá và nến mới được cập nhật trực tiếp tại chỗ (`mergeLiveCandles` & `candleSeries.update(...)`) 100% từ Yahoo `GC=F` qua cầu nối HTTP CORS nội bộ (`127.0.0.1:8765/api/yahoo_gc` khi chạy `--loop`) và `version.json` (kèm `recent_candles`), bảo toàn nguyên vẹn tọa độ zoom/pan của trader. Đồng thời:
+   - **Realtime Tick Engine & Cloudflare Worker Relay (Zero Reload & Zero Proxy Contamination):** Gỡ bỏ hoàn toàn `window.location.reload()`, bộ sinh nến ngẫu nhiên (`Math.random()`), cầu nối laptop `--loop` / `127.0.0.1:8765` và luồng WebSocket proxy `paxgusdt@aggTrade`. Giá và nến mới được cập nhật trực tiếp tại chỗ (`mergeLiveCandles` & `candleSeries.update(...)`) qua 1 luồng Cloudflare Worker duy nhất (`/api/yahoo_gc` mỗi `3s` cho cả Máy tính & Điện thoại) và `version.json` (kèm `recent_candles`), bảo toàn nguyên vẹn tọa độ zoom/pan của trader. Đồng thời:
      * **20-Day Donchian CTA Breakout (`H20` / `L20`):** Tính toán trực tiếp từ đỉnh/đáy 20 phiên thực tế của nến `1D` `GC=F` (`daily_candles`).
      * **Strict Lee-Ready Quote Classification:** Chỉ phân loại hướng chủ động (`w_c`, `w_p`) khi tồn tại báo giá 2 chiều `Bid` và `Ask` hợp lệ (`Bid > 0`, `Ask > Bid`), gán `0.0` cho các strike thiếu thanh khoản báo giá thay vì đoán trọng số giả định.
      * **Auto-Sync Cloud Options CSV:** Tự động đồng bộ `data/options_prices_GCZ26.csv` mới nhất từ GitHub Cloud nếu file cục bộ đã cũ quá 2 giờ.
@@ -44,7 +44,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
      * **End-to-End Pipeline Latency, Threaded Live Bridge & Scalping Cockpit Optimization (Đã triển khai — [ADR-027](decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md)):** Triển khai đầy đủ 5 giai đoạn tối ưu hóa toàn trình: vector hóa `loader.py` & `dealer.py`, chữa lành IV chọn lọc, cache HTF `1h`/`1d` tải song song + nén HTTP gzip `_read_yahoo_json`, cầu nối `ThreadingHTTPServer` RAM-cached (`/api/yahoo_gc` `< 8ms`), bỏ gọi `build_plotly_figure` trên đường chạy chính (giữ nguyên hàm cho tests), tách chu kỳ tĩnh/động trong `--loop`, cắt tỉa hành lang `±$600` (`INITIAL_OPTIONS` & `squeeze_ladder`), giới hạn DOM Pinning `±35 strikes` (`<= 71` dòng) và khử trùng lặp 3 thẻ Orderflow tĩnh ở `KHỐI 5`, không xâm phạm `mt5/Indicators/*.mq5`.
      * **VPIN Background Dispersion & KHỐI 6 Strategy Calibration (Đã triển khai — [ADR-028](decisions/ADR-028-vpin-and-tactical-strategy-calibration.md)):** Hiệu chỉnh `compute_vpin_bvc` (chuẩn hóa phân tán nền `candles[:-6]` + chia đều 5 equal-volume buckets), đẩy Entry Breakout `Squeeze`/`Breakdown` ra ngoài vùng quét râu (`>= ±2.80`), nâng Hard SL tối thiểu `\$5.00` theo ATR `M5`, giới hạn TP `<= 1.5x Risk` và bổ sung huy hiệu `[KÍCH HOẠT]` / `[CHỜ XÁC NHẬN]` / `[TẠM KHÓA]` theo Gamma Regime / Zero Gamma / Put Wall / Air Pocket / VPIN trên `KHỐI 6`.
      * **Cockpit Tác chiến 3 Giây & Đồng bộ 100% Realtime JS/Python (Đã triển khai — [ADR-029](decisions/ADR-029-simplified-3sec-cockpit-and-full-realtime-sync.md)):** Sửa triệt để lỗi `currentTfKey` chặn polling, bổ sung thanh `#tactical-3s-command-bar` (4 ô ngay dưới chart), đơn giản hóa nhãn chiến lược & chế độ theo 4 kèo trực quan (`ƯU TIÊN ĐÁNH ĐẢO CHIỀU (GEX +)` / `ƯU TIÊN ĐÁNH THUẬN CHIỀU (GEX -)` và `1. THUẬN CHIỀU BUY (Phá cản)`, `2. ĐẢO CHIỀU SELL (Chạm cản)`, `3. ĐẢO CHIỀU BUY (Chạm sàn)`, `4. THUẬN CHIỀU SELL (Thủng sàn)` + nhãn `CHEX · HÚT GIÁ VỀ ĐÂY` / `VEX · VÙNG BẬT / GIẬT SÓNG` & tooltip GEX), bố cục 2 tầng CSS Flexbox `order` (đẩy `KHỐI 4 Spine` & `KHỐI 6` mở sẵn lên ngay dưới Command Bar và thu gọn các bảng kiểm toán vào `<details>` giữ nguyên thứ tự landmark), cổng hóa 1:1 `computeLiveVpinBvcJs` & `computeTacticalMatrixJs` với Python ADR-028, thu gọn HUD 5 dòng cốt lõi, gỡ Canvas Gauge đè hình và thêm chế độ `Lớp phủ: Tinh gọn / Đầy đủ` + payload `_compute_live_microstructure_payload` trên `/api/yahoo_gc` (trong đó chế độ `Tinh gọn` luôn vẽ trực tiếp các đường Cản/Sàn strike trong ngày & Trạm Options kế cận `CẢN TRÊN / SÀN DƯỚI / TRẠM TRÊN / TRẠM DƯỚI / TƯỜNG LỚN ↑↓` kèm các vùng `Air Pocket Vacuum` phân tầng độ mờ theo mức độ `RỖNG CỰC MẠNH` (cam mờ) / `RỖNG MẠNH` (xanh dương mờ) / `MỎNG NHẸ` (xám trắng mờ) ngay trên chart & cột Profile).
-     * **Cloudflare Worker Dual-Mode Relay & Pepperstone cTrader Demo Feed (Đã triển khai Giai đoạn A — [ADR-030](decisions/ADR-030-cloudflare-worker-dual-mode-ctrader-feed.md)):** Triển khai relay không VPS chi phí `$0` tại `cloud/cloudflare-worker/` (hỗ trợ proxy `GC=F` tức thì + SQLite Durable Object `CTraderFeedDO` kết nối `wss://demo.ctraderapi.com:5036` chỉ đọc scope `accounts` lấy nến & spot thô `XAUUSDF` với `basis_offset = 0.0`, tự gia hạn token 30 ngày & tự ngủ sau 5p idle), cấu hình qua `[cloud].live_feed_worker_url` / nút `Cloud Feed` / `?worker=...` làm fallback trong `pollLiveYahooChart()`.
+     * **Cloudflare Worker Dual-Mode Relay & Pepperstone cTrader Demo Feed (Đã triển khai Giai đoạn A — [ADR-030](decisions/ADR-030-cloudflare-worker-dual-mode-ctrader-feed.md)):** Triển khai relay không VPS chi phí `$0` tại `cloud/cloudflare-worker/` (hỗ trợ proxy `GC=F` trong lúc chờ duyệt App `48894`, tự chuyển sang SQLite Durable Object `CTraderFeedDO` kết nối `wss://demo.ctraderapi.com:5036` chỉ đọc scope `accounts` lấy nến & spot thô `XAUUSDF` với `basis_offset = 0.0`, tự gia hạn token 30 ngày & tự ngủ sau 5p idle). Sau khi có OAuth token hoặc bật `ctrader_only`, Worker khóa chặt không fallback về Yahoo `-10m` (tránh trộn nến làm loạn VPIN/KHỐI 6); đồng thời gỡ bỏ cầu nối `--loop` / `127.0.0.1:8765` để cả Desktop và Mobile dùng chung 1 luồng `pollLiveYahooChart()` duy nhất (`3s/lần`). Trong khi đó `Barchart` vẫn là nguồn duy nhất cho CME Options Chain / OI.
 5. **Lưới Cron Đa Tầng Pre-Session Radar (3 Khối):**
    - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt Open Interest chính thức từ CME Clearing.
    - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.
@@ -93,19 +93,16 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
 # 2. Cào dữ liệu Options Chain COMEX Gold (GCZ26)
 python -m src.collector.scraper --output data/options_prices_GCZ26.csv
 
-# 3. Sinh Terminal Tác chiến Dual-View (Snapshot 1 lần)
-python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/index.html
+# 3. Sinh Terminal Tác chiến Snapshot 1 lần (tự nối Cloudflare Worker 3s trên trình duyệt)
+python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html index.html --no-mt5
 
-# 4. Chạy Live Terminal liên tục (vòng lặp 15s tự giải phóng RAM)
-python -m src.hud.html_dashboard --loop 15
-
-# 5. Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM (< 15MB)
+# 4. Dọn dẹp cache không gian làm việc và thu hồi bộ nhớ RAM (< 15MB)
 python -m src.hud.html_dashboard --clear-cache
 
-# 6. Kiểm thử tự động (Unit, Math, Parity & Playwright E2E Suite)
+# 5. Kiểm thử tự động (Unit, Math, Parity & Playwright E2E Suite)
 python -m pytest tests/ -v --tb=short
 
-# 7. Kiểm tra chuẩn mã nguồn
+# 6. Kiểm tra chuẩn mã nguồn
 python -m ruff check src/ tests/
 python -m ruff format src/ tests/
 ```
@@ -145,7 +142,7 @@ Neiro-Gold-Quant/
 │   │   └── strategy.py               # Ma trận chiến lược KHỐI 6, compute_tactical_intraday_matrix, precompute_squeeze_ladder
 │   └── hud/
 │       ├── neiro_terminal.py         # Canvas 60 FPS, 5-line HUD, Lớp phủ Tinh gọn/Đầy đủ & JS ADR-028 Live Engine
-│       └── html_dashboard.py         # 3s Command Bar, 2-tier Flex Cockpit Generator & Live Bridge Micro-Payload
+│       └── html_dashboard.py         # 3s Command Bar, 2-tier Flex Cockpit Generator & Cloud Snapshot Exporter
 ├── data/
 │   └── options_prices_GCZ26.csv      # Dataset Options Chain CME mới nhất
 ├── tests/                            # Systematic Testing Rig & Unit/Integration Suite

@@ -257,11 +257,14 @@ def test_adr029_stale_cloud_sync_does_not_overwrite_live_and_reads_label_vi(
             ctx = browser.new_context(viewport={"width": 1440, "height": 900})
             page = ctx.new_page()
 
+            seen_urls: list[str] = []
+
             def _route_handler(route: sync_api.Route) -> None:
                 url = route.request.url
+                seen_urls.append(url)
                 if _fulfill_common(route):
                     return
-                if "127.0.0.1:8765/api/yahoo_gc" in url:
+                if "workers.dev/api/yahoo_gc" in url:
                     route.fulfill(
                         status=200,
                         content_type="application/json",
@@ -280,9 +283,12 @@ def test_adr029_stale_cloud_sync_does_not_overwrite_live_and_reads_label_vi(
             page.goto(html_path.as_uri(), wait_until="domcontentloaded")
             page.wait_for_timeout(300)
 
-            # Force a Yahoo bridge sync + manual checkCloudSyncNow against stale 2025 version.json
+            # Force a Cloud Worker chart sync + manual checkCloudSyncNow against stale 2025 version.json
             page.evaluate("async () => { await pollLiveYahooChart('1m'); await checkCloudSyncNow(true); }")
             page.wait_for_timeout(150)
+
+            assert not any("127.0.0.1:8765" in u for u in seen_urls), f"Unexpected legacy bridge request: {seen_urls}"
+            assert any("workers.dev/api/yahoo_gc" in u for u in seen_urls), f"Expected Worker poll request: {seen_urls}"
 
             ticker_after_stale = page.locator("#top-ticker-price").inner_text()
             meta_cw_after_stale = page.evaluate("() => window.INITIAL_META.call_wall")

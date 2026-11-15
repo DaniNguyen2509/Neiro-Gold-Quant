@@ -20,3 +20,8 @@
 - `config/settings.toml`: trường `[cloud].live_feed_worker_url` đã gắn mặc định `https://neiro-gold-feed.dani-wind2509.workers.dev` (có thể override bằng biến môi trường `NEIRO_CLOUD_FEED_URL` hoặc `?worker=`).
 - `src/hud/neiro_terminal.py`: nút `Cloud Feed` (`#btn-cloud-worker`), đọc query `?worker=https://...` lưu vào `localStorage`, fallback tự động trong `pollLiveYahooChart()` (`127.0.0.1:8765` -> Worker URL), tự reset series mượt mà khi đổi nguồn feed (`GC=F` <-> `XAUUSDF`) và tránh ghi đè nến live bởi `version.json`.
 
+
+## 4. Hợp Nhất 1 Luồng Duy Nhất & Chống Trộn Dữ Liệu (No-Mix + Gỡ `--loop`)
+- **Chống trộn dữ liệu (`Zero-Mixing Invariant`):** Trước khi có OAuth token (lúc chờ Spotware duyệt App `48894`), `FEED_MODE = "auto"` phục vụ tạm Yahoo `GC=F` để tránh gián đoạn. Ngay sau khi người dùng cấp quyền tại `/callback` (Durable Object đã có `tok`) hoặc khi đặt `FEED_MODE = "ctrader_only"`, mọi lỗi WebSocket tạm thời của Pepperstone trả HTTP `503` (`available: false`, `candles: []`), **tuyệt đối không fallback về Yahoo `-10m`** để bảo vệ tính liên tục thời gian cho `VPIN` và `KHỐI 6`.
+- **Gỡ bỏ cầu nối `--loop` / `127.0.0.1:8765`:** Đã xóa hoàn toàn `start_local_live_bridge_server`, `_run_lightweight_live_tick`, cờ `--loop`, `isLocalBridgeMode`, `lastBridgeSuccessEpoch`, và menu `[3]` trong `Chay_Live_Terminal.bat`. Desktop và Mobile dùng chung **1 luồng Cloudflare Worker duy nhất (`3s/lần`)**, không còn mất 1.5s probe lỗi vào `localhost`.
+- **Phân tách vai trò với CME Options (`Barchart`):** Pepperstone chỉ cung cấp giá và nến vàng thực tế (`XAUUSDF`); dữ liệu Options Chain / OI tĩnh của `GCZ26` vẫn giữ nguyên đường ống `Barchart -> Python Quant Engine -> GitHub Pages`.

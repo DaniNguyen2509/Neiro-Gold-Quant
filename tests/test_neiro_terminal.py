@@ -234,4 +234,7 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     assert "WORKER LIVE (XAUUSDF" in js
     assert "WORKER CLOUD (GC=F)" in js
     assert "cloud_feed_url" in js
+    assert "127.0.0.1:8765" not in js
+    assert "LIVE BRIDGE" not in js
+    assert "lastBridgeSuccessEpoch" not in js
 

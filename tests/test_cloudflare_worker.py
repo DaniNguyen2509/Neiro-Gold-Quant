@@ -142,3 +142,110 @@ console.log(JSON.stringify({ doCalls, j1, jAuth }));
     assert out["jAuth"]["ok"] is True
     assert out["jAuth"]["scope"] == "accounts"
     assert "scope=accounts" in out["jAuth"]["authorize_url"]
+
+
+def test_worker_strict_no_yahoo_mixing_after_oauth_or_ctrader_only(tmp_path) -> None:
+    """Guarantees Yahoo is never mixed after OAuth authorization or in ctrader_only mode."""
+    import json
+    import pathlib
+    import shutil
+    import subprocess
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        import pytest
+        pytest.skip("Node.js not installed")
+
+    worker_src = pathlib.Path("cloud/cloudflare-worker/worker.js").read_text(encoding="utf-8")
+    patched_src = worker_src.replace(
+        'import { DurableObject } from "cloudflare:workers";',
+        "class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }",
+    )
+    mod_path = tmp_path / "worker_test.mjs"
+    mod_path.write_text(patched_src, encoding="utf-8")
+
+    runner_js = f"""
+import {{ CTraderFeedDO }} from {json.dumps(mod_path.resolve().as_uri())};
+import workerDefault from {json.dumps(mod_path.resolve().as_uri())};
+
+let yahooCalled = 0;
+globalThis.fetch = async () => {{
+    yahooCalled += 1;
+    const nowSec = Math.floor(Date.now() / 1000);
+    return new Response(JSON.stringify({{
+        chart: {{
+            result: [{{
+                meta: {{ regularMarketPrice: 4123.5 }},
+                timestamp: [nowSec - 300, nowSec],
+                indicators: {{ quote: [{{
+                    open: [4120, 4122], high: [4124, 4125], low: [4119, 4121], close: [4122, 4123.5], volume: [10, 12]
+                }}] }}
+            }}]
+        }}
+    }}), {{ status: 200, headers: {{ "Content-Type": "application/json" }} }});
+}};
+
+const makeCtx = (storedTokens) => ({{
+    storage: {{
+        async get(k) {{ return k === "tokens" ? storedTokens : null; }},
+        async put() {{}},
+        async setAlarm() {{}},
+    }},
+}});
+
+// Case A: FEED_MODE="auto" with NO OAuth token yet -> uses Yahoo GC=F cleanly
+yahooCalled = 0;
+const doNoTokAuto = new CTraderFeedDO(makeCtx(null), {{ FEED_MODE: "auto", CTRADER_ENV: "demo", CTRADER_SYMBOL: "XAUUSDF" }});
+const rA = await doNoTokAuto.fetch(new Request("https://w.test/api/yahoo_gc?tf=5m"));
+const bA = await rA.json();
+if (rA.status !== 200 || bA.source !== "yahoo_gcf" || !bA.available || yahooCalled !== 1) {{
+    throw new Error("Case A failed: " + JSON.stringify(bA));
+}}
+
+// Case B: FEED_MODE="ctrader_only" with NO OAuth token -> 503, NEVER Yahoo
+yahooCalled = 0;
+const doNoTokStrict = new CTraderFeedDO(makeCtx(null), {{ FEED_MODE: "ctrader_only", CTRADER_ENV: "demo", CTRADER_SYMBOL: "XAUUSDF" }});
+const rB = await doNoTokStrict.fetch(new Request("https://w.test/api/yahoo_gc?tf=5m"));
+const bB = await rB.json();
+if (rB.status !== 503 || bB.available !== false || bB.source !== "ctrader_demo_xauusdf" || yahooCalled !== 0) {{
+    throw new Error("Case B failed: " + JSON.stringify(bB));
+}}
+
+// Case C: FEED_MODE="auto" WITH OAuth token + WS error -> 503, NEVER falls back to Yahoo
+yahooCalled = 0;
+const doWithTok = new CTraderFeedDO(
+    makeCtx({{ accessToken: "acc", refreshToken: "ref", expiresAtMs: Date.now() + 3600000 }}),
+    {{ FEED_MODE: "auto", CTRADER_ENV: "demo", CTRADER_SYMBOL: "XAUUSDF", CTRADER_CLIENT_ID: "id", CTRADER_CLIENT_SECRET: "sec" }}
+);
+doWithTok.ensureConnected = async () => {{ throw new Error("WS closed 1006"); }};
+const rC = await doWithTok.fetch(new Request("https://w.test/api/yahoo_gc?tf=5m"));
+const bC = await rC.json();
+if (rC.status !== 503 || bC.available !== false || bC.source !== "ctrader_demo_xauusdf" || bC.candles.length !== 0 || !String(bC.error).includes("WS closed 1006") || yahooCalled !== 0) {{
+    throw new Error("Case C failed: " + JSON.stringify(bC));
+}}
+
+// Case D: default.fetch with FEED_MODE="ctrader_only" & missing secrets -> 503, NEVER Yahoo
+yahooCalled = 0;
+const rD = await workerDefault.fetch(new Request("https://w.test/api/yahoo_gc?tf=5m"), {{ FEED_MODE: "ctrader_only", CTRADER_ENV: "demo", CTRADER_SYMBOL: "XAUUSDF" }});
+const bD = await rD.json();
+if (rD.status !== 503 || bD.available !== false || bD.source !== "ctrader_demo_xauusdf" || yahooCalled !== 0) {{
+    throw new Error("Case D failed: " + JSON.stringify(bD));
+}}
+
+console.log(JSON.stringify({{ ok: true, cases: ["A", "B", "C", "D"] }}));
+"""
+    runner_path = tmp_path / "runner.mjs"
+    runner_path.write_text(runner_js, encoding="utf-8")
+    out_path = tmp_path / "out.txt"
+    err_path = tmp_path / "err.txt"
+    with out_path.open("w", encoding="utf-8") as out_fh, err_path.open("w", encoding="utf-8") as err_fh:
+        rc = subprocess.call(
+            [node_bin, str(runner_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=out_fh,
+            stderr=err_fh,
+        )
+    stdout_txt = out_path.read_text(encoding="utf-8")
+    stderr_txt = err_path.read_text(encoding="utf-8")
+    assert rc == 0, f"Node runner failed: {stderr_txt or stdout_txt}"
+    assert json.loads(stdout_txt.strip())["ok"] is True
