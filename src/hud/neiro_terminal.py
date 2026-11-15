@@ -1779,14 +1779,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                         const depthFactor = apOi > 0 ? Math.max(0.25, Math.min(1.0, 1.0 - (apOi - 150) / 300)) : 0.65;
                         const cAlpha = (0.045 + 0.055 * depthFactor).toFixed(3);
                         const pAlpha = (0.10 + 0.10 * depthFactor).toFixed(3);
-                        const bAlpha = (0.35 + 0.30 * depthFactor).toFixed(2);
-                        chartFill = 'rgba(245, 158, 11, ' + cAlpha + ')';
-                        profFill = 'rgba(245, 158, 11, ' + pAlpha + ')';
-                        borderCol = 'rgba(245, 158, 11, ' + bAlpha + ')';
+                        const bAlpha = (0.32 + 0.26 * depthFactor).toFixed(2);
+                        chartFill = 'rgba(148, 163, 184, ' + cAlpha + ')';
+                        profFill = 'rgba(148, 163, 184, ' + pAlpha + ')';
+                        borderCol = 'rgba(148, 163, 184, ' + bAlpha + ')';
                         borderW = 0.9;
                         borderDash = [3, 5];
-                        labelCol = 'rgba(250, 204, 21, ' + (0.62 + 0.25 * depthFactor).toFixed(2) + ')';
-                        badgeCol = 'rgba(253, 224, 71, 0.85)';
+                        labelCol = 'rgba(203, 213, 225, ' + (0.60 + 0.25 * depthFactor).toFixed(2) + ')';
+                        badgeCol = 'rgba(203, 213, 225, 0.88)';
                         levelTxt = 'MỎNG NHẸ';
                     }}
 
