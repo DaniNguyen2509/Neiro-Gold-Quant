@@ -202,6 +202,11 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
         assert action_lbl in hud
     assert "hud-4actions-val" in js
 
+    # Air Pockets must always draw directly on Canvas in Compact mode before Full-only FVGs
+    draw_fn_src = js[js.index("function drawNeiroOverlay") :]
+    assert draw_fn_src.index("airPockets.forEach") < draw_fn_src.index("if (!overlayCompactMode)")
+    assert "Always-On Air Pocket Vacuum Matrix" in draw_fn_src
+
     # Realtime ADR-028 JS parity engines & 3-tier sync
     for fn_name in (
         "computeLiveVpinBvcJs",

@@ -337,7 +337,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         </div>
 
         <div class="neiro-top-right">
-            <button id="btn-overlay-mode" class="timeframe-pill" onclick="toggleOverlayMode()" title="Chuyển lớp phủ Chart: Tinh gọn (3 đường cấu trúc + Entry/SL/TP) hoặc Đầy đủ (thêm Vanna, Charm, FVG, Air Pocket)">
+            <button id="btn-overlay-mode" class="timeframe-pill" onclick="toggleOverlayMode()" title="Chuyển lớp phủ Chart: Tinh gọn (3 đường cấu trúc + Air Pocket + Entry/SL/TP) hoặc Đầy đủ (thêm Vanna, Charm, Squeeze, FVG)">
                 Lớp phủ: Tinh gọn
             </button>
             <button id="btn-chart-height" class="timeframe-pill" onclick="toggleChartHeight()" title="Phóng to hoặc thu gọn chiều cao biểu đồ">
@@ -1868,8 +1868,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         ctx.lineWidth = 1;
         ctx.strokeRect(panelX - 4, 0, panelW, h);
 
-        // 2. Secondary Structural Zones (Air Pockets & Institutional FVGs) — visible in Full Overlay Mode
-        if (!overlayCompactMode) {{
+        // 2. Always-On Air Pocket Vacuum Matrix (Main Chart + Right Profile)
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
             const pFrom = parseFloat(ap.from || 0);
@@ -1891,10 +1890,15 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     ctx.strokeRect(0, topY, chartW, bandH);
                     ctx.setLineDash([]);
 
+                    const apLabelX = (topY < 185 && chartW > 680) ? 514 : 20;
+                    const apRange = '[$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + ']';
+                    const apTxt = (apLabelX > 20)
+                        ? ('⚠️ AIR POCKET VACUUM ' + apRange)
+                        : ('⚠️ AIR POCKET VACUUM ' + apRange + ' · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)');
                     ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
                     ctx.textAlign = 'left';
                     ctx.fillStyle = '#FACC15';
-                    ctx.fillText('⚠️ AIR POCKET VACUUM [$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + '] · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)', 20, topY + Math.min(bandH - 3, 13));
+                    ctx.fillText(apTxt, apLabelX, topY + Math.min(bandH - 3, 13));
 
                     // B. Right Greeks / Orderflow Panel Area (User requested: highlight right profile):
                     ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
@@ -1922,7 +1926,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }}
         }});
 
-        // 2b. Draw Validated Institutional FVG Zones (ADR-026: Bullish Green / Bearish Red + 50% Retrace Line)
+        // 2b. Secondary Structural Zones (Institutional FVGs) — visible in Full Overlay Mode
+        if (!overlayCompactMode) {{
         const instFvgs = m.institutional_fvgs || [];
         instFvgs.forEach(fvg => {{
             const gLo = parseFloat(fvg.low || 0);
