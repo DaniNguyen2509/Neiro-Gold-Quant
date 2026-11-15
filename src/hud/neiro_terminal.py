@@ -276,7 +276,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         </div>
 
         <div class="neiro-top-right">
-            <button id="btn-overlay-mode" class="timeframe-pill" onclick="toggleOverlayMode()" title="Chuyển lớp phủ Chart: Tinh gọn (3 đường cấu trúc + Air Pocket + Entry/SL/TP) hoặc Đầy đủ (thêm Vanna, Charm, Squeeze, FVG)">
+            <button id="btn-overlay-mode" class="timeframe-pill" onclick="toggleOverlayMode()" title="Chuyển lớp phủ Chart: Tinh gọn (Call/Put Wall, Gamma Flip, Cản/Sàn &amp; Trạm Options, Air Pocket, Entry/SL/TP) hoặc Đầy đủ (thêm Vanna, Charm, FVG)">
                 Lớp phủ: Tinh gọn
             </button>
             <button id="btn-chart-height" class="timeframe-pill" onclick="toggleChartHeight()" title="Phóng to hoặc thu gọn chiều cao biểu đồ">
@@ -1646,7 +1646,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 const mx = e.clientX - rect.left;
                 const my = e.clientY - rect.top;
                 const rightX = canvas.width - 70;
-                const panelW = 5 * 64 + 8;
+                const panelW = 5 * getProfileColW(canvas.width) + 8;
                 const panelX = rightX - panelW;
                 if (mx >= panelX - 4 && mx <= rightX) {{
                     const opts = window.INITIAL_OPTIONS || [];
@@ -1691,6 +1691,12 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     // ----------------------------------------------------------------------------
     // Canvas Overlay Engine: 5-Column Orderflow + Greeks & Air Pocket Matrix
     // ----------------------------------------------------------------------------
+    function getProfileColW(canvasW) {{
+        if (canvasW < 640) return 26;
+        if (canvasW < 920) return 44;
+        return 64;
+    }}
+
     function drawNeiroOverlay() {{
         const canvas = document.getElementById('neiro-canvas');
         if (!canvas || !neiroChart || !candleSeries) return;
@@ -1701,7 +1707,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         const m = window.INITIAL_META;
         const rightX = w - 70;
-        const colW = 64;
+        const colW = getProfileColW(w);
         const cols = [
             {{ key: 'currentNetFLOW', name: 'FLOW',  unit: 'GC',  pos: '#22C55E', neg: '#F43F5E', bPos: '#4ADE80', bNeg: '#FB7185' }},
             {{ key: 'currentNetGEX',  name: 'GEX',   unit: 'M',   pos: '#10B981', neg: '#EF4444', bPos: '#34D399', bNeg: '#F87171' }},
@@ -1881,18 +1887,30 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }});
         }}
 
-        // 3. Key Quant Options Levels: Core 3 Structure Lines + Active Strategy Entry/SL/TP (+ Full Mode Extras)
+        // 3. Key Quant Options Levels: Core Structure + Always-On Intraday Strike Barriers & Checkpoints (+ Full Mode Extras)
+        const fallbackOff = Math.max(2.30, Math.round((0.8 * Math.max(2.0, Math.min(6.5, Number(m.atr_5m || 4.0))) - 0.50) * 100) / 100);
+        const sqTrigPx = (liveTacticalMatrix && liveTacticalMatrix.squeeze && liveTacticalMatrix.squeeze.entry)
+            ? Number(liveTacticalMatrix.squeeze.entry) - 0.50
+            : (Number(m.strike_above || 0) + fallbackOff);
+        const bdTrigPx = (liveTacticalMatrix && liveTacticalMatrix.breakdown && liveTacticalMatrix.breakdown.entry)
+            ? Number(liveTacticalMatrix.breakdown.entry) + 0.50
+            : (Number(m.strike_below || 0) - fallbackOff);
+
         const keyLevels = [
-            {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
-            {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
-            {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], txt: 'GAMMA FLIP (Trục cân đối) $' + Math.round(m.zero_gamma_flip) + ' · [' + (liveFlipVerdict.split(':')[0] || 'KIỂM ĐỊNH') + ']' }},
+            {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], lw: 1.4, pin: true,  txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
+            {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], lw: 1.4, pin: true,  txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
+            {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], lw: 1.4, pin: true,  txt: 'GAMMA FLIP (Trục cân đối) $' + Math.round(m.zero_gamma_flip) + ' · [' + (liveFlipVerdict.split(':')[0] || 'KIỂM ĐỊNH') + ']' }},
+            {{ p: m.strike_above,       c: '#FB7185', d: [5, 3], lw: 1.5, pin: true,  txt: 'CẢN TRÊN $' + Math.round(m.strike_above) + ' · Phá BUY >$' + sqTrigPx.toFixed(1) }},
+            {{ p: m.strike_below,       c: '#4ADE80', d: [5, 3], lw: 1.5, pin: true,  txt: 'SÀN DƯỚI $' + Math.round(m.strike_below) + ' · Thủng SELL <$' + bdTrigPx.toFixed(1) }},
+            {{ p: m.next_above,         c: '#FBBF24', d: [2, 4], lw: 1.0, pin: false, txt: 'TRẠM TRÊN $' + Math.round(m.next_above) }},
+            {{ p: m.next_below,         c: '#38BDF8', d: [2, 4], lw: 1.0, pin: false, txt: 'TRẠM DƯỚI $' + Math.round(m.next_below) }},
+            {{ p: m.major_up_wall,      c: '#F97316', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↑ $' + Math.round(m.major_up_wall) }},
+            {{ p: m.major_down_wall,    c: '#2DD4BF', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↓ $' + Math.round(m.major_down_wall) }},
         ];
         if (!overlayCompactMode) {{
             keyLevels.push(
-                {{ p: m.strike_above,       c: '#4ADE80', d: [2, 3], txt: 'GAMMA SQUEEZE ↑ > $' + Math.round(m.strike_above) + ' → TP $' + Math.round(m.next_above) }},
-                {{ p: m.strike_below,       c: '#F87171', d: [2, 3], txt: 'GAMMA SQUEEZE ↓ < $' + Math.round(m.strike_below) + ' → TP $' + Math.round(m.next_below) }},
-                {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], txt: 'CHEX · HÚT GIÁ VỀ ĐÂY ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
-                {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], txt: 'VEX · VÙNG BẬT / GIẬT SÓNG ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }}
+                {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], lw: 1.2, pin: true, txt: 'CHEX · HÚT GIÁ VỀ ĐÂY ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
+                {{ p: m.vanna_peak_strike,  c: '#22D3EE', d: [4, 4], lw: 1.2, pin: true, txt: 'VEX · VÙNG BẬT / GIẬT SÓNG ' + (m.vanna_peak_val || 0).toFixed(1) + 'M' }}
             );
         }}
         if (liveTacticalMatrix) {{
@@ -1900,65 +1918,112 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             if (act.length > 0) {{
                 const topAct = act.slice().sort((a, b) => Math.abs(a.entry - currentGoldPrice) - Math.abs(b.entry - currentGoldPrice))[0];
                 keyLevels.push(
-                    {{ p: topAct.entry, c: topAct.side === 'BUY' ? '#4ADE80' : '#FB7185', d: [3, 2], txt: 'ACTIVE ENTRY ' + topAct.side + ' $' + topAct.entry.toFixed(2) }},
-                    {{ p: topAct.sl,    c: '#EF4444', d: [2, 2], txt: 'SL $' + topAct.sl.toFixed(2) }},
-                    {{ p: topAct.tp,    c: '#38BDF8', d: [2, 2], txt: 'TP $' + topAct.tp.toFixed(2) }}
+                    {{ p: topAct.entry, c: topAct.side === 'BUY' ? '#4ADE80' : '#FB7185', d: [3, 2], lw: 1.4, pin: true,  txt: 'ACTIVE ENTRY ' + topAct.side + ' $' + topAct.entry.toFixed(2) }},
+                    {{ p: topAct.sl,    c: '#EF4444', d: [2, 2], lw: 1.2, pin: false, txt: 'SL $' + topAct.sl.toFixed(2) }},
+                    {{ p: topAct.tp,    c: '#38BDF8', d: [2, 2], lw: 1.2, pin: false, txt: 'TP $' + topAct.tp.toFixed(2) }}
                 );
             }}
         }}
 
+        const drawnPriceKeys = new Set();
+        const placedPillBoxes = [];
+        const pendingPins = [];
+        const pillFont = chartW < 280 ? 'bold 8.5px "JetBrains Mono", monospace' : 'bold 9.5px "JetBrains Mono", monospace';
+        const formatLevelTxt = (raw, compactOnly) => compactOnly
+            ? raw.split('·')[0].replace(' (Trục cân đối)', '').trim()
+            : raw;
+
         keyLevels.forEach(L => {{
-            if (!L.p) return;
-            const y = candleSeries.priceToCoordinate(L.p);
+            const px = Number(L.p);
+            if (!px || Number.isNaN(px)) return;
+            const pxKey = Math.round(px * 100);
+            if (drawnPriceKeys.has(pxKey)) return;
+            drawnPriceKeys.add(pxKey);
+
+            const y = candleSeries.priceToCoordinate(px);
             if (y !== null && y >= 0 && y <= h) {{
                 ctx.strokeStyle = L.c;
                 ctx.setLineDash(L.d);
-                ctx.lineWidth = 1.3;
+                ctx.lineWidth = L.lw || 1.3;
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(rightX, y);
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
+                const boxTop = Math.min(h - 16, Math.max(2, y - 12));
+                const boxBot = boxTop + 14;
+                const textY = boxTop + 10;
+                const labelTxt = formatLevelTxt(L.txt, chartW < 280);
+                ctx.font = pillFont;
                 ctx.textAlign = 'right';
-                const tw = ctx.measureText(L.txt).width;
-                ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
-                ctx.fillRect(chartW - tw - 14, y - 12, tw + 10, 14);
-                ctx.strokeStyle = L.c;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(chartW - tw - 14, y - 12, tw + 10, 14);
-                ctx.fillStyle = L.c;
-                ctx.fillText(L.txt, chartW - 9, y - 2);
-            }} else if (y !== null && y < 0) {{
-                // Pinned Top Edge Indicator
-                const edgeY = 14;
-                ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
-                ctx.textAlign = 'right';
-                const shortTxt = '▲ ' + L.txt.split('·')[0];
-                const tw = ctx.measureText(shortTxt).width;
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                ctx.fillRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
-                ctx.strokeStyle = L.c;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
-                ctx.fillStyle = L.c;
-                ctx.fillText(shortTxt, chartW - 9, edgeY);
-            }} else if (y !== null && y > h) {{
-                // Pinned Bottom Edge Indicator
-                const edgeY = h - 8;
-                ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
-                ctx.textAlign = 'right';
-                const shortTxt = '▼ ' + L.txt.split('·')[0];
-                const tw = ctx.measureText(shortTxt).width;
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                ctx.fillRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
-                ctx.strokeStyle = L.c;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(chartW - tw - 14, edgeY - 11, tw + 10, 14);
-                ctx.fillStyle = L.c;
-                ctx.fillText(shortTxt, chartW - 9, edgeY);
+                const tw = ctx.measureText(labelTxt).width;
+                let labelRightX = chartW - 9;
+                let guard = 0;
+                while (guard < 3) {{
+                    const boxLeft = labelRightX - tw - 5;
+                    const hit = placedPillBoxes.find(b =>
+                        !(labelRightX + 5 < b.left || boxLeft > b.right) &&
+                        !(boxBot < b.top || boxTop > b.bottom)
+                    );
+                    if (!hit) break;
+                    labelRightX = hit.left - 10;
+                    guard++;
+                }}
+                if (labelRightX - tw - 5 >= 4) {{
+                    ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
+                    ctx.fillRect(labelRightX - tw - 5, boxTop, tw + 10, 14);
+                    ctx.strokeStyle = L.c;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(labelRightX - tw - 5, boxTop, tw + 10, 14);
+                    ctx.fillStyle = L.c;
+                    ctx.fillText(labelTxt, labelRightX, textY);
+                    placedPillBoxes.push({{ left: labelRightX - tw - 5, right: labelRightX + 5, top: boxTop, bottom: boxBot }});
+                }}
+            }} else if (L.pin && y !== null && (y < 0 || y > h)) {{
+                pendingPins.push({{ L: L, isTop: y < 0 }});
             }}
+        }});
+
+        // Render offscreen edge pins after in-viewport lines so active strike barriers keep priority on right edge
+        let topPinCount = 0;
+        let botPinCount = 0;
+        pendingPins.forEach(item => {{
+            if (item.isTop && topPinCount >= 4) return;
+            if (!item.isTop && botPinCount >= 4) return;
+            const shortTxt = (item.isTop ? '▲ ' : '▼ ') + formatLevelTxt(item.L.txt.split('·')[0], chartW < 280);
+            ctx.font = pillFont;
+            ctx.textAlign = 'right';
+            const tw = ctx.measureText(shortTxt).width;
+            const pinLeft = chartW - tw - 14;
+            const pinRight = chartW - 4;
+            if (pinLeft < 4) return;
+
+            let chosenEdgeY = null;
+            for (let slot = 0; slot < 6; slot++) {{
+                const candidateY = item.isTop ? (14 + slot * 16) : (h - 8 - slot * 16);
+                const pTop = candidateY - 11;
+                const pBot = candidateY + 3;
+                const hit = placedPillBoxes.find(b =>
+                    !(pinRight < b.left || pinLeft > b.right) &&
+                    !(pBot < b.top || pTop > b.bottom)
+                );
+                if (!hit) {{
+                    chosenEdgeY = candidateY;
+                    break;
+                }}
+            }}
+            if (chosenEdgeY === null) return;
+            if (item.isTop) topPinCount++; else botPinCount++;
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+            ctx.fillRect(pinLeft, chosenEdgeY - 11, tw + 10, 14);
+            ctx.strokeStyle = item.L.c;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(pinLeft, chosenEdgeY - 11, tw + 10, 14);
+            ctx.fillStyle = item.L.c;
+            ctx.fillText(shortTxt, chartW - 9, chosenEdgeY);
+            placedPillBoxes.push({{ left: pinLeft, right: pinRight, top: chosenEdgeY - 11, bottom: chosenEdgeY + 3 }});
         }});
 
         // 4. Per-strike Greeks exposure profile (GEX | VEX | CHEX | THETA)
@@ -1989,14 +2054,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
                 // Column Header: Name
                 ctx.fillStyle = c.name === 'FLOW' ? '#FACC15' : (c.name === 'VEX' ? '#22D3EE' : (c.name === 'CHEX' ? '#C084FC' : (c.name === 'GEX' ? '#34D399' : '#FBBF24')));
-                ctx.font = 'bold 10px "JetBrains Mono", monospace';
+                ctx.font = colW < 34 ? 'bold 7.5px "JetBrains Mono", monospace' : 'bold 10px "JetBrains Mono", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(c.name, cx, 12);
+                ctx.fillText((colW < 34 && c.name === 'THETA') ? 'THT' : c.name, cx, 12);
 
                 // Column Subheader: Visible Magnitude Scale (e.g. ±2.8M or ±1.1M/d)
                 const scaleTxt = '±' + (visibleMaxAbs >= 10 ? visibleMaxAbs.toFixed(0) : (visibleMaxAbs >= 1 ? visibleMaxAbs.toFixed(1) : visibleMaxAbs.toFixed(2))) + c.unit;
                 ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
-                ctx.font = '8px "JetBrains Mono", monospace';
+                ctx.font = colW < 34 ? '7px "JetBrains Mono", monospace' : '8px "JetBrains Mono", monospace';
                 ctx.fillText(scaleTxt, cx, 22);
 
                 // Render Per-Strike Bars with Square-Root / Sublinear Boost

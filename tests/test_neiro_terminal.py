@@ -193,9 +193,19 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     assert hud.count('class="hud-item"') == 5
     assert 'id="hud-4actions-val"' not in hud
 
-    # Air Pockets must always draw directly on Canvas in Compact mode with severity intensity
+    # Air Pockets and primary strike barriers (CẢN TRÊN / SÀN DƯỚI + Trạm Options) must always draw in Compact mode
     draw_fn_src = js[js.index("function drawNeiroOverlay") :]
     assert draw_fn_src.index("airPockets.forEach") < draw_fn_src.index("if (!overlayCompactMode)")
+    keylevels_src = draw_fn_src[draw_fn_src.index("const keyLevels = [") :]
+    for always_on_lvl in (
+        "CẢN TRÊN $",
+        "SÀN DƯỚI $",
+        "TRẠM TRÊN $",
+        "TRẠM DƯỚI $",
+        "TƯỜNG LỚN ↑ $",
+        "TƯỜNG LỚN ↓ $",
+    ):
+        assert keylevels_src.index(always_on_lvl) < keylevels_src.index("if (!overlayCompactMode)")
     for tier_lbl in (
         "RỖNG CỰC MẠNH",
         "RỖNG MẠNH",
