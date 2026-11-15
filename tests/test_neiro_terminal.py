@@ -190,7 +190,17 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     assert "toggleChartHeight()" in nav
     assert 'id="neiro-tf-badge"' in nav
     assert 'id="top-vpin-val"' in nav
-    assert hud.count('class="hud-item"') == 5
+    assert hud.count('class="hud-item"') == 6
+    assert 'id="hud-4actions-val"' in hud
+    assert "4 HÀNH ĐỘNG:" in hud
+    for action_lbl in (
+        "ĐẢO CHIỀU SELL",
+        "THUẬN CHIỀU SELL",
+        "ĐẢO CHIỀU BUY",
+        "THUẬN CHIỀU BUY",
+    ):
+        assert action_lbl in hud
+    assert "hud-4actions-val" in js
 
     # Realtime ADR-028 JS parity engines & 3-tier sync
     for fn_name in (

@@ -158,6 +158,8 @@ def test_generate_html_terminal_content():
     assert "GEX (+): Đánh ĐẢO CHIỀU" in html
     assert "CHEX · HÚT GIÁ VỀ ĐÂY" in html
     assert "VEX · VÙNG BẬT / GIẬT SÓNG" in html
+    assert 'id="hud-4actions-val"' in html
+    assert "4 HÀNH ĐỘNG:" in html
     assert "PHẦN 2: BẢNG TÁC CHIẾN PHỤC KÍCH THÀNH TRÌ" not in html
     assert "refreshWithCacheBuster()" in html
     # Check Microstructure Greeks & Pinning Table
