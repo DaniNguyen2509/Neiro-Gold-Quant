@@ -17,7 +17,9 @@ WORKER_JS = WORKER_DIR / "worker.js"
 WRANGLER_TOML = WORKER_DIR / "wrangler.toml"
 
 
-def _run_node_worker_harness(tmp_path: pathlib.Path, js_body: str) -> dict:
+def _run_node_worker_harness(
+    tmp_path: pathlib.Path, js_body: str, *, expose_default_entry: bool = False
+) -> dict:
     """Execute ESM harness against worker.js by stubbing `cloudflare:workers` in memory."""
     node_bin = shutil.which("node")
     if not node_bin:
@@ -28,6 +30,8 @@ def _run_node_worker_harness(tmp_path: pathlib.Path, js_body: str) -> dict:
         'import { DurableObject } from "cloudflare:workers";',
         "class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }",
     )
+    if expose_default_entry:
+        patched = patched.replace("export default {", "const workerEntry = {")
     script_file = tmp_path / "worker_harness.mjs"
     script_file.write_text(patched + "\n" + js_body, encoding="utf-8")
 
@@ -110,3 +114,31 @@ def test_resolve_cloud_feed_worker_url_from_env(monkeypatch):
     assert _resolve_cloud_feed_worker_url() == "https://neiro-gold-feed.demo.workers.dev"
     monkeypatch.delenv("NEIRO_CLOUD_FEED_URL", raising=False)
     assert _resolve_cloud_feed_worker_url() == "https://neiro-gold-feed.dani-wind2509.workers.dev"
+
+
+def test_worker_auto_mode_routes_to_do_with_oauth_secrets_only(tmp_path: pathlib.Path):
+    # Verify FEED_MODE="auto" + client secrets (without env tokens) forwards /api/yahoo_gc to FEED_DO
+    # so OAuth tokens stored inside Durable Object storage activate automatically after /callback.
+    harness = """
+let doCalls = 0;
+const fakeEnv = {
+    FEED_MODE: "auto",
+    CTRADER_CLIENT_ID: "test_id",
+    CTRADER_CLIENT_SECRET: "test_secret",
+    FEED_DO: {
+        idFromName: (k) => k,
+        get: () => ({ fetch: async () => { doCalls += 1; return new Response(JSON.stringify({ routed: true }), { status: 200 }); } }),
+    },
+};
+const r1 = await workerEntry.fetch(new Request("https://example.workers.dev/api/yahoo_gc?tf=5m"), fakeEnv);
+const j1 = await r1.json();
+const rAuth = await workerEntry.fetch(new Request("https://example.workers.dev/auth/url"), fakeEnv);
+const jAuth = await rAuth.json();
+console.log(JSON.stringify({ doCalls, j1, jAuth }));
+"""
+    out = _run_node_worker_harness(tmp_path, harness, expose_default_entry=True)
+    assert out["doCalls"] == 1
+    assert out["j1"] == {"routed": True}
+    assert out["jAuth"]["ok"] is True
+    assert out["jAuth"]["scope"] == "accounts"
+    assert "scope=accounts" in out["jAuth"]["authorize_url"]

@@ -547,6 +547,8 @@ export class CTraderFeedDO extends DurableObject {
             expiresAtMs: Date.now() + expiresInSec * 1000,
             accountId: Number(this.env.CTRADER_ACCOUNT_ID || 0),
         });
+        this.tfCache.clear();
+        this.lastError = "";
         return { ok: true, message: "Authorized cTrader read-only token stored encrypted inside DO storage." };
     }
 
@@ -580,6 +582,10 @@ export class CTraderFeedDO extends DurableObject {
 
         this.lastClientPollMs = Date.now();
         const tf = normalizeTf(url.searchParams.get("tf"));
+        const tok = await this.loadTokens();
+        if (!tok || (!tok.accessToken && !tok.refreshToken)) {
+            return jsonResponse(await fetchYahooGcPayload(tf), this.env, 200, origin);
+        }
         const cached = this.tfCache.get(tf);
         if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS && cached.data && cached.data.available) {
             if (this.liveSpotPrice > 0 && cached.data.candles.length > 0) {
@@ -659,9 +665,8 @@ export default {
         }
 
         const feedMode = String((env && env.FEED_MODE) || "auto").trim().toLowerCase();
-        const hasCTraderConfig = Boolean(
+        const hasCTraderAppSecrets = Boolean(
             env && env.FEED_DO && env.CTRADER_CLIENT_ID && env.CTRADER_CLIENT_SECRET
-            && (env.CTRADER_ACCESS_TOKEN || env.CTRADER_REFRESH_TOKEN || feedMode === "ctrader")
         );
 
         if (url.pathname === "/auth/url") {
@@ -712,7 +717,7 @@ export default {
 
         if (url.pathname === "/api/yahoo_gc" || url.pathname === "/") {
             const tf = normalizeTf(url.searchParams.get("tf"));
-            if (feedMode !== "yahoo" && env && env.FEED_DO && (feedMode === "ctrader" || hasCTraderConfig)) {
+            if (feedMode !== "yahoo" && hasCTraderAppSecrets) {
                 const stub = env.FEED_DO.get(env.FEED_DO.idFromName("gold-feed"));
                 return stub.fetch(request);
             }
