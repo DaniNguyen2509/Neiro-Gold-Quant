@@ -109,4 +109,4 @@ def test_resolve_cloud_feed_worker_url_from_env(monkeypatch):
     monkeypatch.setenv("NEIRO_CLOUD_FEED_URL", "https://neiro-gold-feed.demo.workers.dev/")
     assert _resolve_cloud_feed_worker_url() == "https://neiro-gold-feed.demo.workers.dev"
     monkeypatch.delenv("NEIRO_CLOUD_FEED_URL", raising=False)
-    assert _resolve_cloud_feed_worker_url() == ""
+    assert _resolve_cloud_feed_worker_url() == "https://neiro-gold-feed.dani-wind2509.workers.dev"
