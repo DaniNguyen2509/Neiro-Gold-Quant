@@ -17,53 +17,6 @@ import json
 from typing import Any
 import pandas as pd
 
-from src.quant_engine.strategy import compute_tactical_intraday_matrix
-
-
-def _build_hud_4actions_html(mat: dict[str, dict[str, Any]], session_open: bool) -> str:
-    """Render compact 2x2 bottom strip inside .neiro-floating-hud for the 4 tactical actions."""
-    specs = (
-        ("ĐẢO CHIỀU SELL", "SELL", mat.get("fade") or {}, "rev"),
-        ("THUẬN CHIỀU SELL", "SELL", mat.get("breakdown") or {}, "brk_dn"),
-        ("ĐẢO CHIỀU BUY", "BUY", mat.get("rebound") or {}, "rev"),
-        ("THUẬN CHIỀU BUY", "BUY", mat.get("squeeze") or {}, "brk_up"),
-    )
-    pills = []
-    for title, side, item, kind in specs:
-        active = bool(item.get("active", False))
-        entry = float(item.get("entry", 0.0) or 0.0)
-        reason = str(item.get("gate_reason") or "")
-        if active:
-            col = "#86EFAC" if side == "BUY" else "#FCA5A5"
-            bdr = "#22C55E" if side == "BUY" else "#EF4444"
-            bg = "rgba(34,197,94,0.22)" if side == "BUY" else "rgba(239,68,68,0.22)"
-            txt = f"● {title} @{entry:,.0f}"
-            op = "1"
-        elif kind == "rev":
-            col, bdr, bg, op = "#64748B", "1px solid #334155", "rgba(15,23,42,0.7)", "0.75"
-            txt = f"✕ {title} [KHÓA]"
-        else:
-            trig = (entry - 0.50) if kind == "brk_up" else (entry + 0.50)
-            arrow = "&gt;" if kind == "brk_up" else "&lt;"
-            if session_open:
-                col = "#4ADE80" if side == "BUY" else "#F87171"
-                bdr = "rgba(34,197,94,0.45)" if side == "BUY" else "rgba(239,68,68,0.45)"
-                bg = "rgba(34,197,94,0.08)" if side == "BUY" else "rgba(239,68,68,0.08)"
-            else:
-                col, bdr, bg = "#64748B", "#334155", "rgba(15,23,42,0.7)"
-            txt = f"○ {title} {arrow}${trig:,.0f}"
-            op = "0.9"
-            bdr_style = f"1px dashed {bdr}"
-            pills.append(
-                f"<span class='hud-action-pill' style='color:{col}; background:{bg}; border:{bdr_style}; opacity:{op};' title='{reason}'>{txt}</span>"
-            )
-            continue
-        border_css = bdr if "solid" in bdr else f"1px solid {bdr}"
-        pills.append(
-            f"<span class='hud-action-pill' style='color:{col}; background:{bg}; border:{border_css}; opacity:{op};' title='{reason}'>{txt}</span>"
-        )
-    return "".join(pills)
-
 
 def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> dict[str, str]:
     """Generates HTML, CSS, and JS artifacts for Neiro-Quant Tactical Gold Cockpit."""
@@ -265,22 +218,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         background: rgba(8, 11, 18, 0.88); border: 1px solid #1E293B; border-radius: 5px;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
         padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
-        max-width: min(490px, calc(100% - 24px)); pointer-events: none;
+        max-width: min(460px, calc(100% - 24px)); pointer-events: none;
     }
     .hud-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hud-label { color: #94A3B8; font-weight: 700; font-size: 10px; min-width: 112px; }
-    #hud-4actions-row {
-        border-top: 1px solid #1E293B; padding-top: 4px; margin-top: 2px;
-        align-items: flex-start; white-space: normal; overflow: visible;
-    }
-    .hud-actions-pills {
-        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 3px 5px; width: 100%; min-width: 0;
-    }
-    .hud-action-pill {
-        font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25;
-    }
 
     @media (max-width: 1180px) {
         .neiro-win-topbar {
@@ -299,8 +240,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }
         .neiro-floating-hud { padding: 5px 8px; }
         .hud-label { min-width: 84px; }
-        #hud-4actions-row { flex-direction: column; gap: 3px; }
-        .hud-action-pill { font-size: 8.5px; padding: 2px 4px; }
     }
     """
 
@@ -380,32 +319,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     has_down_ap_val = bool(meta.get("has_down_air_pocket", bool(air_pockets)))
     session_name_val = str(inst_flow.get("session_name") or ("GLOBEX_CLOSED" if not market_open_flag else "NY_COMEX_DEEP"))
 
-    hud_mat = meta.get("tactical_matrix")
-    if not isinstance(hud_mat, dict):
-        hud_mat = compute_tactical_intraday_matrix(
-            spot=spot,
-            strike_above=strike_above,
-            next_above=next_above,
-            strike_below=strike_below,
-            next_below=next_below,
-            step=step_val,
-            call_wall=call_wall,
-            put_wall=put_wall,
-            zero_gamma=zero_gamma,
-            major_up_wall=major_up_wall_val,
-            major_down_wall=major_down_wall_val,
-            has_up_air_pocket=has_up_ap_val,
-            has_down_air_pocket=has_down_ap_val,
-            regime=regime_val,
-            vpin_pct=vpin_pct,
-            call_wall_siege=call_wall_siege,
-            put_wall_siege=put_wall_siege,
-            session_tag=session_name_val,
-            atr_5m=atr_5m_val,
-        )
-    hud_4actions_html = _build_hud_4actions_html(hud_mat, session_name_val.upper() != "GLOBEX_CLOSED")
-
-    # 3. Main M1 Chart Body with Compact Quant HUD + Bottom 4-Action Row
+    # 3. Main M1 Chart Body with Compact Quant HUD (5 Core Rows)
     neiro_container_html = f"""
     <div class="neiro-body-container" id="neiro-view-container">
         <div id="tv-chart-wrapper">
@@ -435,10 +349,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     <b id="hud-post-sweep-val" style="color:{post_sweep_col}; font-size:10px;" title="{vac_label}">{post_sweep_label}</b>
                     <span style="color:#64748B;">&bull;</span>
                     <b id="hud-kyle-val" style="color:#38BDF8; font-size:9.5px;">{kyle_label}</b>
-                </div>
-                <div class="hud-item" id="hud-4actions-row">
-                    <span class="hud-label" style="padding-top:2px;">4 HÀNH ĐỘNG:</span>
-                    <div id="hud-4actions-val" class="hud-actions-pills">{hud_4actions_html}</div>
                 </div>
             </div>
             <div id="neiro-tv-chart"></div>
@@ -1315,46 +1225,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 actSub.innerText = 'VPIN ' + liveVpinPct.toFixed(1) + '% · Chờ giá chạm bẫy & xác nhận bộ lọc ADR-028.';
             }}
         }}
-
-        // 5. Floating HUD Bottom Row (4 Tactical Actions live sync)
-        const hud4El = document.getElementById('hud-4actions-val');
-        if (hud4El) {{
-            const specs = [
-                {{ name: 'ĐẢO CHIỀU SELL', side: 'SELL', it: mat.fade, kind: 'rev' }},
-                {{ name: 'THUẬN CHIỀU SELL', side: 'SELL', it: mat.breakdown, kind: 'brk_dn' }},
-                {{ name: 'ĐẢO CHIỀU BUY', side: 'BUY', it: mat.rebound, kind: 'rev' }},
-                {{ name: 'THUẬN CHIỀU BUY', side: 'BUY', it: mat.squeeze, kind: 'brk_up' }},
-            ];
-            hud4El.innerHTML = specs.map(sp => {{
-                const item = sp.it || {{}};
-                const isBuy = sp.side === 'BUY';
-                let col, bdr, bg, txt, op;
-                if (item.active) {{
-                    col = isBuy ? '#86EFAC' : '#FCA5A5';
-                    bdr = '1px solid ' + (isBuy ? '#22C55E' : '#EF4444');
-                    bg = isBuy ? 'rgba(34,197,94,0.22)' : 'rgba(239,68,68,0.22)';
-                    txt = '● ' + sp.name + ' @' + Math.round(Number(item.entry || 0)).toLocaleString('en-US');
-                    op = '1';
-                }} else if (sp.kind === 'rev') {{
-                    col = '#64748B'; bdr = '1px solid #334155'; bg = 'rgba(15,23,42,0.7)';
-                    txt = '✕ ' + sp.name + ' [KHÓA]';
-                    op = '0.75';
-                }} else {{
-                    const trig = sp.kind === 'brk_up' ? (Number(item.entry || 0) - 0.50) : (Number(item.entry || 0) + 0.50);
-                    const arrow = sp.kind === 'brk_up' ? '&gt;' : '&lt;';
-                    if (sessionOpen) {{
-                        col = isBuy ? '#4ADE80' : '#F87171';
-                        bdr = '1px dashed ' + (isBuy ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)');
-                        bg = isBuy ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
-                    }} else {{
-                        col = '#64748B'; bdr = '1px dashed #334155'; bg = 'rgba(15,23,42,0.7)';
-                    }}
-                    txt = '○ ' + sp.name + ' ' + arrow + '$' + Math.round(trig).toLocaleString('en-US');
-                    op = '0.9';
-                }}
-                return "<span class='hud-action-pill' style='color:" + col + "; background:" + bg + "; border:" + bdr + "; opacity:" + op + ";' title='" + String(item.reason || '') + "'>" + txt + "</span>";
-            }}).join('');
-        }}
     }}
 
     function updateSyncBadgeHonest() {{
@@ -1868,7 +1738,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         ctx.lineWidth = 1;
         ctx.strokeRect(panelX - 4, 0, panelW, h);
 
-        // 2. Always-On Air Pocket Vacuum Matrix (Main Chart + Right Profile)
+        // 2. Always-On Air Pocket Vacuum Matrix (Opacity & Border scaled by Severity + OI depth)
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
             const pFrom = parseFloat(ap.from || 0);
@@ -1881,47 +1751,87 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 const botY = Math.max(y1, y2);
                 const bandH = Math.max(14, botY - topY);
                 if (topY <= h && botY >= 0) {{
+                    const apOi = Number(ap.avg_oi || 0);
+                    const apSev = String(ap.severity || '').toUpperCase();
+                    const isDeep = (apSev === 'CRITICAL') || (apSev === 'HIGH' && (apOi <= 0 || apOi < 125));
+                    const isHigh = !isDeep && (apSev === 'HIGH');
+
+                    let chartFill, profFill, borderCol, borderW, borderDash, labelCol, badgeCol, levelTxt;
+                    if (isDeep) {{
+                        chartFill = 'rgba(239, 68, 68, 0.22)';
+                        profFill = 'rgba(239, 68, 68, 0.34)';
+                        borderCol = 'rgba(248, 113, 113, 0.92)';
+                        borderW = 1.5;
+                        borderDash = [5, 3];
+                        labelCol = '#FCA5A5';
+                        badgeCol = '#FECACA';
+                        levelTxt = 'RỖNG SÂU';
+                    }} else if (isHigh) {{
+                        chartFill = 'rgba(245, 158, 11, 0.15)';
+                        profFill = 'rgba(245, 158, 11, 0.25)';
+                        borderCol = 'rgba(251, 191, 36, 0.85)';
+                        borderW = 1.2;
+                        borderDash = [4, 4];
+                        labelCol = '#FACC15';
+                        badgeCol = '#FDE047';
+                        levelTxt = 'RỖNG MẠNH';
+                    }} else {{
+                        const depthFactor = apOi > 0 ? Math.max(0.25, Math.min(1.0, 1.0 - (apOi - 150) / 300)) : 0.65;
+                        const cAlpha = (0.045 + 0.055 * depthFactor).toFixed(3);
+                        const pAlpha = (0.10 + 0.10 * depthFactor).toFixed(3);
+                        const bAlpha = (0.35 + 0.30 * depthFactor).toFixed(2);
+                        chartFill = 'rgba(245, 158, 11, ' + cAlpha + ')';
+                        profFill = 'rgba(245, 158, 11, ' + pAlpha + ')';
+                        borderCol = 'rgba(245, 158, 11, ' + bAlpha + ')';
+                        borderW = 0.9;
+                        borderDash = [3, 5];
+                        labelCol = 'rgba(250, 204, 21, ' + (0.62 + 0.25 * depthFactor).toFixed(2) + ')';
+                        badgeCol = 'rgba(253, 224, 71, 0.85)';
+                        levelTxt = 'MỎNG NHẸ';
+                    }}
+
                     // A. Main Chart Canvas Area:
-                    ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+                    ctx.fillStyle = chartFill;
                     ctx.fillRect(0, topY, chartW, bandH);
-                    ctx.strokeStyle = '#F59E0B';
-                    ctx.setLineDash([4, 4]);
-                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = borderCol;
+                    ctx.setLineDash(borderDash);
+                    ctx.lineWidth = borderW;
                     ctx.strokeRect(0, topY, chartW, bandH);
                     ctx.setLineDash([]);
 
-                    const apLabelX = (topY < 185 && chartW > 680) ? 514 : 20;
+                    const apLabelX = (topY < 145 && chartW > 650) ? 482 : 20;
                     const apRange = '[$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + ']';
+                    const oiInfo = apOi > 0 ? (' · OI ~' + Math.round(apOi)) : '';
                     const apTxt = (apLabelX > 20)
-                        ? ('⚠️ AIR POCKET VACUUM ' + apRange)
-                        : ('⚠️ AIR POCKET VACUUM ' + apRange + ' · NGUY CƠ TRƯỢT DÀI (CẤM ĐỠ DAO)');
+                        ? ('⚠️ AIR POCKET VACUUM ' + apRange + ' · ' + levelTxt)
+                        : ('⚠️ AIR POCKET VACUUM ' + apRange + ' · ' + levelTxt + oiInfo + ' · CẤM ĐỠ DAO');
                     ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
                     ctx.textAlign = 'left';
-                    ctx.fillStyle = '#FACC15';
+                    ctx.fillStyle = labelCol;
                     ctx.fillText(apTxt, apLabelX, topY + Math.min(bandH - 3, 13));
 
-                    // B. Right Greeks / Orderflow Panel Area (User requested: highlight right profile):
-                    ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+                    // B. Right Greeks / Orderflow Panel Area:
+                    ctx.fillStyle = profFill;
                     ctx.fillRect(panelX - 4, topY, panelW, bandH);
-                    ctx.strokeStyle = '#F59E0B';
-                    ctx.setLineDash([3, 3]);
-                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = borderCol;
+                    ctx.setLineDash(borderDash);
+                    ctx.lineWidth = borderW;
                     ctx.strokeRect(panelX - 4, topY, panelW, bandH);
                     ctx.setLineDash([]);
 
-                    // Amber caution badge inside right panel
+                    // Intensity caution badge inside right panel
                     const bW = Math.min(panelW - 14, 210);
                     const bX = panelX + (panelW - bW) / 2 - 4;
                     const bY = topY + Math.max(1, (bandH - 15) / 2);
                     ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
                     ctx.fillRect(bX, bY, bW, 15);
-                    ctx.strokeStyle = '#F59E0B';
+                    ctx.strokeStyle = borderCol;
                     ctx.lineWidth = 1;
                     ctx.strokeRect(bX, bY, bW, 15);
-                    ctx.fillStyle = '#FDE047';
+                    ctx.fillStyle = badgeCol;
                     ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText('⚠️ AIR POCKET [CẤM ĐỠ] $' + Math.min(pFrom, pTo).toFixed(0) + '-' + Math.max(pFrom, pTo).toFixed(0), bX + bW / 2, bY + 11);
+                    ctx.fillText('⚠️ ' + levelTxt + ' $' + Math.min(pFrom, pTo).toFixed(0) + '-' + Math.max(pFrom, pTo).toFixed(0) + (apOi > 0 ? ' (' + Math.round(apOi) + ')' : ''), bX + bW / 2, bY + 11);
                 }}
             }}
         }});

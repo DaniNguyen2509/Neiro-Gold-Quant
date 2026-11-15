@@ -190,22 +190,14 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     assert "toggleChartHeight()" in nav
     assert 'id="neiro-tf-badge"' in nav
     assert 'id="top-vpin-val"' in nav
-    assert hud.count('class="hud-item"') == 6
-    assert 'id="hud-4actions-val"' in hud
-    assert "4 HÀNH ĐỘNG:" in hud
-    for action_lbl in (
-        "ĐẢO CHIỀU SELL",
-        "THUẬN CHIỀU SELL",
-        "ĐẢO CHIỀU BUY",
-        "THUẬN CHIỀU BUY",
-    ):
-        assert action_lbl in hud
-    assert "hud-4actions-val" in js
+    assert hud.count('class="hud-item"') == 5
+    assert 'id="hud-4actions-val"' not in hud
 
-    # Air Pockets must always draw directly on Canvas in Compact mode before Full-only FVGs
+    # Air Pockets must always draw directly on Canvas in Compact mode with severity intensity
     draw_fn_src = js[js.index("function drawNeiroOverlay") :]
     assert draw_fn_src.index("airPockets.forEach") < draw_fn_src.index("if (!overlayCompactMode)")
-    assert "Always-On Air Pocket Vacuum Matrix" in draw_fn_src
+    for tier_lbl in ("RỖNG SÂU", "RỖNG MẠNH", "MỎNG NHẸ"):
+        assert tier_lbl in draw_fn_src
 
     # Realtime ADR-028 JS parity engines & 3-tier sync
     for fn_name in (

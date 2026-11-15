@@ -2130,7 +2130,6 @@ def generate_html_terminal(
     guard_tag = " (VI MÔ)" if is_micro_guarded else ""
 
     pinning_table_html = build_microstructure_pinning_table_html(df, meta)
-    meta["tactical_matrix"] = _k6_mat
     neiro_comp = render_neiro_orderflow_component(meta, df)
 
     # Render complete HTML
