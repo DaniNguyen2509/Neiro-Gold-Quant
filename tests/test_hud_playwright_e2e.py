@@ -168,7 +168,7 @@ def test_adr029_chart_height_toggle_and_mobile_no_overflow(
             ctx = browser.new_context(viewport={"width": 1440, "height": 900})
             page = ctx.new_page()
             _block_external_routes(page)
-            page.goto(html_path.as_uri(), wait_until="domcontentloaded")
+            page.goto(html_path.resolve().as_uri(), wait_until="domcontentloaded")
             page.wait_for_timeout(150)
 
             before_h = page.locator("#neiro-view-container").bounding_box()["height"]
@@ -196,7 +196,7 @@ def test_adr029_chart_height_toggle_and_mobile_no_overflow(
             mob = browser.new_context(viewport={"width": 390, "height": 844})
             mpage = mob.new_page()
             _block_external_routes(mpage)
-            mpage.goto(html_path.as_uri(), wait_until="domcontentloaded")
+            mpage.goto(html_path.resolve().as_uri(), wait_until="domcontentloaded")
             mpage.wait_for_timeout(150)
             metrics = mpage.evaluate(
                 "() => ({sw: document.documentElement.scrollWidth, iw: window.innerWidth})"
@@ -280,7 +280,7 @@ def test_adr029_stale_cloud_sync_does_not_overwrite_live_and_reads_label_vi(
                     route.abort()
 
             page.route("**/*", _route_handler)
-            page.goto(html_path.as_uri(), wait_until="domcontentloaded")
+            page.goto(html_path.resolve().as_uri(), wait_until="domcontentloaded")
             page.wait_for_timeout(300)
 
             # Force a Cloud Worker chart sync + manual checkCloudSyncNow against stale 2025 version.json

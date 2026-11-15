@@ -326,3 +326,28 @@ def test_d10_scraper_enriches_zero_iv_with_black76():
     assert (enriched["putIV"] > 0.05).all(), f"putIV was not enriched: {enriched['putIV']}"
     assert (enriched["callIV"] < 0.50).all(), f"callIV is unrealistically high: {enriched['callIV']}"
     assert (enriched["putIV"] < 0.50).all(), f"putIV is unrealistically high: {enriched['putIV']}"
+
+
+# ---------------------------------------------------------------------------
+# D11 - Cross-platform pytest/CI configuration & Playwright file:// URI guard
+# ---------------------------------------------------------------------------
+def test_d11_pytest_config_has_no_os_hardcoded_basetemp():
+    """pyproject.toml addopts must not pin a Windows drive/user path that breaks Linux CI."""
+    import re
+    import tomllib
+
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    addopts = pyproject.get("tool", {}).get("pytest", {}).get("ini_options", {}).get("addopts", "")
+    assert "--basetemp" not in addopts, f"Hardcoded --basetemp breaks cross-platform CI: {addopts!r}"
+    assert not re.search(r"[A-Za-z]:[/\\]|/Users/|\\Users\\", addopts), (
+        f"OS/user-specific path leaked into pyproject.toml addopts: {addopts!r}"
+    )
+
+    e2e_src = (REPO_ROOT / "tests" / "test_hud_playwright_e2e.py").read_text(encoding="utf-8")
+    all_uris = re.findall(r"\.as_uri\(\)", e2e_src)
+    assert all_uris, "Expected at least one .as_uri() navigation in test_hud_playwright_e2e.py"
+    resolved_uris = re.findall(r"\.resolve\(\)\.as_uri\(\)", e2e_src)
+    assert len(resolved_uris) == len(all_uris), (
+        "All tmp_path .as_uri() calls in Playwright E2E tests must call .resolve().as_uri() "
+        "so file:// URIs never fail on relative basetemp."
+    )

@@ -146,7 +146,7 @@ Neiro-Gold-Quant/
 ├── data/
 │   └── options_prices_GCZ26.csv      # Dataset Options Chain CME mới nhất
 ├── tests/                            # Systematic Testing Rig & Unit/Integration Suite
-│   ├── test_data_gate.py             # Cổng kiểm định dữ liệu đầu vào & CI Guard (D1-D9)
+│   ├── test_data_gate.py             # Cổng kiểm định dữ liệu đầu vào & CI Guard (D1-D11)
 │   ├── test_math_core.py             # Lõi toán Black-76, Dekker-Brent _brentq, Zero Gamma Flip (M1-M11)
 │   ├── test_expiry_rollover.py       # Tính nhất quán T_floor, DTE vi mô T->0 & Rollover hợp đồng (T1-T6)
 │   ├── test_liquidity_vacuum.py      # Dynamic Vacuum (Amihud + RS), Institutional FVG & Post-Sweep Classifier
@@ -164,7 +164,7 @@ Neiro-Gold-Quant/
 - [x] Lõi toán Black-76 giải tích bậc 1 & bậc 2 chính xác, bộ giải ngược IV lai (Newton-Raphson + Dekker-Brent `_brentq`), loại bỏ triệt để NaN.
 - [x] Bất biến Zero Gamma Flip ($S^*$) giải liên tục bằng Dekker-Brent `_brentq` thuần Python, đo lường Wall Siege Ratio ($Volume / OI$).
 - [x] Hoàn thiện tài liệu kiến trúc và đặc tả chuyên biệt cho Vàng (`docs/spec.md` & `docs/architecture.md`).
-- [x] Bộ kiểm thử tự động toàn hệ thống (`pytest tests/` — bao gồm ADR-022..029: Data Gate D1-D10, Math Core M1-M11, Rollover & Múi giờ mùa đông T1-T7, Dashboard Smoke H1-H3, Data Analyst Pipeline, Precomputed Squeeze, Black-76 Gamma Healing + 3-tier Auto-Discovery, JS/Python `r2`/VPIN Parity, và Playwright E2E Desktop/Mobile) pass sạch sẽ không lỗi.
+- [x] Bộ kiểm thử tự động toàn hệ thống (`pytest tests/` — bao gồm ADR-022..029: Data Gate D1-D11, Math Core M1-M11, Rollover & Múi giờ mùa đông T1-T7, Dashboard Smoke H1-H3, Data Analyst Pipeline, Precomputed Squeeze, Black-76 Gamma Healing + 3-tier Auto-Discovery, JS/Python `r2`/VPIN Parity, và Playwright E2E Desktop/Mobile) pass sạch sẽ không lỗi.
 - [x] Động cơ tính toán sẵn & Chuẩn hóa Data Analyst (ADR-024): Tính sẵn 100% Ma trận Gamma Squeeze Ladder cho tra cứu O(1) thời gian thực, khử trùng lặp, ép đơn điệu, chữa lỗi chào giá chéo và tự động chữa lành `callGammaPower`/`putGammaPower` bằng Black-76 theo độ lệch Volatility Skew (`callIV`/`putIV` từng strike) khi phát hiện dummy flat gamma (`0.0037`).
 - [x] Đồng bộ Múi giờ Mùa đông Hoa Kỳ & Tự Động Hóa 3 Tầng Đáo Hạn (ADR-023): Tự động nhận diện 3 tầng đáo hạn (`WEEKLY` + `MONTHLY` + `QUARTERLY` chu kỳ chính `G, J, M, Q, Z`) kèm Lịch Nghỉ Lễ CME (`get_cme_holidays`), tự động chuyển đổi hợp đồng cơ sở (`GCZ26` -> `GCG27`), tính 13:30 Chicago Time (18:30 UTC hè / 19:30 UTC đông) và tự động làm giàu Black-76 IV theo từng kỳ hạn con trước khi gộp Multi-Expiry tại Scraper.
 - [x] Triển khai TradingView Fullscreen Zero-Tabs Realtime Terminal: Mặc định nến M1, layout tràn màn hình 100%, tích hợp Realtime Tick Engine không reload trang, Unified Greeks Matrix (GEX, VEX, CHEX, Net Delta) và Plotly 4-Panel trên cùng 1 màn hình.
