@@ -216,7 +216,7 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     ):
         assert tier_lbl in draw_fn_src
 
-    # Realtime ADR-028 JS parity engines & 3-tier sync
+    # Realtime ADR-028 JS parity engines & Cloud Worker dual-mode polling (ADR-030)
     for fn_name in (
         "computeLiveVpinBvcJs",
         "computeM5AtrJs",
@@ -224,7 +224,14 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
         "computeTacticalMatrixJs",
         "updateRealtimeTacticalCockpit",
         "updateSyncBadgeHonest",
+        "normalizeCloudWorkerUrl",
+        "getCloudFeedWorkerUrl",
+        "promptCloudFeedUrl",
+        "fetchJsonWithTimeout",
     ):
         assert fn_name in js
-
+    assert 'id="btn-cloud-worker"' in nav
+    assert "WORKER LIVE (XAUUSDF" in js
+    assert "WORKER CLOUD (GC=F)" in js
+    assert "cloud_feed_url" in js
 

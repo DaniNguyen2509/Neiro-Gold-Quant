@@ -21,10 +21,26 @@ import math
 import os
 import sys
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
 
 _logger = logging.getLogger(__name__)
+
+
+def _resolve_cloud_feed_worker_url() -> str:
+    """Resolve optional Cloudflare Worker URL from env or config/settings.toml."""
+    env_url = str(os.environ.get("NEIRO_CLOUD_FEED_URL") or "").strip().rstrip("/")
+    if env_url:
+        return env_url
+    cfg_path = Path(__file__).resolve().parents[2] / "config" / "settings.toml"
+    try:
+        with cfg_path.open("rb") as fh:
+            cfg = tomllib.load(fh)
+        val = str((cfg.get("cloud") or {}).get("live_feed_worker_url") or "").strip().rstrip("/")
+        return val if val.startswith(("https://", "http://127.0.0.1", "http://localhost")) else ""
+    except Exception:
+        return ""
 
 import numpy as np
 import pandas as pd
@@ -825,6 +841,7 @@ def load_and_preprocess_options(
         "file_age_hours": round(file_age_hours, 1),
         "is_data_stale": is_data_stale,
         "is_benchmark_fallback": is_benchmark_fallback,
+        "cloud_feed_url": _resolve_cloud_feed_worker_url(),
         "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "synced_at_vn": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%d/%m/%Y %H:%M:%S VN"),
     }

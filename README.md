@@ -61,6 +61,7 @@ Khi trader muốn theo dõi bảng điện và luồng nến M5 cập nhật li�
 ## 📚 TÀI LIỆU KIẾN TRÚC & CẨM NANG THỰC CHIẾN
 
 - **Cẩm nang Tác chiến Thực chiến cho Trader (Trader Playbook):** [docs/TRADER_PLAYBOOK.md](docs/TRADER_PLAYBOOK.md) *(Đọc hiểu Command Bar 3s, 7 KPI, KHỐI 6 ma trận 4 kịch bản SL `>= $5.00`, VPIN/BVC & Air Pocket)*
+- **Cloudflare Worker Real-Time 24/7 ($0 / Không cần VPS):** [cloud/cloudflare-worker/README.md](cloud/cloudflare-worker/README.md) & [ADR-030](docs/decisions/ADR-030-cloudflare-worker-dual-mode-ctrader-feed.md) *(Chạy ngay Yahoo `GC=F` trên điện thoại & nâng cấp lên Pepperstone cTrader Demo `XAUUSDF` 0 giây)*
 - **Kiến trúc Hệ thống v3.3 (Cockpit 3s, Dual-View Terminal & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
 - **Quyết định Cockpit Tác Chiến 3 Giây & Đồng Bộ 100% Realtime JS/Python (ADR-029):** [docs/decisions/ADR-029-simplified-3sec-cockpit-and-full-realtime-sync.md](docs/decisions/ADR-029-simplified-3sec-cockpit-and-full-realtime-sync.md)

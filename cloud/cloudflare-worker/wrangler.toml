@@ -1,0 +1,25 @@
+name = "neiro-gold-feed"
+main = "worker.js"
+# >= 2024-09-02 enables `allow_custom_ports` so Worker fetch/WebSocket can reach cTrader port 5036
+compatibility_date = "2024-11-01"
+compatibility_flags = ["allow_custom_ports"]
+
+[vars]
+# "auto" = use cTrader Demo XAUUSDF when Secrets are configured, else fallback to Yahoo GC=F immediately
+# "yahoo" = force Yahoo GC=F (works immediately with 0 setup while awaiting Spotware approval)
+# "ctrader" = prefer Pepperstone cTrader Demo XAUUSDF (falls back to Yahoo on transient broker outage)
+FEED_MODE = "auto"
+# Always keep "demo" unless you explicitly choose a read-only Live token
+CTRADER_ENV = "demo"
+CTRADER_SYMBOL = "XAUUSDF"
+ALLOWED_ORIGIN = "*"
+
+[[durable_objects.bindings]]
+name = "FEED_DO"
+class_name = "CTraderFeedDO"
+
+[[migrations]]
+tag = "v1"
+# SQLite-backed Durable Objects are required on the Cloudflare Workers Free plan
+new_sqlite_classes = ["CTraderFeedDO"]
+

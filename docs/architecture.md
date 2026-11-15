@@ -388,5 +388,13 @@ on:
 3. **Mở Rộng Payload Cầu Nối Realtime (`src/hud/html_dashboard.py`):**
    - Helper dùng chung `_compute_live_microstructure_payload(tape)` cấp trực tiếp `vpin_pct`, `vpin_label`, `bvc_buy_pct`, `bvc_cvd_contracts`, `kyle_lambda_label`, `atr_5m` cho `/api/yahoo_gc`, `_run_lightweight_live_tick()` và `version.json`, kết hợp trường adaptive strike mới trong `meta` (`next_above`, `next_below`, `step`, `major_up_wall`, `major_down_wall`, `has_up_air_pocket`, `has_down_air_pocket`, `atr_5m`).
 
+---
 
+## XVII. CLOUDFLARE WORKER DUAL-MODE RELAY & CTRADER DEMO FEED (ADR-030)
+
+1. **Zero-VPS Edge Relay (`cloud/cloudflare-worker/worker.js` & `wrangler.toml`):**
+   - Dùng chung chuẩn JSON `/api/yahoo_gc?tf=...` với cầu nối Python cục bộ. Hỗ trợ `FEED_MODE = "auto"` (chạy ngay Yahoo `GC=F` khi chưa nạp Secret, tự chuyển sang Pepperstone cTrader Demo `XAUUSDF` `wss://demo.ctraderapi.com:5036` qua `allow_custom_ports` khi có credentials).
+   - SQLite Durable Object `CTraderFeedDO` lưu kín `Access Token` / `Refresh Token` (tự gia hạn qua `/apps/token?grant_type=refresh_token`), cache nến 2.5s và tự ngủ sau 5 phút idle; giải mã `(low + delta) / 100000.0` giữ nguyên `basis_offset = 0.0`.
+2. **Nối Fallback Client & Cấu Hình (`src/hud/neiro_terminal.py`, `html_dashboard.py`, `config/settings.toml`):**
+   - `_resolve_cloud_feed_worker_url()` đọc `NEIRO_CLOUD_FEED_URL` hoặc `[cloud].live_feed_worker_url` vào `INITIAL_META.cloud_feed_url`; frontend hỗ trợ lưu qua `?worker=...` hoặc nút `#btn-cloud-worker` (`Cloud Feed`), ưu tiên fallback từ `127.0.0.1:8765` sang Cloud Worker trong `pollLiveYahooChart()`.
 

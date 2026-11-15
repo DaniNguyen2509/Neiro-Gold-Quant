@@ -67,6 +67,7 @@ max_footprint_mb = 15.0
 cloud_provider = "github_actions"
 web_hosting = "github_pages"
 multi_tier_radar = true            # 3-tier pre-session cron execution
+live_feed_worker_url = ""          # Optional Cloudflare Worker HTTPS URL (e.g. "https://neiro-gold-feed.<sub >.workers.dev")
 
 [logging]
 level = "INFO"

@@ -282,6 +282,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             <button id="btn-chart-height" class="timeframe-pill" onclick="toggleChartHeight()" title="Phóng to hoặc thu gọn chiều cao biểu đồ">
                 Mở rộng Chart
             </button>
+            <button id="btn-cloud-worker" class="timeframe-pill" onclick="promptCloudFeedUrl()" title="Cài đặt URL Cloudflare Worker (xem realtime 24/7 trên điện thoại &amp; GitHub Pages)">
+                Cloud Feed
+            </button>
             <span class="neiro-badge-contract" id="cloud-sync-badge" style="background:rgba(148,163,184,0.16); border-color:rgba(148,163,184,0.4); color:#CBD5E1; font-size:10px; cursor:pointer;" title="Trạng thái đồng bộ realtime. Bấm để kiểm tra ngay." onclick="checkCloudSyncNow(true)">
                 ● SNAPSHOT BUILD
             </span>
@@ -468,6 +471,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "dynamic_vacuum": dyn_vac,
         "institutional_fvgs": inst_fvgs,
         "post_sweep_execution": post_sweep,
+        "cloud_feed_url": str(meta.get("cloud_feed_url") or ""),
     })
 
     json_candles_str = json.dumps(chart_candles)
@@ -494,8 +498,65 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     let chartExpanded = false;
     let liveTacticalMatrix = null;
     let lastBridgeSuccessEpoch = 0;
+    let lastCloudWorkerEpoch = 0;
+    let lastCloudFeedSource = '';
     let lastCloudSuccessEpoch = 0;
     let lastAuthoritativeVpinEpoch = 0;
+    const CLOUD_WORKER_STORAGE_KEY = 'neiro_cloud_feed_url';
+
+    function normalizeCloudWorkerUrl(raw) {{
+        if (!raw) return '';
+        try {{
+            const u = new URL(String(raw).trim());
+            if (u.protocol === 'https:' || u.hostname === '127.0.0.1' || u.hostname === 'localhost') {{
+                return u.origin;
+            }}
+        }} catch (e) {{}}
+        return '';
+    }}
+
+    function getCloudFeedWorkerUrl() {{
+        try {{
+            const saved = normalizeCloudWorkerUrl(localStorage.getItem(CLOUD_WORKER_STORAGE_KEY));
+            if (saved) return saved;
+        }} catch (e) {{}}
+        return normalizeCloudWorkerUrl(window.INITIAL_META && window.INITIAL_META.cloud_feed_url);
+    }}
+
+    function updateCloudWorkerButtonState() {{
+        const btn = document.getElementById('btn-cloud-worker');
+        if (!btn) return;
+        const wUrl = getCloudFeedWorkerUrl();
+        if (!wUrl) {{
+            btn.innerText = 'Cloud Feed';
+            btn.classList.remove('active');
+            btn.title = 'Cài đặt URL Cloudflare Worker (xem realtime 24/7 trên điện thoại & GitHub Pages)';
+            return;
+        }}
+        const isCtrader = String(lastCloudFeedSource || '').startsWith('ctrader_');
+        btn.innerText = isCtrader ? 'Cloud: XAUUSDF' : 'Cloud: Bật';
+        btn.classList.add('active');
+        btn.title = 'Cloudflare Worker: ' + wUrl + ' (Bấm để đổi hoặc tắt)';
+    }}
+
+    function promptCloudFeedUrl() {{
+        const current = getCloudFeedWorkerUrl();
+        const entered = window.prompt(
+            'Dán URL Cloudflare Worker (VD: https://neiro-gold-feed.ten-anh.workers.dev) — để trống để tắt:',
+            current || ''
+        );
+        if (entered === null) return;
+        const cleaned = normalizeCloudWorkerUrl(entered);
+        try {{
+            if (cleaned) localStorage.setItem(CLOUD_WORKER_STORAGE_KEY, cleaned);
+            else localStorage.removeItem(CLOUD_WORKER_STORAGE_KEY);
+        }} catch (e) {{}}
+        lastCloudWorkerEpoch = 0;
+        lastCloudFeedSource = '';
+        updateCloudWorkerButtonState();
+        updateSyncBadgeHonest();
+        if (cleaned) checkCloudSyncNow(true);
+    }}
     let liveVpinPct = Number(window.INITIAL_META.vpin_pct || 32.0);
     let liveVpinLabel = String(window.INITIAL_META.vpin_label || '🟢 VPIN 32.0% [AN TOÀN FADE WALL]');
     let liveAtr5m = Number(window.INITIAL_META.atr_5m || 4.0);
@@ -1243,6 +1304,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             badge.style.borderColor = 'rgba(34, 197, 94, 0.45)';
             badge.style.color = '#4ADE80';
             badge.innerText = '● LIVE BRIDGE (2.5s)';
+            return;
+        }}
+        if (lastCloudWorkerEpoch && (now - lastCloudWorkerEpoch) < 15000) {{
+            const isCtrader = String(lastCloudFeedSource || '').startsWith('ctrader_');
+            badge.style.background = isCtrader ? 'rgba(34, 197, 94, 0.18)' : 'rgba(56, 189, 248, 0.16)';
+            badge.style.borderColor = isCtrader ? 'rgba(34, 197, 94, 0.45)' : 'rgba(56, 189, 248, 0.4)';
+            badge.style.color = isCtrader ? '#4ADE80' : '#38BDF8';
+            badge.innerText = isCtrader ? '● WORKER LIVE (XAUUSDF · 0s)' : '● WORKER CLOUD (GC=F)';
             return;
         }}
         const tsUtc = window.INITIAL_META && window.INITIAL_META.timestamp_utc;
@@ -2197,11 +2266,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return null;
     }}
 
-    function mergeLiveCandles(newCandles, tfKey = '1m') {{
+    function mergeLiveCandles(newCandles, tfKey = '1m', resetSeries = false) {{
         if (!Array.isArray(newCandles) || newCandles.length === 0) return;
-        const targetList = (tfKey === '1m')
+        const targetList = resetSeries ? [] : ((tfKey === '1m')
             ? (window.INITIAL_CANDLES || [])
-            : ((window.INITIAL_TF_CANDLES && window.INITIAL_TF_CANDLES[tfKey]) || []);
+            : ((window.INITIAL_TF_CANDLES && window.INITIAL_TF_CANDLES[tfKey]) || []));
         const byTime = new Map();
         for (let i = 0; i < targetList.length; i++) {{
             const b = targetList[i];
@@ -2230,34 +2299,83 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 delta: lastBar.delta || 0,
             }};
             evaluateBarOrderflow(merged, tfKey);
-            candleSeries.update({{
-                time: lastBar.time,
-                open: lastBar.open,
-                high: lastBar.high,
-                low: lastBar.low,
-                close: lastBar.close,
-            }});
+            if (resetSeries) {{
+                candleSeries.setData(merged.map(c => ({{ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }})));
+            }} else {{
+                try {{
+                    candleSeries.update({{
+                        time: lastBar.time,
+                        open: lastBar.open,
+                        high: lastBar.high,
+                        low: lastBar.low,
+                        close: lastBar.close,
+                    }});
+                }} catch (e) {{
+                    candleSeries.setData(merged.map(c => ({{ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }})));
+                }}
+            }}
             applyLiveTick(lastBar.close, null, true);
         }}
     }}
 
     let lastYahooPollEpoch = 0;
 
+    async function fetchJsonWithTimeout(url, timeoutMs = 5000) {{
+        const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+        try {{
+            const res = await fetch(url, {{ cache: 'no-store', signal: ctrl ? ctrl.signal : undefined }});
+            if (!res || !res.ok) return null;
+            return await res.json();
+        }} finally {{
+            if (timer) clearTimeout(timer);
+        }}
+    }}
+
     async function pollLiveYahooChart(tf = currentTf) {{
         const ts = Date.now();
         lastYahooPollEpoch = ts;
-        try {{
-            const res = await fetch('http://127.0.0.1:8765/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts, {{ cache: 'no-store' }});
-            if (res && res.ok) {{
-                const payload = await res.json();
-                lastBridgeSuccessEpoch = Date.now();
+        const candidates = [];
+        if (isLocalBridgeMode) {{
+            candidates.push({{
+                kind: 'bridge',
+                timeoutMs: 1500,
+                url: 'http://127.0.0.1:8765/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts,
+            }});
+        }}
+        const workerUrl = getCloudFeedWorkerUrl();
+        if (workerUrl) {{
+            candidates.push({{
+                kind: 'worker',
+                timeoutMs: 6500,
+                url: workerUrl + '/api/yahoo_gc?tf=' + encodeURIComponent(tf) + '&_t=' + ts,
+            }});
+        }}
+
+        for (let i = 0; i < candidates.length; i++) {{
+            const cand = candidates[i];
+            try {{
+                const payload = await fetchJsonWithTimeout(cand.url, cand.timeoutMs);
+                if (!payload || (!payload.available && !(Array.isArray(payload.candles) && payload.candles.length > 0))) {{
+                    continue;
+                }}
+                if (cand.kind === 'bridge') {{
+                    lastBridgeSuccessEpoch = Date.now();
+                }} else {{
+                    lastCloudWorkerEpoch = Date.now();
+                }}
+                const nextSrc = String(payload.source || '');
+                const sourceSwitched = Boolean(nextSrc && lastCloudFeedSource && nextSrc !== lastCloudFeedSource)
+                    || Boolean(!lastCloudFeedSource && nextSrc.startsWith('ctrader_'));
+                if (nextSrc) lastCloudFeedSource = nextSrc;
+
                 if (window.INITIAL_META) {{
                     window.INITIAL_META.timestamp_utc = new Date().toISOString();
-                    if (payload && payload.market_open !== undefined) {{
+                    if (payload.market_open !== undefined) {{
                         window.INITIAL_META.market_open = Boolean(payload.market_open);
                     }}
                 }}
-                if (payload && payload.vpin_pct !== undefined) {{
+                if (payload.vpin_pct !== undefined) {{
                     liveVpinPct = Number(payload.vpin_pct);
                     if (payload.vpin_label) liveVpinLabel = String(payload.vpin_label);
                     if (payload.bvc_buy_pct !== undefined) liveBuyPct = Number(payload.bvc_buy_pct);
@@ -2266,22 +2384,24 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     if (payload.atr_5m !== undefined) liveAtr5m = Number(payload.atr_5m);
                     lastAuthoritativeVpinEpoch = Date.now();
                 }}
-                if (payload && Array.isArray(payload.candles) && payload.candles.length > 0) {{
-                    mergeLiveCandles(payload.candles, tf);
+                if (Array.isArray(payload.candles) && payload.candles.length > 0) {{
+                    mergeLiveCandles(payload.candles, tf, sourceSwitched);
                 }}
-                if (payload && payload.latest_price) {{
+                if (payload.latest_price) {{
                     applyLiveTick(Number(payload.latest_price), null, true);
                 }} else {{
                     updateRealtimeTacticalCockpit();
                 }}
                 buildEpoch = Date.now();
+                updateCloudWorkerButtonState();
                 updateSyncTimeAgo();
                 updateSyncBadgeHonest();
                 return true;
+            }} catch (e) {{
+                // Try next live endpoint cleanly
             }}
-        }} catch (e) {{
-            // Local bridge not running; fallback to Cloud/Version JSON sync
         }}
+        updateCloudWorkerButtonState();
         updateSyncBadgeHonest();
         return false;
     }}
@@ -2297,8 +2417,11 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
         const m = window.INITIAL_META;
         const nowMs = Date.now();
-        const bridgeLive = Boolean(lastBridgeSuccessEpoch && (nowMs - lastBridgeSuccessEpoch) < 15000);
-        const allowLiveMarketState = Boolean(opts.forceLive || !bridgeLive);
+        const streamLive = Boolean(
+            (lastBridgeSuccessEpoch && (nowMs - lastBridgeSuccessEpoch) < 15000)
+            || (lastCloudWorkerEpoch && (nowMs - lastCloudWorkerEpoch) < 15000)
+        );
+        const allowLiveMarketState = Boolean(opts.forceLive || !streamLive);
 
         if (allowLiveMarketState && data.market_open !== undefined) m.market_open = Boolean(data.market_open);
         if (data.call_wall) m.call_wall = data.call_wall;
@@ -2421,7 +2544,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         || window.location.hostname === '127.0.0.1'
         || window.location.hostname === 'localhost'
     );
-    const YAHOO_POLL_INTERVAL_MS = isLocalBridgeMode ? 2500 : 5000;
+    function getLivePollIntervalMs() {{
+        if (isLocalBridgeMode) return 2500;
+        return getCloudFeedWorkerUrl() ? 3000 : 10000;
+    }}
 
     function connectLiveGoldOrderflowStream() {{
         if (!isCmeGlobexMarketOpen()) {{
@@ -2430,16 +2556,22 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             return;
         }}
         pollLiveYahooChart(currentTf);
-        setTimeout(connectLiveGoldOrderflowStream, YAHOO_POLL_INTERVAL_MS);
+        setTimeout(connectLiveGoldOrderflowStream, getLivePollIntervalMs());
     }}
 
-    // Tự động kiểm tra Yahoo GC=F & Cloud mỗi 10s hoàn toàn tự động (Zero-Touch, Zero-Reload)
+    // Tự động kiểm tra Yahoo GC=F / Worker & Cloud mỗi 10s hoàn toàn tự động (Zero-Touch, Zero-Reload)
     setInterval(updateSyncTimeAgo, 15000);
     setInterval(() => checkCloudSyncNow(false), 10000);
     window.addEventListener('focus', () => checkCloudSyncNow(false));
 
-    // Auto-init 100% hands-free on load
+    // Auto-init 100% hands-free on load (supports ?worker=https://... quick setup link)
     window.addEventListener('DOMContentLoaded', () => {{
+        try {{
+            const qWorker = new URLSearchParams(window.location.search).get('worker');
+            const normQ = normalizeCloudWorkerUrl(qWorker);
+            if (normQ) localStorage.setItem(CLOUD_WORKER_STORAGE_KEY, normQ);
+        }} catch (e) {{}}
+        updateCloudWorkerButtonState();
         setTimeout(initNeiroGoldChart, 60);
         setTimeout(connectLiveGoldOrderflowStream, 300);
         setTimeout(() => checkCloudSyncNow(false), 600);
