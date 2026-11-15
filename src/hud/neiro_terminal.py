@@ -1758,22 +1758,22 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
                     let chartFill, profFill, borderCol, borderW, borderDash, labelCol, badgeCol, levelTxt;
                     if (isDeep) {{
-                        chartFill = 'rgba(239, 68, 68, 0.22)';
-                        profFill = 'rgba(239, 68, 68, 0.34)';
-                        borderCol = 'rgba(248, 113, 113, 0.92)';
-                        borderW = 1.5;
+                        chartFill = 'rgba(249, 115, 22, 0.18)';
+                        profFill = 'rgba(249, 115, 22, 0.28)';
+                        borderCol = 'rgba(251, 146, 60, 0.85)';
+                        borderW = 1.4;
                         borderDash = [5, 3];
-                        labelCol = '#FCA5A5';
-                        badgeCol = '#FECACA';
-                        levelTxt = 'RỖNG SÂU';
+                        labelCol = '#FDBA74';
+                        badgeCol = '#FED7AA';
+                        levelTxt = 'RỖNG CỰC MẠNH';
                     }} else if (isHigh) {{
-                        chartFill = 'rgba(245, 158, 11, 0.15)';
-                        profFill = 'rgba(245, 158, 11, 0.25)';
-                        borderCol = 'rgba(251, 191, 36, 0.85)';
-                        borderW = 1.2;
+                        chartFill = 'rgba(56, 189, 248, 0.13)';
+                        profFill = 'rgba(56, 189, 248, 0.22)';
+                        borderCol = 'rgba(56, 189, 248, 0.78)';
+                        borderW = 1.15;
                         borderDash = [4, 4];
-                        labelCol = '#FACC15';
-                        badgeCol = '#FDE047';
+                        labelCol = '#7DD3FC';
+                        badgeCol = '#BAE6FD';
                         levelTxt = 'RỖNG MẠNH';
                     }} else {{
                         const depthFactor = apOi > 0 ? Math.max(0.25, Math.min(1.0, 1.0 - (apOi - 150) / 300)) : 0.65;

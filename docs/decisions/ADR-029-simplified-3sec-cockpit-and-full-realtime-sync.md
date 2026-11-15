@@ -21,7 +21,7 @@
 
 3. **Tinh gọn Canvas Overlay, HUD Nổi & Payload Cầu Nối (`html_dashboard.py` & `neiro_terminal.py`):**
    - Gỡ bỏ Top-Center Canvas Gauge đè hình, thu gọn `.neiro-floating-hud` xuống 5 dòng cốt lõi (`hud-item`), đặt `.neiro-body-container` mặc định `540px` (`.expanded` `700px`) kèm 2 nút trên Topbar (`#btn-overlay-mode`: `Lớp phủ: Tinh gọn / Đầy đủ`, `#btn-chart-height`: `↕ Mở rộng Chart`).
-   - Mặc định chế độ `Tinh gọn` hiển thị trực tiếp 3 đường cấu trúc lõi (`CALL WALL`, `PUT WALL`, `GAMMA FLIP`), các vùng **Air Pocket Vacuum** (`m.air_pockets`) phân tầng độ mờ/đậm theo mức độ rỗng OI (`RỖNG SÂU` đỏ cam / `RỖNG MẠNH` vàng hổ phách / `MỎNG NHẸ` xám trắng mờ) trên cả Chart lẫn cột Profile phải, cùng các đường `ENTRY / SL / TP` đang `[KÍCH HOẠT]`; Vanna, Charm, FVG và Squeeze chỉ hiện thêm khi bật `Đầy đủ` (`syncSecondaryPriceLines()`).
+   - Mặc định chế độ `Tinh gọn` hiển thị trực tiếp 3 đường cấu trúc lõi (`CALL WALL`, `PUT WALL`, `GAMMA FLIP`), các vùng **Air Pocket Vacuum** (`m.air_pockets`) phân tầng độ mờ/đậm theo mức độ rỗng OI (`RỖNG CỰC MẠNH` cam mờ / `RỖNG MẠNH` xanh dương mờ / `MỎNG NHẸ` xám trắng mờ) trên cả Chart lẫn cột Profile phải, cùng các đường `ENTRY / SL / TP` đang `[KÍCH HOẠT]`; Vanna, Charm, FVG và Squeeze chỉ hiện thêm khi bật `Đầy đủ` (`syncSecondaryPriceLines()`).
    - Hợp nhất `_compute_live_microstructure_payload(tape)` ở backend (tái sử dụng `compute_vpin_bvc` & `compute_rolling_kyle_lambda_ols`) nối vào `/api/yahoo_gc`, `_run_lightweight_live_tick()` và `run_pipeline()` (`version.json`); mở rộng `meta` với `next_above`, `next_below`, `step`, `major_up_wall`, `major_down_wall`, `has_up_air_pocket`, `has_down_air_pocket`, `atr_5m`.
 
 4. **Đơn giản hóa Nhãn Hành Động Theo 4 Kèo Trực Quan (Kiểu 2):**

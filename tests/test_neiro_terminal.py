@@ -196,7 +196,14 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     # Air Pockets must always draw directly on Canvas in Compact mode with severity intensity
     draw_fn_src = js[js.index("function drawNeiroOverlay") :]
     assert draw_fn_src.index("airPockets.forEach") < draw_fn_src.index("if (!overlayCompactMode)")
-    for tier_lbl in ("RỖNG SÂU", "RỖNG MẠNH", "MỎNG NHẸ", "rgba(148, 163, 184,"):
+    for tier_lbl in (
+        "RỖNG CỰC MẠNH",
+        "RỖNG MẠNH",
+        "MỎNG NHẸ",
+        "rgba(249, 115, 22,",
+        "rgba(56, 189, 248,",
+        "rgba(148, 163, 184,",
+    ):
         assert tier_lbl in draw_fn_src
 
     # Realtime ADR-028 JS parity engines & 3-tier sync
