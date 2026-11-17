@@ -21,11 +21,11 @@ const HEARTBEAT_INTERVAL_MS = 20 * 1000;
 const TOKEN_REFRESH_MARGIN_MS = 24 * 3600 * 1000;
 
 const TF_CONFIG = {
-    "1m":  { yahooInterval: "1m",  yahooRange: "1d",  ctraderPeriod: 1,  barSec: 60,    lookbackMs: 6 * 3600 * 1000 },
-    "5m":  { yahooInterval: "5m",  yahooRange: "5d",  ctraderPeriod: 5,  barSec: 300,   lookbackMs: 24 * 3600 * 1000 },
-    "15m": { yahooInterval: "15m", yahooRange: "5d",  ctraderPeriod: 7,  barSec: 900,   lookbackMs: 3 * 24 * 3600 * 1000 },
-    "1h":  { yahooInterval: "60m", yahooRange: "1mo", ctraderPeriod: 9,  barSec: 3600,  lookbackMs: 14 * 24 * 3600 * 1000 },
-    "1d":  { yahooInterval: "1d",  yahooRange: "6mo", ctraderPeriod: 12, barSec: 86400, lookbackMs: 180 * 24 * 3600 * 1000 },
+    "1m": { yahooInterval: "1m", yahooRange: "1d", ctraderPeriod: 1, barSec: 60, lookbackMs: 6 * 3600 * 1000 },
+    "5m": { yahooInterval: "5m", yahooRange: "5d", ctraderPeriod: 5, barSec: 300, lookbackMs: 24 * 3600 * 1000 },
+    "15m": { yahooInterval: "15m", yahooRange: "5d", ctraderPeriod: 7, barSec: 900, lookbackMs: 3 * 24 * 3600 * 1000 },
+    "1h": { yahooInterval: "60m", yahooRange: "1mo", ctraderPeriod: 9, barSec: 3600, lookbackMs: 14 * 24 * 3600 * 1000 },
+    "1d": { yahooInterval: "1d", yahooRange: "6mo", ctraderPeriod: 12, barSec: 86400, lookbackMs: 180 * 24 * 3600 * 1000 },
 };
 
 function normalizeTf(tf) {
@@ -351,7 +351,7 @@ export class CTraderFeedDO extends DurableObject {
         }
         this.pendingRpc.clear();
         if (this.ws) {
-            try { this.ws.close(1000, reason); } catch (_) {}
+            try { this.ws.close(1000, reason); } catch (_) { }
             this.ws = null;
         }
         this.symbolInfo = null;
@@ -454,7 +454,7 @@ export class CTraderFeedDO extends DurableObject {
     async ensureConnected() {
         if (this.ws && this.symbolInfo && this.ws.readyState === 1) {
             if (Date.now() - this.lastHeartbeatMs > HEARTBEAT_INTERVAL_MS) {
-                try { this.sendRaw({ payloadType: 51, payload: {} }); } catch (_) {}
+                try { this.sendRaw({ payloadType: 51, payload: {} }); } catch (_) { }
             }
             return;
         }
