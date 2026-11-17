@@ -109,6 +109,38 @@ console.log(JSON.stringify({ bar, yahoo, sym, satClosed, tueOpen, tueMaint }));
     assert res["tueMaint"] is False
 
 
+def test_worker_normalize_yahoo_strips_trailing_zero_vol_dot_and_aligns_close(tmp_path: pathlib.Path):
+    """Root-cause guard: Yahoo appends a trailing regularMarketTime snapshot dot (unaligned seconds,
+    0 volume, high==low). normalizeYahooChart must drop that dot and align the last real bar's close."""
+    harness = """
+const yahoo = normalizeYahooChart({
+    chart: {
+        result: [{
+            meta: { regularMarketPrice: 3850.9 },
+            timestamp: [1794923340, 1794923400, 1794923444],
+            indicators: {
+                quote: [{
+                    open:   [3849.5, 3850.1, 3850.9],
+                    high:   [3850.3, 3852.0, 3850.9],
+                    low:    [3849.5, 3849.6, 3850.9],
+                    close:  [3850.1, 3850.1, 3850.9],
+                    volume: [89,     45,     0]
+                }]
+            }
+        }]
+    }
+}, "1m");
+console.log(JSON.stringify(yahoo));
+"""
+    res = _run_node_worker_harness(tmp_path, harness)
+    assert res["available"] is True
+    assert res["latest_price"] == 3850.9
+    assert [c["time"] for c in res["candles"]] == [1794923340, 1794923400]
+    assert res["candles"][-1]["close"] == 3850.9
+    assert res["candles"][-1]["high"] == 3852.0
+    assert res["candles"][-1]["low"] == 3849.6
+
+
 def test_resolve_cloud_feed_worker_url_from_env(monkeypatch):
     monkeypatch.setenv("NEIRO_CLOUD_FEED_URL", "https://neiro-gold-feed.demo.workers.dev/")
     assert _resolve_cloud_feed_worker_url() == "https://neiro-gold-feed.demo.workers.dev"

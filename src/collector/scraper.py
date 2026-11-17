@@ -331,17 +331,36 @@ def scrape_and_save(
     return str(out_file)
 
 
+def _resolve_chain_file_tag(underlying_futures: str, master_filename: str | None) -> tuple[str, str]:
+    """Tra ve (stem, master_name) cho file CSV, khong bao gio de lo chuoi 'AUTO' vao ten file.
+
+    Uu tien ten file master do caller/CI chi dinh (--output) de workflow va scraper luon
+    cung ten file; neu khong co thi phan giai ma HĐTL that theo dong ho CME.
+    """
+    if master_filename:
+        name = Path(master_filename).name
+        return Path(name).stem, name
+    tag = str(underlying_futures or "").strip().upper()
+    if not tag or tag == "AUTO":
+        from src.quant_engine.synthetic import resolve_front_month_cme_option
+        tag = resolve_front_month_cme_option(underlying_futures="AUTO")["underlying"]
+    stem = f"options_prices_{tag}"
+    return stem, f"{stem}.csv"
+
+
 def scrape_multi_expiry_and_save(
     output_dir: str = "data",
     underlying_futures: str = "GCZ26",
     weekly_count: int = 1,
     include_quarterly: bool = True,
     dry_run: bool = False,
+    master_filename: str | None = None,
 ) -> list[str]:
     """Scrape 3-Tier CME expirations (Weekly + Monthly + Quarterly Anchor) and aggregate into primary dataset."""
     from src.quant_engine.synthetic import compute_dynamic_dte, resolve_active_expirations
     from src.quant_engine.loader import aggregate_options_dataframes
 
+    file_stem, master_name = _resolve_chain_file_tag(underlying_futures, master_filename)
     expirations = resolve_active_expirations(
         underlying_futures=underlying_futures,
         weekly_count=weekly_count,
@@ -368,7 +387,7 @@ def scrape_multi_expiry_and_save(
     for exp in expirations:
         sym = exp["option_symbol"]
         url = exp["barchart_url"]
-        sub_csv = out_dir_path / f"options_prices_{underlying_futures}_{sym}.csv"
+        sub_csv = out_dir_path / f"{file_stem}_{sym}.csv"
 
         try:
             logger.info("Scraping %s (%s) from %s", exp["name"], sym, url)
@@ -382,13 +401,11 @@ def scrape_multi_expiry_and_save(
                         exp["name"], sym, ref_price, val_sub.errors
                     )
                     continue
-                # Prefer official expirationDate returned by Barchart JSON if present
-                live_exp = str(df.attrs.get("expiration_date") or "").strip()
-                if not live_exp and "expirationDate" in df.columns:
-                    s_exp = df["expirationDate"].dropna()
-                    if not s_exp.empty:
-                        live_exp = str(s_exp.iloc[0]).strip()
+                # Chi tin expirationDate tu Barchart khi do la gia tri that (khong phai suy ra
+                # tu Monthly); nguoc lai dung ngay dao han cua chinh ky han dang cao.
+                live_exp = "" if df.attrs.get("expiration_inferred") else str(df.attrs.get("expiration_date") or "").strip()
                 resolved_exp = live_exp if len(live_exp) >= 10 else str(exp["expiration_date"])
+                df["expirationDate"] = resolved_exp
                 resolved_dte = compute_dynamic_dte(resolved_exp, default_dte=float(exp.get("dte", 15.0)))
 
                 df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
@@ -423,6 +440,7 @@ def scrape_multi_expiry_and_save(
                         source_timestamps.append(cached_ts)
                         resolved_dte = float(exp.get("dte", 15.0))
                         df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
+                        df["expirationDate"] = exp["expiration_date"]
                         df.attrs["expiration_date"] = exp["expiration_date"]
                         df.attrs["dte_days"] = resolved_dte
                         df.attrs["option_symbol"] = sym
@@ -436,7 +454,7 @@ def scrape_multi_expiry_and_save(
     if scraped_dfs:
         logger.info("Superimposing %d options chains into master aggregated dataset...", len(scraped_dfs))
         agg_df = aggregate_options_dataframes(scraped_dfs)
-        master_path = out_dir_path / f"options_prices_{underlying_futures}.csv"
+        master_path = out_dir_path / master_name
         if not dry_run and not agg_df.empty:
             from src.collector.validator import validate_options_frame
             ref_price = 4000.0
@@ -467,6 +485,16 @@ def scrape_multi_expiry_and_save(
                 saved_files.append(str(master_path))
                 logger.info("Master aggregated dataset saved to %s (%d strikes)", master_path, len(agg_df))
 
+                active_sub_names = {f"{file_stem}_{exp['option_symbol']}.csv" for exp in expirations}
+                for old_csv in out_dir_path.glob("options_prices*.csv"):
+                    lname = old_csv.name.lower()
+                    if old_csv.name != master_name and old_csv.name not in active_sub_names and ("_og" in lname or "auto" in lname):
+                        try:
+                            old_csv.unlink()
+                            logger.info("Pruned expired/stale options chain file: %s", old_csv)
+                        except Exception as prune_err:
+                            logger.debug("Could not prune %s: %s", old_csv, prune_err)
+
     return saved_files
 
 
@@ -490,6 +518,7 @@ def main():
                 underlying_futures="AUTO",
                 weekly_count=args.weekly_count,
                 dry_run=args.dry_run,
+                master_filename=Path(args.output).name,
             )
     except Exception as e:
         logger.error("Scraper failed: %s", e)

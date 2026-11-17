@@ -212,7 +212,20 @@ def load_and_preprocess_options(
                 f for f in p_path.parent.glob("options_prices*.csv")
                 if "near_the_money" not in f.name.lower()
             ]
-            if p_path.name.lower().startswith("options_prices") and len(sibling_chain_files) >= 2:
+            sub_chain_files = [
+                f for f in sibling_chain_files
+                if f.resolve() != p_path.resolve() and "_og" in f.name.lower()
+            ]
+            sub_files_fresh = True
+            if sub_chain_files:
+                try:
+                    p_mtime = p_path.stat().st_mtime
+                    max_sub_mtime = max(f.stat().st_mtime for f in sub_chain_files)
+                    if (p_mtime - max_sub_mtime) > 120.0:
+                        sub_files_fresh = False
+                except Exception:
+                    pass
+            if p_path.name.lower().startswith("options_prices") and len(sibling_chain_files) >= 2 and sub_files_fresh:
                 df_multi = load_multi_expiry_options(data_parent)
                 if hasattr(df_multi, "attrs") and df_multi.attrs.get("is_aggregated"):
                     df_raw = df_multi

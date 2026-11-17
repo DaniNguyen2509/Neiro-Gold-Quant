@@ -1404,9 +1404,17 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
 
         const nowSec = Math.floor(Date.now() / 1000);
-        const barTime = marketOpen
-            ? (nowSec - (nowSec % currentPeriodSec))
-            : (activeCandle ? activeCandle.time : (nowSec - (nowSec % currentPeriodSec)));
+        const wallClockBucket = nowSec - (nowSec % currentPeriodSec);
+        const canAdvanceToWallClock = Boolean(
+            marketOpen &&
+            !isAuthoritativeYahoo &&
+            activeCandle &&
+            wallClockBucket > activeCandle.time &&
+            (wallClockBucket - activeCandle.time) <= currentPeriodSec * 2
+        );
+        const barTime = !activeCandle
+            ? wallClockBucket
+            : (canAdvanceToWallClock ? wallClockBucket : activeCandle.time);
         const hasRealTickVol = (tickVol !== null && Number(tickVol) > 0);
         const realVTick = hasRealTickVol ? Number(tickVol) : 0;
 
@@ -1420,7 +1428,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             liveBuyPct = Math.max(5.0, Math.min(95.0, 0.92 * liveBuyPct + 0.08 * (buyFrac * 100.0)));
         }}
 
-        if (!activeCandle || (marketOpen && activeCandle.time < barTime)) {{
+        if (!activeCandle || activeCandle.time < barTime) {{
             activeCandle = {{
                 time: barTime,
                 open: prevPrice,
@@ -2255,19 +2263,68 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return null;
     }}
 
+    function getTfPeriodSec(tfKey = '1m') {{
+        const k = String(tfKey || '1m').toLowerCase();
+        if (k === '5m') return 300;
+        if (k === '15m') return 900;
+        if (k === '1h') return 3600;
+        if (k === '1d' || k === 'd') return 86400;
+        return 60;
+    }}
+
     function mergeLiveCandles(newCandles, tfKey = '1m', resetSeries = false) {{
         if (!Array.isArray(newCandles) || newCandles.length === 0) return;
+        const tfSec = getTfPeriodSec(tfKey);
         const targetList = resetSeries ? [] : ((tfKey === '1m')
             ? (window.INITIAL_CANDLES || [])
             : ((window.INITIAL_TF_CANDLES && window.INITIAL_TF_CANDLES[tfKey]) || []));
         const byTime = new Map();
+        let latestKey = 0;
+
+        function ingestBar(b, allowOverwrite) {{
+            if (!b || !b.time) return;
+            const rawT = Math.floor(Number(b.time));
+            const vol = Math.max(0, Number(b.volume || 0));
+            const spread = Math.abs(Number(b.high || 0) - Number(b.low || 0));
+            // Drop/fold Yahoo unaligned trailing quote dots (:15, :35, :44 with 0 volume and 0 spread)
+            if (tfSec < 86400 && (rawT % tfSec) !== 0 && vol <= 0 && spread < 0.05) {{
+                if (latestKey > 0 && byTime.has(latestKey)) {{
+                    const prev = byTime.get(latestKey);
+                    const px = Number(b.close || 0);
+                    if (px > 500 && Math.abs(px - prev.close) <= 25.0) {{
+                        prev.close = px;
+                        prev.high = Math.max(prev.high, px);
+                        prev.low = Math.min(prev.low, px);
+                    }}
+                }}
+                return;
+            }}
+            const bucketT = tfSec < 86400 ? (rawT - (rawT % tfSec)) : rawT;
+            if (byTime.has(bucketT) && !allowOverwrite) {{
+                const ex = byTime.get(bucketT);
+                ex.high = Math.max(ex.high, Number(b.high));
+                ex.low = Math.min(ex.low, Number(b.low));
+                ex.close = Number(b.close);
+                ex.volume = Math.max(Number(ex.volume || 0), vol);
+            }} else {{
+                byTime.set(bucketT, {{
+                    time: bucketT,
+                    open: Number(b.open),
+                    high: Number(b.high),
+                    low: Number(b.low),
+                    close: Number(b.close),
+                    volume: vol,
+                    delta: b.delta || 0,
+                }});
+            }}
+            if (bucketT > latestKey) latestKey = bucketT;
+        }}
+
         for (let i = 0; i < targetList.length; i++) {{
-            const b = targetList[i];
-            if (b && b.time) byTime.set(Number(b.time), b);
+            ingestBar(targetList[i], true);
         }}
         for (let i = 0; i < newCandles.length; i++) {{
-            const b = newCandles[i];
-            if (b && b.time) byTime.set(Number(b.time), b);
+            ingestBar(newCandles[i], false);
         }}
         const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time).slice(-320);
         if (tfKey === '1m') {{

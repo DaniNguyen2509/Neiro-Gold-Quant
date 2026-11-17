@@ -116,10 +116,14 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
     if not all_strikes:
         raise ValueError("No valid strike prices found in records")
 
+    # Barchart quotes/get payload thuong KHONG kem expirationDate. Khi do chi suy ra
+    # ngay dao han Monthly va danh dau "inferred" de caller (Weekly/Quarterly) ghi de dung ky han.
+    expiry_inferred = False
     if not found_expiry:
         try:
             from src.quant_engine.synthetic import resolve_front_month_cme_option
             found_expiry = resolve_front_month_cme_option()["expiration_date"]
+            expiry_inferred = True
         except Exception:
             pass
 
@@ -180,5 +184,6 @@ def parse_barchart_json(json_data: dict[str, Any] | list[Any]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     if found_expiry:
         df.attrs["expiration_date"] = found_expiry
+        df.attrs["expiration_inferred"] = expiry_inferred
     logger.info("Successfully parsed %d strikes from Barchart JSON (expiry: %s)", len(df), found_expiry or "N/A")
     return df

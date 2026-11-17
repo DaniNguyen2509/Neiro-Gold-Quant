@@ -114,6 +114,8 @@ function normalizeYahooChart(yahooJson, tf = "1m") {
         : null;
     if (!result) return null;
 
+    const normTf = normalizeTf(tf);
+    const barSec = (TF_CONFIG[normTf] && TF_CONFIG[normTf].barSec) || 60;
     const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
     const quote = result.indicators && Array.isArray(result.indicators.quote) ? result.indicators.quote[0] : {};
     const opens = quote.open || [];
@@ -122,7 +124,7 @@ function normalizeYahooChart(yahooJson, tf = "1m") {
     const closes = quote.close || [];
     const vols = quote.volume || [];
 
-    const candles = [];
+    const rawCandles = [];
     for (let i = 0; i < timestamps.length; i++) {
         const t = Number(timestamps[i]);
         const o = Number(opens[i]);
@@ -132,7 +134,7 @@ function normalizeYahooChart(yahooJson, tf = "1m") {
         const v = Number(vols[i] || 0);
         if (!Number.isFinite(t) || !Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) continue;
         if (o <= 0 || h <= 0 || l <= 0 || c <= 0) continue;
-        candles.push({
+        rawCandles.push({
             time: Math.floor(t),
             open: Math.round(o * 100) / 100,
             high: Math.round(Math.max(h, o, c) * 100) / 100,
@@ -142,17 +144,50 @@ function normalizeYahooChart(yahooJson, tf = "1m") {
         });
     }
 
+    // Discard Yahoo trailing regularMarketTime snapshot dot (0 volume and flat spread)
+    while (
+        rawCandles.length > 1 &&
+        rawCandles[rawCandles.length - 1].volume <= 0 &&
+        (rawCandles[rawCandles.length - 1].high - rawCandles[rawCandles.length - 1].low) < 0.05 &&
+        (barSec >= 86400 || (rawCandles[rawCandles.length - 1].time % barSec) !== 0)
+    ) {
+        rawCandles.pop();
+    }
+
+    // Bucket intraday timestamps to barSec so unaligned ticks never spawn duplicate bars
+    const candles = [];
+    for (let i = 0; i < rawCandles.length; i++) {
+        const rc = rawCandles[i];
+        const bucketTime = barSec < 86400 ? (rc.time - (rc.time % barSec)) : rc.time;
+        if (candles.length > 0 && candles[candles.length - 1].time === bucketTime) {
+            const prev = candles[candles.length - 1];
+            prev.high = Math.round(Math.max(prev.high, rc.high) * 100) / 100;
+            prev.low = Math.round(Math.min(prev.low, rc.low) * 100) / 100;
+            prev.close = rc.close;
+            prev.volume += rc.volume;
+        } else {
+            candles.push({ ...rc, time: bucketTime });
+        }
+    }
+
     const sliced = candles.slice(-180);
     const metaPrice = Number(result.meta && result.meta.regularMarketPrice);
     const latestPrice = Number.isFinite(metaPrice) && metaPrice > 0
         ? Math.round(metaPrice * 100) / 100
         : (sliced.length ? sliced[sliced.length - 1].close : 0.0);
 
+    if (sliced.length > 0 && latestPrice > 500 && Math.abs(latestPrice - sliced[sliced.length - 1].close) <= 25.0) {
+        const last = sliced[sliced.length - 1];
+        last.close = latestPrice;
+        last.high = Math.round(Math.max(last.high, latestPrice) * 100) / 100;
+        last.low = Math.round(Math.min(last.low, latestPrice) * 100) / 100;
+    }
+
     return {
         available: sliced.length > 0 && latestPrice > 0,
         market_open: isCmeGlobexOpenUtc(Date.now()),
         latest_price: latestPrice,
-        tf,
+        tf: normTf,
         symbol: "GC=F",
         source: "yahoo_gcf",
         basis_offset: 0.0,

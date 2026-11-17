@@ -238,3 +238,96 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     assert "LIVE BRIDGE" not in js
     assert "lastBridgeSuccessEpoch" not in js
 
+
+def test_neiro_terminal_live_candle_merge_no_future_gap_or_setdata_thrash(tmp_path):
+    """Root-cause guard: polling delayed Yahoo candles (or unaligned 0-vol dots) must NOT
+    fabricate a +10m future activeCandle from Date.now() or trigger setData() on subsequent updates."""
+    import json
+    import shutil
+    import subprocess
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        import pytest
+        pytest.skip("Node.js not installed")
+
+    meta = {"spot_price": 3850.0, "atm_strike": 3850.0, "call_wall": 4000.0, "put_wall": 3700.0}
+    df = pd.DataFrame([
+        {"strike": 3850.0, "callOpenInterest": 500, "putOpenInterest": 500, "callVolume": 50, "putVolume": 50, "netGEX": -10.0, "netVEX": 1.0, "netCHEX": -1.0},
+    ])
+    js_raw = render_neiro_orderflow_component(meta, df)["neiro_js_script"]
+    js_body = js_raw.replace("<script>", "").replace("</script>", "")
+
+    harness = """
+let setDataCalls = 0;
+let updateCalls = 0;
+let lastSeriesTime = 0;
+globalThis.window = globalThis;
+globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+globalThis.requestAnimationFrame = () => {};
+globalThis.setInterval = () => {};
+globalThis.setTimeout = () => {};
+globalThis.addEventListener = () => {};
+globalThis.document = {
+    getElementById: () => null,
+    querySelectorAll: () => [],
+};
+globalThis.LightweightCharts = { LineStyle: { Dashed: 1, Solid: 0 } };
+""" + js_body + """
+candleSeries = {
+    setData: (bars) => {
+        setDataCalls += 1;
+        if (bars.length) lastSeriesTime = bars[bars.length - 1].time;
+    },
+    update: (bar) => {
+        if (bar.time < lastSeriesTime) {
+            throw new Error("Cannot update oldest data: " + bar.time + " < " + lastSeriesTime);
+        }
+        lastSeriesTime = bar.time;
+        updateCalls += 1;
+    },
+};
+
+// Simulate 10m-delayed Yahoo candles with trailing unaligned 0-vol dots (:35, :40, :44)
+const delayedBase = Math.floor(Date.now() / 1000) - 600;
+const t1 = delayedBase - (delayedBase % 60) - 60;
+const t2 = t1 + 60;
+const poll1 = [
+    { time: t1, open: 3849.5, high: 3850.3, low: 3849.5, close: 3850.1, volume: 89 },
+    { time: t2, open: 3850.1, high: 3852.0, low: 3849.6, close: 3850.1, volume: 40 },
+    { time: t2 + 35, open: 3851.7, high: 3851.7, low: 3851.7, close: 3851.7, volume: 0 },
+    { time: t2 + 44, open: 3850.9, high: 3850.9, low: 3850.9, close: 3850.9, volume: 0 },
+];
+window.INITIAL_CANDLES = [poll1[0]];
+lastSeriesTime = t1;
+mergeLiveCandles(poll1, "1m", false);
+applyLiveTick(3850.9, null, true);
+
+// Poll 2 (3 seconds later) with updated price on t2
+const poll2 = [
+    poll1[0],
+    { time: t2, open: 3850.1, high: 3852.0, low: 3849.6, close: 3851.2, volume: 55 },
+    { time: t2 + 48, open: 3851.2, high: 3851.2, low: 3851.2, close: 3851.2, volume: 0 },
+];
+mergeLiveCandles(poll2, "1m", false);
+applyLiveTick(3851.2, null, true);
+
+console.log(JSON.stringify({
+    setDataCalls,
+    updateCalls,
+    activeTime: activeCandle.time,
+    expectedTime: t2,
+    candleTimes: window.INITIAL_CANDLES.map(c => c.time),
+    lastClose: activeCandle.close,
+}));
+"""
+    script_path = tmp_path / "terminal_harness.js"
+    script_path.write_text(harness, encoding="utf-8")
+    proc = subprocess.run([node_bin, str(script_path)], capture_output=True, text=True, check=True, timeout=15)
+    res = json.loads(proc.stdout.strip())
+    assert res["setDataCalls"] == 0, f"Expected 0 setData fallbacks, got {res}"
+    assert res["activeTime"] == res["expectedTime"], f"Future gap bug: {res}"
+    assert res["candleTimes"] == [res["expectedTime"] - 60, res["expectedTime"]], f"Unaligned dots leaked: {res}"
+    assert res["lastClose"] == 3851.2
+
+

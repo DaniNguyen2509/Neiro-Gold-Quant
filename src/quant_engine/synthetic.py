@@ -250,7 +250,7 @@ def resolve_next_quarterly_cme_option(
                 "expiration_date": exp.isoformat(),
                 "contract_month": target_m,
                 "contract_year": target_y,
-                "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying}/options/{opt_symbol}?futuresOptionsView=merged",
+                "barchart_url": f"https://www.barchart.com/futures/quotes/{underlying}/options?futuresOptionsView=merged",
             }
 
     return front_monthly

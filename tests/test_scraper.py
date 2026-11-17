@@ -262,6 +262,42 @@ class TestScraperWorkflow:
         df_master = pd.read_csv(master)
         assert str(df_master["scraped_at_utc"].iloc[0]).startswith("2025-01-01")
 
+    def test_scrape_multi_expiry_auto_writes_canonical_filenames_and_true_expiry(self, tmp_path):
+        """Root-cause guard: underlying 'AUTO' must never leak into file names, and each
+        sub-chain must keep its own expiry instead of the parser's front-month fallback."""
+        from src.collector.scraper import scrape_multi_expiry_and_save
+        from src.quant_engine.synthetic import resolve_active_expirations
+
+        payload = {
+            "data": [
+                {"raw": {"strikePrice": str(k), "optionType": t, "bidPrice": "10", "askPrice": "11",
+                         "openInterest": "100", "volume": "5"}}
+                for k in range(3700, 4301, 25) for t in ("Call", "Put")
+            ]
+        }
+        (tmp_path / "options_prices_GCZ26_OG1F20.csv").write_text("strike,callBid\n4000,10\n", encoding="utf-8")
+        (tmp_path / "options_prices_AUTO.csv").write_text("strike,callBid\n4000,10\n", encoding="utf-8")
+        with (
+            mock.patch("src.collector.scraper.fetch_barchart_options_playwright", return_value=payload),
+            mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4000.0),
+        ):
+            saved = scrape_multi_expiry_and_save(
+                output_dir=str(tmp_path), underlying_futures="AUTO", weekly_count=1,
+                master_filename="options_prices_GCZ26.csv",
+            )
+
+        names = sorted(p.name for p in tmp_path.glob("*.csv"))
+        assert not any("AUTO" in n for n in names), names
+        assert "options_prices_GCZ26_OG1F20.csv" not in names, names
+        assert (tmp_path / "options_prices_GCZ26.csv").exists()
+        assert str(tmp_path / "options_prices_GCZ26.csv") in saved
+
+        exps = resolve_active_expirations(underlying_futures="AUTO", weekly_count=1, include_quarterly=True)
+        for exp in exps:
+            sub = tmp_path / f"options_prices_GCZ26_{exp['option_symbol']}.csv"
+            assert sub.exists(), sub
+            assert set(pd.read_csv(sub)["expirationDate"].astype(str)) == {exp["expiration_date"]}
+
     def test_enrich_options_iv_handles_partial_zeros(self):
         from src.collector.scraper import _enrich_options_iv_and_greeks
 
