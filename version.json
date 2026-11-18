@@ -1,63 +1,53 @@
 {
-  "timestamp_utc": "2026-11-18T01:32:17.136534+00:00",
-  "synced_at_vn": "18/11/2026 08:32:17 VN",
-  "spot_price": 3821.3,
-  "atm_strike": 3820.0,
+  "timestamp_utc": "2026-11-18T01:38:47.943221+00:00",
+  "synced_at_vn": "18/11/2026 08:38:47 VN",
+  "spot_price": 3815.7,
+  "atm_strike": 3815.0,
   "call_wall": 4000.0,
   "put_wall": 3700.0,
   "call_wall_siege": 0.09,
   "put_wall_siege": 0.03,
-  "zero_gamma_flip": 4102.21,
+  "zero_gamma_flip": 4102.23,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -1343.5792374061418,
-  "total_net_vex": 207.0751617412236,
-  "total_net_chex": -282.9158224365628,
-  "strike_above": 3825.0,
-  "next_above": 3830.0,
-  "strike_below": 3820.0,
-  "next_below": 3815.0,
+  "total_net_gex": -1337.0512618542691,
+  "total_net_vex": 27.61656528863943,
+  "total_net_chex": -258.61756333284444,
+  "strike_above": 3820.0,
+  "next_above": 3825.0,
+  "strike_below": 3815.0,
+  "next_below": 3810.0,
   "step": 5.0,
-  "dte_days": 2.7484598678472225,
+  "dte_days": 2.7439107721064815,
   "major_up_wall": 3845.0,
   "major_down_wall": 3800.0,
   "has_up_air_pocket": true,
   "has_down_air_pocket": true,
   "atr_5m": 6.5,
-  "expected_move_1s": 102.13159597979335,
-  "implied_forward_price": 3824.02,
-  "forward_dislocation_usd": 2.72,
-  "dealer_hedge_futures_flow": 135.2,
-  "bvc_cvd_contracts": 389.1,
-  "bvc_buy_pct": 61.5,
-  "vpin_pct": 43.0,
-  "vpin_label": "\u26a0\ufe0f VPIN 43.0% [L\u1ec6CH D\u00d2NG L\u1ec6NH \u2014 GI\u1ea2M SIZE LIMIT]",
-  "kyle_lambda_ols": 6.1,
-  "kyle_lambda_label": "TR\u01af\u1ee2T GI\u00c1 R\u1ed6NG S\u1ed4 L\u1ec6NH (VACUUM MARKET SWEEP \u2022 \u03bb=6.10)",
-  "flip_integrity_label": "\ud83d\udfe2 H\u1ea4P TH\u1ee4 \u0110\u00c1Y (BEAR TRAP): C\u00c1 M\u1eacP GOM CALL \u00c9P MM MUA \u0110\u1ee0 GI\u00c1",
-  "flip_integrity_color": "#4ADE80",
+  "expected_move_1s": 101.69899127755126,
+  "implied_forward_price": 3823.97,
+  "forward_dislocation_usd": 8.27,
+  "dealer_hedge_futures_flow": 61.2,
+  "bvc_cvd_contracts": 87.6,
+  "bvc_buy_pct": 53.0,
+  "vpin_pct": 61.7,
+  "vpin_label": "\u26a0\ufe0f VPIN 61.7% [L\u1ec6CH D\u00d2NG L\u1ec6NH \u2014 GI\u1ea2M SIZE LIMIT]",
+  "kyle_lambda_ols": 22.65,
+  "kyle_lambda_label": "THANH KHO\u1ea2N S\u1ed4 L\u1ec6NH B\u00ccNH TH\u01af\u1edcNG (\u03bb_OLS=22.65)",
+  "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
+  "flip_integrity_color": "#FACC15",
   "dynamic_vacuum": {
     "vacuum_active": false,
     "regime": "THIN_SESSION_GUARDED",
     "label_vi": "PHI\u00caN \u00c1 THANH KHO\u1ea2N M\u1eceNG \u2014 CH\u1eb6N C\u1ea2NH B\u00c1O VACUUM GI\u1ea2",
-    "illiq_latest": 6.72e-06,
-    "illiq_q95": 7.1e-06,
-    "illiq_percentile": 89.7,
-    "rs_latest": 0.00052,
-    "rs_z_score": -0.29,
+    "illiq_latest": 2.88e-06,
+    "illiq_q95": 7.72e-06,
+    "illiq_percentile": 65.5,
+    "rs_latest": 0.000483,
+    "rs_z_score": -0.38,
     "session_tag": "ASIAN_THIN",
     "vacuum_bar_times": []
   },
   "institutional_fvgs": [
-    {
-      "direction": "BEARISH",
-      "time": 1794959940,
-      "low": 3851.4,
-      "high": 3854.1,
-      "midpoint_50": 3852.75,
-      "zone_75": 3853.43,
-      "vacuum_backed": false,
-      "level_backed": true
-    },
     {
       "direction": "BEARISH",
       "time": 1794960000,
@@ -87,6 +77,16 @@
       "zone_75": 3841.18,
       "vacuum_backed": false,
       "level_backed": true
+    },
+    {
+      "direction": "BEARISH",
+      "time": 1794965220,
+      "low": 3816.4,
+      "high": 3817.8,
+      "midpoint_50": 3817.1,
+      "zone_75": 3817.45,
+      "vacuum_backed": false,
+      "level_backed": true
     }
   ],
   "post_sweep_execution": {
@@ -99,54 +99,6 @@
   },
   "market_open": true,
   "recent_candles": [
-    {
-      "time": 1794961380,
-      "open": 3842.6,
-      "high": 3842.7,
-      "low": 3830.5,
-      "close": 3833.8,
-      "volume": 1285
-    },
-    {
-      "time": 1794961440,
-      "open": 3833.5,
-      "high": 3838.7,
-      "low": 3833.3,
-      "close": 3836.4,
-      "volume": 195
-    },
-    {
-      "time": 1794961500,
-      "open": 3836.2,
-      "high": 3837.8,
-      "low": 3831.3,
-      "close": 3834.3,
-      "volume": 290
-    },
-    {
-      "time": 1794961560,
-      "open": 3834.9,
-      "high": 3835.9,
-      "low": 3834.4,
-      "close": 3835.3,
-      "volume": 93
-    },
-    {
-      "time": 1794961620,
-      "open": 3835.4,
-      "high": 3835.4,
-      "low": 3833.7,
-      "close": 3834.1,
-      "volume": 58
-    },
-    {
-      "time": 1794961680,
-      "open": 3834.5,
-      "high": 3835.3,
-      "low": 3832.1,
-      "close": 3832.1,
-      "volume": 112
-    },
     {
       "time": 1794961740,
       "open": 3832.4,
@@ -577,6 +529,54 @@
       "high": 3822.9,
       "low": 3820.8,
       "close": 3821.3,
+      "volume": 30
+    },
+    {
+      "time": 1794964980,
+      "open": 3820.5,
+      "high": 3821.6,
+      "low": 3817.5,
+      "close": 3817.9,
+      "volume": 130
+    },
+    {
+      "time": 1794965040,
+      "open": 3817.8,
+      "high": 3820.0,
+      "low": 3817.6,
+      "close": 3818.1,
+      "volume": 91
+    },
+    {
+      "time": 1794965100,
+      "open": 3818.6,
+      "high": 3820.8,
+      "low": 3818.4,
+      "close": 3819.5,
+      "volume": 201
+    },
+    {
+      "time": 1794965160,
+      "open": 3819.3,
+      "high": 3820.6,
+      "low": 3817.8,
+      "close": 3818.1,
+      "volume": 67
+    },
+    {
+      "time": 1794965220,
+      "open": 3817.3,
+      "high": 3817.7,
+      "low": 3814.7,
+      "close": 3815.7,
+      "volume": 218
+    },
+    {
+      "time": 1794965280,
+      "open": 3816.3,
+      "high": 3816.4,
+      "low": 3814.3,
+      "close": 3815.7,
       "volume": 0
     }
   ]
