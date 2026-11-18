@@ -21,11 +21,11 @@ const HEARTBEAT_INTERVAL_MS = 20 * 1000;
 const TOKEN_REFRESH_MARGIN_MS = 24 * 3600 * 1000;
 
 const TF_CONFIG = {
-    "1m": { yahooInterval: "1m", yahooRange: "1d", ctraderPeriod: 1, barSec: 60, lookbackMs: 6 * 3600 * 1000 },
-    "5m": { yahooInterval: "5m", yahooRange: "5d", ctraderPeriod: 5, barSec: 300, lookbackMs: 24 * 3600 * 1000 },
-    "15m": { yahooInterval: "15m", yahooRange: "5d", ctraderPeriod: 7, barSec: 900, lookbackMs: 3 * 24 * 3600 * 1000 },
-    "1h": { yahooInterval: "60m", yahooRange: "1mo", ctraderPeriod: 9, barSec: 3600, lookbackMs: 14 * 24 * 3600 * 1000 },
-    "1d": { yahooInterval: "1d", yahooRange: "6mo", ctraderPeriod: 12, barSec: 86400, lookbackMs: 180 * 24 * 3600 * 1000 },
+    "1m": { yahooInterval: "1m", yahooRange: "1d", ctraderPeriod: 1, barSec: 60, lookbackMs: 6 * 3600 * 1000, maxBars: 360 },
+    "5m": { yahooInterval: "5m", yahooRange: "5d", ctraderPeriod: 5, barSec: 300, lookbackMs: 24 * 3600 * 1000, maxBars: 288 },
+    "15m": { yahooInterval: "15m", yahooRange: "5d", ctraderPeriod: 7, barSec: 900, lookbackMs: 3 * 24 * 3600 * 1000, maxBars: 288 },
+    "1h": { yahooInterval: "60m", yahooRange: "1mo", ctraderPeriod: 9, barSec: 3600, lookbackMs: 14 * 24 * 3600 * 1000, maxBars: 336 },
+    "1d": { yahooInterval: "1d", yahooRange: "6mo", ctraderPeriod: 12, barSec: 86400, lookbackMs: 180 * 24 * 3600 * 1000, maxBars: 180 },
 };
 
 function normalizeTf(tf) {
@@ -170,7 +170,8 @@ function normalizeYahooChart(yahooJson, tf = "1m") {
         }
     }
 
-    const sliced = candles.slice(-180);
+    const maxBars = (TF_CONFIG[normTf] && TF_CONFIG[normTf].maxBars) || 360;
+    const sliced = candles.slice(-maxBars);
     const metaPrice = Number(result.meta && result.meta.regularMarketPrice);
     const latestPrice = Number.isFinite(metaPrice) && metaPrice > 0
         ? Math.round(metaPrice * 100) / 100
@@ -423,7 +424,7 @@ export class CTraderFeedDO extends DurableObject {
                         if (idx >= 0) arr[idx] = bar;
                         else if (!arr.length || bar.time > arr[arr.length - 1].time) {
                             arr.push(bar);
-                            if (arr.length > 180) arr.shift();
+                            if (arr.length > 360) arr.shift();
                         }
                     }
                     if (this.liveSpotPrice > 0) cached1m.data.latest_price = this.liveSpotPrice;
@@ -657,20 +658,21 @@ export class CTraderFeedDO extends DurableObject {
             const cfg = TF_CONFIG[tf];
             const toMs = Date.now();
             const fromMs = toMs - cfg.lookbackMs;
+            const maxBars = cfg.maxBars || 360;
             const res = await this.sendRpc(2137, {
                 ctidTraderAccountId: this.symbolInfo.accountId,
                 symbolId: this.symbolInfo.symbolId,
                 period: cfg.ctraderPeriod,
                 fromTimestamp: fromMs,
                 toTimestamp: toMs,
-                count: 180,
+                count: maxBars,
             }, 2138, 7000);
 
             const candles = (Array.isArray(res.trendbar) ? res.trendbar : [])
                 .map(b => decodeCTraderTrendbar(b, this.symbolInfo.digits, 0.0))
                 .filter(Boolean)
                 .sort((a, b) => a.time - b.time)
-                .slice(-180);
+                .slice(-maxBars);
 
             let latestPrice = candles.length ? candles[candles.length - 1].close : 0.0;
             if (this.liveSpotPrice > 0) {

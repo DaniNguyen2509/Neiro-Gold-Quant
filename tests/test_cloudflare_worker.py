@@ -281,3 +281,34 @@ console.log(JSON.stringify({{ ok: true, cases: ["A", "B", "C", "D"] }}));
     stderr_txt = err_path.read_text(encoding="utf-8")
     assert rc == 0, f"Node runner failed: {stderr_txt or stdout_txt}"
     assert json.loads(stdout_txt.strip())["ok"] is True
+
+
+def test_worker_normalize_yahoo_preserves_up_to_360_1m_bars(tmp_path: pathlib.Path):
+    """Ensure 1m Yahoo feed keeps 360 bars (6 hours) to bridge cron intervals cleanly."""
+    harness = """
+const baseTs = 1794940020;
+const timestamps = [];
+const opens = [], highs = [], lows = [], closes = [], volumes = [];
+for (let i = 0; i < 400; i++) {
+    timestamps.push(baseTs + i * 60);
+    opens.push(3850.0);
+    highs.push(3851.0);
+    lows.push(3849.0);
+    closes.push(3850.5);
+    volumes.push(25);
+}
+const yahoo = normalizeYahooChart({
+    chart: {
+        result: [{
+            meta: { regularMarketPrice: 3850.5 },
+            timestamp: timestamps,
+            indicators: { quote: [{ open: opens, high: highs, low: lows, close: closes, volume: volumes }] }
+        }]
+    }
+}, "1m");
+console.log(JSON.stringify({ count: yahoo.candles.length, first: yahoo.candles[0].time, last: yahoo.candles[yahoo.candles.length - 1].time }));
+"""
+    res = _run_node_worker_harness(tmp_path, harness)
+    assert res["count"] == 360
+    assert res["last"] - res["first"] == 359 * 60
+

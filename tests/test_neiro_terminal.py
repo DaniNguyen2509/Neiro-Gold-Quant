@@ -331,3 +331,155 @@ console.log(JSON.stringify({
     assert res["lastClose"] == 3851.2
 
 
+def test_neiro_terminal_live_candle_merge_backfills_multi_bar_gap_via_setdata(tmp_path):
+    """Regression guard for chart drop-off bug: when live feed or version.json returns multiple
+    new/missing bars ahead of what candleSeries currently renders (e.g. stale snapshot or tab sleep),
+    mergeLiveCandles must call setData() once so intermediate candles are NOT skipped, then revert to
+    update() on subsequent 3s ticks; and stale version.json must not clobber newer Worker candles."""
+    import json
+    import shutil
+    import subprocess
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        import pytest
+        pytest.skip("Node.js not installed")
+
+    meta = {"spot_price": 3851.2, "atm_strike": 3850.0, "call_wall": 4000.0, "put_wall": 3700.0}
+    df = pd.DataFrame([
+        {"strike": 3850.0, "callOpenInterest": 500, "putOpenInterest": 500, "callVolume": 50, "putVolume": 50, "netGEX": -10.0, "netVEX": 1.0, "netCHEX": -1.0},
+    ])
+    js_raw = render_neiro_orderflow_component(meta, df)["neiro_js_script"]
+    js_body = js_raw.replace("<script>", "").replace("</script>", "")
+
+    harness = """
+let setDataCalls = 0;
+let updateCalls = 0;
+let renderedBars = [];
+globalThis.window = globalThis;
+globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+globalThis.requestAnimationFrame = () => {};
+globalThis.setInterval = () => {};
+globalThis.setTimeout = () => {};
+globalThis.addEventListener = () => {};
+globalThis.document = {
+    getElementById: () => null,
+    querySelectorAll: () => [],
+};
+globalThis.LightweightCharts = { LineStyle: { Dashed: 1, Solid: 0 } };
+""" + js_body + """
+let visibleRangeSetCalls = 0;
+neiroChart = {
+    timeScale: () => ({
+        getVisibleLogicalRange: () => ({ from: 0, to: renderedBars.length + 8 }),
+        setVisibleLogicalRange: () => { visibleRangeSetCalls += 1; },
+    }),
+};
+candleSeries = {
+    setData: (bars) => {
+        setDataCalls += 1;
+        renderedBars = bars.map(b => ({ ...b }));
+    },
+    update: (bar) => {
+        const last = renderedBars[renderedBars.length - 1];
+        if (last && bar.time < last.time) {
+            throw new Error("Cannot update oldest data: " + bar.time + " < " + last.time);
+        }
+        if (last && last.time === bar.time) {
+            renderedBars[renderedBars.length - 1] = { ...bar };
+        } else {
+            renderedBars.push({ ...bar });
+        }
+        updateCalls += 1;
+    },
+};
+
+// 1. Initial stale snapshot ending at 03:49 VN
+const tSnapshotEnd = 1794948540;
+const initialSnap = [];
+for (let i = 10; i >= 0; i--) {
+    const t = tSnapshotEnd - i * 60;
+    initialSnap.push({ time: t, open: 3852.0, high: 3853.0, low: 3850.6, close: 3851.2, volume: 30 });
+}
+window.INITIAL_CANDLES = initialSnap;
+window.INITIAL_TF_CANDLES = { "1m": initialSnap.slice() };
+buildHistoricalGoldBars(60, "1m");
+const setDataAfterInit = setDataCalls;
+
+// 2. Worker poll returns 20 newer bars after gap (e.g. 04:13..04:32) dropping to 3824.9
+const gapBars = [];
+const tGapStart = tSnapshotEnd + 24 * 60;
+for (let i = 0; i < 20; i++) {
+    const px = 3850.0 - i * 1.25;
+    gapBars.push({ time: tGapStart + i * 60, open: px + 0.5, high: px + 0.8, low: px - 0.5, close: px, volume: 100 });
+}
+mergeLiveCandles(gapBars, "1m", false);
+const renderedCountAfterGap = renderedBars.length;
+const setDataAfterGap = setDataCalls;
+
+// 3. Subsequent 3s live tick on the same last bar must use update(), NOT setData()
+const updatedLast = { ...gapBars[gapBars.length - 1], close: 3824.9, low: 3824.0 };
+mergeLiveCandles([...gapBars.slice(0, -1), updatedLast], "1m", false);
+const setDataAfterTick = setDataCalls;
+const updateAfterTick = updateCalls;
+
+// 4. Tab-sleep case: 3 bars jump ahead at once
+const sleepBars = [];
+const tLast = updatedLast.time;
+for (let i = 1; i <= 3; i++) {
+    sleepBars.push({ time: tLast + i * 60, open: 3824.9, high: 3826.0, low: 3824.0, close: 3825.5, volume: 80 });
+}
+mergeLiveCandles([...gapBars, ...sleepBars], "1m", false);
+const renderedCountAfterSleep = renderedBars.length;
+const setDataAfterSleep = setDataCalls;
+
+// 5. Stale version.json older than activeCandle must NOT revert currentGoldPrice backwards
+lastCloudWorkerEpoch = 0;
+hotPatchCloudMeta({
+    timestamp_utc: "2026-11-18T01:19:13+00:00",
+    spot_price: 3827.3,
+    recent_candles: [gapBars[0]],
+});
+
+console.log(JSON.stringify({
+    setDataAfterInit,
+    renderedCountAfterGap,
+    expectedAfterGap: initialSnap.length + gapBars.length,
+    setDataAfterGap,
+    setDataAfterTick,
+    updateAfterTick,
+    renderedCountAfterSleep,
+    expectedAfterSleep: initialSnap.length + gapBars.length + sleepBars.length,
+    setDataAfterSleep,
+    priceAfterStalePatch: currentGoldPrice,
+    activeTimeAfterStalePatch: activeCandle.time,
+    expectedActiveTime: sleepBars[sleepBars.length - 1].time,
+}));
+"""
+    script_path = tmp_path / "terminal_backfill_harness.js"
+    script_path.write_text(harness, encoding="utf-8")
+    out_path = tmp_path / "backfill_out.txt"
+    err_path = tmp_path / "backfill_err.txt"
+    with out_path.open("w", encoding="utf-8") as out_fh, err_path.open("w", encoding="utf-8") as err_fh:
+        rc = subprocess.call(
+            [node_bin, str(script_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=out_fh,
+            stderr=err_fh,
+            timeout=15,
+        )
+    stdout_txt = out_path.read_text(encoding="utf-8")
+    stderr_txt = err_path.read_text(encoding="utf-8")
+    assert rc == 0, f"Node harness failed: {stderr_txt or stdout_txt}"
+    res = json.loads(stdout_txt.strip())
+    assert res["renderedCountAfterGap"] == res["expectedAfterGap"], f"Intermediate gap candles were dropped: {res}"
+    assert res["setDataAfterGap"] == res["setDataAfterInit"] + 1
+    assert res["setDataAfterTick"] == res["setDataAfterGap"], f"Repeated 3s tick caused setData thrash: {res}"
+    assert res["updateAfterTick"] >= 1
+    assert res["renderedCountAfterSleep"] == res["expectedAfterSleep"], f"Tab-sleep bars were skipped: {res}"
+    assert res["setDataAfterSleep"] == res["setDataAfterGap"] + 1
+    assert res["activeTimeAfterStalePatch"] == res["expectedActiveTime"]
+    assert res["priceAfterStalePatch"] == 3825.5
+
+
+

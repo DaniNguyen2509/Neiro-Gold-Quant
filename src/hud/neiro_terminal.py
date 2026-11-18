@@ -501,7 +501,30 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     let lastCloudFeedSource = '';
     let lastCloudSuccessEpoch = 0;
     let lastAuthoritativeVpinEpoch = 0;
+    let renderedSeriesTf = '';
+    let renderedSeriesCount = 0;
+    let renderedSeriesBarsByTime = new Map();
     const CLOUD_WORKER_STORAGE_KEY = 'neiro_cloud_feed_url';
+
+    function recordRenderedSeries(bars, tfKey) {{
+        renderedSeriesTf = String(tfKey || '');
+        renderedSeriesCount = Array.isArray(bars) ? bars.length : 0;
+        renderedSeriesBarsByTime = new Map();
+        if (Array.isArray(bars)) {{
+            for (let i = 0; i < bars.length; i++) {{
+                const b = bars[i];
+                if (b && b.time !== undefined) {{
+                    renderedSeriesBarsByTime.set(Number(b.time), {{
+                        time: Number(b.time),
+                        open: Number(b.open),
+                        high: Number(b.high),
+                        low: Number(b.low),
+                        close: Number(b.close),
+                    }});
+                }}
+            }}
+        }}
+    }}
 
     function normalizeCloudWorkerUrl(raw) {{
         if (!raw) return '';
@@ -749,6 +772,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
         if (bars && bars.length > 0) {{
             candleSeries.setData(bars);
+            recordRenderedSeries(bars, key);
             const lastB = bars[bars.length - 1];
             activeCandle = {{
                 time: lastB.time,
@@ -1450,13 +1474,20 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         liveCandleDelta = activeCandle.delta || 0.0;
 
         if (candleSeries) {{
-            candleSeries.update({{
+            const barPayload = {{
                 time: activeCandle.time,
                 open: activeCandle.open,
                 high: activeCandle.high,
                 low: activeCandle.low,
                 close: activeCandle.close,
-            }});
+            }};
+            candleSeries.update(barPayload);
+            if (renderedSeriesTf === currentTf) {{
+                if (!renderedSeriesBarsByTime.has(activeCandle.time)) {{
+                    renderedSeriesCount += 1;
+                }}
+                renderedSeriesBarsByTime.set(activeCandle.time, barPayload);
+            }}
         }}
 
         // 2. Zero-Latency Dealer Gamma Hedge Flow & Put-Call Parity Lead-Lag (delta_F)
@@ -2278,6 +2309,33 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const targetList = resetSeries ? [] : ((tfKey === '1m')
             ? (window.INITIAL_CANDLES || [])
             : ((window.INITIAL_TF_CANDLES && window.INITIAL_TF_CANDLES[tfKey]) || []));
+
+        let baselineMap = null;
+        let prevCount = 0;
+        if (!resetSeries) {{
+            if (renderedSeriesTf === tfKey && renderedSeriesBarsByTime.size > 0) {{
+                baselineMap = renderedSeriesBarsByTime;
+                prevCount = renderedSeriesCount;
+            }} else if (targetList.length > 0) {{
+                baselineMap = new Map();
+                for (let i = 0; i < targetList.length; i++) {{
+                    const tb = targetList[i];
+                    if (tb && tb.time) {{
+                        const rawTbTime = Math.floor(Number(tb.time));
+                        const tbTime = tfSec < 86400 ? (rawTbTime - (rawTbTime % tfSec)) : rawTbTime;
+                        baselineMap.set(tbTime, {{
+                            time: tbTime,
+                            open: Number(tb.open),
+                            high: Number(tb.high),
+                            low: Number(tb.low),
+                            close: Number(tb.close),
+                        }});
+                    }}
+                }}
+                prevCount = baselineMap.size;
+            }}
+        }}
+
         const byTime = new Map();
         let latestKey = 0;
 
@@ -2326,7 +2384,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         for (let i = 0; i < newCandles.length; i++) {{
             ingestBar(newCandles[i], false);
         }}
-        const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time).slice(-320);
+        const merged = Array.from(byTime.values()).sort((a, b) => a.time - b.time).slice(-360);
         if (tfKey === '1m') {{
             window.INITIAL_CANDLES = merged;
         }}
@@ -2345,8 +2403,48 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 delta: lastBar.delta || 0,
             }};
             evaluateBarOrderflow(merged, tfKey);
-            if (resetSeries) {{
+
+            // Use setData() whenever resetSeries is set, or any earlier/intermediate bar
+            // (gap fill, tab-sleep backfill, or historical bar revision) differs from rendered series.
+            let needsFullSetData = Boolean(resetSeries || !baselineMap || baselineMap.size === 0);
+            if (!needsFullSetData) {{
+                for (let i = 0; i < merged.length - 1; i++) {{
+                    const b = merged[i];
+                    const prev = baselineMap.get(b.time);
+                    if (!prev) {{
+                        needsFullSetData = true;
+                        break;
+                    }}
+                    if (
+                        Math.abs(prev.open - b.open) > 1e-6 ||
+                        Math.abs(prev.high - b.high) > 1e-6 ||
+                        Math.abs(prev.low - b.low) > 1e-6 ||
+                        Math.abs(prev.close - b.close) > 1e-6
+                    ) {{
+                        needsFullSetData = true;
+                        break;
+                    }}
+                }}
+            }}
+
+            const applyFullSeries = () => {{
+                const tsApi = (neiroChart && typeof neiroChart.timeScale === 'function') ? neiroChart.timeScale() : null;
+                const prevRange = (tsApi && typeof tsApi.getVisibleLogicalRange === 'function')
+                    ? tsApi.getVisibleLogicalRange()
+                    : null;
+                const wasAtRightEdge = !prevRange || prevCount === 0 || (prevRange.to >= prevCount - 3);
                 candleSeries.setData(merged.map(c => ({{ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }})));
+                if (tsApi && typeof tsApi.setVisibleLogicalRange === 'function' && (resetSeries || wasAtRightEdge)) {{
+                    const span = prevRange ? Math.max(30, Math.min(240, prevRange.to - prevRange.from)) : 128;
+                    tsApi.setVisibleLogicalRange({{
+                        from: Math.max(0, merged.length + 8 - span),
+                        to: merged.length + 8,
+                    }});
+                }}
+            }};
+
+            if (needsFullSetData) {{
+                applyFullSeries();
             }} else {{
                 try {{
                     candleSeries.update({{
@@ -2357,9 +2455,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                         close: lastBar.close,
                     }});
                 }} catch (e) {{
-                    candleSeries.setData(merged.map(c => ({{ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }})));
+                    applyFullSeries();
                 }}
             }}
+            recordRenderedSeries(merged, tfKey);
             applyLiveTick(lastBar.close, null, true);
         }}
     }}
@@ -2508,6 +2607,19 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 }}
             }});
         }}
+        let staticRecentMaxTime = 0;
+        if (Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
+            for (let i = 0; i < data.recent_candles.length; i++) {{
+                const t = Number((data.recent_candles[i] && data.recent_candles[i].time) || 0);
+                if (t > staticRecentMaxTime) staticRecentMaxTime = t;
+            }}
+        }}
+        const staticIsOlderThanActive = Boolean(
+            activeCandle && (
+                (staticRecentMaxTime > 0 && staticRecentMaxTime < activeCandle.time) ||
+                (incomingMs > 0 && (incomingMs / 1000) < activeCandle.time)
+            )
+        );
         if (allowLiveMarketState && Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
             mergeLiveCandles(data.recent_candles, '1m');
         }}
@@ -2516,7 +2628,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 mergeLiveCandles(data.tf_candles[k], k);
             }});
         }}
-        if (allowLiveMarketState && data.timestamp_utc) m.timestamp_utc = data.timestamp_utc;
+        if (allowLiveMarketState && !staticIsOlderThanActive && data.timestamp_utc) m.timestamp_utc = data.timestamp_utc;
         if (data.regime) m.regime = data.regime;
         if (data.call_wall_siege !== undefined) m.call_wall_siege = Number(data.call_wall_siege);
         if (data.put_wall_siege !== undefined) m.put_wall_siege = Number(data.put_wall_siege);
@@ -2524,14 +2636,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (data.major_down_wall) m.major_down_wall = Number(data.major_down_wall);
         if (data.has_up_air_pocket !== undefined) m.has_up_air_pocket = Boolean(data.has_up_air_pocket);
         if (data.has_down_air_pocket !== undefined) m.has_down_air_pocket = Boolean(data.has_down_air_pocket);
-        if (allowLiveMarketState && data.vpin_pct !== undefined && (lastAuthoritativeVpinEpoch === 0 || (nowMs - lastAuthoritativeVpinEpoch) >= 15000 || incomingMs >= lastAuthoritativeVpinEpoch)) {{
+        if (allowLiveMarketState && !staticIsOlderThanActive && data.vpin_pct !== undefined && (lastAuthoritativeVpinEpoch === 0 || (nowMs - lastAuthoritativeVpinEpoch) >= 15000 || incomingMs >= lastAuthoritativeVpinEpoch)) {{
             liveVpinPct = Number(data.vpin_pct);
             if (data.vpin_label) liveVpinLabel = String(data.vpin_label);
             if (data.kyle_lambda_label) liveKyleLabel = String(data.kyle_lambda_label);
             if (data.atr_5m !== undefined) liveAtr5m = Number(data.atr_5m);
             lastAuthoritativeVpinEpoch = Date.now();
         }}
-        if (allowLiveMarketState && data.spot_price) {{
+        if (allowLiveMarketState && !staticIsOlderThanActive && data.spot_price) {{
             yahooAnchorPrice = Number(data.spot_price);
             if (Math.abs(data.spot_price - currentGoldPrice) > 0.01) {{
                 applyLiveTick(data.spot_price, null, true);
