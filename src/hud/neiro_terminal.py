@@ -1837,10 +1837,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             ctx.fillText(fpTxt, fpX + 6, fpY + 11);
         }}
 
-        // 1. Right Greeks Panel Background
-        ctx.fillStyle = 'rgba(5, 7, 11, 0.82)';
-        ctx.fillRect(panelX - 4, 0, panelW, h);
-        ctx.strokeStyle = 'rgba(30, 41, 59, 0.7)';
+        // 1. Right Greeks Panel Background — no fill, only subtle border
+        ctx.strokeStyle = 'rgba(30, 41, 59, 0.5)';
         ctx.lineWidth = 1;
         ctx.strokeRect(panelX - 4, 0, panelW, h);
 
