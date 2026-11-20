@@ -1,63 +1,53 @@
 {
-  "timestamp_utc": "2026-11-20T13:43:40.551473+00:00",
-  "synced_at_vn": "20/11/2026 20:43:40 VN",
-  "spot_price": 3558.0,
-  "atm_strike": 3560.0,
+  "timestamp_utc": "2026-11-20T13:54:10.918708+00:00",
+  "synced_at_vn": "20/11/2026 20:54:10 VN",
+  "spot_price": 3557.0,
+  "atm_strike": 3555.0,
   "call_wall": 3900.0,
   "put_wall": 3500.0,
-  "call_wall_siege": 0.04,
-  "put_wall_siege": 0.11,
-  "zero_gamma_flip": 4077.4,
+  "call_wall_siege": 0.7,
+  "put_wall_siege": 1.74,
+  "zero_gamma_flip": 4094.02,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -1161.4228530136959,
-  "total_net_vex": -13.121879964720408,
-  "total_net_chex": 76.10425194896925,
+  "total_net_gex": -1279.9984477739438,
+  "total_net_vex": -3.2808616030340048,
+  "total_net_chex": 25.162895467873298,
   "strike_above": 3560.0,
   "next_above": 3565.0,
   "strike_below": 3555.0,
   "next_below": 3550.0,
   "step": 5.0,
-  "dte_days": 0.24053263939814815,
+  "dte_days": 0.23322148880787036,
   "major_up_wall": 3570.0,
   "major_down_wall": 3525.0,
   "has_up_air_pocket": true,
   "has_down_air_pocket": true,
   "atr_5m": 6.5,
-  "expected_move_1s": 79.00987278073598,
-  "implied_forward_price": 3558.0,
-  "forward_dislocation_usd": 0.0,
-  "dealer_hedge_futures_flow": -10285.7,
-  "bvc_cvd_contracts": -1653.7,
-  "bvc_buy_pct": 34.1,
-  "vpin_pct": 50.9,
-  "vpin_label": "\u26a0\ufe0f VPIN 50.9% [L\u1ec6CH D\u00d2NG L\u1ec6NH \u2014 GI\u1ea2M SIZE LIMIT]",
+  "expected_move_1s": 49.366127938704636,
+  "implied_forward_price": 3558.64,
+  "forward_dislocation_usd": 1.64,
+  "dealer_hedge_futures_flow": 3699.3,
+  "bvc_cvd_contracts": 4.6,
+  "bvc_buy_pct": 50.1,
+  "vpin_pct": 46.3,
+  "vpin_label": "\u26a0\ufe0f VPIN 46.3% [L\u1ec6CH D\u00d2NG L\u1ec6NH \u2014 GI\u1ea2M SIZE LIMIT]",
   "kyle_lambda_ols": 9.32,
   "kyle_lambda_label": "THANH KHO\u1ea2N S\u1ed4 L\u1ec6NH B\u00ccNH TH\u01af\u1edcNG (\u03bb_OLS=9.32)",
-  "flip_integrity_label": "\ud83d\udd34 S\u1eacP TH\u1eacT (SHORT GAMMA): MM B\u00c1N \u0110U\u1ed4I THU\u1eacN XU H\u01af\u1edaNG",
-  "flip_integrity_color": "#F87171",
+  "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
+  "flip_integrity_color": "#FACC15",
   "dynamic_vacuum": {
     "vacuum_active": false,
     "regime": "NORMAL_DEPTH",
-    "label_vi": "\u0110\u1ed8 S\u00c2U TH\u1eca TR\u01af\u1edcNG \u1ed4N \u0110\u1ecaNH (RS Z=+0.4)",
-    "illiq_latest": 2.4e-07,
+    "label_vi": "\u0110\u1ed8 S\u00c2U TH\u1eca TR\u01af\u1edcNG \u1ed4N \u0110\u1ecaNH (RS Z=-1.6)",
+    "illiq_latest": 2.1e-06,
     "illiq_q95": 5.78e-06,
-    "illiq_percentile": 10.3,
-    "rs_latest": 0.000653,
-    "rs_z_score": 0.39,
+    "illiq_percentile": 58.6,
+    "rs_latest": 0.000199,
+    "rs_z_score": -1.63,
     "session_tag": "NY_COMEX_DEEP",
     "vacuum_bar_times": []
   },
   "institutional_fvgs": [
-    {
-      "direction": "BEARISH",
-      "time": 1795174920,
-      "low": 3586.2,
-      "high": 3587.0,
-      "midpoint_50": 3586.6,
-      "zone_75": 3586.8,
-      "vacuum_backed": false,
-      "level_backed": true
-    },
     {
       "direction": "BEARISH",
       "time": 1795175580,
@@ -79,94 +69,6 @@
   },
   "market_open": true,
   "recent_candles": [
-    {
-      "time": 1795178040,
-      "open": 3572.1,
-      "high": 3573.5,
-      "low": 3570.6,
-      "close": 3572.4,
-      "volume": 81
-    },
-    {
-      "time": 1795178100,
-      "open": 3572.8,
-      "high": 3574.5,
-      "low": 3571.1,
-      "close": 3571.2,
-      "volume": 143
-    },
-    {
-      "time": 1795178160,
-      "open": 3571.2,
-      "high": 3573.4,
-      "low": 3570.8,
-      "close": 3571.2,
-      "volume": 211
-    },
-    {
-      "time": 1795178220,
-      "open": 3571.1,
-      "high": 3572.1,
-      "low": 3570.4,
-      "close": 3570.9,
-      "volume": 223
-    },
-    {
-      "time": 1795178280,
-      "open": 3571.1,
-      "high": 3572.9,
-      "low": 3571.1,
-      "close": 3571.8,
-      "volume": 343
-    },
-    {
-      "time": 1795178340,
-      "open": 3571.4,
-      "high": 3571.6,
-      "low": 3569.6,
-      "close": 3571.6,
-      "volume": 242
-    },
-    {
-      "time": 1795178400,
-      "open": 3571.8,
-      "high": 3572.5,
-      "low": 3570.5,
-      "close": 3570.7,
-      "volume": 80
-    },
-    {
-      "time": 1795178460,
-      "open": 3571.1,
-      "high": 3571.8,
-      "low": 3570.0,
-      "close": 3571.1,
-      "volume": 77
-    },
-    {
-      "time": 1795178520,
-      "open": 3571.5,
-      "high": 3572.0,
-      "low": 3570.8,
-      "close": 3571.4,
-      "volume": 80
-    },
-    {
-      "time": 1795178580,
-      "open": 3571.4,
-      "high": 3571.8,
-      "low": 3570.5,
-      "close": 3571.8,
-      "volume": 63
-    },
-    {
-      "time": 1795178640,
-      "open": 3572.0,
-      "high": 3572.9,
-      "low": 3570.5,
-      "close": 3572.0,
-      "volume": 320
-    },
     {
       "time": 1795178700,
       "open": 3571.8,
@@ -556,7 +458,95 @@
       "open": 3556.9,
       "high": 3558.8,
       "low": 3556.2,
-      "close": 3558.0,
+      "close": 3556.5,
+      "volume": 133
+    },
+    {
+      "time": 1795181640,
+      "open": 3556.3,
+      "high": 3558.8,
+      "low": 3556.1,
+      "close": 3557.5,
+      "volume": 126
+    },
+    {
+      "time": 1795181700,
+      "open": 3557.9,
+      "high": 3558.9,
+      "low": 3556.0,
+      "close": 3556.1,
+      "volume": 289
+    },
+    {
+      "time": 1795181760,
+      "open": 3556.3,
+      "high": 3560.1,
+      "low": 3556.2,
+      "close": 3559.7,
+      "volume": 612
+    },
+    {
+      "time": 1795181820,
+      "open": 3560.2,
+      "high": 3560.7,
+      "low": 3558.4,
+      "close": 3558.4,
+      "volume": 227
+    },
+    {
+      "time": 1795181880,
+      "open": 3558.3,
+      "high": 3560.6,
+      "low": 3557.2,
+      "close": 3559.6,
+      "volume": 298
+    },
+    {
+      "time": 1795181940,
+      "open": 3559.2,
+      "high": 3563.4,
+      "low": 3557.5,
+      "close": 3562.9,
+      "volume": 337
+    },
+    {
+      "time": 1795182000,
+      "open": 3562.4,
+      "high": 3563.9,
+      "low": 3559.7,
+      "close": 3559.9,
+      "volume": 739
+    },
+    {
+      "time": 1795182060,
+      "open": 3560.0,
+      "high": 3560.6,
+      "low": 3556.4,
+      "close": 3557.6,
+      "volume": 167
+    },
+    {
+      "time": 1795182120,
+      "open": 3557.6,
+      "high": 3560.2,
+      "low": 3557.4,
+      "close": 3559.1,
+      "volume": 192
+    },
+    {
+      "time": 1795182180,
+      "open": 3559.6,
+      "high": 3559.8,
+      "low": 3558.0,
+      "close": 3558.1,
+      "volume": 134
+    },
+    {
+      "time": 1795182240,
+      "open": 3557.8,
+      "high": 3558.8,
+      "low": 3556.0,
+      "close": 3557.0,
       "volume": 0
     }
   ]
