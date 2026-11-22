@@ -186,7 +186,11 @@ async def fetch_barchart_options_playwright(
         raise RuntimeError("Failed to obtain Barchart options data via browser evaluation")
 
 
-def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = None) -> pd.DataFrame:
+def _enrich_options_iv_and_greeks(
+    df: pd.DataFrame,
+    dte_days: float | None = None,
+    ref_price: float | None = None,
+) -> pd.DataFrame:
     """Enriches scraped options chain with calibrated Black-76 IV if Barchart provides 0."""
     if df is None or df.empty or "strike" not in df.columns:
         return df
@@ -205,14 +209,17 @@ def _enrich_options_iv_and_greeks(df: pd.DataFrame, dte_days: float | None = Non
             dte_days = compute_dynamic_dte(exp_attr, default_dte=15.0)
         except Exception:
             dte_days = 15.0
-    ref_p = 4000.0
-    try:
-        from src.quant_engine.basis import fetch_live_cme_futures_price
-        lp = fetch_live_cme_futures_price()
-        if lp and lp > 500.0:
-            ref_p = lp
-    except Exception:
-        pass
+    if ref_price is not None and ref_price > 500.0:
+        ref_p = float(ref_price)
+    else:
+        ref_p = 4000.0
+        try:
+            from src.quant_engine.basis import fetch_live_cme_futures_price
+            lp = fetch_live_cme_futures_price()
+            if lp and lp > 500.0:
+                ref_p = lp
+        except Exception:
+            pass
 
     t_years = max(1.0 / 365.0, float(dte_days) / 365.0)
     r = 0.045
@@ -312,7 +319,7 @@ def scrape_and_save(
     out_file.parent.mkdir(parents=True, exist_ok=True)
     if "scraped_at_utc" not in df.columns:
         df["scraped_at_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    df = _enrich_options_iv_and_greeks(df)
+    df = _enrich_options_iv_and_greeks(df, ref_price=ref_price)
     df.to_csv(out_file, index=False)
     logger.info("Saved %d strikes to %s (file size: %d bytes)", len(df), out_file, out_file.stat().st_size)
 
@@ -408,7 +415,7 @@ def scrape_multi_expiry_and_save(
                 df["expirationDate"] = resolved_exp
                 resolved_dte = compute_dynamic_dte(resolved_exp, default_dte=float(exp.get("dte", 15.0)))
 
-                df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
+                df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte, ref_price=ref_price)
                 fresh_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 if "scraped_at_utc" not in df.columns:
                     df["scraped_at_utc"] = fresh_ts
@@ -439,7 +446,7 @@ def scrape_multi_expiry_and_save(
                             ).isoformat()
                         source_timestamps.append(cached_ts)
                         resolved_dte = float(exp.get("dte", 15.0))
-                        df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte)
+                        df = _enrich_options_iv_and_greeks(df, dte_days=resolved_dte, ref_price=ref_price)
                         df["expirationDate"] = exp["expiration_date"]
                         df.attrs["expiration_date"] = exp["expiration_date"]
                         df.attrs["dte_days"] = resolved_dte
@@ -480,7 +487,7 @@ def scrape_multi_expiry_and_save(
                         if source_timestamps
                         else datetime.datetime.now(datetime.timezone.utc).isoformat()
                     )
-                agg_df = _enrich_options_iv_and_greeks(agg_df)
+                agg_df = _enrich_options_iv_and_greeks(agg_df, ref_price=ref_price)
                 agg_df.to_csv(master_path, index=False)
                 saved_files.append(str(master_path))
                 logger.info("Master aggregated dataset saved to %s (%d strikes)", master_path, len(agg_df))

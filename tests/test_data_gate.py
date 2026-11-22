@@ -320,7 +320,8 @@ def test_d10_scraper_enriches_zero_iv_with_black76():
         "putVolume": [120, 180, 140],
     })
 
-    enriched = scraper_mod._enrich_options_iv_and_greeks(raw_df, dte_days=23.0)
+    with mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=REFERENCE_GC):
+        enriched = scraper_mod._enrich_options_iv_and_greeks(raw_df, dte_days=23.0)
 
     assert (enriched["callIV"] > 0.05).all(), f"callIV was not enriched: {enriched['callIV']}"
     assert (enriched["putIV"] > 0.05).all(), f"putIV was not enriched: {enriched['putIV']}"

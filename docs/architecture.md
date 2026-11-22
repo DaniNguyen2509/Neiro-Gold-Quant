@@ -278,7 +278,7 @@ on:
      * `45 13,14,15,16,17,18,19 * * 1-5`: Bám sát đà rung lắc cao điểm, London PM Fix và thu hoạch chính xác giá chốt sổ (18:45 UTC hè / 19:45 UTC đông).
 
 3. **Tự Động Tính Black-76 IV Ngay Tại Scraper:**
-   - Hàm `_enrich_options_iv_and_greeks()` trong `src/collector/scraper.py` tự động giải nghiệm độ biến động ngầm định bằng mô hình Black-76 nếu Barchart trả về `callIV == 0.0` hoặc `putIV == 0.0`.
+   - Hàm `_enrich_options_iv_and_greeks(df, dte_days, ref_price)` trong `src/collector/scraper.py` tự động giải nghiệm độ biến động ngầm định bằng mô hình Black-76 nếu Barchart trả về `callIV == 0.0` hoặc `putIV == 0.0`. Hàm hỗ trợ nhận trực tiếp tham số `ref_price` để tái sử dụng giá tham chiếu futures đã giải nghiệm, tránh truy vấn mạng lặp lại và tuân thủ nghiêm ngặt nguyên tắc cách ly mạng (Rule G1 network isolation) trong toàn bộ test suite.
 
 4. **Neo Giữ ATM Strike Khi Thị Trường Kém Thanh Khoản (Spot-Anchored ATM):**
    - `find_atm_strike()` ưu tiên các strike có chào giá 2 chiều (Bid/Ask > 0). Trường hợp phiên ngoài giờ hoặc cuối tuần chưa mở bảng giá (`bid=0, ask=0`), hàm tự động neo vào `spot_price` (hoặc Strike trung vị) thay vì chọn nhầm strike xa lắc như $1,350.

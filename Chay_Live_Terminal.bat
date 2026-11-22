@@ -72,7 +72,7 @@ echo ===========================================================================
 echo [DONG BO CLOUD] Dang tu dong day du lieu va dashboard len GitHub Cloud...
 echo ===============================================================================
 git add data/options_prices_GCZ26.csv index.html version.json tactical_levels.json
-git diff --staged --quiet || (git commit -m "chore(data): auto-sync options chain from local terminal" && git pull --rebase origin main && git push origin main)
+git diff --staged --quiet || (git commit -m "chore(data): auto-sync options chain from local terminal [skip ci]" && git pull --rebase origin main && git push origin main)
 echo.
 echo [HOAN TAT] Da cap nhat va dong bo 100%% len GitHub Cloud & Trang Online!
 pause
