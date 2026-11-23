@@ -214,14 +214,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     /* Compact Floating Quant HUD Card (5 Core Signals - Top-Left of Chart) */
     .neiro-floating-hud {
         position: absolute; top: 10px; left: 12px; z-index: 10;
-        display: flex; flex-direction: column; gap: 3px;
-        background: rgba(8, 11, 18, 0.88); border: 1px solid #1E293B; border-radius: 5px;
+        display: flex; flex-direction: column; gap: 3.5px;
+        background: rgba(8, 11, 18, 0.92); border: 1px solid #1E293B; border-radius: 5px;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
         padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
-        max-width: min(460px, calc(100% - 24px)); pointer-events: none;
+        max-width: min(580px, calc(100% - 24px)); pointer-events: none;
     }
     .hud-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .hud-label { color: #94A3B8; font-weight: 700; font-size: 10px; min-width: 112px; }
+    .hud-label { color: #94A3B8; font-weight: 700; font-size: 10px; min-width: 105px; }
 
     @media (max-width: 1180px) {
         .neiro-win-topbar {
@@ -270,7 +270,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 <span class="neiro-pill-lbl">GEX:</span> <b id="kpi-gex-val" style="color:{regime_color};">${total_gex:+.1f}M</b>
                 <span class="neiro-pill-lbl">VPIN:</span> <b id="top-vpin-val" style="color:{vpin_col};">{vpin_pct:.1f}%</b>
                 <span class="neiro-win-sep">|</span>
-                <span class="neiro-pill-lbl">CVD:</span> <b id="top-cvd-val" style="color:{cvd_color};">{bvc_cvd_val:+.0f} HĐ ({bvc_buy_pct:.0f}%B)</b>
+                <span class="neiro-pill-lbl" style="color:#38BDF8; font-weight:800;">CVD:</span> <b id="top-cvd-val" style="color:{cvd_color}; background:rgba(255,255,255,0.08); padding:1px 6px; border-radius:3px; font-weight:800;">{bvc_cvd_val:+.0f} HĐ ({bvc_buy_pct:.0f}%B)</b>
                 <span class="neiro-pill-lbl">MM HEDGE:</span> <b id="top-hedge-val" style="color:{hedge_color};">{dealer_hedge_val:+.0f} GC</b>
             </div>
         </div>
@@ -336,16 +336,22 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                         <b id="hud-flip-verdict" style="color:{flip_verdict_col}; font-size:10px;">{flip_verdict_lbl}</b>
                     </span>
                 </div>
-                <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &uarr;:</span> <b id="hud-sqz-up" style="color:#4ADE80;">&gt; ${strike_above:,.0f} &rarr; TP ${next_above:,.0f}</b></div>
-                <div class="hud-item"><span class="hud-label">GAMMA SQUEEZE &darr;:</span> <b id="hud-sqz-down" style="color:#F87171;">&lt; ${strike_below:,.0f} &rarr; TP ${next_below:,.0f}</b></div>
-                <div class="hud-item" style="flex-wrap:nowrap;">
-                    <span class="hud-label">VPIN &amp; BVC:</span>
-                    <b id="hud-vpin-val" style="color:{vpin_col}; font-size:10px;">{vpin_label}</b>
+                <div class="hud-item">
+                    <span class="hud-label">GAMMA SQUEEZE:</span>
+                    <b id="hud-sqz-up" style="color:#4ADE80;">&gt; ${strike_above:,.0f} &rarr; TP ${next_above:,.0f}</b>
                     <span style="color:#64748B;">&bull;</span>
-                    <b id="hud-cvd-val" style="color:{cvd_color}; font-size:10px;">{bvc_cvd_val:+,.0f} HĐ | {bvc_buy_pct:.1f}% MUA</b>
+                    <b id="hud-sqz-down" style="color:#F87171;">&lt; ${strike_below:,.0f} &rarr; TP ${next_below:,.0f}</b>
                 </div>
-                <div style="width:100%; height:4px; background:#EF4444; border-radius:2px; overflow:hidden;">
-                    <div id="hud-bvc-bar" style="width:{bvc_buy_pct:.1f}%; height:100%; background:#22C55E; transition:width 0.12s linear;"></div>
+                <div class="hud-item">
+                    <span class="hud-label">VPIN TOXIC:</span>
+                    <b id="hud-vpin-val" style="color:{vpin_col}; font-size:10px;">{vpin_label}</b>
+                </div>
+                <div class="hud-item" style="display:flex; align-items:center; gap:8px;">
+                    <span class="hud-label" style="color:#38BDF8; font-weight:800;">CVD ORDERFLOW:</span>
+                    <b id="hud-cvd-val" style="color:{cvd_color}; font-size:11px; font-weight:800;">CVD {bvc_cvd_val:+,.0f} HĐ ({bvc_buy_pct:.0f}% Mua)</b>
+                    <div style="flex:1; max-width:90px; height:5px; background:#EF4444; border-radius:2px; overflow:hidden;">
+                        <div id="hud-bvc-bar" style="width:{bvc_buy_pct:.1f}%; height:100%; background:#22C55E; transition:width 0.12s linear;"></div>
+                    </div>
                 </div>
                 <div class="hud-item">
                     <span class="hud-label">POST-SWEEP / KYLE:</span>
@@ -1525,7 +1531,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
         const hudCvd = document.getElementById('hud-cvd-val');
         if (hudCvd) {{
-            hudCvd.innerText = (liveCvdContracts >= 0 ? '+' : '') + Math.round(liveCvdContracts) + ' HĐ | ' + liveBuyPct.toFixed(1) + '% MUA';
+            hudCvd.innerText = 'CVD ' + (liveCvdContracts >= 0 ? '+' : '') + Math.round(liveCvdContracts) + ' HĐ (' + Math.round(liveBuyPct) + '% Mua)';
             hudCvd.style.color = cvdCol;
         }}
         const hudBar = document.getElementById('hud-bvc-bar');
