@@ -78,6 +78,22 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     post_sweep_regime = str(post_sweep.get("post_sweep_regime", "MONITORING"))
     post_sweep_label = str(post_sweep.get("label_vi", "THEO DÕI — CHỜ QUÉT & HẤP THỤ TẠI WALL"))
     vac_label = str(dyn_vac.get("label_vi", "ĐỘ SÂU THỊ TRƯỜNG ỔN ĐỊNH"))
+    post_sweep_dir = str(post_sweep.get("direction") or "").strip().upper()
+    v_shape_lbl = f"V-SHAPE {post_sweep_dir}" if post_sweep_dir and post_sweep_dir != "NONE" else "V-SHAPE ĐẢO CHIỀU"
+    post_sweep_compact = (
+        "CẤM CẢN TÀU (VPIN CAO)" if post_sweep_regime == "TOXIC_CASCADE_BLOCKED"
+        else (v_shape_lbl if post_sweep_regime == "POST_SWEEP_V_SHAPE"
+              else ("CHỜ HỒI FVG 50%–75%" if post_sweep_regime == "POST_SWEEP_PULLBACK"
+                    else "CHỜ TÍN HIỆU SWEEP"))
+    )
+    kyle_compact = (
+        kyle_label
+        .replace(" (ICEBERG LIMIT ABSORPTION)", " (ICEBERG)")
+        .replace(" (VACUUM MARKET SWEEP)", " (VACUUM)")
+        .replace("THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (BAR OLS)", "SỔ LỆNH BÌNH THƯỜNG")
+        .replace("THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG", "SỔ LỆNH BÌNH THƯỜNG")
+        .replace("THANH KHOẢN BÌNH THƯỜNG", "SỔ LỆNH BÌNH THƯỜNG")
+    )
     post_sweep_col = (
         "#F87171" if post_sweep_regime == "TOXIC_CASCADE_BLOCKED"
         else ("#4ADE80" if post_sweep_regime == "POST_SWEEP_V_SHAPE"
@@ -355,9 +371,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 </div>
                 <div class="hud-item">
                     <span class="hud-label">POST-SWEEP / KYLE:</span>
-                    <b id="hud-post-sweep-val" style="color:{post_sweep_col}; font-size:10px;" title="{vac_label}">{post_sweep_label}</b>
+                    <b id="hud-post-sweep-val" style="color:{post_sweep_col}; font-size:10px;" title="{vac_label}">{post_sweep_compact}</b>
                     <span style="color:#64748B;">&bull;</span>
-                    <b id="hud-kyle-val" style="color:#38BDF8; font-size:9.5px;">{kyle_label}</b>
+                    <b id="hud-kyle-val" style="color:#38BDF8; font-size:9.5px;">{kyle_compact}</b>
                 </div>
             </div>
             <div id="neiro-tv-chart"></div>
@@ -1537,7 +1553,16 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const hudBar = document.getElementById('hud-bvc-bar');
         if (hudBar) hudBar.style.width = liveBuyPct.toFixed(1) + '%';
         const hudKyle = document.getElementById('hud-kyle-val');
-        if (hudKyle) hudKyle.innerText = liveKyleLabel;
+        if (hudKyle) {{
+            const kyleCompact = liveKyleLabel
+                .replace(' (ICEBERG LIMIT ABSORPTION)', ' (ICEBERG)')
+                .replace(' (VACUUM MARKET SWEEP)', ' (VACUUM)')
+                .replace('THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (BAR OLS)', 'SỔ LỆNH BÌNH THƯỜNG')
+                .replace('THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG', 'SỔ LỆNH BÌNH THƯỜNG')
+                .replace('THANH KHOẢN BÌNH THƯỜNG', 'SỔ LỆNH BÌNH THƯỜNG');
+            hudKyle.innerText = kyleCompact;
+            hudKyle.title = liveKyleLabel;
+        }}
 
         const topCvd = document.getElementById('top-cvd-val');
         if (topCvd) {{
