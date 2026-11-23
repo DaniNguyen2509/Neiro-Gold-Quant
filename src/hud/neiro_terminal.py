@@ -1611,7 +1611,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const hudFv = document.getElementById('hud-flip-verdict');
         const hudFvBox = document.getElementById('hud-flip-verdict-box');
         if (hudFv) {{
-            hudFv.innerText = liveFlipVerdict;
+            hudFv.innerText = fv.shortTxt || fv.txt;
+            hudFv.title = fv.txt;
             hudFv.style.color = liveFlipColor;
         }}
         if (hudFvBox) {{
@@ -2627,14 +2628,25 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     ? '#4ADE80'
                     : (psRegime === 'POST_SWEEP_PULLBACK' ? '#38BDF8' : '#94A3B8'));
             const vacTitle = String((m.dynamic_vacuum && (m.dynamic_vacuum.label_vi || m.dynamic_vacuum.vacuum_label)) || '');
-            ['hud-post-sweep-val', 'micro-post-sweep-val'].forEach((id) => {{
-                const el = document.getElementById(id);
-                if (el) {{
-                    el.innerText = psLabel;
-                    el.style.color = psCol;
-                    if (vacTitle) el.title = vacTitle;
+            const elHud = document.getElementById('hud-post-sweep-val');
+            if (elHud) {{
+                let psCompact = 'CHỜ TÍN HIỆU SWEEP';
+                if (psRegime === 'TOXIC_CASCADE_BLOCKED') psCompact = 'CẤM CẢN TÀU (VPIN CAO)';
+                else if (psRegime === 'POST_SWEEP_V_SHAPE') {{
+                    const d = String((data.post_sweep_execution && data.post_sweep_execution.direction) || '').trim().toUpperCase();
+                    psCompact = (d && d !== 'NONE') ? ('V-SHAPE ' + d) : 'V-SHAPE ĐẢO CHIỀU';
                 }}
-            }});
+                else if (psRegime === 'POST_SWEEP_PULLBACK') psCompact = 'CHỜ HỒI FVG 50%–75%';
+                elHud.innerText = psCompact;
+                elHud.style.color = psCol;
+                if (vacTitle) elHud.title = vacTitle;
+            }}
+            const elMicro = document.getElementById('micro-post-sweep-val');
+            if (elMicro) {{
+                elMicro.innerText = psLabel;
+                elMicro.style.color = psCol;
+                if (vacTitle) elMicro.title = vacTitle;
+            }}
         }}
         let staticRecentMaxTime = 0;
         if (Array.isArray(data.recent_candles) && data.recent_candles.length > 0) {{
@@ -2668,7 +2680,20 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (allowLiveMarketState && !staticIsOlderThanActive && data.vpin_pct !== undefined && (lastAuthoritativeVpinEpoch === 0 || (nowMs - lastAuthoritativeVpinEpoch) >= 15000 || incomingMs >= lastAuthoritativeVpinEpoch)) {{
             liveVpinPct = Number(data.vpin_pct);
             if (data.vpin_label) liveVpinLabel = String(data.vpin_label);
-            if (data.kyle_lambda_label) liveKyleLabel = String(data.kyle_lambda_label);
+            if (data.kyle_lambda_label) {{
+                liveKyleLabel = String(data.kyle_lambda_label);
+                const hudKyle = document.getElementById('hud-kyle-val');
+                if (hudKyle) {{
+                    const kyleCompact = liveKyleLabel
+                        .replace(' (ICEBERG LIMIT ABSORPTION)', ' (ICEBERG)')
+                        .replace(' (VACUUM MARKET SWEEP)', ' (VACUUM)')
+                        .replace('THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG (BAR OLS)', 'SỔ LỆNH BÌNH THƯỜNG')
+                        .replace('THANH KHOẢN SỔ LỆNH BÌNH THƯỜNG', 'SỔ LỆNH BÌNH THƯỜNG')
+                        .replace('THANH KHOẢN BÌNH THƯỜNG', 'SỔ LỆNH BÌNH THƯỜNG');
+                    hudKyle.innerText = kyleCompact;
+                    hudKyle.title = liveKyleLabel;
+                }}
+            }}
             if (data.atr_5m !== undefined) liveAtr5m = Number(data.atr_5m);
             lastAuthoritativeVpinEpoch = Date.now();
         }}
