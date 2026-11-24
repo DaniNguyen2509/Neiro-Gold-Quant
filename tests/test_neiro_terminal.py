@@ -323,8 +323,20 @@ console.log(JSON.stringify({
 """
     script_path = tmp_path / "terminal_harness.js"
     script_path.write_text(harness, encoding="utf-8")
-    proc = subprocess.run([node_bin, str(script_path)], capture_output=True, text=True, check=True, timeout=15)
-    res = json.loads(proc.stdout.strip())
+    out_path = tmp_path / "terminal_out.txt"
+    err_path = tmp_path / "terminal_err.txt"
+    with out_path.open("w", encoding="utf-8") as out_fh, err_path.open("w", encoding="utf-8") as err_fh:
+        rc = subprocess.call(
+            [node_bin, str(script_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=out_fh,
+            stderr=err_fh,
+            timeout=15,
+        )
+    stdout_txt = out_path.read_text(encoding="utf-8")
+    stderr_txt = err_path.read_text(encoding="utf-8")
+    assert rc == 0, f"Node harness failed: {stderr_txt or stdout_txt}"
+    res = json.loads(stdout_txt.strip())
     assert res["setDataCalls"] == 0, f"Expected 0 setData fallbacks, got {res}"
     assert res["activeTime"] == res["expectedTime"], f"Future gap bug: {res}"
     assert res["candleTimes"] == [res["expectedTime"] - 60, res["expectedTime"]], f"Unaligned dots leaked: {res}"

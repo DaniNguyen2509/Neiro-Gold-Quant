@@ -778,6 +778,65 @@ export default {
             }, env, 200, origin);
         }
 
+        if (url.pathname === "/api/trigger_sync") {
+            const authHeader = request.headers.get("Authorization") || "";
+            const token = String(
+                (env && env.GITHUB_DISPATCH_TOKEN) || (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "")
+            ).trim();
+
+            if (!token) {
+                return jsonResponse({
+                    ok: false,
+                    error: "Missing GITHUB_DISPATCH_TOKEN secret or Bearer token header.",
+                    hint: "Add GITHUB_DISPATCH_TOKEN to Cloudflare Worker Secrets (or enter your GitHub PAT in Terminal UI prompt).",
+                }, env, 401, origin);
+            }
+
+            const repo = String((env && env.GITHUB_REPO) || "DaniNguyen2509/Neiro-Gold-Quant").trim();
+            const ghUrl = `https://api.github.com/repos/${repo}/dispatches`;
+
+            try {
+                const ghResp = await fetch(ghUrl, {
+                    method: "POST",
+                    headers: {
+                        "User-Agent": "Neiro-Gold-Feed-Worker/2.0",
+                        "Accept": "application/vnd.github+json",
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        event_type: "sync-options",
+                        client_payload: {
+                            triggered_at: new Date().toISOString(),
+                            source: "mobile_hud_remote_sync",
+                        },
+                    }),
+                });
+
+                if (ghResp.status === 204 || ghResp.ok) {
+                    return jsonResponse({
+                        ok: true,
+                        message: "CME Options scrape triggered successfully on GitHub Actions! Running Playwright on cloud...",
+                        status_code: ghResp.status,
+                        repo,
+                        queued_at: new Date().toISOString(),
+                        eta_seconds: 60,
+                    }, env, 200, origin);
+                }
+
+                const errBody = await ghResp.text();
+                return jsonResponse({
+                    ok: false,
+                    error: `GitHub API error (${ghResp.status}): ${errBody}`,
+                }, env, 502, origin);
+            } catch (err) {
+                return jsonResponse({
+                    ok: false,
+                    error: `Fetch error calling GitHub API: ${err.message}`,
+                }, env, 500, origin);
+            }
+        }
+
         if (url.pathname === "/api/yahoo_gc" || url.pathname === "/") {
             const tf = normalizeTf(url.searchParams.get("tf"));
             if (feedMode === "ctrader_only" && !hasCTraderAppSecrets) {

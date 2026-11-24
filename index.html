@@ -240,6 +240,9 @@
             <button id="btn-cloud-worker" class="timeframe-pill" onclick="promptCloudFeedUrl()" title="Cài đặt URL Cloudflare Worker (xem realtime 24/7 trên điện thoại &amp; GitHub Pages)">
                 Cloud Feed
             </button>
+            <button id="btn-sync-cme" class="timeframe-pill" onclick="triggerRemoteCmeSync()" title="Kích hoạt cào CME Options mới nhất từ đám mây (không cần mở máy tính)">
+                ⚡ Sync CME
+            </button>
             <span class="neiro-badge-contract" id="cloud-sync-badge" style="background:rgba(148,163,184,0.16); border-color:rgba(148,163,184,0.4); color:#CBD5E1; font-size:10px; cursor:pointer;" title="Trạng thái đồng bộ realtime. Bấm để kiểm tra ngay." onclick="checkCloudSyncNow(true)">
                 ● SNAPSHOT BUILD
             </span>
@@ -1749,6 +1752,115 @@
         updateCloudWorkerButtonState();
         updateSyncBadgeHonest();
         if (cleaned) checkCloudSyncNow(true);
+    }
+
+    let isCmeSyncInProgress = false;
+    async function triggerRemoteCmeSync() {
+        if (isCmeSyncInProgress) {
+            alert('Yêu cầu cào CME đang chạy, vui lòng đợi hoàn tất!');
+            return;
+        }
+        const btn = document.getElementById('btn-sync-cme');
+        const wUrl = getCloudFeedWorkerUrl() || 'https://neiro-gold-feed.dani-wind2509.workers.dev';
+        
+        const pat = localStorage.getItem('NEIRO_GITHUB_PAT') || '';
+        if (!confirm('Kích hoạt máy ảo GitHub Actions cào bảng Options COMEX mới nhất từ Barchart ngay bây giờ? (~60 giây)')) {
+            return;
+        }
+
+        isCmeSyncInProgress = true;
+        if (btn) {
+            btn.classList.add('active');
+            btn.innerText = '⏳ Đang gọi Cloud...';
+            btn.style.color = '#FACC15';
+        }
+
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (pat) headers['Authorization'] = 'Bearer ' + pat;
+
+            const res = await fetch(wUrl + '/api/trigger_sync', {
+                method: 'POST',
+                headers: headers
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) {
+                if (res.status === 401 || (data.error && data.error.includes('Missing GITHUB_DISPATCH_TOKEN'))) {
+                    const entered = prompt('Nhập GitHub Personal Access Token (PAT) để cấp quyền cào từ xa:');
+                    if (entered && entered.trim()) {
+                        localStorage.setItem('NEIRO_GITHUB_PAT', entered.trim());
+                        isCmeSyncInProgress = false;
+                        triggerRemoteCmeSync();
+                        return;
+                    }
+                }
+                alert('Lỗi kích hoạt: ' + (data.error || 'Không thể kết nối Cloudflare Worker'));
+                isCmeSyncInProgress = false;
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.innerText = '⚡ Sync CME';
+                    btn.style.color = '';
+                }
+                return;
+            }
+
+            let countdown = 65;
+            const startEpoch = Date.now();
+            if (btn) btn.innerText = '⏳ Đang cào (65s)';
+
+            const timer = setInterval(async () => {
+                countdown--;
+                if (btn) btn.innerText = '⏳ Đang cào (' + countdown + 's)';
+
+                if (countdown % 10 === 0 || countdown <= 5) {
+                    try {
+                        const vRes = await fetch('version.json?t=' + Date.now());
+                        if (vRes.ok) {
+                            const vData = await vRes.json();
+                            const vTime = Date.parse(vData.timestamp_utc || vData.scraped_at_utc || 0);
+                            if (vTime > startEpoch) {
+                                clearInterval(timer);
+                                isCmeSyncInProgress = false;
+                                if (btn) {
+                                    btn.innerText = '✅ Đã xong';
+                                    btn.style.color = '#4ADE80';
+                                    setTimeout(() => {
+                                        btn.classList.remove('active');
+                                        btn.innerText = '⚡ Sync CME';
+                                        btn.style.color = '';
+                                    }, 4000);
+                                }
+                                alert('🎉 Bảng CME Options đã được cập nhật mới nhất! Đang tải lại...');
+                                checkCloudSyncNow(true);
+                                window.location.href = window.location.pathname + window.location.search;
+                                return;
+                            }
+                        }
+                    } catch (_) {}
+                }
+
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    isCmeSyncInProgress = false;
+                    if (btn) {
+                        btn.classList.remove('active');
+                        btn.innerText = '⚡ Sync CME';
+                        btn.style.color = '';
+                    }
+                    alert('Lệnh cào đã gửi thành công lên GitHub Actions. Trang sẽ nhận data mới sau 1-2 phút!');
+                }
+            }, 1000);
+
+        } catch (e) {
+            alert('Lỗi kết nối: ' + e.message);
+            isCmeSyncInProgress = false;
+            if (btn) {
+                btn.classList.remove('active');
+                btn.innerText = '⚡ Sync CME';
+                btn.style.color = '';
+            }
+        }
     }
     let liveVpinPct = Number(window.INITIAL_META.vpin_pct || 32.0);
     let liveVpinLabel = String(window.INITIAL_META.vpin_label || '🟢 VPIN 32.0% [AN TOÀN FADE WALL]');

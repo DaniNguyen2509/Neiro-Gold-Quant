@@ -312,3 +312,17 @@ console.log(JSON.stringify({ count: yahoo.candles.length, first: yahoo.candles[0
     assert res["count"] == 360
     assert res["last"] - res["first"] == 359 * 60
 
+
+def test_worker_trigger_sync_missing_token_returns_401(tmp_path: pathlib.Path):
+    """Verifies /api/trigger_sync returns 401 with clear hint when GITHUB_DISPATCH_TOKEN is missing."""
+    harness = """
+const r = await workerEntry.fetch(new Request("https://w.test/api/trigger_sync"), {});
+const b = await r.json();
+console.log(JSON.stringify({ status: r.status, ok: b.ok, error: b.error }));
+"""
+    res = _run_node_worker_harness(tmp_path, harness, expose_default_entry=True)
+    assert res["status"] == 401
+    assert res["ok"] is False
+    assert "Missing GITHUB_DISPATCH_TOKEN" in res["error"]
+
+

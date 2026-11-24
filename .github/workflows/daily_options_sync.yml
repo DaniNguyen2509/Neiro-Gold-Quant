@@ -26,6 +26,8 @@ on:
         required: false
         default: false
         type: boolean
+  repository_dispatch:
+    types: [sync-options, sync_options]
 
 concurrency:
   group: options-sync
