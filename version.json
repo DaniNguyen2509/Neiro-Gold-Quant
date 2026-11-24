@@ -1,49 +1,49 @@
 {
-  "timestamp_utc": "2026-11-24T04:37:08.005231+00:00",
-  "synced_at_vn": "24/11/2026 11:37:08 VN",
-  "spot_price": 3625.9,
+  "timestamp_utc": "2026-11-24T04:39:57.215329+00:00",
+  "synced_at_vn": "24/11/2026 11:39:57 VN",
+  "spot_price": 3626.0,
   "atm_strike": 3625.0,
-  "call_wall": 3700.0,
+  "call_wall": 3650.0,
   "put_wall": 3500.0,
-  "call_wall_siege": 0.09,
+  "call_wall_siege": 0.08,
   "put_wall_siege": 0.03,
-  "zero_gamma_flip": 4012.05,
+  "zero_gamma_flip": 4015.25,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -1054.3087128550087,
-  "total_net_vex": 0.6973204174562975,
-  "total_net_chex": -242.34202631697303,
+  "total_net_gex": -989.9503652839717,
+  "total_net_vex": 99.93218554555399,
+  "total_net_chex": -154.58652564907723,
   "strike_above": 3630.0,
   "next_above": 3635.0,
   "strike_below": 3625.0,
   "next_below": 3620.0,
   "step": 5.0,
-  "dte_days": 1.6200609769675924,
+  "dte_days": 1.6180927825347222,
   "major_up_wall": 3650.0,
   "major_down_wall": 3600.0,
   "has_up_air_pocket": true,
   "has_down_air_pocket": true,
   "atr_5m": 4.09,
-  "expected_move_1s": 64.36515141967672,
-  "implied_forward_price": 3633.18,
-  "forward_dislocation_usd": 7.28,
-  "dealer_hedge_futures_flow": 648.9,
-  "bvc_cvd_contracts": -236.7,
-  "bvc_buy_pct": 31.8,
-  "vpin_pct": 36.4,
-  "vpin_label": "\ud83d\udfe2 VPIN 36.4% [NHI\u1ec4U \u0110\u00c1M \u0110\u00d4NG \u2014 AN TO\u00c0N FADE WALL]",
-  "kyle_lambda_ols": 21.56,
-  "kyle_lambda_label": "H\u1ea4P TH\u1ee4 T\u1ea2NG B\u0102NG (ICEBERG LIMIT ABSORPTION \u2022 \u03bb=21.56)",
+  "expected_move_1s": 63.42246985127423,
+  "implied_forward_price": 3626.43,
+  "forward_dislocation_usd": 0.43,
+  "dealer_hedge_futures_flow": 1915.5,
+  "bvc_cvd_contracts": -124.1,
+  "bvc_buy_pct": 41.4,
+  "vpin_pct": 35.5,
+  "vpin_label": "\ud83d\udfe2 VPIN 35.5% [NHI\u1ec4U \u0110\u00c1M \u0110\u00d4NG \u2014 AN TO\u00c0N FADE WALL]",
+  "kyle_lambda_ols": 21.71,
+  "kyle_lambda_label": "THANH KHO\u1ea2N S\u1ed4 L\u1ec6NH B\u00ccNH TH\u01af\u1edcNG (\u03bb_OLS=21.71)",
   "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
   "flip_integrity_color": "#FACC15",
   "dynamic_vacuum": {
     "vacuum_active": false,
     "regime": "THIN_SESSION_GUARDED",
     "label_vi": "PHI\u00caN \u00c1 THANH KHO\u1ea2N M\u1eceNG \u2014 CH\u1eb6N C\u1ea2NH B\u00c1O VACUUM GI\u1ea2",
-    "illiq_latest": 3.52e-06,
+    "illiq_latest": 6.09e-06,
     "illiq_q95": 2.369e-05,
-    "illiq_percentile": 34.5,
+    "illiq_percentile": 56.9,
     "rs_latest": 0.000273,
-    "rs_z_score": 0.44,
+    "rs_z_score": 0.38,
     "session_tag": "ASIAN_THIN",
     "vacuum_bar_times": []
   },
@@ -90,28 +90,12 @@
   "market_open": true,
   "recent_candles": [
     {
-      "time": 1795490880,
-      "open": 3631.3,
-      "high": 3631.6,
-      "low": 3630.6,
-      "close": 3631.3,
-      "volume": 47
-    },
-    {
-      "time": 1795490940,
-      "open": 3631.7,
-      "high": 3633.2,
-      "low": 3631.3,
-      "close": 3633.1,
-      "volume": 81
-    },
-    {
       "time": 1795491000,
       "open": 3631.6,
       "high": 3631.6,
       "low": 3629.9,
       "close": 3630.6,
-      "volume": 60
+      "volume": 59
     },
     {
       "time": 1795491060,
@@ -119,7 +103,7 @@
       "high": 3630.9,
       "low": 3629.6,
       "close": 3630.0,
-      "volume": 43
+      "volume": 44
     },
     {
       "time": 1795491120,
@@ -187,7 +171,7 @@
     },
     {
       "time": 1795491600,
-      "open": 3633.3,
+      "open": 3633.2,
       "high": 3633.5,
       "low": 3632.5,
       "close": 3633.3,
@@ -203,7 +187,7 @@
     },
     {
       "time": 1795491720,
-      "open": 3633.8,
+      "open": 3633.3,
       "high": 3633.8,
       "low": 3631.2,
       "close": 3631.3,
@@ -251,7 +235,7 @@
     },
     {
       "time": 1795492080,
-      "open": 3628.7,
+      "open": 3628.4,
       "high": 3629.8,
       "low": 3628.3,
       "close": 3629.4,
@@ -307,7 +291,7 @@
     },
     {
       "time": 1795492500,
-      "open": 3631.9,
+      "open": 3632.1,
       "high": 3632.2,
       "low": 3631.2,
       "close": 3631.3,
@@ -315,7 +299,7 @@
     },
     {
       "time": 1795492560,
-      "open": 3631.6,
+      "open": 3631.5,
       "high": 3632.0,
       "low": 3630.7,
       "close": 3631.6,
@@ -414,8 +398,8 @@
       "open": 3629.3,
       "high": 3632.1,
       "low": 3629.1,
-      "close": 3631.5,
-      "volume": 32
+      "close": 3631.3,
+      "volume": 30
     },
     {
       "time": 1795493340,
@@ -423,7 +407,7 @@
       "high": 3632.1,
       "low": 3631.0,
       "close": 3631.3,
-      "volume": 31
+      "volume": 33
     },
     {
       "time": 1795493400,
@@ -443,7 +427,7 @@
     },
     {
       "time": 1795493520,
-      "open": 3630.7,
+      "open": 3630.4,
       "high": 3630.9,
       "low": 3629.8,
       "close": 3630.6,
@@ -454,8 +438,8 @@
       "open": 3630.9,
       "high": 3631.0,
       "low": 3629.3,
-      "close": 3629.9,
-      "volume": 25
+      "close": 3630.2,
+      "volume": 23
     },
     {
       "time": 1795493640,
@@ -463,7 +447,7 @@
       "high": 3630.8,
       "low": 3629.5,
       "close": 3630.2,
-      "volume": 15
+      "volume": 17
     },
     {
       "time": 1795493700,
@@ -507,7 +491,7 @@
     },
     {
       "time": 1795494000,
-      "open": 3630.3,
+      "open": 3630.4,
       "high": 3631.5,
       "low": 3630.3,
       "close": 3631.2,
@@ -518,8 +502,8 @@
       "open": 3631.6,
       "high": 3631.8,
       "low": 3630.4,
-      "close": 3630.6,
-      "volume": 43
+      "close": 3630.5,
+      "volume": 41
     },
     {
       "time": 1795494120,
@@ -527,11 +511,11 @@
       "high": 3632.8,
       "low": 3630.0,
       "close": 3631.1,
-      "volume": 95
+      "volume": 97
     },
     {
       "time": 1795494180,
-      "open": 3630.9,
+      "open": 3630.8,
       "high": 3630.9,
       "low": 3629.1,
       "close": 3629.5,
@@ -558,15 +542,31 @@
       "open": 3627.8,
       "high": 3628.0,
       "low": 3625.8,
-      "close": 3626.1,
-      "volume": 133
+      "close": 3626.3,
+      "volume": 131
     },
     {
       "time": 1795494420,
       "open": 3625.6,
       "high": 3626.2,
       "low": 3624.9,
-      "close": 3625.9,
+      "close": 3625.7,
+      "volume": 62
+    },
+    {
+      "time": 1795494480,
+      "open": 3625.7,
+      "high": 3627.7,
+      "low": 3625.5,
+      "close": 3627.4,
+      "volume": 77
+    },
+    {
+      "time": 1795494540,
+      "open": 3627.4,
+      "high": 3627.4,
+      "low": 3625.7,
+      "close": 3626.0,
       "volume": 0
     }
   ]
