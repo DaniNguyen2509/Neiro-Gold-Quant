@@ -1,4 +1,4 @@
-# 🪙 Neiro-Gold-Quant — Market Microstructure & All-in-One Orderflow Terminal
+# 🪙 Neiro-Gold-Quant — Market Microstructure & All-in-One Realtime Terminal
 
 [![Tactical Terminal](https://img.shields.io/badge/Web%20Terminal-Live%20Dashboard-00f2fe?style=for-the-badge&logo=github)](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated%20Sync-238636?style=for-the-badge&logo=github-actions)](https://github.com/DaniNguyen2509/Neiro-Gold-Quant/actions)
@@ -6,21 +6,22 @@
 [![Unit Tests](https://img.shields.io/badge/Tests-Pytest%20Verified-success?style=for-the-badge&logo=pytest)](tests/)
 [![Zero-Waste](https://img.shields.io/badge/Zero--Waste-%3C%2015MB-green?style=for-the-badge)](docs/spec.md)
 
-Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX), Greeks bậc 2 (Vanna, Charm), Cấu trúc Kỳ hạn Đa tầng (Multi-Expiry Term Structure) & Market Microstructure vận hành **tự động 100% trên Cloud (Serverless Zero-Touch Automation)** cho **COMEX Gold Futures (`GC` / `MGC`) và ETF `GLD` Options Proxy**.
+Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), Gamma Exposure (GEX), Delta Exposure (DEX), Greeks bậc 2 (Vanna, Charm), Cấu trúc Kỳ hạn Đa tầng & Market Microstructure vận hành **tự động 100% trên Cloud (Serverless Zero-Touch Automation)** cho **100% Pure COMEX Gold Futures (`GC` / `XAUUSD-F`)**.
 
 ---
 
-## ⚡ TRUY CẬP ALL-IN-ONE ORDERFLOW TERMINAL TRÊN ĐIỆN THOẠI & MÁY TÍNH
+## ⚡ TRUY CẬP ALL-IN-ONE REALTIME TERMINAL TRÊN ĐIỆN THOẠI & MÁY TÍNH
 
 - **URL Dashboard Trực Tuyến:** [https://daninguyen2509.github.io/Neiro-Gold-Quant/](https://daninguyen2509.github.io/Neiro-Gold-Quant/)
 - **Hệ Thống All-in-One Orderflow Terminal (Nhìn 1 Biểu Đồ Thấu Suốt Toàn Bộ):**
-  - **Tab 1: NEIRO ALL-IN-ONE ORDERFLOW CANVAS:** Canvas HTML5 60 FPS tích hợp trực tiếp:
-    * Air Pocket Vacuum Zones (`⚠️ AIR POCKET VACUUM [$min - $max]`) phát hiện khoảng trống thanh khoản.
-    * Net GEX Profile Bars & nhãn VEX hiển thị song hành cạnh từng Strike trên thước đo giá.
-    * Key Structural Boundary Lines (Call Wall, Put Wall kèm Wall Siege Ratio, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers).
-    * Sổ lệnh thang giá dọc DOM, Delta Footprint cụm nến 1M/5M, Tick-by-Tick tape (Multiplier = $100.0/oz cho GC, $10.0/oz cho MGC).
-  - **Tab 2: 3-PANEL QUANT LADDER & MICROSTRUCTURE MATRIX:** Plotly Dark HUD trực quan (Net GEX Profile, OI Concentration, Vanna/Charm Flow, Bảng cấu trúc vi mô Strike Pinning Matrix, Bảng tác chiến Scalping lướt sóng trong ngày).
-  - Đã loại bỏ hoàn toàn các khối kịch bản suy đoán (PHẦN 2 Structural Swing Walls, Action Banner KB-2, Ma trận 6 Kịch bản) để tối ưu độ tập trung cho trader.
+  - **TRADINGVIEW FULLSCREEN CANVAS 60 FPS:** Biểu đồ Canvas Lightweight Charts 4.2 tích hợp:
+    * **Air Pocket Vacuum Zones:** Dải chân không thanh khoản quét xuyên suốt nến và cột Greeks với cảnh báo `[CẤM ĐỠ DAO]`.
+    * **5 Cột Profile Greeks Cố Định Trục Giá:** `FLOW | GEX | VEX | CHEX | THETA` tự động co giãn theo giá Spot (Dynamic GEX Elasticity - ADR-031).
+    * **Key Structural Boundary Lines:** Call Wall, Put Wall, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers.
+    * **Thanh Chỉ Huy Tác Chiến 3 Giây (4 Thẻ):** Đọc vị Regime, Wall, Flow, Action ngay lập tức.
+    * **KHỐI 4 Spine & KHỐI 6:** Thước đo khoảng cách và Ma trận Tác chiến 4 Kèo (Squeeze, Fade, Rebound, Breakdown) kèm tính toán SL/TP/Lots tự động.
+    * **Nút Bấm Cào Tức Thì `[ ⚡ Sync CME ]`:** Trực tiếp kích hoạt GitHub Actions cào dữ liệu mới từ COMEX Clearing House ngay trên điện thoại khi ở ngoài đường.
+
 - **Lịch chạy tự động (Lưới Cron Pre-Session Radar thích ứng 2 mùa):**
   - **Khối 1 (07:15 VN - 00:15 UTC):** Chốt số liệu Open Interest (OI) chính thức ngày mới từ CME Clearing.
   - **Khối 2 (12:30/14:30 VN - 05:30/07:30 UTC):** Pre-Europe & In-Session Europe Radar.
@@ -30,7 +31,8 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
 
 ## 🚀 KHỞI CHẠY & VẬN HÀNH TERMINAL (DESKTOP & MOBILE 1 LUỒNG DUY NHẤT)
 
-Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đều kết nối **1 luồng trực tiếp duy nhất** qua Cloudflare Worker mỗi 3 giây (tự động nâng cấp lên Pepperstone cTrader `XAUUSDF` 0 giây sau khi OAuth, không cần chạy server `--loop` nền trên laptop):
+Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đều kết nối **1 luồng trực tiếp duy nhất** qua Cloudflare Worker Edge Relay mỗi 3 giây (kết nối trực tiếp Pepperstone cTrader Open API `XAUUSD-F` 0 giây latency, không dùng Yahoo Finance, không cần chạy server `--loop` nền trên laptop):
+
 - **Cách 1 (Nhanh nhất - 1 Click Windows):** Nhấp đúp chuột vào file `Chay_Live_Terminal.bat` tại thư mục gốc để mở Bảng Điều Khiển Trung Tâm 8-trong-1:
   - `[1]` Mở Terminal Online 100% (GitHub Pages Cloud)
   - `[2]` Đồng bộ dữ liệu & code mới nhất từ GitHub Cloud (`git pull origin main`)
@@ -38,7 +40,7 @@ Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đ�
   - `[4]` Dọn sạch Cache & giải phóng bộ nhớ RAM
   - `[5]` Cập nhật Snapshot 1 lần (`exports/index.html`)
   - `[6]` Kiểm thử hệ thống toàn diện (`pytest`)
-  - `[7]` Mở thư mục `data/` để thả file CSV thủ công
+  - `[7]` Mở thư mục `data/` để kiểm tra file CSV
   - `[8]` Thoát
 - **Cách 2 (Dòng lệnh CLI):**
   ```bash
@@ -48,10 +50,10 @@ Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đ�
   # Tạo lại Snapshot 1 lần (HTML + version.json + tactical_levels.json)
   python -m src.hud.html_dashboard --input data/options_prices_GCZ26.csv --output exports/latest_gold_dashboard.html exports/index.html index.html --no-mt5
 
-  # Thu thập chuỗi Options Proxy GLD & tính Cost of Carry
-  python -m src.collector.gold_collector
+  # Chạy toàn bộ Test Suite kiểm thử tự động
+  python -m pytest tests/ -v --tb=short
 
-  # Dọn dẹp cache không gian làm việc và giải phóng RAM
+  # Dọn dẹp cache không gian làm việc và giải phóng RAM (< 15MB)
   python -m src.hud.html_dashboard --clear-cache
   ```
 
@@ -60,24 +62,16 @@ Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đ�
 ## 📚 TÀI LIỆU KIẾN TRÚC & CẨM NANG THỰC CHIẾN
 
 - **Cẩm nang Tác chiến Thực chiến cho Trader (Trader Playbook):** [docs/TRADER_PLAYBOOK.md](docs/TRADER_PLAYBOOK.md) *(Đọc hiểu Command Bar 3s, 7 KPI, KHỐI 6 ma trận 4 kịch bản SL `>= $5.00`, VPIN/BVC & Air Pocket)*
-- **Cloudflare Worker Real-Time 24/7 ($0 / Không cần VPS):** [cloud/cloudflare-worker/README.md](cloud/cloudflare-worker/README.md) & [ADR-030](docs/decisions/ADR-030-cloudflare-worker-dual-mode-ctrader-feed.md) *(Chạy ngay Yahoo `GC=F` trên điện thoại & nâng cấp lên Pepperstone cTrader Demo `XAUUSDF` 0 giây)*
-- **Kiến trúc Hệ thống v3.3 (Cockpit 3s, Dual-View Terminal & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
+- **Báo cáo Đánh giá Tính Chân Thật Hệ Thống (Honesty Audit):** [docs/system-honesty-audit.md](docs/system-honesty-audit.md) *(Minh bạch dữ liệu thật vs mô hình xấp xỉ vi cấu trúc)*
+- **Kiến trúc Hệ thống v4.0 (Động hóa 0s, cTrader Live Feed & Pure CME Engine):** [docs/architecture.md](docs/architecture.md)
 - **Đặc tả Kỹ thuật Hệ thống (Tech Stack & Pipeline Spec):** [docs/spec.md](docs/spec.md)
+- **Quyết định Động Hóa Vi Cấu Trúc Options Bằng Vectorized Black-76 Greeks & Elastic GEX Engine (ADR-031):** [docs/decisions/ADR-031-realtime-vectorized-greeks-and-elastic-gex-engine.md](docs/decisions/ADR-031-realtime-vectorized-greeks-and-elastic-gex-engine.md)
+- **Quyết định Cloudflare Worker cTrader Live Feed Relay (ADR-030):** [docs/decisions/ADR-030-cloudflare-worker-dual-mode-ctrader-feed.md](docs/decisions/ADR-030-cloudflare-worker-dual-mode-ctrader-feed.md)
 - **Quyết định Cockpit Tác Chiến 3 Giây & Đồng Bộ 100% Realtime JS/Python (ADR-029):** [docs/decisions/ADR-029-simplified-3sec-cockpit-and-full-realtime-sync.md](docs/decisions/ADR-029-simplified-3sec-cockpit-and-full-realtime-sync.md)
 - **Quyết định Hiệu Chỉnh VPIN BVC & Ma Trận Tác Chiến KHỐI 6 (ADR-028):** [docs/decisions/ADR-028-vpin-and-tactical-strategy-calibration.md](docs/decisions/ADR-028-vpin-and-tactical-strategy-calibration.md)
 - **Quyết định Tối Ưu Độ Trễ Toàn Trình & Live Bridge Đa Luồng (ADR-027):** [docs/decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md](docs/decisions/ADR-027-end-to-end-latency-and-cockpit-optimization.md)
 - **Quyết định Dynamic Liquidity Vacuum, FVG & Post-Sweep (ADR-026):** [docs/decisions/ADR-026-liquidity-vacuum-and-architecture-dedup.md](docs/decisions/ADR-026-liquidity-vacuum-and-architecture-dedup.md)
-- **Quyết định Tích Hợp Air Pocket Lên Cột Greeks & Dynamic Visible Scale Vanna/Charm (ADR-021):** [docs/decisions/ADR-021-cross-canvas-air-pocket-matrix-and-dynamic-visible-greeks-normalization.md](docs/decisions/ADR-021-cross-canvas-air-pocket-matrix-and-dynamic-visible-greeks-normalization.md)
-- **Quyết định Chuẩn Hóa 1:1 Cockpit Với Neiro-NQ-Quant & 4 Cột Profile Greeks Trên Canvas (ADR-020):** [docs/decisions/ADR-020-dedicated-vanna-and-charm-ladder-column.md](docs/decisions/ADR-020-dedicated-vanna-and-charm-ladder-column.md)
-- **Quyết định Giao diện Fullscreen TradingView, Mặc Định Nến M1, Zero Tabs & Realtime Tick Engine (ADR-018):** [docs/decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md](docs/decisions/ADR-018-tradingview-fullscreen-zero-tabs-and-realtime-tick-engine.md)
-- **Quyết định Định lượng Quyền chọn Vàng, Mô hình Cost of Carry, Call Skew & Terminal Dual-View (ADR-015):** [docs/decisions/ADR-015-gold-options-cost-of-carry-call-skew-and-dual-view-terminal.md](docs/decisions/ADR-015-gold-options-cost-of-carry-call-skew-and-dual-view-terminal.md)
-- **Quyết định Định Lượng Vi Cấu Trúc Greeks & Tâm Bão Pinning (ADR-014):** [docs/decisions/ADR-014-quantitative-microstructure-greeks-and-pinning-table.md](docs/decisions/ADR-014-quantitative-microstructure-greeks-and-pinning-table.md)
-- **Quyết định Hiệu Chỉnh Black-76 IV Qua Forward Nội Suy (ADR-013):** [docs/decisions/ADR-013-options-chain-synthetic-forward-iv-calibration.md](docs/decisions/ADR-013-options-chain-synthetic-forward-iv-calibration.md)
-- **Quyết định Định Tuyến URL Barchart & Đánh Chặn API Nội Bộ Quotes/Get (ADR-012):** [docs/decisions/ADR-012-barchart-routing-and-quotes-api-interception.md](docs/decisions/ADR-012-barchart-routing-and-quotes-api-interception.md)
-- **Quyết định Bảo Vệ Bước Giá Vi Mô $5 (Adaptive Micro-Strike Guard) & Phát Hiện Dữ Liệu Cũ (ADR-011):** [docs/decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md](docs/decisions/ADR-011-adaptive-micro-strike-guard-and-stale-options-detection.md)
-- **Quy chuẩn Đường cong Nụ cười Biến động (Volatility Smile & Skew Curve SVI) (ADR-009):** [docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md](docs/decisions/ADR-009-volatility-smile-and-skew-microstructure-invariants.md)
-- **Quyết định Phân Tích GEX Đa Kỳ Hạn & Chấm Điểm Gamma Power (ADR-008):** [docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md](docs/decisions/ADR-008-multi-expiry-gex-and-gamma-weighted-walls.md)
-- **Quyết định Giải Nghiệm Số Zero Gamma Flip & Wall Siege Ratio (ADR-007):** [docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md](docs/decisions/ADR-007-zero-gamma-flip-and-wall-siege-velocity.md)
+- **Toàn bộ 31 Bản Quyết Định Kiến Trúc (ADR-001 đến ADR-031):** Xem chi tiết tại [docs/decisions/](docs/decisions/)
 
 ---
 
@@ -86,41 +80,26 @@ Cả máy tính (`exports/index.html`) và điện thoại (`GitHub Pages`) đ�
 ```
 Neiro-Gold-Quant/
 ├── .github/workflows/
-│   └── daily_options_sync.yml   # Workflow cào Barchart, tính toán Greeks & xuất bản GitHub Pages
+│   └── daily_options_sync.yml   # Workflow cào Barchart, tính Greeks, dispatch webhook & deploy Pages
+├── cloud/cloudflare-worker/     # Serverless Edge Relay nối cTrader Open API WebSocket & trigger sync
 ├── config/
-│   └── settings.toml            # Cấu hình trung tâm cho Vàng (GC, GLD, Multiplier 100.0, GVZ)
+│   └── settings.toml            # Cấu hình trung tâm cho Vàng (GC, Multiplier 100.0, GVZ)
 ├── docs/
-│   ├── TRADER_PLAYBOOK.md       # Cẩm nang tác chiến thực chiến cho Trader (Playbook)
-│   ├── HUONG_DAN_INDICATORS_MT5_TRADINGVIEW.md # Hướng dẫn cài đặt & hợp lưu bộ đôi Indicator
-│   ├── thuat_ngu_quant.md       # Từ điển thuật ngữ Quant Options & Vi cấu trúc bỏ túi
-│   ├── FAQ_VA_XU_LY_SU_CO.md    # Hỏi đáp thường gặp & hướng dẫn khắc phục sự cố
-│   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v3.0 (Single Source of Truth)
+│   ├── TRADER_PLAYBOOK.md       # Cẩm nang tác chiến thực chiến cho Trader
+│   ├── system-honesty-audit.md  # Báo cáo đánh giá tính chân thật và phân định dữ liệu thật vs proxy
+│   ├── architecture.md          # Tài liệu kiến trúc toàn cảnh v4.0 (Single Source of Truth)
 │   ├── spec.md                  # Bản đặc tả kỹ thuật chi tiết
-│   ├── decisions/               # 29 bản Architecture Decision Records (ADR-001 đến ADR-029)
+│   ├── decisions/               # 31 bản Architecture Decision Records (ADR-001 đến ADR-031)
 │   └── tailieudacta/            # Công thức toán học và tài liệu đặc tả vi mô
 ├── src/
-│   ├── collector/               # Thu thập Options Chain Barchart & yfinance GLD Proxy
-│   │   ├── gold_collector.py    # Live GLD Options Proxy & Black-76 Greeks Mapper
-│   │   ├── scraper.py           # Bộ cào Options Chain đa kỳ hạn Barchart
-│   │   └── parser.py            # Chuẩn hóa OptionsSnapshot
-│   ├── quant_engine/            # Lõi tính toán Black-76, Cost of Carry, Zero Gamma, GEX
-│   │   ├── models.py            # Dataclasses & kiểu dữ liệu
-│   │   ├── loader.py            # Ingestion, cleaning pipeline & benchmark fallback
-│   │   ├── basis.py             # Cost of Carry (u=0.2%, y=1.5%) & Live CME M1/M5 Tape
-│   │   ├── synthetic.py         # Put-Call Parity Implied Spot & Expected Move Bands
-│   │   ├── dealer.py            # Gamma Walls, Zero Gamma (_brentq), Kyle OLS, VPIN, Dynamic Vacuum & FVG, Post-Sweep
-│   │   ├── institutional.py     # 25Δ Skew (RR/BF), VRP, Session Filter & Bayesian SNR
-│   │   ├── level_state.py       # Finite State Machine & Static OI Air Pockets (hợp nhất)
-│   │   └── strategy.py          # Ma trận chiến lược & precompute_squeeze_ladder (O(1) HUD Lookup)
-│   ├── hud/                     # Giao diện Tactical Terminal
-│   │   ├── neiro_terminal.py    # Canvas Orderflow Footprint 60 FPS, 5-line HUD & JS Parity Engine
-│   │   └── html_dashboard.py    # 3s Command Bar, 2-Tier Cockpit Generator & Threaded Live Bridge
-│   └── mt5_bridge/              # Package placeholder cho bridge MT5 tùy chọn
+│   ├── collector/               # Thu thập Options Chain Barchart (scraper, parser, validator)
+│   ├── quant_engine/            # Lõi tính toán Black-76, Zero Gamma (_brentq), Level State, Tactical Matrix
+│   └── hud/                     # Giao diện Tactical Terminal (neiro_terminal.py, html_dashboard.py)
 ├── data/
 │   └── options_prices_GCZ26.csv # Dữ liệu CME Options Chain tự động cập nhật
 ├── tests/                       # Bộ kiểm thử Unit, Integration, Parity & Playwright E2E (pytest)
-├── Chay_Live_Terminal.bat       # Bảng điều khiển trung tâm 9-trong-1 tiện lợi
-├── AGENTS.md / GEMINI.md        # Quy tắc cốt lõi & Quy trình kích hoạt Skill
+├── Chay_Live_Terminal.bat       # Bảng điều khiển trung tâm 8-trong-1 tiện lợi
+├── AGENTS.md / GEMINI.md        # Hiến pháp Workspace & Quy tắc cốt lõi
 └── README.md                    # Hướng dẫn truy cập và tổng quan dự án
 ```
 
