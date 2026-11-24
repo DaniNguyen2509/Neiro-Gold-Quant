@@ -199,7 +199,9 @@ class TestDynamicDTE:
 
     def test_to_market_snapshot_with_dynamic_dte(self):
         df = pd.DataFrame(BENCHMARK_GCZ26_DATA)
-        df['expirationDate'] = '2026-11-24'
+        import datetime
+        future_exp = (datetime.date.today() + datetime.timedelta(days=10)).strftime('%Y-%m-%d')
+        df['expirationDate'] = future_exp
         snap = to_market_snapshot(df)
         assert snap.dte_days > 1.0
 
