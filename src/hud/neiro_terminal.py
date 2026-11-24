@@ -211,20 +211,46 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     }
     .neiro-watermark-text { color: #475569; font-size: 9.5px; }
 
-    /* Chart & Canvas View */
+    /* Chart & Canvas View: 2-Panel Side-by-Side Architecture */
     .neiro-body-container {
-        display: flex; flex: 0 0 auto; width: 100%; height: 540px;
+        display: flex; flex-direction: row; flex: 0 0 auto; width: 100%; height: 540px;
         position: relative; overflow: hidden; background: #000000;
         border: 1px solid #1E293B; border-radius: 6px; margin-bottom: 10px;
     }
     .neiro-body-container.expanded { height: 700px; }
     #tv-chart-wrapper {
-        position: relative; width: 100%; height: 100%; background-color: #000000;
+        position: relative; flex: 1 1 auto; min-width: 0; height: 100%; background-color: #000000;
+        transition: flex 0.15s ease, width 0.15s ease;
     }
     #neiro-tv-chart { width: 100%; height: 100%; }
     #neiro-canvas {
         position: absolute; top: 0; left: 0; width: 100%; height: 100%;
         pointer-events: none; z-index: 5;
+    }
+
+    /* Dedicated Right Profile Panel: 6 Columns [VOL | FLOW | GEX | VEX | CHEX | THETA] */
+    #neiro-profile-wrapper {
+        position: relative; flex: 0 0 340px; width: 340px; height: 100%;
+        background: #080B12; border-left: 1px solid #1E293B;
+        display: flex; flex-direction: column; overflow: hidden;
+        z-index: 6; transition: flex 0.15s ease, width 0.15s ease;
+    }
+    #neiro-profile-wrapper.collapsed {
+        display: none !important;
+    }
+    .neiro-profile-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 5px 8px; background: rgba(15, 23, 42, 0.95);
+        border-bottom: 1px solid #1E293B; height: 26px; flex-shrink: 0;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: #94A3B8;
+    }
+    .neiro-profile-title { display: flex; align-items: center; gap: 6px; color: #E2E8F0; }
+    .neiro-profile-canvas-box {
+        position: relative; flex: 1 1 auto; width: 100%; height: calc(100% - 26px); overflow: hidden;
+    }
+    #neiro-profile-canvas {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        cursor: crosshair;
     }
 
     /* Compact Floating Quant HUD Card (5 Core Signals - Top-Left of Chart) */
@@ -248,6 +274,18 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }
         .neiro-quant-pill {
             flex-wrap: wrap; max-width: 100%; min-width: 0;
+        }
+    }
+    @media (max-width: 900px) {
+        #neiro-profile-wrapper {
+            display: none;
+            width: 100%;
+            height: 320px;
+            border-left: none;
+            border-top: 1px solid #1E293B;
+        }
+        #neiro-profile-wrapper.mobile-open {
+            display: flex;
         }
     }
     @media (max-width: 768px) {
@@ -294,6 +332,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         <div class="neiro-top-right">
             <button id="btn-overlay-mode" class="timeframe-pill" onclick="toggleOverlayMode()" title="Chuyển lớp phủ Chart: Tinh gọn (Call/Put Wall, Gamma Flip, Cản/Sàn &amp; Trạm Options, Air Pocket, Entry/SL/TP) hoặc Đầy đủ (thêm Vanna, Charm, FVG)">
                 Lớp phủ: Tinh gọn
+            </button>
+            <button id="btn-toggle-profile" class="timeframe-pill" onclick="toggleProfilePanel()" title="Ẩn hoặc hiện Panel 6 cột Profile [VOL | FLOW | GEX | VEX | CHEX | THETA] bên phải">
+                Ẩn Profile
             </button>
             <button id="btn-chart-height" class="timeframe-pill" onclick="toggleChartHeight()" title="Phóng to hoặc thu gọn chiều cao biểu đồ">
                 Mở rộng Chart
@@ -381,6 +422,18 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             </div>
             <div id="neiro-tv-chart"></div>
             <canvas id="neiro-canvas"></canvas>
+        </div>
+        <!-- Panel Phải: Dàn 6 Cột Profile Riêng Biệt (VOL | FLOW | GEX | VEX | CHEX | THETA) -->
+        <div id="neiro-profile-wrapper">
+            <div class="neiro-profile-header">
+                <span class="neiro-profile-title">
+                    <span style="color:#FACC15;">⚡</span> MATRIX PROFILE &amp; ORDERFLOW
+                </span>
+                <span id="profile-poc-tag" style="color:#FACC15; font-size:9.5px; font-weight:800;">POC $---</span>
+            </div>
+            <div class="neiro-profile-canvas-box" id="neiro-profile-box">
+                <canvas id="neiro-profile-canvas"></canvas>
+            </div>
         </div>
     </div>
     """
@@ -737,6 +790,21 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         window.dispatchEvent(new Event('resize'));
     }}
 
+    let profileCollapsed = false;
+    function toggleProfilePanel() {{
+        profileCollapsed = !profileCollapsed;
+        const panel = document.getElementById('neiro-profile-wrapper');
+        const btn = document.getElementById('btn-toggle-profile');
+        if (panel) {{
+            panel.classList.toggle('collapsed', profileCollapsed);
+            panel.classList.toggle('mobile-open', !profileCollapsed);
+        }}
+        if (btn) {{
+            btn.innerText = profileCollapsed ? 'Hiện Profile' : 'Ẩn Profile';
+        }}
+        window.dispatchEvent(new Event('resize'));
+    }}
+
     function syncSecondaryPriceLines() {{
         if (!candleSeries) return;
         const m = window.INITIAL_META || {{}};
@@ -924,6 +992,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     to: totalBars + 8,
                 }});
             }}
+        }}
+        if (typeof computeVolumeProfile === 'function') {{
+            computeVolumeProfile((window.INITIAL_CANDLES && window.INITIAL_CANDLES.length) ? window.INITIAL_CANDLES : bars);
         }}
         setTimeout(drawNeiroOverlay, 40);
     }}
@@ -2051,11 +2122,17 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const handleResize = () => {{
             if (!container || !neiroChart) return;
             const newW = container.clientWidth;
-            const newH = container.clientHeight || 540;
+            const newH = container.clientHeight || (chartExpanded ? 700 : 540);
             neiroChart.applyOptions({{ width: newW, height: newH }});
             if (canvas) {{
                 canvas.width = newW;
                 canvas.height = newH;
+            }}
+            const pBox = document.getElementById('neiro-profile-box');
+            const pCanvas = document.getElementById('neiro-profile-canvas');
+            if (pBox && pCanvas) {{
+                pCanvas.width = pBox.clientWidth || 340;
+                pCanvas.height = pBox.clientHeight || (newH - 26);
             }}
             drawNeiroOverlay();
         }};
@@ -2064,63 +2141,160 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         neiroChart.timeScale().subscribeVisibleTimeRangeChange(() => drawNeiroOverlay());
         neiroChart.timeScale().subscribeVisibleLogicalRangeChange(() => drawNeiroOverlay());
 
-        if (canvas) {{
-            canvas.addEventListener('mousemove', (e) => {{
-                const rect = canvas.getBoundingClientRect();
+        const pCanvas = document.getElementById('neiro-profile-canvas');
+        if (pCanvas) {{
+            pCanvas.addEventListener('mousemove', (e) => {{
+                const rect = pCanvas.getBoundingClientRect();
                 const mx = e.clientX - rect.left;
                 const my = e.clientY - rect.top;
-                const rightX = canvas.width - 70;
-                const panelW = 5 * getProfileColW(canvas.width) + 8;
-                const panelX = rightX - panelW;
-                if (mx >= panelX - 4 && mx <= rightX) {{
-                    const opts = window.INITIAL_OPTIONS || [];
-                    let closest = null;
-                    let minDist = 16;
-                    let closestY = null;
-                    opts.forEach(o => {{
-                        const y = candleSeries.priceToCoordinate(o.strike);
-                        if (y !== null) {{
-                            const d = Math.abs(y - my);
-                            if (d < minDist) {{
-                                minDist = d;
-                                closest = o;
-                                closestY = y;
-                            }}
+                const opts = window.INITIAL_OPTIONS || [];
+                let closest = null;
+                let minDist = 18;
+                let closestY = null;
+                opts.forEach(o => {{
+                    const y = candleSeries.priceToCoordinate(o.strike);
+                    if (y !== null) {{
+                        const d = Math.abs(y - my);
+                        if (d < minDist) {{
+                            minDist = d;
+                            closest = o;
+                            closestY = y;
                         }}
-                    }});
-                    hoveredOption = closest;
-                    hoveredY = closestY;
-                }} else {{
-                    hoveredOption = null;
-                    hoveredY = null;
-                }}
-                drawNeiroOverlay();
+                    }}
+                }});
+                hoveredOption = closest;
+                hoveredY = closestY;
+                hoveredMx = mx;
+                drawNeiroProfilePanel();
             }});
-            canvas.addEventListener('mouseleave', () => {{
+            pCanvas.addEventListener('mouseleave', () => {{
                 hoveredOption = null;
                 hoveredY = null;
-                drawNeiroOverlay();
+                hoveredMx = null;
+                drawNeiroProfilePanel();
             }});
         }}
         neiroChart.subscribeCrosshairMove(() => {{
             drawNeiroOverlay();
         }});
 
+        computeVolumeProfile(window.INITIAL_CANDLES || []);
         handleResize();
     }}
 
     let hoveredOption = null;
     let hoveredY = null;
+    let hoveredMx = null;
 
     // ----------------------------------------------------------------------------
-    // Canvas Overlay Engine: 5-Column Orderflow + Greeks & Air Pocket Matrix
+    // Realtime Session Volume Profile Engine (POC / VAH / VAL / Strike Aggregation)
     // ----------------------------------------------------------------------------
-    function getProfileColW(canvasW) {{
-        if (canvasW < 640) return 26;
-        if (canvasW < 920) return 44;
-        return 64;
+    let sessionPocPrice = null;
+    let sessionVahPrice = null;
+    let sessionValPrice = null;
+    let sessionPocVol = 0;
+    let sessionTotalVol = 0;
+    let sessionVolByStrike = {{}};
+
+    function computeVolumeProfile(candles) {{
+        if (!Array.isArray(candles) || candles.length === 0) return;
+        const binSize = 1.0;
+        const volByBin = {{}};
+        let totalVol = 0;
+
+        for (let i = 0; i < candles.length; i++) {{
+            const c = candles[i];
+            const v = Number(c.volume || 0);
+            if (v <= 0) continue;
+            const h = Number(c.high);
+            const l = Number(c.low);
+            totalVol += v;
+            if (h <= l) {{
+                const b = Math.round(c.close / binSize) * binSize;
+                volByBin[b] = (volByBin[b] || 0) + v;
+                continue;
+            }}
+            const bStart = Math.floor(l / binSize) * binSize;
+            const bEnd = Math.floor(h / binSize) * binSize;
+            const span = h - l;
+            for (let b = bStart; b <= bEnd; b += binSize) {{
+                const ov = Math.max(0.0, Math.min(h, b + binSize) - Math.max(l, b));
+                const frac = ov / span;
+                volByBin[b] = (volByBin[b] || 0) + v * frac;
+            }}
+        }}
+
+        if (totalVol <= 0 || Object.keys(volByBin).length === 0) return;
+        sessionTotalVol = totalVol;
+
+        let maxV = 0;
+        let poc = null;
+        const bins = [];
+        for (const bStr in volByBin) {{
+            const b = parseFloat(bStr);
+            bins.push(b);
+            if (volByBin[b] > maxV) {{
+                maxV = volByBin[b];
+                poc = b;
+            }}
+        }}
+        bins.sort((a, b) => a - b);
+        sessionPocPrice = poc;
+        sessionPocVol = maxV;
+
+        const targetVa = totalVol * 0.70;
+        const vaBins = new Set([poc]);
+        let curVaVol = maxV;
+        let upIdx = bins.indexOf(poc) + 1;
+        let dnIdx = bins.indexOf(poc) - 1;
+
+        while (curVaVol < targetVa && (upIdx < bins.length || dnIdx >= 0)) {{
+            const upBin = upIdx < bins.length ? bins[upIdx] : null;
+            const dnBin = dnIdx >= 0 ? bins[dnIdx] : null;
+            const upV = upBin !== null ? (volByBin[upBin] || 0) : -1;
+            const dnV = dnBin !== null ? (volByBin[dnBin] || 0) : -1;
+
+            if (upV >= dnV && upBin !== null) {{
+                vaBins.add(upBin);
+                curVaVol += upV;
+                upIdx++;
+            }} else if (dnBin !== null) {{
+                vaBins.add(dnBin);
+                curVaVol += dnV;
+                dnIdx--;
+            }} else {{
+                break;
+            }}
+        }}
+
+        let minVa = Infinity, maxVa = -Infinity;
+        vaBins.forEach(b => {{
+            if (b < minVa) minVa = b;
+            if (b > maxVa) maxVa = b;
+        }});
+        sessionVahPrice = maxVa;
+        sessionValPrice = minVa;
+
+        const opts = window.INITIAL_OPTIONS || [];
+        sessionVolByStrike = {{}};
+        for (let j = 0; j < opts.length; j++) {{
+            const stk = opts[j].strike;
+            let aggV = 0;
+            for (let b = stk - 2.0; b <= stk + 2.0; b += binSize) {{
+                if (volByBin[b]) aggV += volByBin[b];
+            }}
+            sessionVolByStrike[stk] = aggV;
+        }}
+
+        const pocTag = document.getElementById('profile-poc-tag');
+        if (pocTag && sessionPocPrice) {{
+            pocTag.innerText = 'POC $' + Math.round(sessionPocPrice) + ' (' + Math.round(sessionPocVol) + ' HĐ)';
+        }}
     }}
 
+    // ----------------------------------------------------------------------------
+    // Canvas Overlay Engine: Clean Chart Lines, Key Levels & Air Pocket Matrix
+    // ----------------------------------------------------------------------------
     function drawNeiroOverlay() {{
         const canvas = document.getElementById('neiro-canvas');
         if (!canvas || !neiroChart || !candleSeries) return;
@@ -2130,18 +2304,8 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         ctx.clearRect(0, 0, w, h);
 
         const m = window.INITIAL_META;
-        const rightX = w - 70;
-        const colW = getProfileColW(w);
-        const cols = [
-            {{ key: 'currentNetFLOW', name: 'FLOW',  unit: 'GC',  pos: '#22C55E', neg: '#F43F5E', bPos: '#4ADE80', bNeg: '#FB7185' }},
-            {{ key: 'currentNetGEX',  name: 'GEX',   unit: 'M',   pos: '#10B981', neg: '#EF4444', bPos: '#34D399', bNeg: '#F87171' }},
-            {{ key: 'currentNetVEX',  name: 'VEX',   unit: 'M',   pos: '#06B6D4', neg: '#0284C7', bPos: '#22D3EE', bNeg: '#38BDF8' }},
-            {{ key: 'currentNetCHEX', name: 'CHEX',  unit: 'M/d', pos: '#A855F7', neg: '#7E22CE', bPos: '#C084FC', bNeg: '#D8B4FE' }},
-            {{ key: 'currentNetTEX',  name: 'THETA', unit: 'M/d', pos: '#F59E0B', neg: '#D97706', bPos: '#FBBF24', bNeg: '#FCD34D' }},
-        ];
-        const panelW = cols.length * colW + 8;
-        const panelX = rightX - panelW;
-        const chartW = panelX - 6;
+        // chartW leaves room for the Lightweight Charts price scale (65px) on the right
+        const chartW = Math.max(100, w - 65);
 
         // Live Candle Orderflow Footprint Badge right next to current F0 LIVE price line
         const yLive = candleSeries.priceToCoordinate(currentGoldPrice);
@@ -2161,12 +2325,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             ctx.fillText(fpTxt, fpX + 6, fpY + 11);
         }}
 
-        // 1. Right Greeks Panel Background — no fill, only subtle border
-        ctx.strokeStyle = 'rgba(30, 41, 59, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(panelX - 4, 0, panelW, h);
-
-        // 2. Always-On Air Pocket Vacuum Matrix (Opacity & Border scaled by Severity + OI depth)
+        // 1. Always-On Air Pocket Vacuum Matrix (Across the pure chart canvas)
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
             const pFrom = parseFloat(ap.from || 0);
@@ -2184,41 +2343,33 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     const isDeep = (apSev === 'CRITICAL') || (apSev === 'HIGH' && (apOi <= 0 || apOi < 125));
                     const isHigh = !isDeep && (apSev === 'HIGH');
 
-                    let chartFill, profFill, borderCol, borderW, borderDash, labelCol, badgeCol, levelTxt;
+                    let chartFill, borderCol, borderW, borderDash, labelCol, levelTxt;
                     if (isDeep) {{
                         chartFill = 'rgba(249, 115, 22, 0.18)';
-                        profFill = 'rgba(249, 115, 22, 0.28)';
                         borderCol = 'rgba(251, 146, 60, 0.85)';
                         borderW = 1.4;
                         borderDash = [5, 3];
                         labelCol = '#FDBA74';
-                        badgeCol = '#FED7AA';
                         levelTxt = 'RỖNG CỰC MẠNH';
                     }} else if (isHigh) {{
                         chartFill = 'rgba(56, 189, 248, 0.13)';
-                        profFill = 'rgba(56, 189, 248, 0.22)';
                         borderCol = 'rgba(56, 189, 248, 0.78)';
                         borderW = 1.15;
                         borderDash = [4, 4];
                         labelCol = '#7DD3FC';
-                        badgeCol = '#BAE6FD';
                         levelTxt = 'RỖNG MẠNH';
                     }} else {{
                         const depthFactor = apOi > 0 ? Math.max(0.25, Math.min(1.0, 1.0 - (apOi - 150) / 300)) : 0.65;
                         const cAlpha = (0.045 + 0.055 * depthFactor).toFixed(3);
-                        const pAlpha = (0.10 + 0.10 * depthFactor).toFixed(3);
                         const bAlpha = (0.32 + 0.26 * depthFactor).toFixed(2);
                         chartFill = 'rgba(148, 163, 184, ' + cAlpha + ')';
-                        profFill = 'rgba(148, 163, 184, ' + pAlpha + ')';
                         borderCol = 'rgba(148, 163, 184, ' + bAlpha + ')';
                         borderW = 0.9;
                         borderDash = [3, 5];
                         labelCol = 'rgba(203, 213, 225, ' + (0.60 + 0.25 * depthFactor).toFixed(2) + ')';
-                        badgeCol = 'rgba(203, 213, 225, 0.88)';
                         levelTxt = 'MỎNG NHẸ';
                     }}
 
-                    // A. Main Chart Canvas Area:
                     ctx.fillStyle = chartFill;
                     ctx.fillRect(0, topY, chartW, bandH);
                     ctx.strokeStyle = borderCol;
@@ -2227,7 +2378,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     ctx.strokeRect(0, topY, chartW, bandH);
                     ctx.setLineDash([]);
 
-                    const apLabelX = (topY < 145 && chartW > 650) ? 482 : 20;
+                    const apLabelX = (topY < 145 && chartW > 550) ? 460 : 20;
                     const apRange = '[$' + Math.min(pFrom, pTo).toFixed(0) + ' - $' + Math.max(pFrom, pTo).toFixed(0) + ']';
                     const oiInfo = apOi > 0 ? (' · OI ~' + Math.round(apOi)) : '';
                     const apTxt = (apLabelX > 20)
@@ -2237,79 +2388,56 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                     ctx.textAlign = 'left';
                     ctx.fillStyle = labelCol;
                     ctx.fillText(apTxt, apLabelX, topY + Math.min(bandH - 3, 13));
-
-                    // B. Right Greeks / Orderflow Panel Area:
-                    ctx.fillStyle = profFill;
-                    ctx.fillRect(panelX - 4, topY, panelW, bandH);
-                    ctx.strokeStyle = borderCol;
-                    ctx.setLineDash(borderDash);
-                    ctx.lineWidth = borderW;
-                    ctx.strokeRect(panelX - 4, topY, panelW, bandH);
-                    ctx.setLineDash([]);
-
-                    // Intensity caution badge inside right panel
-                    const bW = Math.min(panelW - 14, 210);
-                    const bX = panelX + (panelW - bW) / 2 - 4;
-                    const bY = topY + Math.max(1, (bandH - 15) / 2);
-                    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                    ctx.fillRect(bX, bY, bW, 15);
-                    ctx.strokeStyle = borderCol;
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(bX, bY, bW, 15);
-                    ctx.fillStyle = badgeCol;
-                    ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('⚠️ ' + levelTxt + ' $' + Math.min(pFrom, pTo).toFixed(0) + '-' + Math.max(pFrom, pTo).toFixed(0) + (apOi > 0 ? ' (' + Math.round(apOi) + ')' : ''), bX + bW / 2, bY + 11);
                 }}
             }}
         }});
 
         // 2b. Secondary Structural Zones (Institutional FVGs) — visible in Full Overlay Mode
         if (!overlayCompactMode) {{
-        const instFvgs = m.institutional_fvgs || [];
-        instFvgs.forEach(fvg => {{
-            const gLo = parseFloat(fvg.low || 0);
-            const gHi = parseFloat(fvg.high || 0);
-            const mid50 = parseFloat(fvg.midpoint_50 || 0);
-            if (!gLo || !gHi) return;
-            const yHi = candleSeries.priceToCoordinate(gHi);
-            const yLo = candleSeries.priceToCoordinate(gLo);
-            if (yHi !== null && yLo !== null) {{
-                const topY = Math.min(yHi, yLo);
-                const botY = Math.max(yHi, yLo);
-                const bandH = Math.max(10, botY - topY);
-                if (topY <= h && botY >= 0) {{
-                    const isBull = fvg.direction === 'BULLISH';
-                    const fCol = isBull ? '#22C55E' : '#EF4444';
-                    ctx.fillStyle = isBull ? 'rgba(34, 197, 94, 0.09)' : 'rgba(239, 68, 68, 0.09)';
-                    ctx.fillRect(0, topY, chartW, bandH);
-                    ctx.strokeStyle = fCol;
-                    ctx.setLineDash([2, 3]);
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(0, topY, chartW, bandH);
-                    ctx.setLineDash([]);
-                    if (mid50) {{
-                        const yMid = candleSeries.priceToCoordinate(mid50);
-                        if (yMid !== null && yMid >= 0 && yMid <= h) {{
-                            ctx.strokeStyle = fCol;
-                            ctx.setLineDash([4, 2]);
-                            ctx.beginPath();
-                            ctx.moveTo(0, yMid);
-                            ctx.lineTo(chartW, yMid);
-                            ctx.stroke();
-                            ctx.setLineDash([]);
+            const instFvgs = m.institutional_fvgs || [];
+            instFvgs.forEach(fvg => {{
+                const gLo = parseFloat(fvg.low || 0);
+                const gHi = parseFloat(fvg.high || 0);
+                const mid50 = parseFloat(fvg.midpoint_50 || 0);
+                if (!gLo || !gHi) return;
+                const yHi = candleSeries.priceToCoordinate(gHi);
+                const yLo = candleSeries.priceToCoordinate(gLo);
+                if (yHi !== null && yLo !== null) {{
+                    const topY = Math.min(yHi, yLo);
+                    const botY = Math.max(yHi, yLo);
+                    const bandH = Math.max(10, botY - topY);
+                    if (topY <= h && botY >= 0) {{
+                        const isBull = fvg.direction === 'BULLISH';
+                        const fCol = isBull ? '#22C55E' : '#EF4444';
+                        ctx.fillStyle = isBull ? 'rgba(34, 197, 94, 0.09)' : 'rgba(239, 68, 68, 0.09)';
+                        ctx.fillRect(0, topY, chartW, bandH);
+                        ctx.strokeStyle = fCol;
+                        ctx.setLineDash([2, 3]);
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(0, topY, chartW, bandH);
+                        ctx.setLineDash([]);
+                        if (mid50) {{
+                            const yMid = candleSeries.priceToCoordinate(mid50);
+                            if (yMid !== null && yMid >= 0 && yMid <= h) {{
+                                ctx.strokeStyle = fCol;
+                                ctx.setLineDash([4, 2]);
+                                ctx.beginPath();
+                                ctx.moveTo(0, yMid);
+                                ctx.lineTo(chartW, yMid);
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                            }}
                         }}
+                        ctx.font = 'bold 9px "JetBrains Mono", monospace';
+                        ctx.textAlign = 'left';
+                        ctx.fillStyle = fCol;
+                        ctx.fillText('INSTITUTIONAL FVG 50% $' + mid50.toFixed(1) + ' | 75% $' + parseFloat(fvg.zone_75 || mid50).toFixed(1), 20, topY + Math.min(bandH - 2, 11));
                     }}
-                    ctx.font = 'bold 9px "JetBrains Mono", monospace';
-                    ctx.textAlign = 'left';
-                    ctx.fillStyle = fCol;
-                    ctx.fillText('INSTITUTIONAL FVG 50% $' + mid50.toFixed(1) + ' | 75% $' + parseFloat(fvg.zone_75 || mid50).toFixed(1), 20, topY + Math.min(bandH - 2, 11));
                 }}
-            }}
-        }});
+            }});
         }}
 
-        // 3. Key Quant Options Levels: Core Structure + Always-On Intraday Strike Barriers & Checkpoints (+ Full Mode Extras)
+        // 3. Key Quant Options Levels + Volume Profile (POC / VAH / VAL)
         const fallbackOff = Math.max(2.30, Math.round((0.8 * Math.max(2.0, Math.min(6.5, Number(m.atr_5m || 4.0))) - 0.50) * 100) / 100);
         const sqTrigPx = (liveTacticalMatrix && liveTacticalMatrix.squeeze && liveTacticalMatrix.squeeze.entry)
             ? Number(liveTacticalMatrix.squeeze.entry) - 0.50
@@ -2329,6 +2457,39 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             {{ p: m.major_up_wall,      c: '#F97316', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↑ $' + Math.round(m.major_up_wall) }},
             {{ p: m.major_down_wall,    c: '#2DD4BF', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↓ $' + Math.round(m.major_down_wall) }},
         ];
+
+        // Session Volume Profile Key Levels: POC, VAH, VAL
+        if (sessionPocPrice) {{
+            keyLevels.push({{
+                p: sessionPocPrice,
+                c: '#FACC15',
+                d: [6, 3],
+                lw: 1.6,
+                pin: true,
+                txt: '★ POC (Vol Max) $' + Math.round(sessionPocPrice) + ' · ' + Math.round(sessionPocVol) + ' HĐ'
+            }});
+        }}
+        if (sessionVahPrice) {{
+            keyLevels.push({{
+                p: sessionVahPrice,
+                c: '#38BDF8',
+                d: [4, 4],
+                lw: 1.2,
+                pin: true,
+                txt: 'VAH (Vùng Giá Trị 70%) $' + Math.round(sessionVahPrice)
+            }});
+        }}
+        if (sessionValPrice) {{
+            keyLevels.push({{
+                p: sessionValPrice,
+                c: '#FB7185',
+                d: [4, 4],
+                lw: 1.2,
+                pin: true,
+                txt: 'VAL (Vùng Giá Trị 70%) $' + Math.round(sessionValPrice)
+            }});
+        }}
+
         if (!overlayCompactMode) {{
             keyLevels.push(
                 {{ p: m.charm_peak_strike,  c: '#C084FC', d: [4, 4], lw: 1.2, pin: true, txt: 'CHEX · HÚT GIÁ VỀ ĐÂY ' + (m.charm_peak_val || 0).toFixed(1) + 'M/d' }},
@@ -2369,7 +2530,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 ctx.lineWidth = L.lw || 1.3;
                 ctx.beginPath();
                 ctx.moveTo(0, y);
-                ctx.lineTo(rightX, y);
+                ctx.lineTo(chartW, y);
                 ctx.stroke();
                 ctx.setLineDash([]);
 
@@ -2407,7 +2568,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             }}
         }});
 
-        // Render offscreen edge pins after in-viewport lines so active strike barriers keep priority on right edge
+        // Render offscreen edge pins
         let topPinCount = 0;
         let botPinCount = 0;
         pendingPins.forEach(item => {{
@@ -2448,59 +2609,153 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             placedPillBoxes.push({{ left: pinLeft, right: pinRight, top: chosenEdgeY - 11, bottom: chosenEdgeY + 3 }});
         }});
 
-        // 4. Per-strike Greeks exposure profile (GEX | VEX | CHEX | THETA)
+        // Synchronize and repaint Right Dedicated Profile Panel
+        drawNeiroProfilePanel();
+    }}
+
+    // ----------------------------------------------------------------------------
+    // Dedicated Right Profile Panel: 6-Column Matrix [VOL | FLOW | GEX | VEX | CHEX | THETA]
+    // ----------------------------------------------------------------------------
+    function drawNeiroProfilePanel() {{
+        const canvas = document.getElementById('neiro-profile-canvas');
+        if (!canvas || !neiroChart || !candleSeries) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const m = window.INITIAL_META;
         const opts = window.INITIAL_OPTIONS || [];
-        if (opts.length && opts[0].currentNetGEX !== undefined) {{
-            cols.forEach((c, ci) => {{
-                const cx = panelX + ci * colW + colW / 2;
-                
-                // Dynamic Visible Normalization
-                let visibleMaxAbs = 1e-9;
-                let globalMaxAbs = 1e-9;
-                opts.forEach(o => {{
-                    const val = Math.abs(o[c.key] || 0);
-                    globalMaxAbs = Math.max(globalMaxAbs, val);
-                    const y = candleSeries.priceToCoordinate(o.strike);
-                    if (y !== null && y >= 28 && y <= h - 4) {{
-                        visibleMaxAbs = Math.max(visibleMaxAbs, val);
+        if (!opts.length) return;
+
+        // Background
+        ctx.fillStyle = '#080B12';
+        ctx.fillRect(0, 0, w, h);
+
+        // 6 Columns: VOL, FLOW, GEX, VEX, CHEX, THETA
+        const cols = [
+            {{ key: 'currentVol',     name: 'VOL',   unit: 'HĐ',  pos: '#FBBF24', neg: '#FBBF24', bPos: '#F59E0B', bNeg: '#F59E0B' }},
+            {{ key: 'currentNetFLOW', name: 'FLOW',  unit: 'GC',  pos: '#22C55E', neg: '#F43F5E', bPos: '#4ADE80', bNeg: '#FB7185' }},
+            {{ key: 'currentNetGEX',  name: 'GEX',   unit: 'M',   pos: '#10B981', neg: '#EF4444', bPos: '#34D399', bNeg: '#F87171' }},
+            {{ key: 'currentNetVEX',  name: 'VEX',   unit: 'M',   pos: '#06B6D4', neg: '#0284C7', bPos: '#22D3EE', bNeg: '#38BDF8' }},
+            {{ key: 'currentNetCHEX', name: 'CHEX',  unit: 'M/d', pos: '#A855F7', neg: '#7E22CE', bPos: '#C084FC', bNeg: '#D8B4FE' }},
+            {{ key: 'currentNetTEX',  name: 'THETA', unit: 'M/d', pos: '#F59E0B', neg: '#D97706', bPos: '#FBBF24', bNeg: '#FCD34D' }},
+        ];
+
+        const strikeColW = 46;
+        const matrixW = Math.max(120, w - strikeColW);
+        const colW = matrixW / cols.length;
+
+        // 1. Air Pocket Vacuum horizontal background bands
+        const airPockets = m.air_pockets || [];
+        airPockets.forEach(ap => {{
+            const pFrom = parseFloat(ap.from || 0);
+            const pTo = parseFloat(ap.to || 0);
+            if (!pFrom || !pTo) return;
+            const y1 = candleSeries.priceToCoordinate(Math.max(pFrom, pTo));
+            const y2 = candleSeries.priceToCoordinate(Math.min(pFrom, pTo));
+            if (y1 !== null && y2 !== null) {{
+                const topY = Math.min(y1, y2);
+                const botY = Math.max(y1, y2);
+                const bandH = Math.max(12, botY - topY);
+                if (topY <= h && botY >= 0) {{
+                    const apSev = String(ap.severity || '').toUpperCase();
+                    const isDeep = (apSev === 'CRITICAL') || (apSev === 'HIGH');
+                    ctx.fillStyle = isDeep ? 'rgba(249, 115, 22, 0.22)' : 'rgba(56, 189, 248, 0.14)';
+                    ctx.fillRect(0, topY, w, bandH);
+                    ctx.strokeStyle = isDeep ? 'rgba(251, 146, 60, 0.70)' : 'rgba(56, 189, 248, 0.60)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(0, topY, w, bandH);
+                }}
+            }}
+        }});
+
+        // 2. Render Columns
+        cols.forEach((c, ci) => {{
+            const cx = ci * colW + colW / 2;
+
+            let visibleMaxAbs = 1e-9;
+            let globalMaxAbs = 1e-9;
+            opts.forEach(o => {{
+                let val = 0;
+                if (c.key === 'currentVol') {{
+                    val = Number(sessionVolByStrike[o.strike] || 0);
+                }} else {{
+                    val = Math.abs(Number(o[c.key] || 0));
+                }}
+                globalMaxAbs = Math.max(globalMaxAbs, val);
+                const y = candleSeries.priceToCoordinate(o.strike);
+                if (y !== null && y >= 24 && y <= h - 4) {{
+                    visibleMaxAbs = Math.max(visibleMaxAbs, val);
+                }}
+            }});
+            if (visibleMaxAbs < 1e-6) visibleMaxAbs = globalMaxAbs > 1e-6 ? globalMaxAbs : 1.0;
+
+            // Column vertical divider line
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+            ctx.beginPath();
+            ctx.moveTo(cx, 24);
+            ctx.lineTo(cx, h);
+            ctx.stroke();
+
+            // Column Header
+            ctx.fillStyle = c.name === 'VOL' ? '#FACC15' : (c.name === 'FLOW' ? '#4ADE80' : (c.name === 'VEX' ? '#22D3EE' : (c.name === 'CHEX' ? '#C084FC' : (c.name === 'GEX' ? '#34D399' : '#FBBF24'))));
+            ctx.font = 'bold 9px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(c.name, cx, 11);
+
+            // Column Scale Subheader
+            let scaleTxt = '';
+            if (c.name === 'VOL') {{
+                scaleTxt = visibleMaxAbs >= 1000 ? (visibleMaxAbs / 1000).toFixed(1) + 'k' : Math.round(visibleMaxAbs);
+            }} else {{
+                scaleTxt = '±' + (visibleMaxAbs >= 10 ? visibleMaxAbs.toFixed(0) : (visibleMaxAbs >= 1 ? visibleMaxAbs.toFixed(1) : visibleMaxAbs.toFixed(2))) + c.unit;
+            }}
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.65)';
+            ctx.font = '7.5px "JetBrains Mono", monospace';
+            ctx.fillText(scaleTxt, cx, 21);
+
+            // Bars
+            const maxBarW = colW / 2 - 2;
+            opts.forEach(o => {{
+                const y = candleSeries.priceToCoordinate(o.strike);
+                if (y === null || y < 24 || y > h - 4) return;
+
+                let v = 0;
+                let isPocStrike = false;
+                if (c.key === 'currentVol') {{
+                    v = Number(sessionVolByStrike[o.strike] || 0);
+                    if (sessionPocPrice && Math.abs(o.strike - sessionPocPrice) <= 2.5) {{
+                        isPocStrike = true;
                     }}
-                }});
-                if (visibleMaxAbs < 1e-6) visibleMaxAbs = globalMaxAbs > 1e-6 ? globalMaxAbs : 1.0;
+                }} else {{
+                    v = Number(o[c.key] || 0);
+                }}
+                if (v === 0) return;
 
-                // Center divider line
-                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
-                ctx.beginPath();
-                ctx.moveTo(cx, 26);
-                ctx.lineTo(cx, h);
-                ctx.stroke();
+                const norm = Math.min(1.0, Math.abs(v) / visibleMaxAbs);
+                const scaled = Math.pow(norm, 0.50);
+                let len = scaled * maxBarW;
+                if (Math.abs(v) > 0.0001) len = Math.max(3.0, len);
 
-                // Column Header: Name
-                ctx.fillStyle = c.name === 'FLOW' ? '#FACC15' : (c.name === 'VEX' ? '#22D3EE' : (c.name === 'CHEX' ? '#C084FC' : (c.name === 'GEX' ? '#34D399' : '#FBBF24')));
-                ctx.font = colW < 34 ? 'bold 7.5px "JetBrains Mono", monospace' : 'bold 10px "JetBrains Mono", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText((colW < 34 && c.name === 'THETA') ? 'THT' : c.name, cx, 12);
+                const barH = c.name === 'VOL' ? 8 : (c.name === 'FLOW' ? 7 : 6);
 
-                // Column Subheader: Visible Magnitude Scale (e.g. ±2.8M or ±1.1M/d)
-                const scaleTxt = '±' + (visibleMaxAbs >= 10 ? visibleMaxAbs.toFixed(0) : (visibleMaxAbs >= 1 ? visibleMaxAbs.toFixed(1) : visibleMaxAbs.toFixed(2))) + c.unit;
-                ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
-                ctx.font = colW < 34 ? '7px "JetBrains Mono", monospace' : '8px "JetBrains Mono", monospace';
-                ctx.fillText(scaleTxt, cx, 22);
+                if (c.name === 'VOL') {{
+                    const barX = cx - len / 2;
+                    ctx.fillStyle = isPocStrike ? 'rgba(250, 204, 21, 0.95)' : 'rgba(251, 191, 36, 0.65)';
+                    ctx.fillRect(barX, y - barH / 2, len, barH);
+                    ctx.strokeStyle = isPocStrike ? '#FACC15' : '#D97706';
+                    ctx.lineWidth = isPocStrike ? 1.2 : 0.7;
+                    ctx.strokeRect(barX, y - barH / 2, len, barH);
 
-                // Render Per-Strike Bars with Square-Root / Sublinear Boost
-                const maxBarW = colW / 2 - 3;
-                opts.forEach(o => {{
-                    const y = candleSeries.priceToCoordinate(o.strike);
-                    const v = o[c.key] || 0;
-                    if (y === null || y < 28 || y > h - 4 || v === 0) return;
-                    
-                    // Square-root boost: makes small VEX and CHEX clearly visible without blowing out
-                    const norm = Math.min(1.0, Math.abs(v) / visibleMaxAbs);
-                    const scaled = Math.pow(norm, 0.50);
-                    let len = scaled * maxBarW;
-                    if (Math.abs(v) > 0.0001) len = Math.max(3.5, len);
-
+                    if (isPocStrike) {{
+                        ctx.fillStyle = '#FACC15';
+                        ctx.font = 'bold 8px "JetBrains Mono", monospace';
+                        ctx.textAlign = 'right';
+                        ctx.fillText('★POC', barX - 2, y + 3);
+                    }}
+                }} else {{
                     const barX = v >= 0 ? cx : cx - len;
-                    const barH = c.name === 'FLOW' ? 7 : 6;
                     ctx.fillStyle = v >= 0 ? c.pos : c.neg;
                     ctx.fillRect(barX, y - barH / 2, len, barH);
                     ctx.strokeStyle = v >= 0 ? c.bPos : c.bNeg;
@@ -2509,29 +2764,58 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
 
                     if (c.name === 'FLOW' && o.isWhale) {{
                         ctx.fillStyle = '#FACC15';
-                        ctx.font = 'bold 8px "JetBrains Mono", monospace';
-                        ctx.textAlign = 'left';
-                        ctx.fillText('⚡W', panelX - 2, y + 3);
+                        ctx.font = 'bold 7.5px "JetBrains Mono", monospace';
+                        ctx.textAlign = 'right';
+                        ctx.fillText('⚡W', barX - 1, y + 3);
                     }}
-                }});
+                }}
             }});
-        }}
+        }});
 
-        // 5. Interactive Tooltip when hovering over 5-Column Orderflow + Greeks panel
-        if (hoveredOption && hoveredY !== null && hoveredY >= 28 && hoveredY <= h - 4) {{
-            ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
+        // 3. Right Strike Price Labels Column
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fillRect(matrixW, 0, strikeColW, h);
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.20)';
+        ctx.beginPath();
+        ctx.moveTo(matrixW, 0);
+        ctx.lineTo(matrixW, h);
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748B';
+        ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('STRIKE', matrixW + strikeColW / 2, 16);
+
+        opts.forEach(o => {{
+            const y = candleSeries.priceToCoordinate(o.strike);
+            if (y === null || y < 24 || y > h - 4) return;
+            const isPoc = sessionPocPrice && Math.abs(o.strike - sessionPocPrice) <= 2.5;
+            ctx.fillStyle = isPoc ? '#FACC15' : 'rgba(226, 232, 240, 0.82)';
+            ctx.font = isPoc ? 'bold 9.5px "JetBrains Mono", monospace' : '8.5px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('$' + Math.round(o.strike), matrixW + strikeColW / 2, y + 3);
+        }});
+
+        // 4. Interactive Hover Tooltip inside Right Panel
+        if (hoveredOption && hoveredY !== null && hoveredY >= 24 && hoveredY <= h - 4) {{
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.7)';
             ctx.setLineDash([2, 2]);
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(panelX - 4, hoveredY);
-            ctx.lineTo(rightX, hoveredY);
+            ctx.moveTo(0, hoveredY);
+            ctx.lineTo(w, hoveredY);
             ctx.stroke();
             ctx.setLineDash([]);
 
+            const stk = hoveredOption.strike;
+            const volVal = sessionVolByStrike[stk] || 0;
             const flowVal = hoveredOption.currentNetFLOW || 0;
             const gexHint = hoveredOption.currentNetGEX >= 0 ? '-> GEX (+): Đánh ĐẢO CHIỀU' : '-> GEX (-): Đánh THUẬN CHIỀU';
+            const isPoc = sessionPocPrice && Math.abs(stk - sessionPocPrice) <= 2.5;
+
             const ttLines = [
-                'Strike $' + hoveredOption.strike.toFixed(0) + (hoveredOption.isWhale ? ' ⚡WHALE' : ''),
+                'Strike $' + stk.toFixed(0) + (isPoc ? ' ★POC' : '') + (hoveredOption.isWhale ? ' ⚡WHALE' : ''),
+                'VOL: ' + Math.round(volVal) + ' HĐ' + (isPoc ? ' (KHỚP NHIỀU NHẤT)' : ''),
                 'FLOW: ' + (flowVal >= 0 ? '+' : '') + flowVal.toFixed(1) + ' HĐ GC',
                 'Vol C/P: ' + (hoveredOption.c_vol || 0) + ' / ' + (hoveredOption.p_vol || 0),
                 'GEX: ' + (hoveredOption.currentNetGEX >= 0 ? '+' : '') + hoveredOption.currentNetGEX.toFixed(1) + 'M',
@@ -2539,13 +2823,14 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 'CHEX: ' + (hoveredOption.currentNetCHEX >= 0 ? '+' : '') + hoveredOption.currentNetCHEX.toFixed(2) + 'M/d',
                 gexHint,
             ];
-            const ttW = 172;
-            const ttH = 102;
-            const ttX = Math.max(10, panelX - ttW - 8);
-            const ttY = Math.min(h - ttH - 10, Math.max(10, hoveredY - ttH / 2));
+            const ttW = 186;
+            const ttH = 114;
+            const ttX = Math.max(8, Math.min(w - ttW - 8, (hoveredMx || 100) - ttW / 2));
+            const ttY = Math.min(h - ttH - 8, Math.max(8, hoveredY - ttH / 2));
+
             ctx.fillStyle = 'rgba(15, 23, 42, 0.96)';
             ctx.fillRect(ttX, ttY, ttW, ttH);
-            ctx.strokeStyle = '#FACC15';
+            ctx.strokeStyle = isPoc ? '#FACC15' : '#38BDF8';
             ctx.lineWidth = 1;
             ctx.strokeRect(ttX, ttY, ttW, ttH);
 
@@ -2553,20 +2838,23 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
             ctx.fillStyle = '#F8FAFC';
             ctx.fillText(ttLines[0], ttX + 6, ttY + 13);
+
             ctx.font = '8.5px "JetBrains Mono", monospace';
-            ctx.fillStyle = flowVal >= 0 ? '#4ADE80' : '#FB7185';
-            ctx.fillText(ttLines[1], ttX + 6, ttY + 26);
             ctx.fillStyle = '#FACC15';
+            ctx.fillText(ttLines[1], ttX + 6, ttY + 26);
+            ctx.fillStyle = flowVal >= 0 ? '#4ADE80' : '#FB7185';
             ctx.fillText(ttLines[2], ttX + 6, ttY + 39);
-            ctx.fillStyle = hoveredOption.currentNetGEX >= 0 ? '#4ADE80' : '#F87171';
+            ctx.fillStyle = '#FBBF24';
             ctx.fillText(ttLines[3], ttX + 6, ttY + 52);
-            ctx.fillStyle = '#22D3EE';
+            ctx.fillStyle = hoveredOption.currentNetGEX >= 0 ? '#4ADE80' : '#F87171';
             ctx.fillText(ttLines[4], ttX + 6, ttY + 65);
-            ctx.fillStyle = '#C084FC';
+            ctx.fillStyle = '#22D3EE';
             ctx.fillText(ttLines[5], ttX + 6, ttY + 78);
+            ctx.fillStyle = '#C084FC';
+            ctx.fillText(ttLines[6], ttX + 6, ttY + 91);
             ctx.font = 'bold 8.5px "JetBrains Mono", monospace';
             ctx.fillStyle = hoveredOption.currentNetGEX >= 0 ? '#4ADE80' : '#F87171';
-            ctx.fillText(ttLines[6], ttX + 6, ttY + 92);
+            ctx.fillText(ttLines[7], ttX + 6, ttY + 105);
         }}
     }}
 
@@ -2725,6 +3013,9 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 delta: lastBar.delta || 0,
             }};
             evaluateBarOrderflow(merged, tfKey);
+            if (typeof computeVolumeProfile === 'function') {{
+                computeVolumeProfile(targetList);
+            }}
 
             // Use setData() whenever resetSeries is set, or any earlier/intermediate bar
             // (gap fill, tab-sleep backfill, or historical bar revision) differs from rendered series.

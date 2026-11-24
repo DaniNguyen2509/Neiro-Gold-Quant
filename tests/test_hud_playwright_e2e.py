@@ -186,6 +186,18 @@ def test_adr029_chart_height_toggle_and_mobile_no_overflow(
             collapsed_h = page.locator("#neiro-view-container").bounding_box()["height"]
             assert collapsed_h <= 550
 
+            # Profile toggle test: collapse & expand side-by-side panel
+            assert page.is_visible("#neiro-profile-wrapper")
+            chart_w_before = page.locator("#neiro-tv-chart").bounding_box()["width"]
+            page.click("#btn-toggle-profile")
+            page.wait_for_timeout(200)
+            assert not page.is_visible("#neiro-profile-wrapper")
+            chart_w_after = page.locator("#neiro-tv-chart").bounding_box()["width"]
+            assert chart_w_after > chart_w_before, f"Expected chart to expand when profile collapsed: {chart_w_after} > {chart_w_before}"
+            page.click("#btn-toggle-profile")
+            page.wait_for_timeout(200)
+            assert page.is_visible("#neiro-profile-wrapper")
+
             overflow_desktop = page.evaluate(
                 "() => document.documentElement.scrollWidth > window.innerWidth"
             )

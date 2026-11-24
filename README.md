@@ -17,6 +17,7 @@ Hệ thống Định lượng Vị thế Nhà tạo lập (Dealer Positioning), 
   - **TRADINGVIEW FULLSCREEN CANVAS 60 FPS:** Biểu đồ Canvas Lightweight Charts 4.2 tích hợp:
     * **Air Pocket Vacuum Zones:** Dải chân không thanh khoản quét xuyên suốt nến và cột Greeks với cảnh báo `[CẤM ĐỠ DAO]`.
     * **5 Cột Profile Greeks Cố Định Trục Giá:** `FLOW | GEX | VEX | CHEX | THETA` tự động co giãn theo giá Spot (Dynamic GEX Elasticity - ADR-031).
+    * **Kiến Trúc 2-Panel Song Song & Session Volume Profile (ADR-032):** Tách đôi màn hình: Panel Trái nến TradingView sạch sẽ 100% không bị che đè, tự động kẻ đường POC (Point of Control vàng), VAH, VAL; Panel Phải độc lập gồm 6 cột `[VOL | FLOW | GEX | VEX | CHEX | THETA]` đồng bộ 100% trục giá Y.
     * **Key Structural Boundary Lines:** Call Wall, Put Wall, Zero Gamma Flip $S^*$, Squeeze/Waterfall Triggers.
     * **Thanh Chỉ Huy Tác Chiến 3 Giây (4 Thẻ):** Đọc vị Regime, Wall, Flow, Action ngay lập tức.
     * **KHỐI 4 Spine & KHỐI 6:** Thước đo khoảng cách và Ma trận Tác chiến 4 Kèo (Squeeze, Fade, Rebound, Breakdown) kèm tính toán SL/TP/Lots tự động.

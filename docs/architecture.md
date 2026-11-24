@@ -242,6 +242,7 @@ Toàn bộ quá trình tiến hóa của hệ thống được ghi nhận qua 31
 | **ADR-029** | Simplified 3-Second Cockpit & Full Realtime Sync | Chấp thuận |
 | **ADR-030** | Cloudflare Worker Dual-Mode cTrader Feed Relay | Chấp thuận |
 | **ADR-031** | Real-time Vectorized Greeks & Elastic GEX Engine on Client JS | Chấp thuận |
+| **ADR-032** | Session Volume Profile (POC/VAH/VAL) & Side-by-Side 2-Panel Matrix Architecture | Chấp thuận |
 
 ---
 

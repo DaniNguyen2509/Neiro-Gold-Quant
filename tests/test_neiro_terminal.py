@@ -49,6 +49,9 @@ def test_render_neiro_orderflow_component():
     assert "neiro-view-container" in comp["neiro_container_html"]
     assert "neiro-tv-chart" in comp["neiro_container_html"]
     assert "neiro-canvas" in comp["neiro_container_html"]
+    assert "neiro-profile-wrapper" in comp["neiro_container_html"]
+    assert "neiro-profile-canvas" in comp["neiro_container_html"]
+    assert "btn-toggle-profile" in comp["nav_topbar_html"]
     assert "GAMMA SQUEEZE" in comp["neiro_container_html"]
     assert "neiro-floating-hud" in comp["neiro_container_html"]
 
@@ -62,6 +65,9 @@ def test_render_neiro_orderflow_component():
     assert "resampleBars" in comp["neiro_js_script"]
     assert "generateRealisticGoldCandles" in comp["neiro_js_script"]
     assert "drawNeiroOverlay" in comp["neiro_js_script"]
+    assert "drawNeiroProfilePanel" in comp["neiro_js_script"]
+    assert "computeVolumeProfile" in comp["neiro_js_script"]
+    assert "toggleProfilePanel" in comp["neiro_js_script"]
     assert "AIR POCKET VACUUM" in comp["neiro_js_script"]
 
 
@@ -597,6 +603,120 @@ console.log(JSON.stringify({
     assert res["gex2640_at2640"] > res["gex2640_at2680"], f"GEX elasticity failed: {res}"
     assert res["callWall"] >= 2640.0
     assert res["putWall"] <= 2680.0
+
+
+def test_adr032_volume_profile_and_side_by_side_panels(tmp_path):
+    """Verify ADR-032: 2-Panel Side-by-Side architecture & Volume Profile math."""
+    import shutil
+    import subprocess
+    import json
+
+    meta = {
+        "spot_price": 2650.0,
+        "atm_strike": 2650.0,
+        "call_wall": 2680.0,
+        "put_wall": 2620.0,
+        "zero_gamma_flip": 2650.0,
+        "air_pockets": [],
+    }
+    df = pd.DataFrame([
+        {"strike": 2640.0, "callVolume": 50, "putVolume": 50, "callOpenInterest": 100, "putOpenInterest": 100, "netGEX": -2.0, "netVEX": 0.5, "netCHEX": 0.1},
+        {"strike": 2650.0, "callVolume": 100, "putVolume": 100, "callOpenInterest": 500, "putOpenInterest": 500, "netGEX": 10.0, "netVEX": 2.0, "netCHEX": 0.5},
+        {"strike": 2660.0, "callVolume": 30, "putVolume": 30, "callOpenInterest": 200, "putOpenInterest": 200, "netGEX": 4.0, "netVEX": 0.8, "netCHEX": 0.2},
+    ])
+    comp = render_neiro_orderflow_component(meta, df)
+    js = comp["neiro_js_script"]
+    html = comp["neiro_container_html"]
+    topbar = comp["nav_topbar_html"]
+
+    # 1. Structural checks
+    assert "id=\"tv-chart-wrapper\"" in html
+    assert "id=\"neiro-profile-wrapper\"" in html
+    assert "id=\"neiro-profile-canvas\"" in html
+    assert "id=\"profile-poc-tag\"" in html
+    assert "id=\"btn-toggle-profile\"" in topbar
+    assert "toggleProfilePanel" in js
+    assert "computeVolumeProfile" in js
+    assert "drawNeiroProfilePanel" in js
+    assert "POC (Vol Max)" in js
+    assert "VAH (Vùng Giá Trị 70%)" in js
+    assert "VAL (Vùng Giá Trị 70%)" in js
+
+    # 2. Node.js unit execution of computeVolumeProfile algorithm
+    node_bin = shutil.which("node")
+    if not node_bin:
+        return
+
+    # Extract computeVolumeProfile function definition
+    fn_idx = js.find("function computeVolumeProfile(candles)")
+    assert fn_idx != -1
+    fn_end = js.find("function drawNeiroOverlay()", fn_idx)
+    assert fn_end != -1
+    fn_code = js[fn_idx:fn_end].strip()
+
+    harness = f"""
+    let window = {{
+        INITIAL_OPTIONS: [
+            {{ strike: 2640.0 }},
+            {{ strike: 2650.0 }},
+            {{ strike: 2660.0 }}
+        ]
+    }};
+    let document = {{
+        getElementById: function(id) {{
+            return {{ innerText: '' }};
+        }}
+    }};
+    let sessionPocPrice = null;
+    let sessionVahPrice = null;
+    let sessionValPrice = null;
+    let sessionPocVol = 0;
+    let sessionTotalVol = 0;
+    let sessionVolByStrike = {{}};
+
+    {fn_code}
+
+    const testCandles = [
+        {{ time: 100, open: 2649.0, high: 2651.0, low: 2648.5, close: 2650.5, volume: 500 }},
+        {{ time: 160, open: 2650.0, high: 2652.0, low: 2649.5, close: 2651.0, volume: 600 }},
+        {{ time: 220, open: 2651.0, high: 2658.0, low: 2651.0, close: 2657.0, volume: 150 }},
+        {{ time: 280, open: 2648.0, high: 2649.0, low: 2641.0, close: 2642.0, volume: 200 }},
+    ];
+
+    computeVolumeProfile(testCandles);
+
+    console.log(JSON.stringify({{
+        poc: sessionPocPrice,
+        pocVol: sessionPocVol,
+        vah: sessionVahPrice,
+        val: sessionValPrice,
+        totalVol: sessionTotalVol,
+        volByStrike: sessionVolByStrike
+    }}));
+    """
+    script_path = tmp_path / "test_vp_harness.js"
+    script_path.write_text(harness, encoding="utf-8")
+    out_path = tmp_path / "vp_out.txt"
+    err_path = tmp_path / "vp_err.txt"
+    with out_path.open("w", encoding="utf-8") as out_fh, err_path.open("w", encoding="utf-8") as err_fh:
+        rc = subprocess.call(
+            [node_bin, str(script_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=out_fh,
+            stderr=err_fh,
+            timeout=15,
+        )
+    out_txt = out_path.read_text(encoding="utf-8")
+    err_txt = err_path.read_text(encoding="utf-8")
+    assert rc == 0, f"Node harness failed: {err_txt or out_txt}"
+    res = json.loads(out_txt.strip())
+
+    assert res["poc"] is not None
+    assert res["pocVol"] > 0
+    assert res["totalVol"] == 1450
+    assert res["val"] <= res["poc"] <= res["vah"]
+    assert res["volByStrike"]["2650"] > res["volByStrike"]["2660"]
+
 
 
 

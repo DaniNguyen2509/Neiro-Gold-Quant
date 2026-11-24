@@ -49,6 +49,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
 | **Độ dốc Biến động (IV Skew)** | **Call Skew** | Nhu cầu mua Call OTM phòng hộ tăng vọt làm cong vểnh cánh Call IV. |
 | **Chu kỳ Đáo hạn Chính (Rollover)** | 5 tháng chẵn: **G, J, M, Q, Z** | Tháng 2, 4, 6, 8, 12 (Tháng 12 Z và Tháng 6 M là 2 kỳ hạn thanh khoản lớn nhất). |
 | **Lõi Toán Options & Động Hóa 0s** | **Black-76 Vectorized Engine (ADR-031)** | Lõi giải tích thuần Python & JavaScript, 0.001ms/lần, GEX co giãn động. |
+| **Giao Diện & Volume Profile (ADR-032)** | **2-Panel Side-by-Side + Session VP** | Tách chart nến sạch 70% và panel Profile 6 cột 30% [VOL|FLOW|GEX|VEX|CHEX|THETA], POC/VAH/VAL. |
 | **Chỉ số Biến động Hàm ý (IV)** | **`GVZ`** (`^GVZ`) | CBOE Gold Volatility Index (đo lường IV kỳ hạn 30 ngày của Vàng). |
 
 ---
