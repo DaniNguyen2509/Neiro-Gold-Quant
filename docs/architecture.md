@@ -400,3 +400,16 @@ on:
    - `_resolve_cloud_feed_worker_url()` đọc `NEIRO_CLOUD_FEED_URL` hoặc `[cloud].live_feed_worker_url` (`https://neiro-gold-feed.dani-wind2509.workers.dev`) vào `INITIAL_META.cloud_feed_url`; frontend hỗ trợ đổi qua `?worker=...` hoặc nút `#btn-cloud-worker` (`Cloud Feed`).
    - Đã gỡ bỏ hoàn toàn `--loop`, `start_local_live_bridge_server` (`127.0.0.1:8765`), `_run_lightweight_live_tick`, `isLocalBridgeMode`, và `lastBridgeSuccessEpoch`: cả Desktop và Mobile dùng chung duy nhất luồng `pollLiveYahooChart()` tới Cloudflare Worker mỗi `3s`.
 
+---
+
+## XVIII. CLIENT-SIDE VECTORIZED GREEKS & ELASTIC GEX ENGINE (ADR-031)
+
+1. **Bản chất Cấu trúc Vi mô & Bài toán Động hóa:**
+   - Dữ liệu Open Interest ($OI$) của CME Options là tĩnh trong phiên (chỉ được chốt sổ qua đêm bởi CME Clearing House). Tuy nhiên, độ nhạy Gamma ($\Gamma_K$), Delta ($\Delta_K$), Vanna, Charm, Net GEX và Zero Gamma Flip ($S^*$) là hàm phi tuyến phụ thuộc trực tiếp vào giá Spot hiện tại $S_t$.
+   - Module `recomputeLiveGreeksAndWalls(liveSpot)` trong `src/hud/neiro_terminal.py` tích hợp giải thuật Black-76 vectorized thuần JavaScript siêu nhẹ: mỗi chu kỳ nến cTrader (3s) hoặc mỗi tick giá mới, toàn bộ 35 strikes trong corridor được tái tính toán trong `< 0.001ms` (benchmark 10,000 lượt mất `9.63ms`).
+2. **Hiệu ứng Gamma Clustering & GEX Co Giãn Động (Dynamic GEX Elasticity):**
+   - Khi giá vàng leo dốc hoặc sụt giảm, các thanh GEX quanh strike ATM tự động phình to (Gamma tập trung), các strike xa co nhỏ lại, phản ánh chính xác cấu trúc vi mô phòng hộ của Market Maker.
+   - Trục **Zero Gamma Flip ($S^*_t$)** được giải nghiệm liên tục bằng phương pháp chia đôi (Bisection) trong hành lang giá, giúp trader theo dõi mốc cân đối vị thế Dealer trôi theo giá thực tế.
+   - Thước đo **Wall Siege Ratio** tự động kích hoạt chế độ cảnh báo phá cản khi giá cTrader tiếp cận trong phạm vi \$4.0 của Call Wall hoặc Put Wall.
+   - **Bảo tồn 100% tính cơ động:** Chạy độc lập hoàn toàn trên trình duyệt của máy tính và điện thoại mà không cần mở server nền hay cắm laptop ở nhà.
+

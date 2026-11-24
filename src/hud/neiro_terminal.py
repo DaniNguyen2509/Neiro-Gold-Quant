@@ -1256,10 +1256,190 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }};
     }}
 
+    // ----------------------------------------------------------------------------
+    // Realtime Vectorized Black-76 Greeks Engine: Dynamic GEX, Walls & Flip S*
+    // ----------------------------------------------------------------------------
+    function recomputeLiveGreeksAndWalls(liveSpot) {{
+        if (!liveSpot || isNaN(liveSpot) || liveSpot <= 0) return;
+        const opts = window.INITIAL_OPTIONS;
+        if (!Array.isArray(opts) || opts.length === 0) return;
+        const m = window.INITIAL_META || {{}};
+
+        // Preserve initial baseline walls as fallback reference
+        if (m.baseline_call_wall === undefined) m.baseline_call_wall = m.call_wall;
+        if (m.baseline_put_wall === undefined) m.baseline_put_wall = m.put_wall;
+        if (m.baseline_zero_gamma === undefined) m.baseline_zero_gamma = m.zero_gamma_flip;
+
+        const dteDays = Math.max(1.0, Number(m.dte_days || 30.0));
+        const T = Math.max(dteDays / 365.0, 1.0 / 365.0);
+        const r = 0.045;
+        const sqrtT = Math.sqrt(T);
+        const dfDisc = Math.exp(-r * T);
+        const scale = (liveSpot * liveSpot) * 0.01 / 1e6 * 100.0;
+
+        let totalGex = 0.0;
+        let totalVex = 0.0;
+        let totalChex = 0.0;
+        let totalNetDelta = 0.0;
+
+        let bestCallPower = -1;
+        let bestCallStrike = Number(m.call_wall || (liveSpot + 50));
+        let bestCallOi = Number(m.call_wall_oi || 0);
+
+        let bestPutPower = -1;
+        let bestPutStrike = Number(m.put_wall || (liveSpot - 50));
+        let bestPutOi = Number(m.put_wall_oi || 0);
+
+        for (let i = 0; i < opts.length; i++) {{
+            const o = opts[i];
+            const K = Number(o.strike || 0);
+            if (K <= 0) continue;
+
+            const cOi = Number(o.c_oi || 0);
+            const pOi = Number(o.p_oi || 0);
+            const iv = Math.max(0.01, Math.min(1.5, Number(o.c_iv || o.p_iv || 0.16)));
+            const denom = Math.max(1e-5, iv * sqrtT);
+            const halfSig2T = 0.5 * (iv * iv) * T;
+
+            const d1 = (Math.log(liveSpot / K) + halfSig2T) / denom;
+            const d2 = d1 - denom;
+            const pdf = (1.0 / Math.sqrt(2.0 * Math.PI)) * Math.exp(-0.5 * d1 * d1);
+            const gamma = (dfDisc * pdf) / Math.max(1e-4, liveSpot * denom);
+
+            // Vectorized GEX (in Millions USD per 1% move)
+            const cGex = gamma * cOi * scale;
+            const pGex = -(gamma * pOi * scale);
+            const netGex = cGex + pGex;
+            o.currentNetGEX = netGex;
+            o.c_gamma = gamma;
+            o.p_gamma = gamma;
+            totalGex += netGex;
+
+            // Vectorized Delta & DEX
+            const cdfD1 = normCdf(d1);
+            const cDelta = dfDisc * cdfD1;
+            const pDelta = cDelta - dfDisc;
+            o.c_delta = cDelta;
+            o.p_delta = pDelta;
+            const netDelta = (cOi * cDelta) + (pOi * pDelta);
+            o.netDelta = netDelta;
+            totalNetDelta += netDelta;
+
+            // Vectorized Vanna (VEX) & Charm (CHEX)
+            const vanna = -dfDisc * pdf * (d2 / iv);
+            const netVex = vanna * (cOi - pOi) * scale * 0.1;
+            o.currentNetVEX = netVex;
+            totalVex += netVex;
+
+            const charm = dfDisc * pdf * ((2.0 * r * T - d2 * iv * sqrtT) / (2.0 * T * denom));
+            const netChex = -charm * (cOi - pOi) * scale * 0.05;
+            o.currentNetCHEX = netChex;
+            totalChex += netChex;
+
+            // Dynamic Gamma-Weighted Walls (True Gamma Power = OI * Gamma)
+            const cPow = cOi * gamma;
+            const pPow = pOi * gamma;
+            if (K >= liveSpot && cPow > bestCallPower && cOi > 50) {{
+                bestCallPower = cPow;
+                bestCallStrike = K;
+                bestCallOi = cOi;
+            }}
+            if (K <= liveSpot && pPow > bestPutPower && pOi > 50) {{
+                bestPutPower = pPow;
+                bestPutStrike = K;
+                bestPutOi = pOi;
+            }}
+        }}
+
+        // Update Live Total GEX, VEX, CHEX
+        m.total_net_gex = totalGex;
+        m.total_net_vex = totalVex;
+        m.total_net_chex = totalChex;
+        m.regime = totalGex >= 10.0 ? 'LONG_GAMMA' : (totalGex <= -10.0 ? 'SHORT_GAMMA' : 'NEUTRAL');
+
+        // Update Walls only if not already provided by authoritative global CME snapshot
+        if (!m.call_wall && bestCallPower > 0) {{
+            m.call_wall = bestCallStrike;
+            m.call_wall_oi = bestCallOi;
+        }}
+        if (!m.put_wall && bestPutPower > 0) {{
+            m.put_wall = bestPutStrike;
+            m.put_wall_oi = bestPutOi;
+        }}
+
+        // Live Zero Gamma Flip Solver (Bisection search in [liveSpot - 180, liveSpot + 180])
+        function netGexAt(s) {{
+            let sumG = 0;
+            const sc = (s * s) * 0.01 / 1e6 * 100.0;
+            for (let j = 0; j < opts.length; j++) {{
+                const oj = opts[j];
+                const k = Number(oj.strike);
+                if (k <= 0) continue;
+                const iv = Math.max(0.01, Number(oj.c_iv || oj.p_iv || 0.16));
+                const den = Math.max(1e-5, iv * sqrtT);
+                const d1Val = (Math.log(s / k) + 0.5 * (iv * iv) * T) / den;
+                const p = (1.0 / Math.sqrt(2.0 * Math.PI)) * Math.exp(-0.5 * d1Val * d1Val);
+                const gam = (dfDisc * p) / Math.max(1e-4, s * den);
+                sumG += (gam * Number(oj.c_oi || 0) * sc) - (gam * Number(oj.p_oi || 0) * sc);
+            }}
+            return sumG;
+        }}
+
+        let lowS = liveSpot - 180.0;
+        let highS = liveSpot + 180.0;
+        let fLow = netGexAt(lowS);
+        let fHigh = netGexAt(highS);
+        if (fLow * fHigh <= 0) {{
+            for (let iter = 0; iter < 24; iter++) {{
+                const midS = (lowS + highS) / 2.0;
+                const fMid = netGexAt(midS);
+                if (Math.abs(fMid) < 0.05 || (highS - lowS) < 0.25) {{
+                    m.zero_gamma_flip = Math.round(midS * 10) / 10;
+                    break;
+                }}
+                if (fLow * fMid < 0) {{
+                    highS = midS;
+                    fHigh = fMid;
+                }} else {{
+                    lowS = midS;
+                    fLow = fMid;
+                }}
+            }}
+        }}
+
+        // Real-time Intraday Wall Siege Ratio update based on price proximity
+        const distCallWall = Math.abs(liveSpot - m.call_wall);
+        const distPutWall = Math.abs(liveSpot - m.put_wall);
+        const baselineCallSiege = Number(m.baseline_call_wall_siege || m.call_wall_siege || 0.05);
+        const baselinePutSiege = Number(m.baseline_put_wall_siege || m.put_wall_siege || 0.05);
+        if (m.baseline_call_wall_siege === undefined) m.baseline_call_wall_siege = baselineCallSiege;
+        if (m.baseline_put_wall_siege === undefined) m.baseline_put_wall_siege = baselinePutSiege;
+
+        if (distCallWall <= 4.0) {{
+            const proximityBoost = (4.0 - distCallWall) / 4.0 * 0.25;
+            m.call_wall_siege = Math.max(baselineCallSiege, Math.min(1.5, baselineCallSiege + proximityBoost));
+        }}
+        if (distPutWall <= 4.0) {{
+            const proximityBoost = (4.0 - distPutWall) / 4.0 * 0.25;
+            m.put_wall_siege = Math.max(baselinePutSiege, Math.min(1.5, baselinePutSiege + proximityBoost));
+        }}
+
+        // Sync DOM KPI elements
+        const gCol = totalGex >= 0 ? '#4ADE80' : '#F87171';
+        const gTxt = '$' + (totalGex >= 0 ? '+' : '') + totalGex.toFixed(1) + 'M';
+        const elKpi = document.getElementById('kpi-gex-val');
+        const elHud = document.getElementById('hud-gex-val');
+        if (elKpi) {{ elKpi.innerText = gTxt; elKpi.style.color = gCol; }}
+        if (elHud) {{ elHud.innerText = gTxt; elHud.style.color = gCol; }}
+    }}
+
     function updateRealtimeTacticalCockpit() {{
         const m = window.INITIAL_META || {{}};
         const spot = Number(currentGoldPrice || m.spot || 0);
         if (!spot) return;
+
+        // 0. Recompute Real-time Black-76 Greeks & Elastic GEX Profile on Live Spot
+        recomputeLiveGreeksAndWalls(spot);
 
         const dteDays = Number(m.dte_days || 8.0);
         const callWall = Number(m.call_wall || spot + 50);

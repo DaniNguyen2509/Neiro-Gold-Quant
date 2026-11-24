@@ -494,4 +494,110 @@ console.log(JSON.stringify({
     assert res["priceAfterStalePatch"] == 3825.5
 
 
+def test_recompute_live_greeks_and_walls_vectorized_js(tmp_path):
+    import json
+    import shutil
+    import subprocess
+    meta = {
+        "spot_price": 2640.0,
+        "atm_strike": 2640.0,
+        "call_wall": 2700.0,
+        "call_wall_oi": 5200,
+        "call_wall_siege": 0.18,
+        "put_wall": 2600.0,
+        "put_wall_oi": 4800,
+        "put_wall_siege": 0.12,
+        "total_net_gex": 18.5,
+        "total_net_vex": 4.2,
+        "total_net_chex": 1.5,
+        "expected_move_1s": 32.0,
+        "rule16_daily_move": 14.5,
+        "strike_above": 2660.0,
+        "next_above": 2680.0,
+        "strike_below": 2620.0,
+        "next_below": 2600.0,
+        "zero_gamma_flip": 2630.0,
+        "dte_days": 8.0,
+        "air_pockets": [],
+    }
+    df = pd.DataFrame([
+        {"strike": 2600.0, "callOpenInterest": 600, "putOpenInterest": 3500, "callVolume": 150, "putVolume": 600, "netGEX": -12.0, "netVEX": -1.2, "netCHEX": -0.5},
+        {"strike": 2640.0, "callOpenInterest": 3200, "putOpenInterest": 1200, "callVolume": 800, "putVolume": 750, "netGEX": 25.0, "netVEX": 3.1, "netCHEX": 1.1},
+        {"strike": 2680.0, "callOpenInterest": 4500, "putOpenInterest": 300, "callVolume": 900, "putVolume": 200, "netGEX": 18.0, "netVEX": 2.3, "netCHEX": 0.8},
+    ])
+    comp = render_neiro_orderflow_component(meta, df)
+    js = comp["neiro_js_script"]
+    assert "recomputeLiveGreeksAndWalls" in js
+    assert "recomputeLiveGreeksAndWalls(spot)" in js
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        return
+
+    js_body = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
+    harness = r"""
+global.window = global;
+global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+global.requestAnimationFrame = () => {};
+global.setInterval = () => {};
+global.setTimeout = () => {};
+global.addEventListener = () => {};
+global.LightweightCharts = { LineStyle: { Dashed: 1, Solid: 0 } };
+""" + js_body + r"""
+let docElements = {};
+global.document = {
+    getElementById: (id) => {
+        if (!docElements[id]) docElements[id] = { innerText: '', style: {} };
+        return docElements[id];
+    },
+    querySelectorAll: () => []
+};
+
+// 1. Initial State at 2640
+recomputeLiveGreeksAndWalls(2640.0);
+const gex2640_at2640 = window.INITIAL_OPTIONS.find(o => o.strike === 2640).currentNetGEX;
+const gex2680_at2640 = window.INITIAL_OPTIONS.find(o => o.strike === 2680).currentNetGEX;
+const totalGex_at2640 = window.INITIAL_META.total_net_gex;
+
+// 2. Price jumps to 2680
+recomputeLiveGreeksAndWalls(2680.0);
+const gex2640_at2680 = window.INITIAL_OPTIONS.find(o => o.strike === 2640).currentNetGEX;
+const gex2680_at2680 = window.INITIAL_OPTIONS.find(o => o.strike === 2680).currentNetGEX;
+const totalGex_at2680 = window.INITIAL_META.total_net_gex;
+
+console.log(JSON.stringify({
+    gex2640_at2640,
+    gex2680_at2640,
+    totalGex_at2640,
+    gex2640_at2680,
+    gex2680_at2680,
+    totalGex_at2680,
+    callWall: window.INITIAL_META.call_wall,
+    putWall: window.INITIAL_META.put_wall,
+    zeroGammaFlip: window.INITIAL_META.zero_gamma_flip
+}));
+"""
+    script_path = tmp_path / "test_greeks_harness.js"
+    script_path.write_text(harness, encoding="utf-8")
+    out_path = tmp_path / "greeks_out.txt"
+    err_path = tmp_path / "greeks_err.txt"
+    with out_path.open("w", encoding="utf-8") as out_fh, err_path.open("w", encoding="utf-8") as err_fh:
+        rc = subprocess.call(
+            [node_bin, str(script_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=out_fh,
+            stderr=err_fh,
+            timeout=15,
+        )
+    stdout_txt = out_path.read_text(encoding="utf-8")
+    stderr_txt = err_path.read_text(encoding="utf-8")
+    assert rc == 0, f"Node harness failed: {stderr_txt or stdout_txt}"
+    res = json.loads(stdout_txt.strip())
+    assert res["gex2680_at2680"] > res["gex2680_at2640"], f"GEX elasticity failed: {res}"
+    assert res["gex2640_at2640"] > res["gex2640_at2680"], f"GEX elasticity failed: {res}"
+    assert res["callWall"] >= 2640.0
+    assert res["putWall"] <= 2680.0
+
+
+
 
