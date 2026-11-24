@@ -215,7 +215,34 @@ def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
         if _cached_futures is not None and (now_mono - _last_fetch_futures_mono) < _CACHE_TTL_S:
             return _cached_futures
 
-    # Method 1: Direct native HTTP query to Yahoo Finance chart endpoints (zero dependencies)
+    # Method 1: Query Neiro Cloud Feed Relay (Pepperstone cTrader Demo XAUUSDF / 0s real-time)
+    relay_urls = [
+        "https://neiro-gold-feed.dani-wind2509.workers.dev/health",
+        "https://neiro-gold-feed.dani-wind2509.workers.dev/api/yahoo_gc?tf=1m",
+    ]
+    for r_url in relay_urls:
+        try:
+            req = urllib.request.Request(
+                r_url,
+                headers={"User-Agent": "Mozilla/5.0 Neiro-Quant/2.0", "Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    raw_b = resp.read()
+                    data = json.loads(raw_b.decode("utf-8"))
+                    price = data.get("live_spot_price") or data.get("latest_price")
+                    if price is None and "candles" in data and data["candles"]:
+                        price = data["candles"][-1].get("close")
+                    if price is not None and float(price) > 500.0:
+                        p = round(float(price), 2)
+                        with _cache_lock:
+                            _cached_futures = p
+                            _last_fetch_futures_mono = time.monotonic()
+                        return p
+        except Exception as e:
+            logger.debug("Cloud relay cTrader fetch from %s failed: %s", r_url, e)
+
+    # Method 2: Direct HTTP query to chart endpoints (zero external library dependencies)
     chart_urls = [
         "https://query1.finance.yahoo.com/v8/finance/chart/GC=F",
         "https://query2.finance.yahoo.com/v8/finance/chart/GC=F",
@@ -236,31 +263,6 @@ def fetch_live_cme_futures_price(timeout: float = 4.0) -> Optional[float]:
                         return p
         except Exception as e:
             logger.debug("Direct HTTP fetch from %s failed: %s", url, e)
-
-    # Method 2: Fallback to yfinance if installed
-    try:
-        import yfinance as yf
-        ticker = yf.Ticker("GC=F")
-        info = ticker.fast_info
-        last_price = None
-        if hasattr(info, "get"):
-            last_price = info.get("lastPrice") or info.get("last_price")
-        if last_price is None:
-            last_price = getattr(info, "last_price", None) or getattr(info, "lastPrice", None)
-        if last_price is None:
-            try:
-                last_price = info["last_price"]
-            except Exception:
-                pass
-
-        if last_price is not None and float(last_price) > 500.0:
-            price = round(float(last_price), 2)
-            with _cache_lock:
-                _cached_futures = price
-                _last_fetch_futures_mono = time.monotonic()
-            return price
-    except Exception as e:
-        logger.debug("Live CME futures fetch via yfinance failed: %s", e)
 
     return None
 

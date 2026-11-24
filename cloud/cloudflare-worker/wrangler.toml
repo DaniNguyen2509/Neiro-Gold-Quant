@@ -5,10 +5,8 @@ compatibility_date = "2024-11-01"
 compatibility_flags = ["allow_custom_ports"]
 
 [vars]
-# "auto" = Yahoo GC=F while OAuth token is not yet authorized, then STRICT Pepperstone cTrader XAUUSDF (no Yahoo mixing)
-# "ctrader_only" = forbid Yahoo even before OAuth authorization (returns 503 until /callback stores token)
-# "yahoo" = force Yahoo GC=F (diagnostic / fallback override)
-FEED_MODE = "auto"
+# "ctrader_only" = forbid Yahoo, strictly enforce Pepperstone cTrader XAUUSDF
+FEED_MODE = "ctrader_only"
 # Always keep "demo" unless you explicitly choose a read-only Live token
 CTRADER_ENV = "demo"
 CTRADER_SYMBOL = "XAUUSDF"

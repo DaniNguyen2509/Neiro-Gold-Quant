@@ -52,7 +52,7 @@ def test_wrangler_toml_free_tier_custom_ports_and_sqlite_do():
     toml_txt = WRANGLER_TOML.read_text(encoding="utf-8")
     assert 'compatibility_flags = ["allow_custom_ports"]' in toml_txt
     assert 'new_sqlite_classes = ["CTraderFeedDO"]' in toml_txt
-    assert 'FEED_MODE = "auto"' in toml_txt
+    assert 'FEED_MODE = "ctrader_only"' in toml_txt
     assert 'CTRADER_ENV = "demo"' in toml_txt
     assert 'CTRADER_SYMBOL = "XAUUSDF"' in toml_txt
 

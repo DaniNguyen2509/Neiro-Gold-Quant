@@ -207,47 +207,21 @@ class GoldCollector:
         gvz_iv = 18.5
 
         try:
-            import yfinance as yf
-            # 1. Fetch GLD Spot
-            tk_gld = yf.Ticker(self.symbol)
-            fast_gld = getattr(tk_gld, "fast_info", None)
-            if fast_gld and "lastPrice" in fast_gld and fast_gld["lastPrice"] is not None:
-                spot_gld = float(fast_gld["lastPrice"])
-            else:
-                hist_gld = tk_gld.history(period="1d")
-                if not hist_gld.empty:
-                    spot_gld = float(hist_gld["Close"].iloc[-1])
-
-            # 2. Fetch Gold Futures (GC=F)
-            tk_gc = yf.Ticker(self.futures_symbol)
-            fast_gc = getattr(tk_gc, "fast_info", None)
-            if fast_gc and "lastPrice" in fast_gc and fast_gc["lastPrice"] is not None:
-                futures_gc = float(fast_gc["lastPrice"])
-            else:
-                hist_gc = tk_gc.history(period="1d")
-                if not hist_gc.empty:
-                    futures_gc = float(hist_gc["Close"].iloc[-1])
-
-            # 3. Fetch Treasury 13-Week Bill (^IRX) for dynamic risk-free rate
-            try:
-                tk_irx = yf.Ticker("^IRX")
-                fast_irx = getattr(tk_irx, "fast_info", None)
-                if fast_irx and "lastPrice" in fast_irx and fast_irx["lastPrice"] is not None:
-                    r_rate = float(fast_irx["lastPrice"]) / 100.0
-            except Exception:
-                pass
-
-            # 4. Fetch CBOE Gold Volatility Index (^GVZ)
-            try:
-                tk_gvz = yf.Ticker(self.volatility_symbol)
-                fast_gvz = getattr(tk_gvz, "fast_info", None)
-                if fast_gvz and "lastPrice" in fast_gvz and fast_gvz["lastPrice"] is not None:
-                    gvz_iv = float(fast_gvz["lastPrice"])
-            except Exception:
-                pass
-
+            # Query the Neiro Cloud Feed Relay (Pepperstone cTrader Demo XAUUSDF / 0s real-time)
+            import urllib.request
+            req = urllib.request.Request(
+                "https://neiro-gold-feed.dani-wind2509.workers.dev/health",
+                headers={"User-Agent": "Mozilla/5.0 Neiro-Quant/2.0", "Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                if resp.status == 200:
+                    h_data = json.loads(resp.read().decode("utf-8"))
+                    live_p = h_data.get("live_spot_price")
+                    if live_p and float(live_p) > 500.0:
+                        futures_gc = float(live_p)
+                        spot_gld = round(futures_gc / self.basis_ratio, 2)
         except Exception as e:
-            print(f"[GoldCollector] Notice: Live fetch encountered ({e}). Using robust fallback values.")
+            print(f"[GoldCollector] Notice: Live cloud cTrader fetch encountered ({e}). Using robust fallback values.")
 
         # Ensure valid range
         spot_gld = max(100.0, spot_gld)

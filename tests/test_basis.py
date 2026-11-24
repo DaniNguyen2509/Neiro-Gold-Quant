@@ -292,14 +292,13 @@ def test_fetch_live_cme_futures_price_mock_success():
 
 
 def test_fetch_live_cme_futures_price_mock_failure():
-    """When both HTTP and yfinance fail, returns None without crashing."""
+    """When both HTTP and fallback fail, returns None without crashing."""
     from src.quant_engine.basis import clear_spot_cache, fetch_live_cme_futures_price
 
     clear_spot_cache()
     with mock.patch("urllib.request.urlopen", side_effect=RuntimeError("HTTP error")):
-        with mock.patch("yfinance.Ticker", side_effect=RuntimeError("yfinance error")):
-            price = fetch_live_cme_futures_price()
-            assert price is None
+        price = fetch_live_cme_futures_price()
+        assert price is None
 
 
 def test_fetch_live_cme_m5_tape_mock_success():
