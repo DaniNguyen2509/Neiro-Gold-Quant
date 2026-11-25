@@ -1,23 +1,23 @@
 {
-  "timestamp_utc": "2026-11-25T16:02:15.897331+00:00",
-  "synced_at_vn": "25/11/2026 23:02:15 VN",
-  "spot_price": 3475.95,
+  "timestamp_utc": "2026-11-25T16:08:20.297204+00:00",
+  "synced_at_vn": "25/11/2026 23:08:20 VN",
+  "spot_price": 3476.9,
   "atm_strike": 3475.0,
   "call_wall": 3600.0,
   "put_wall": 3450.0,
-  "call_wall_siege": 0.26,
+  "call_wall_siege": 0.3,
   "put_wall_siege": 1.27,
-  "zero_gamma_flip": 3846.2,
+  "zero_gamma_flip": 3845.25,
   "regime": "SHORT_GAMMA",
-  "total_net_gex": -344.517029456105,
-  "total_net_vex": 102.47789395757562,
-  "total_net_chex": -64.27717884414287,
+  "total_net_gex": -339.29446311002886,
+  "total_net_vex": 108.6760453442945,
+  "total_net_chex": -78.95861645942117,
   "strike_above": 3480.0,
   "next_above": 3485.0,
   "strike_below": 3475.0,
   "next_below": 3470.0,
   "step": 5.0,
-  "dte_days": 2.1442739903472225,
+  "dte_days": 2.140056809826389,
   "contract_symbol": "GCG27",
   "option_symbol": "OGZ26",
   "expiration_date": "OGZ26 (2026-11-27)",
@@ -28,27 +28,27 @@
   "has_up_air_pocket": true,
   "has_down_air_pocket": true,
   "atr_5m": 6.5,
-  "expected_move_1s": 102.95810462145644,
-  "implied_forward_price": 3472.36,
-  "forward_dislocation_usd": -3.59,
-  "dealer_hedge_futures_flow": 114.3,
-  "bvc_cvd_contracts": 219.6,
-  "bvc_buy_pct": 52.8,
-  "vpin_pct": 18.8,
-  "vpin_label": "\ud83d\udfe2 VPIN 18.8% [NHI\u1ec4U \u0110\u00c1M \u0110\u00d4NG \u2014 AN TO\u00c0N FADE WALL]",
-  "kyle_lambda_ols": 10.3,
-  "kyle_lambda_label": "THANH KHO\u1ea2N S\u1ed4 L\u1ec6NH B\u00ccNH TH\u01af\u1edcNG (\u03bb_OLS=10.30)",
+  "expected_move_1s": 99.11775462217369,
+  "implied_forward_price": 3477.87,
+  "forward_dislocation_usd": 0.97,
+  "dealer_hedge_futures_flow": -2435.5,
+  "bvc_cvd_contracts": 48.9,
+  "bvc_buy_pct": 50.6,
+  "vpin_pct": 16.7,
+  "vpin_label": "\ud83d\udfe2 VPIN 16.7% [NHI\u1ec4U \u0110\u00c1M \u0110\u00d4NG \u2014 AN TO\u00c0N FADE WALL]",
+  "kyle_lambda_ols": 9.79,
+  "kyle_lambda_label": "THANH KHO\u1ea2N S\u1ed4 L\u1ec6NH B\u00ccNH TH\u01af\u1edcNG (\u03bb_OLS=9.79)",
   "flip_integrity_label": "\u26a1 V\u00d9NG \u00c2M GAMMA (D\u01af\u1edaI FLIP): MM KHU\u1ebeCH \u0110\u1ea0I BI\u1ebeN \u0110\u1ed8NG \u2014 CH\u1edc \u0110\u1ed2NG THU\u1eacN",
   "flip_integrity_color": "#FACC15",
   "dynamic_vacuum": {
     "vacuum_active": false,
     "regime": "NORMAL_DEPTH",
-    "label_vi": "\u0110\u1ed8 S\u00c2U TH\u1eca TR\u01af\u1edcNG \u1ed4N \u0110\u1ecaNH (RS Z=+1.0)",
-    "illiq_latest": 9e-07,
+    "label_vi": "\u0110\u1ed8 S\u00c2U TH\u1eca TR\u01af\u1edcNG \u1ed4N \u0110\u1ecaNH (RS Z=-1.1)",
+    "illiq_latest": 1.11e-06,
     "illiq_q95": 5.06e-06,
-    "illiq_percentile": 22.0,
-    "rs_latest": 0.001281,
-    "rs_z_score": 0.98,
+    "illiq_percentile": 33.9,
+    "rs_latest": 0.000515,
+    "rs_z_score": -1.14,
     "session_tag": "NY_COMEX_DEEP",
     "vacuum_bar_times": [
       1795619700
@@ -106,54 +106,6 @@
   },
   "market_open": true,
   "recent_candles": [
-    {
-      "time": 1795618920,
-      "open": 3493.15,
-      "high": 3494.2,
-      "low": 3490.15,
-      "close": 3491.3,
-      "volume": 340
-    },
-    {
-      "time": 1795618980,
-      "open": 3491.15,
-      "high": 3495.45,
-      "low": 3490.65,
-      "close": 3494.65,
-      "volume": 382
-    },
-    {
-      "time": 1795619040,
-      "open": 3494.95,
-      "high": 3498.9,
-      "low": 3494.7,
-      "close": 3497.9,
-      "volume": 350
-    },
-    {
-      "time": 1795619100,
-      "open": 3497.95,
-      "high": 3500.05,
-      "low": 3493.95,
-      "close": 3493.95,
-      "volume": 362
-    },
-    {
-      "time": 1795619160,
-      "open": 3493.7,
-      "high": 3498.8,
-      "low": 3491.25,
-      "close": 3498.4,
-      "volume": 408
-    },
-    {
-      "time": 1795619220,
-      "open": 3498.45,
-      "high": 3499.1,
-      "low": 3495.7,
-      "close": 3498.6,
-      "volume": 354
-    },
     {
       "time": 1795619280,
       "open": 3498.55,
@@ -583,8 +535,56 @@
       "open": 3475.0,
       "high": 3476.3,
       "low": 3471.05,
-      "close": 3475.95,
+      "close": 3472.85,
       "volume": 334
+    },
+    {
+      "time": 1795622520,
+      "open": 3473.1,
+      "high": 3477.4,
+      "low": 3472.3,
+      "close": 3475.25,
+      "volume": 330
+    },
+    {
+      "time": 1795622580,
+      "open": 3475.55,
+      "high": 3477.6,
+      "low": 3474.65,
+      "close": 3475.75,
+      "volume": 332
+    },
+    {
+      "time": 1795622640,
+      "open": 3475.4,
+      "high": 3479.25,
+      "low": 3473.9,
+      "close": 3478.05,
+      "volume": 324
+    },
+    {
+      "time": 1795622700,
+      "open": 3477.95,
+      "high": 3478.9,
+      "low": 3476.75,
+      "close": 3478.7,
+      "volume": 332
+    },
+    {
+      "time": 1795622760,
+      "open": 3478.6,
+      "high": 3479.8,
+      "low": 3477.05,
+      "close": 3478.1,
+      "volume": 320
+    },
+    {
+      "time": 1795622820,
+      "open": 3477.85,
+      "high": 3478.3,
+      "low": 3475.7,
+      "close": 3476.9,
+      "volume": 310
     }
   ]
 }
