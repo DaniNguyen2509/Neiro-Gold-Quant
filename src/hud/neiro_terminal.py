@@ -44,6 +44,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     zero_gamma = float(meta.get("zero_gamma_flip", spot))
     gvz_iv = float(meta.get("gvz_iv") or (float(meta.get("sigma_atm", 0.241)) * 100.0))
     air_pockets = meta.get("air_pockets", [])
+    contract_symbol = str(meta.get("contract_symbol") or "GCZ26")
+    option_symbol_val = str(meta.get("option_symbol") or "")
+    expiration_date_val = str(meta.get("expiration_date") or "")
+    expiration_iso_val = str(meta.get("expiration_date_iso") or "")
 
     total_net_delta = float(meta.get("total_net_delta_contracts", 0.0) or (df["netDeltaContracts"].sum() if "netDeltaContracts" in df.columns else 0.0))
     total_vol = int(df["callVolume"].sum() + df["putVolume"].sum()) if ("callVolume" in df.columns and "putVolume" in df.columns) else 0
@@ -358,7 +362,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     <!-- Authentic Greeks Subbar -->
     <div class="neiro-win-subbar">
         <div class="neiro-subbar-left">
-            <span class="neiro-watermark-text" style="color:#38BDF8; font-weight:700;">NEIRO-QUANT TERMINAL &bull; CME GOLD FUTURES [GC=F / GCZ26]</span>
+            <span id="subbar-contract-label" class="neiro-watermark-text" style="color:#38BDF8; font-weight:700;">NEIRO-QUANT TERMINAL &bull; CME GOLD FUTURES [GC=F / {contract_symbol}]</span>
         </div>
         <div class="neiro-subbar-right">
             <span style="color:#64748B;">ATM: <b id="top-ticker-atm">${atm_strike:,.0f}</b> | IV: <b id="top-ticker-iv">{gvz_iv:.1f}%</b> | Zero Gamma: <b style="color:#FACC15;">${zero_gamma:,.1f}</b> | 1-&sigma;: <b id="kpi-move-val" style="color:#FACC15;">&plusmn;${expected_move:,.1f}</b></span>
@@ -503,6 +507,10 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         "market_open": market_open_flag,
         "regime": regime_val,
         "dte_days": dte_days_val,
+        "contract_symbol": contract_symbol,
+        "option_symbol": option_symbol_val,
+        "expiration_date": expiration_date_val,
+        "expiration_date_iso": expiration_iso_val,
         "step": step_val,
         "atr_5m": atr_5m_val,
         "major_up_wall": major_up_wall_val,
@@ -2307,24 +2315,6 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         // chartW leaves room for the Lightweight Charts price scale (65px) on the right
         const chartW = Math.max(100, w - 65);
 
-        // Live Candle Orderflow Footprint Badge right next to current F0 LIVE price line
-        const yLive = candleSeries.priceToCoordinate(currentGoldPrice);
-        if (yLive !== null && yLive >= 36 && yLive <= h - 24) {{
-            const fpTxt = '⚡ Δ ' + (liveCandleDelta >= 0 ? '+' : '') + liveCandleDelta.toFixed(1) + ' HĐ | CVD ' + (liveCvdContracts >= 0 ? '+' : '') + Math.round(liveCvdContracts) + ' | VPIN ' + liveVpinPct.toFixed(1) + '%';
-            ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
-            const fpW = ctx.measureText(fpTxt).width + 12;
-            const fpX = Math.max(14, chartW - fpW - 10);
-            const fpY = Math.max(30, yLive + 4);
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-            ctx.fillRect(fpX, fpY, fpW, 15);
-            ctx.strokeStyle = liveCandleDelta >= 0 ? '#22C55E' : '#F43F5E';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(fpX, fpY, fpW, 15);
-            ctx.textAlign = 'left';
-            ctx.fillStyle = liveCandleDelta >= 0 ? '#4ADE80' : '#FB7185';
-            ctx.fillText(fpTxt, fpX + 6, fpY + 11);
-        }}
-
         // 1. Always-On Air Pocket Vacuum Matrix (Across the pure chart canvas)
         const airPockets = m.air_pockets || [];
         airPockets.forEach(ap => {{
@@ -3170,6 +3160,32 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const allowLiveMarketState = Boolean(opts.forceLive || !streamLive);
 
         if (allowLiveMarketState && data.market_open !== undefined) m.market_open = Boolean(data.market_open);
+        if (data.dte_days) m.dte_days = Number(data.dte_days);
+        const rolledContract = Boolean(
+            (data.contract_symbol && m.contract_symbol && data.contract_symbol !== m.contract_symbol) ||
+            (data.expiration_date && m.expiration_date && data.expiration_date !== m.expiration_date)
+        );
+        if (data.contract_symbol) {{
+            m.contract_symbol = String(data.contract_symbol);
+            const subEl = document.getElementById('subbar-contract-label');
+            if (subEl) subEl.innerText = 'NEIRO-QUANT TERMINAL • CME GOLD FUTURES [GC=F / ' + m.contract_symbol + ']';
+            const kpiLbl = document.getElementById('kpi-contract-label');
+            if (kpiLbl) kpiLbl.innerText = 'CME Gold Futures ' + m.contract_symbol + ' (COMEX)';
+            document.title = 'NEIRO-QUANT: ' + m.contract_symbol + ' GOLD OPTIONS TACTICAL TERMINAL';
+        }}
+        if (data.option_symbol) m.option_symbol = String(data.option_symbol);
+        if (data.expiration_date) m.expiration_date = String(data.expiration_date);
+        if (data.expiration_date_iso) m.expiration_date_iso = String(data.expiration_date_iso);
+        if (rolledContract && !opts.forceLive) {{
+            try {{
+                const lastRollReload = Number(sessionStorage.getItem('neiro_roll_reload_ts') || 0);
+                if ((Date.now() - lastRollReload) > 60000) {{
+                    sessionStorage.setItem('neiro_roll_reload_ts', String(Date.now()));
+                    window.location.replace(window.location.pathname + window.location.search);
+                    return true;
+                }}
+            }} catch (_) {{}}
+        }}
         if (data.call_wall) m.call_wall = data.call_wall;
         if (data.put_wall) m.put_wall = data.put_wall;
         if (data.zero_gamma_flip) m.zero_gamma_flip = data.zero_gamma_flip;

@@ -49,7 +49,8 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
 │ [TẦNG 1: CLOUD COLLECTOR & REMOTE ON-DEMAND SYNC]                                          │
 │  - Playwright Headless + Internal Sniffer: Bắt gói Options Chain CME Gold (GCZ26).          │
-│  - Dynamic Rollover Engine: Tự động phân giải 5 tháng chẵn chuẩn CME (G, J, M, Q, Z).      │
+│  - Dynamic Rollover Engine: Tự động phân giải 5 tháng chẵn chuẩn CME (G, J, M, Q, Z) &     │
+│    roll Futures active trước ngày đáo hạn (VD: GCZ26 -> GCG27) kèm NEXT_MONTHLY bridge.    │
 │  - Lưới Cron Đa Tầng Pre-Session: Chốt OI EOD lúc 07:15 VN (00:15 UTC) và trước các phiên. │
 │  - Nút bấm từ xa [ ⚡ Sync CME ]: Terminal HUD gửi request tới Cloudflare Worker            │
 │    `/api/trigger_sync` để kích hoạt GitHub Actions repository_dispatch cào số liệu mới.    │
@@ -60,7 +61,8 @@ Hệ thống **Neiro-Gold-Quant** giải quyết các bài toán định lượn
 │ [TẦNG 2: EDGE RELAY & 0s STREAMING FEED (CLOUDFLARE WORKER)]                               │
 │  - URL Relay: https://neiro-gold-feed.dani-wind2509.workers.dev                            │
 │  - Endpoint `/api/yahoo_gc?tf=1m`: Phục vụ 360 nến 1M thực tế từ cTrader (XAUUSD-F).        │
-│  - Chế độ FEED_MODE = "ctrader_only": Khóa cứng nguồn nến 0s, ngắt hoàn toàn fallback.     │
+│  - `basis.py`: Ưu tiên lấy nến & giá 0s từ Cloud Worker (`/api/yahoo_gc?tf=1m`) trước,      │
+│    fallback theo đúng mã Futures active (`GCG27.CMX`) thay vì `GC=F` bị trễ rollover.      │
 │  - Cơ chế Hot-Patching: Client poll mỗi 3s, tự vá chuỗi nến khi tab ngủ, không gọi reload.│
 └───────────────────────────────────────────────┬────────────────────────────────────────────┘
                                                 │

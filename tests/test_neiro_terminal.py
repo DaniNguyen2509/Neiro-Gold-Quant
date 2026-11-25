@@ -188,8 +188,9 @@ def test_neiro_terminal_3sec_simplification_and_no_currenttfkey_bug():
     assert "currentTfKey" not in js
     assert "let currentTf = '1m'" in js
 
-    # Overlapping Top-Center Canvas Gauge must be removed
+    # Overlapping Top-Center Canvas Gauge & live price-line CVD/VPIN badge must be removed
     assert "NẾN M1 Δ:" not in js
+    assert "fpTxt" not in js
 
     # Toggle buttons & compact HUD controls
     assert "toggleOverlayMode()" in nav

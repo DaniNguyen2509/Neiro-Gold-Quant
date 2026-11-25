@@ -311,10 +311,11 @@ def load_and_preprocess_options(
     mask_p_latest = (df["putMid"] <= 0) & (df["putLatest"] > 0)
     df.loc[mask_p_latest, "putMid"] = df.loc[mask_p_latest, "putLatest"]
 
-    # Expiry and DTE (Dynamically resolve front-month option if chain metadata is missing)
+    # Expiry and DTE (Dynamically resolve front-month option & active futures contract)
     from src.quant_engine.synthetic import resolve_front_month_cme_option
     front_opt = resolve_front_month_cme_option()
     front_symbol = front_opt.get("option_symbol", "OGZ26")
+    active_contract_symbol = str(front_opt.get("active_futures") or front_opt.get("underlying") or "GCZ26")
     default_expiry = front_opt.get("expiration_date", "2026-11-25")
 
     exp_val = ""
@@ -833,7 +834,10 @@ def load_and_preprocess_options(
         "basis_source": basis_source,
         "no_mt5": no_mt5,
         "dte_days": dte_days,
+        "contract_symbol": active_contract_symbol,
+        "option_symbol": front_symbol,
         "expiration_date": f"{front_symbol} ({exp_val})",
+        "expiration_date_iso": exp_val,
         "skew_rr25": skew_metrics.rr25,
         "skew_bf25": skew_metrics.bf25,
         "skew_regime": skew_metrics.regime.value,
@@ -1856,6 +1860,7 @@ def generate_html_terminal(
     # Strikes and Geometry with Adaptive Micro-Strike Guard
     strikes = df["strike"].values
     dte_days_val = float(meta.get("dte_days", 8.0))
+    contract_symbol = str(meta.get("contract_symbol") or "GCZ26")
     strike_above, next_above, strike_below, next_below, step, is_micro_guarded = resolve_adaptive_tactical_strikes(
         strikes, spot, dte_days=dte_days_val, call_wall=call_wall, put_wall=put_wall
     )
@@ -2171,7 +2176,7 @@ def generate_html_terminal(
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>NEIRO-QUANT: GCZ26 GOLD OPTIONS TACTICAL TERMINAL</title>
+    <title>NEIRO-QUANT: {contract_symbol} GOLD OPTIONS TACTICAL TERMINAL</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
@@ -2303,8 +2308,8 @@ def generate_html_terminal(
     <!-- KHỐI 1: BIỂU ĐỒ VOLATILITY SMILE & SKEW (PANEL LỚN HẲN MALZ 1997 SVI) -->
     <details class="chart-box drawer-box" style="order: 7; margin-bottom: 10px;" ontoggle="if(this.open){{window.dispatchEvent(new Event('resize'));}}">
         <summary style="cursor:pointer; list-style:none; border-bottom:1px solid #1E293B; padding-bottom:10px;">
-            <div style="font-size:14.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.3px; font-family:'JetBrains Mono', monospace;">
-                CME GOLD OPTIONS GCZ26: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span>
+            <div id="smile-contract-label" style="font-size:14.5px; font-weight:800; color:#F8FAFC; letter-spacing:0.3px; font-family:'JetBrains Mono', monospace;">
+                CME GOLD OPTIONS {contract_symbol}: ĐƯỜNG CONG NỤ CƯỜI BIẾN ĐỘNG & ĐỘ XIÊN (VOLATILITY SMILE & SKEW) <span style="font-size:11px; color:#38BDF8; font-weight:600;">[Bấm để mở/thu gọn]</span>
             </div>
             <div style="font-size:11.5px; color:#94A3B8; margin-top:4px; font-family:'JetBrains Mono', monospace;">
                 Mô hình Malz SVI • ATM IV: <b style="color:#FACC15;">{sigma_atm*100:.2f}%</b> • 
@@ -2329,7 +2334,7 @@ def generate_html_terminal(
         </summary>
         <div class="kpi-grid" style="margin-top: 10px; margin-bottom: 0;">
         <div class="kpi-card">
-            <div class="kpi-label">CME Gold Futures GCZ26 (COMEX)</div>
+            <div id="kpi-contract-label" class="kpi-label">CME Gold Futures {contract_symbol} (COMEX)</div>
             <div id="kpi-cme-price" class="kpi-val" style="color: #FACC15;">${spot:,.2f}</div>
             <div class="kpi-sub">Trục ATM: <b id="kpi-atm-strike">${atm_strike:,.0f}</b> | Nguồn: <b id="kpi-price-source">{meta.get('futures_feed', 'LIVE COMEX (GC=F)')}</b></div>
         </div>
@@ -2764,6 +2769,11 @@ def run_pipeline(
         "next_below": float(meta.get("next_below", 0.0)),
         "step": float(meta.get("step", 25.0)),
         "dte_days": float(meta.get("dte_days", 8.0)),
+        "contract_symbol": str(meta.get("contract_symbol") or ""),
+        "option_symbol": str(meta.get("option_symbol") or ""),
+        "expiration_date": str(meta.get("expiration_date") or ""),
+        "expiration_date_iso": str(meta.get("expiration_date_iso") or ""),
+        "futures_feed": str(meta.get("futures_feed") or ""),
         "major_up_wall": float(meta.get("major_up_wall", meta.get("call_wall", 0.0))),
         "major_down_wall": float(meta.get("major_down_wall", meta.get("put_wall", 0.0))),
         "has_up_air_pocket": bool(meta.get("has_up_air_pocket", False)),

@@ -202,3 +202,24 @@ def test_find_atm_strike_all_illiquid_anchors_to_spot():
     # Without spot_price, falls back to median strike (4000.0), NOT 1350.0!
     atm_fallback = find_atm_strike(snapshot)
     assert atm_fallback.strike == 4000.0
+
+
+def test_resolve_active_cme_futures_and_rollover_bridge():
+    """On a primary option expiry day (e.g. 2026-11-25 for OGZ26), active futures must roll to GCG27
+    and resolve_active_expirations must pre-include NEXT_MONTHLY (OGF27) alongside QUARTERLY (OGG27)."""
+    from src.quant_engine.synthetic import resolve_active_cme_futures, resolve_active_expirations
+
+    # Mid-cycle Oct 15 -> still GCZ26
+    assert resolve_active_cme_futures(now=datetime.datetime(2026, 10, 15, 12, 0, tzinfo=datetime.timezone.utc)) == "GCZ26"
+
+    # OGZ26 expiry day 2026-11-25 before 19:30 UTC cutoff -> active_futures already rolled to GCG27
+    exp_day = datetime.datetime(2026, 11, 25, 8, 0, tzinfo=datetime.timezone.utc)
+    assert resolve_active_cme_futures(now=exp_day) == "GCG27"
+
+    exps = resolve_active_expirations(now=exp_day, underlying_futures="AUTO", weekly_count=1, include_quarterly=True)
+    by_type = {e["type"]: e for e in exps}
+    assert by_type["WEEKLY"]["underlying"] == "GCG27"
+    assert by_type["NEXT_MONTHLY"]["option_symbol"] == "OGF27"
+    assert by_type["NEXT_MONTHLY"]["underlying"] == "GCG27"
+    assert by_type["QUARTERLY"]["option_symbol"] == "OGG27"
+    assert by_type["QUARTERLY"]["underlying"] == "GCG27"

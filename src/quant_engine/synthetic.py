@@ -184,9 +184,20 @@ def resolve_front_month_cme_option(
                 underlying = underlying_futures
 
             url = f"https://www.barchart.com/futures/quotes/{underlying}/options?futuresOptionsView=merged"
+            # Determine live active futures contract (rolls to next primary month on/within 1 day of primary option expiry)
+            active_futures = underlying
+            if target_m in CME_PRIMARY_GOLD_MONTHS and now_date >= (exp - datetime.timedelta(days=1)):
+                for q_off in range(1, 15):
+                    qm = ((target_m - 1 + q_off) % 12) + 1
+                    qy = target_y + ((target_m - 1 + q_off) // 12)
+                    if qm in CME_PRIMARY_GOLD_MONTHS:
+                        active_futures = f"GC{CME_OPTION_MONTH_CODES[qm]}{str(qy)[-2:]}"
+                        break
             return {
                 "option_symbol": opt_symbol,
                 "underlying": underlying,
+                "active_futures": active_futures,
+                "yahoo_symbol": f"{active_futures}.CMX",
                 "expiration_date": exp.isoformat(),
                 "contract_month": target_m,
                 "contract_year": target_y,
@@ -204,11 +215,22 @@ def resolve_front_month_cme_option(
     return {
         "option_symbol": f"OG{fb_opt_code}{fb_yr_code}",
         "underlying": fb_underlying,
+        "active_futures": fb_underlying,
+        "yahoo_symbol": f"{fb_underlying}.CMX",
         "expiration_date": fb_exp.isoformat(),
         "contract_month": fb_m,
         "contract_year": fb_y,
         "barchart_url": f"https://www.barchart.com/futures/quotes/{fb_underlying}/options?futuresOptionsView=merged",
     }
+
+
+def resolve_active_cme_futures(
+    now: Optional[Union[datetime.date, datetime.datetime]] = None,
+    underlying_futures: str = "AUTO",
+) -> str:
+    """Returns the currently liquid COMEX Gold Futures contract symbol (e.g. GCG27)."""
+    front = resolve_front_month_cme_option(now=now, underlying_futures=underlying_futures)
+    return str(front.get("active_futures") or front.get("underlying") or "GCZ26")
 
 
 def resolve_next_quarterly_cme_option(
@@ -283,6 +305,8 @@ def resolve_active_expirations(
     now_date = now_dt.date()
     front_monthly = resolve_front_month_cme_option(now=now_dt, underlying_futures=underlying_futures)
     active_underlying = front_monthly.get("underlying", underlying_futures)
+    active_futures = front_monthly.get("active_futures", active_underlying)
+    weekly_underlying = active_futures if (not underlying_futures or underlying_futures in ("AUTO", "GCZ26")) else active_underlying
 
     results: list[Dict[str, Any]] = []
     seen_dates: set[str] = {front_monthly["expiration_date"]}
@@ -317,10 +341,10 @@ def resolve_active_expirations(
                         "name": f"Weekly {week_num} ({exp_day.strftime('%b %d')})",
                         "option_symbol": opt_sym,
                         "barchart_symbol": barchart_sym,
-                        "underlying": active_underlying,
+                        "underlying": weekly_underlying,
                         "expiration_date": exp_iso,
                         "dte": dte_val,
-                        "barchart_url": f"https://www.barchart.com/futures/quotes/{active_underlying}/options/{barchart_sym}?futuresOptionsView=merged",
+                        "barchart_url": f"https://www.barchart.com/futures/quotes/{weekly_underlying}/options/{barchart_sym}?futuresOptionsView=merged",
                     })
                     seen_dates.add(exp_iso)
                     fridays_found += 1
@@ -339,6 +363,28 @@ def resolve_active_expirations(
         "dte": monthly_dte,
         "barchart_url": front_monthly["barchart_url"],
     })
+
+    # 2b. Rollover Bridge: On expiry day (DTE <= 1.0d), pre-include next monthly contract (e.g. OGF27 on GCG27)
+    if monthly_dte <= 1.0:
+        try:
+            exp_d = datetime.date.fromisoformat(front_monthly["expiration_date"])
+            post_cutoff = get_cme_cutoff_dt(exp_d) + datetime.timedelta(minutes=5)
+            next_m_opt = resolve_front_month_cme_option(now=post_cutoff, underlying_futures=underlying_futures)
+            next_m_exp = next_m_opt["expiration_date"]
+            if next_m_exp not in seen_dates and next_m_opt["option_symbol"] != front_monthly["option_symbol"]:
+                results.append({
+                    "type": "NEXT_MONTHLY",
+                    "name": f"Next Monthly ({next_m_opt['option_symbol']})",
+                    "option_symbol": next_m_opt["option_symbol"],
+                    "barchart_symbol": next_m_opt["option_symbol"],
+                    "underlying": next_m_opt["underlying"],
+                    "expiration_date": next_m_exp,
+                    "dte": compute_dynamic_dte(next_m_exp, now_dt),
+                    "barchart_url": next_m_opt["barchart_url"],
+                })
+                seen_dates.add(next_m_exp)
+        except Exception:
+            pass
 
     # 3. Tier 3: Quarterly / Primary Institutional Anchor (G, J, M, Q, Z)
     # Automatically included when include_quarterly=True and either:

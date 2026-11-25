@@ -14,7 +14,7 @@ Hệ thống **Neiro-Gold-Quant** được thiết kế để giải mã toàn d
 
 1. **Thu thập Dữ liệu Nền Chuẩn CME COMEX (Options Chain Ingestion):**
    - Tự động bắt gói Options Chain CME Gold (`GCZ26`) từ Barchart qua Playwright Headless Chromium + Internal API Sniffer (`/proxies/core-api/v1/quotes/get` & `options/get`).
-   - Tự động nhận diện và tính toán chu kỳ đáo hạn 5 tháng chẵn chuẩn CME Rule 120102.E (`resolve_front_month_cme_option`): **G (T2), J (T4), M (T6), Q (T8), Z (T12)**. Tự động rollover khi đến hạn.
+   - Tự động nhận diện và tính toán chu kỳ đáo hạn 5 tháng chẵn chuẩn CME Rule 120102.E (`resolve_front_month_cme_option`, `resolve_active_cme_futures`): **G (T2), J (T4), M (T6), Q (T8), Z (T12)**. Khi hợp đồng chính còn $\le 1$ ngày tới đáo hạn quyền chọn, hệ thống tự động rollover hợp đồng Futures active sang kỳ tiếp theo (VD: `GCZ26` $\rightarrow$ `GCG27`), nạp sẵn `NEXT_MONTHLY` (`OGF27`) + `QUARTERLY` (`OGG27`), cập nhật động toàn bộ nhãn hợp đồng trên HUD và tự tải lại khi `version.json` xuất bản kỳ hạn mới.
    - **Cơ chế Cào Tự động & Từ xa Theo Yêu Cầu (Remote On-Demand Sync):** Chốt số liệu EOD chính thức hàng ngày qua Lưới Cron GitHub Actions (07:15 VN = 00:15 UTC); đồng thời tích hợp nút bấm `[ ⚡ Sync CME ]` trên Terminal HUD trực tiếp phát webhook `repository_dispatch` tới GitHub Actions qua Cloudflare Worker `/api/trigger_sync` để cào số liệu mới ngay lập tức khi đang ở ngoài đường.
 
 2. **Nguồn cấp Nến & Spot Thời Gian Thực 0s (Cloudflare Edge Relay & cTrader Feed):**

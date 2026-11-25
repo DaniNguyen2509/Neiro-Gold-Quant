@@ -493,5 +493,32 @@ def test_fetch_live_cme_m5_tape_preserves_real_last_candle_ohlc():
         assert "15m" in tape["tf_candles"]
 
 
+def test_fetch_live_cme_m5_tape_prefers_cloud_worker_over_lagging_yahoo():
+    """Cloud Worker XAUUSD-F candles must take priority and set _cached_futures without falling back to stale GC=F."""
+    from src.quant_engine.basis import clear_spot_cache, fetch_live_cme_futures_price, fetch_live_cme_m5_tape
+
+    clear_spot_cache()
+    worker_payload = {
+        "symbol": "XAUUSD-F",
+        "latest_price": 3552.40,
+        "source": "ctrader_demo_xauusdf",
+        "candles": [
+            {"time": 1795593480, "open": 3550.0, "high": 3551.5, "low": 3549.8, "close": 3551.2, "volume": 120},
+            {"time": 1795593540, "open": 3551.2, "high": 3552.6, "low": 3551.0, "close": 3552.4, "volume": 210},
+        ],
+    }
+    fake_response = mock.MagicMock()
+    fake_response.status = 200
+    fake_response.read.return_value = json.dumps(worker_payload).encode("utf-8")
+    fake_response.__enter__.return_value = fake_response
+
+    with mock.patch("urllib.request.urlopen", return_value=fake_response):
+        tape = fetch_live_cme_m5_tape(limit=2, include_htf=False)
+        assert tape["available"] is True
+        assert tape["latest_price"] == 3552.40
+        assert tape["chart_candles"][-1]["close"] == 3552.40
+        assert fetch_live_cme_futures_price() == 3552.40
+
+
 
 

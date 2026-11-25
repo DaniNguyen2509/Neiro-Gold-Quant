@@ -713,3 +713,45 @@ def test_legacy_local_loop_bridge_removed() -> None:
     assert not hasattr(hd, "_load_strikes_fast")
 
 
+def test_html_terminal_renders_dynamic_rolled_contract_symbol_gcg27() -> None:
+    """When meta supplies a rolled contract_symbol (e.g. GCG27), HTML title, watermark, and KPI labels follow it."""
+    from src.hud.html_dashboard import generate_html_terminal
+    import plotly.graph_objects as go
+
+    df_sample = pd.DataFrame([
+        {
+            "strike": 3550.0,
+            "callOpenInterest": 1000, "putOpenInterest": 1000,
+            "callVolume": 100, "putVolume": 100,
+            "callMid": 20.0, "putMid": 20.0,
+            "netGEX": 50.0, "netVEX": 10.0, "netCHEX": 5.0,
+        },
+    ])
+    meta = {
+        "spot_price": 3552.0,
+        "atm_strike": 3550.0,
+        "call_wall": 3600.0,
+        "call_wall_oi": 1000,
+        "put_wall": 3500.0,
+        "put_wall_oi": 1000,
+        "regime": "LONG GAMMA",
+        "total_net_gex": 50.0,
+        "total_net_vex": 10.0,
+        "total_net_chex": 5.0,
+        "expected_move_1s": 30.0,
+        "rule16_daily_move": 15.0,
+        "contract_symbol": "GCG27",
+        "option_symbol": "OGF27",
+        "expiration_date": "OGF27 (2026-12-28)",
+        "expiration_date_iso": "2026-12-28",
+        "m5_tape": {"candles": []},
+    }
+    html = generate_html_terminal(df_sample, meta, go.Figure())
+    assert "NEIRO-QUANT: GCG27 GOLD OPTIONS TACTICAL TERMINAL" in html
+    assert "CME Gold Futures GCG27 (COMEX)" in html
+    assert "CME GOLD OPTIONS GCG27:" in html
+    assert "[GC=F / GCG27]" in html
+    assert "hotPatchCloudMeta" in html
+    assert "rolledContract" in html
+
+

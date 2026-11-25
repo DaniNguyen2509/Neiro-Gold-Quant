@@ -19,7 +19,7 @@ Triển khai kiến trúc **2-Panel Side-by-Side Tách Rời Hoàn Toàn**:
      - **`POC` (Point of Control):** Đường vàng nét đứt nổi bật kèm nhãn `★ POC (Vol Max) $XXXX · XXXX HĐ`.
      - **`VAH` (Value Area High):** Đường xanh nét đứt (vùng giá trị trên 70%).
      - **`VAL` (Value Area Low):** Đường đỏ nét đứt (vùng giá trị dưới 70%).
-     - Call Wall, Put Wall, Zero Gamma Flip, FVG và Orderflow Footprint Delta badge.
+     - Call Wall, Put Wall, Zero Gamma Flip và FVG (không vẽ nhãn CVD/VPIN đè lên đường giá realtime `F0 LIVE`).
 
 2. **Panel Phải: Dedicated Orderflow & Greeks Matrix (`#neiro-profile-wrapper` - Chiếm ~30% / 340px):**
    - Đặt độc lập bên phải sát trục tung Y, có background `#080B12` và header riêng.
