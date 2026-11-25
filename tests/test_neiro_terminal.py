@@ -719,6 +719,86 @@ def test_adr032_volume_profile_and_side_by_side_panels(tmp_path):
     assert res["volByStrike"]["2650"] > res["volByStrike"]["2660"]
 
 
+def test_neiro_terminal_strike_oi_badges_and_js_python_parity(tmp_path):
+    """Verify tactical strike lines and Spine HUD display OI + MỎNG/VỪA/DÀY tags matching Python."""
+    import json
+    import shutil
+    import subprocess
+    from src.hud.html_dashboard import summarize_strike_oi
+
+    df = pd.DataFrame([
+        {"strike": 3500.0, "callOpenInterest": 233, "putOpenInterest": 6000, "callVolume": 10, "putVolume": 200, "netGEX": -20.0, "netVEX": -1.0, "netCHEX": -0.2},
+        {"strike": 3540.0, "callOpenInterest": 20,  "putOpenInterest": 269,  "callVolume": 5,  "putVolume": 11,  "netGEX": -2.0,  "netVEX": -0.1, "netCHEX": -0.05},
+        {"strike": 3545.0, "callOpenInterest": 76,  "putOpenInterest": 842,  "callVolume": 4,  "putVolume": 52,  "netGEX": -5.0,  "netVEX": -0.3, "netCHEX": -0.1},
+        {"strike": 3550.0, "callOpenInterest": 338, "putOpenInterest": 2329, "callVolume": 85, "putVolume": 423, "netGEX": 12.0,  "netVEX": 1.1,  "netCHEX": 0.4},
+        {"strike": 3555.0, "callOpenInterest": 58,  "putOpenInterest": 241,  "callVolume": 15, "putVolume": 21,  "netGEX": 1.0,   "netVEX": 0.2,  "netCHEX": 0.05},
+    ])
+    meta = {
+        "spot_price": 3551.45,
+        "atm_strike": 3550.0,
+        "call_wall": 3600.0,
+        "put_wall": 3500.0,
+        "strike_above": 3555.0,
+        "next_above": 3560.0,
+        "strike_below": 3550.0,
+        "next_below": 3545.0,
+        "zero_gamma_flip": 3580.0,
+    }
+    comp = render_neiro_orderflow_component(meta, df)
+    js = comp["neiro_js_script"]
+
+    assert "summarizeStrikeOiJs" in js
+    assert "saOi.tag" in js
+    assert "sbOi.tag" in js
+    assert "spine-below-oi" in js
+    assert "spine-above-oi" in js
+
+    # Parity check between JS summarizeStrikeOiJs and Python summarize_strike_oi
+    py_3540 = summarize_strike_oi(df, 3540.0, 3551.45)
+    py_3545 = summarize_strike_oi(df, 3545.0, 3551.45)
+    py_3550 = summarize_strike_oi(df, 3550.0, 3551.45)
+    py_missing = summarize_strike_oi(df, 3560.0, 3551.45)
+
+    assert py_3540 == (289, "MỎNG", "OI 289 (MỎNG)")
+    assert py_3545 == (918, "VỪA", "OI 918 (VỪA)")
+    assert py_3550 == (2667, "DÀY", "OI 2,667 (DÀY)")
+    assert py_missing == (0, "MỎNG", "OI 0 (MỎNG)")
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        return
+
+    fn_start = js.index("function summarizeStrikeOiJs")
+    fn_end = js.index("function sizeXauusdJs")
+    fn_code = js[fn_start:fn_end]
+    opts_json = js.split("window.INITIAL_OPTIONS = ")[1].split(";\n")[0]
+
+    harness = f"""
+    const window = {{ INITIAL_OPTIONS: {opts_json}, INITIAL_META: {{ spot: 3551.45 }} }};
+    {fn_code}
+    console.log(JSON.stringify({{
+        s3540: summarizeStrikeOiJs(3540.0, 3551.45),
+        s3545: summarizeStrikeOiJs(3545.0, 3551.45),
+        s3550: summarizeStrikeOiJs(3550.0, 3551.45),
+        s3560: summarizeStrikeOiJs(3560.0, 3551.45),
+    }}));
+    """
+    script_path = tmp_path / "test_oi_tag_harness.js"
+    script_path.write_text(harness, encoding="utf-8")
+    out_path = tmp_path / "oi_tag_out.txt"
+    with out_path.open("w", encoding="utf-8") as fh:
+        rc = subprocess.call([node_bin, str(script_path)], stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT, timeout=15)
+    assert rc == 0, out_path.read_text(encoding="utf-8")
+    res = json.loads(out_path.read_text(encoding="utf-8").strip())
+    assert (res["s3540"]["oi"], res["s3540"]["tier"], res["s3540"]["tag"]) == py_3540
+    assert (res["s3545"]["oi"], res["s3545"]["tier"], res["s3545"]["tag"]) == py_3545
+    assert (res["s3550"]["oi"], res["s3550"]["tier"], res["s3550"]["tag"]) == py_3550
+    assert (res["s3560"]["oi"], res["s3560"]["tier"], res["s3560"]["tag"]) == py_missing
+    assert "dispatchGithubSyncDirect" in js
+    assert "localStorage.removeItem('NEIRO_GITHUB_PAT')" in js
+
+
+
 
 
 

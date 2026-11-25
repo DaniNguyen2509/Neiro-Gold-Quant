@@ -667,6 +667,42 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
     }}
 
     let isCmeSyncInProgress = false;
+    function resetSyncCmeBtn(btn) {{
+        isCmeSyncInProgress = false;
+        if (btn) {{
+            btn.classList.remove('active');
+            btn.innerText = '⚡ Sync CME';
+            btn.style.color = '';
+        }}
+    }}
+
+    async function dispatchGithubSyncDirect(pat) {{
+        const ghRes = await fetch('https://api.github.com/repos/DaniNguyen2509/Neiro-Gold-Quant/dispatches', {{
+            method: 'POST',
+            headers: {{
+                'Accept': 'application/vnd.github+json',
+                'Authorization': 'Bearer ' + pat,
+                'Content-Type': 'application/json',
+            }},
+            body: JSON.stringify({{
+                event_type: 'sync-options',
+                client_payload: {{
+                    triggered_at: new Date().toISOString(),
+                    source: 'browser_direct_sync',
+                }},
+            }}),
+        }});
+        if (ghRes.status === 204 || ghRes.ok) {{
+            return {{ ok: true }};
+        }}
+        const errTxt = await ghRes.text().catch(() => '');
+        return {{
+            ok: false,
+            status: ghRes.status,
+            error: 'GitHub API (' + ghRes.status + '): ' + (errTxt || ghRes.statusText),
+        }};
+    }}
+
     async function triggerRemoteCmeSync() {{
         if (isCmeSyncInProgress) {{
             alert('Yêu cầu cào CME đang chạy, vui lòng đợi hoàn tất!');
@@ -674,8 +710,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
         const btn = document.getElementById('btn-sync-cme');
         const wUrl = getCloudFeedWorkerUrl() || 'https://neiro-gold-feed.dani-wind2509.workers.dev';
-        
-        const pat = localStorage.getItem('NEIRO_GITHUB_PAT') || '';
+        const pat = (localStorage.getItem('NEIRO_GITHUB_PAT') || '').trim();
         if (!confirm('Kích hoạt máy ảo GitHub Actions cào bảng Options COMEX mới nhất từ Barchart ngay bây giờ? (~60 giây)')) {{
             return;
         }}
@@ -688,32 +723,69 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         }}
 
         try {{
-            const headers = {{ 'Content-Type': 'application/json' }};
-            if (pat) headers['Authorization'] = 'Bearer ' + pat;
-
-            const res = await fetch(wUrl + '/api/trigger_sync', {{
-                method: 'POST',
-                headers: headers
-            }});
-            const data = await res.json();
-
-            if (!res.ok || !data.ok) {{
-                if (res.status === 401 || (data.error && data.error.includes('Missing GITHUB_DISPATCH_TOKEN'))) {{
-                    const entered = prompt('Nhập GitHub Personal Access Token (PAT) để cấp quyền cào từ xa:');
-                    if (entered && entered.trim()) {{
-                        localStorage.setItem('NEIRO_GITHUB_PAT', entered.trim());
-                        isCmeSyncInProgress = false;
-                        triggerRemoteCmeSync();
+            let dispatchResult = null;
+            if (!pat) {{
+                try {{
+                    const res = await fetch(wUrl + '/api/trigger_sync', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                    }});
+                    const data = await res.json();
+                    if (res.ok && data.ok) {{
+                        dispatchResult = {{ ok: true }};
+                    }} else if (res.status === 401 || (data.error && data.error.includes('Missing GITHUB_DISPATCH_TOKEN'))) {{
+                        const entered = prompt(
+                            'Đây KHÔNG phải mật khẩu đăng nhập mà là GitHub Token (bắt đầu bằng github_pat_... hoặc ghp_...) để gọi GitHub Actions cào CME.\\n\\n' +
+                            'Cách tạo nhanh: GitHub -> Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens -> chọn repo Neiro-Gold-Quant -> bật Contents: Read and write.\\n\\nDán GitHub Token vào đây:'
+                        );
+                        if (entered && entered.trim()) {{
+                            localStorage.setItem('NEIRO_GITHUB_PAT', entered.trim());
+                            resetSyncCmeBtn(btn);
+                            triggerRemoteCmeSync();
+                            return;
+                        }}
+                        resetSyncCmeBtn(btn);
                         return;
+                    }} else {{
+                        dispatchResult = {{ ok: false, status: res.status, error: data.error || 'Không thể kết nối Cloudflare Worker' }};
                     }}
+                }} catch (workerErr) {{
+                    dispatchResult = {{ ok: false, status: 0, error: workerErr.message || 'Lỗi kết nối Cloud Worker' }};
                 }}
-                alert('Lỗi kích hoạt: ' + (data.error || 'Không thể kết nối Cloudflare Worker'));
-                isCmeSyncInProgress = false;
-                if (btn) {{
-                    btn.classList.remove('active');
-                    btn.innerText = '⚡ Sync CME';
-                    btn.style.color = '';
+            }} else {{
+                // Try Worker first; if Worker CORS rejects Authorization before redeploy, fallback directly to GitHub API
+                try {{
+                    const res = await fetch(wUrl + '/api/trigger_sync', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + pat,
+                        }},
+                    }});
+                    const data = await res.json();
+                    if (res.ok && data.ok) {{
+                        dispatchResult = {{ ok: true }};
+                    }} else {{
+                        dispatchResult = {{ ok: false, status: res.status, error: data.error || 'Worker sync failed' }};
+                    }}
+                }} catch (_) {{
+                    dispatchResult = await dispatchGithubSyncDirect(pat);
                 }}
+            }}
+
+            if (!dispatchResult || !dispatchResult.ok) {{
+                const errMsg = String((dispatchResult && dispatchResult.error) || 'Không thể kích hoạt');
+                const isBadToken = pat && (errMsg.includes('(401)') || errMsg.includes('(403)') || (dispatchResult && (dispatchResult.status === 401 || dispatchResult.status === 403)));
+                if (isBadToken) {{
+                    localStorage.removeItem('NEIRO_GITHUB_PAT');
+                    alert(
+                        'GitHub từ chối Token vừa lưu (có thể anh nhập nhầm mật khẩu, token hết hạn, hoặc thiếu quyền Contents: Read and write).\\n\\n' +
+                        'Hệ thống đã xóa token cũ để anh bấm Sync CME nhập lại GitHub Token (github_pat_... / ghp_...).\\nChi tiết: ' + errMsg
+                    );
+                }} else {{
+                    alert('Lỗi kích hoạt: ' + errMsg);
+                }}
+                resetSyncCmeBtn(btn);
                 return;
             }}
 
@@ -1256,6 +1328,47 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         return {{ strikeAbove, nextAbove, strikeBelow, nextBelow, step, isMicroGuarded: isMicro }};
     }}
 
+    function summarizeStrikeOiJs(strikePrice, spotRef) {{
+        const opts = window.INITIAL_OPTIONS || [];
+        const sVal = Number(strikePrice || 0);
+        const refSpot = Number(spotRef || (window.INITIAL_META && window.INITIAL_META.spot) || sVal);
+        let totalOi = 0;
+        let corridorSum = 0;
+        let corridorCnt = 0;
+        let allSum = 0;
+        let allCnt = 0;
+
+        for (let i = 0; i < opts.length; i++) {{
+            const o = opts[i];
+            if (!o) continue;
+            const k = Number(o.strike || 0);
+            const oi = Number(o.c_oi || 0) + Number(o.p_oi || 0);
+            if (Math.abs(k - sVal) < 0.05) {{
+                totalOi = Math.round(oi);
+            }}
+            if (oi > 0) {{
+                allSum += oi;
+                allCnt++;
+                if (Math.abs(k - refSpot) <= 100.0) {{
+                    corridorSum += oi;
+                    corridorCnt++;
+                }}
+            }}
+        }}
+        const meanOi = corridorCnt >= 3 ? (corridorSum / corridorCnt) : (allCnt > 0 ? (allSum / allCnt) : 0);
+        let tier = 'MỎNG';
+        if (totalOi > 0 && meanOi > 0) {{
+            if (totalOi >= meanOi * 0.85) tier = 'DÀY';
+            else if (totalOi >= meanOi * 0.40) tier = 'VỪA';
+        }}
+        return {{
+            oi: totalOi,
+            tier: tier,
+            isThin: tier === 'MỎNG',
+            tag: 'OI ' + totalOi.toLocaleString('en-US') + ' (' + tier + ')',
+        }};
+    }}
+
     function sizeXauusdJs(slUsd, gexRegime) {{
         const sl = slUsd > 0 ? slUsd : 4.5;
         const reg = String(gexRegime || 'LONG_GAMMA').toUpperCase();
@@ -1568,10 +1681,22 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         if (microVpin) {{ microVpin.innerText = liveVpinLabel; microVpin.style.color = vpinCol; }}
 
         // 2. Spine (KHOI 4) real-time strikes & distances
+        const sbInfo = summarizeStrikeOiJs(strikes.strikeBelow, spot);
+        const saInfo = summarizeStrikeOiJs(strikes.strikeAbove, spot);
         const elSb = document.getElementById('spine-strike-below');
         if (elSb) elSb.innerText = '$' + Math.round(strikes.strikeBelow).toLocaleString('en-US');
+        const elSbo = document.getElementById('spine-below-oi');
+        if (elSbo) {{
+            elSbo.innerText = '(' + sbInfo.tag + ')';
+            elSbo.style.color = sbInfo.isThin ? '#64748B' : (sbInfo.tier === 'DÀY' ? '#4ADE80' : '#FACC15');
+        }}
         const elSa = document.getElementById('spine-strike-above');
         if (elSa) elSa.innerText = '$' + Math.round(strikes.strikeAbove).toLocaleString('en-US');
+        const elSao = document.getElementById('spine-above-oi');
+        if (elSao) {{
+            elSao.innerText = '(' + saInfo.tag + ')';
+            elSao.style.color = saInfo.isThin ? '#64748B' : (saInfo.tier === 'DÀY' ? '#F87171' : '#FACC15');
+        }}
         const elSat = document.getElementById('spine-above-title');
         if (elSat) elSat.innerText = 'CẢN TRÊN' + (strikes.isMicroGuarded ? ' (VI MÔ)' : '');
         const elDp = document.getElementById('spine-dist-put');
@@ -2436,16 +2561,23 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
             ? Number(liveTacticalMatrix.breakdown.entry) + 0.50
             : (Number(m.strike_below || 0) - fallbackOff);
 
+        const saOi = summarizeStrikeOiJs(m.strike_above, currentGoldPrice);
+        const sbOi = summarizeStrikeOiJs(m.strike_below, currentGoldPrice);
+        const naOi = summarizeStrikeOiJs(m.next_above, currentGoldPrice);
+        const nbOi = summarizeStrikeOiJs(m.next_below, currentGoldPrice);
+        const muOi = summarizeStrikeOiJs(m.major_up_wall, currentGoldPrice);
+        const mdOi = summarizeStrikeOiJs(m.major_down_wall, currentGoldPrice);
+
         const keyLevels = [
             {{ p: m.call_wall,          c: '#EF4444', d: [6, 4], lw: 1.4, pin: true,  txt: 'CALL WALL $' + Math.round(m.call_wall) + ' · OI ' + (m.call_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.call_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.put_wall,           c: '#22C55E', d: [6, 4], lw: 1.4, pin: true,  txt: 'PUT WALL $' + Math.round(m.put_wall) + ' · OI ' + (m.put_wall_oi || 0).toLocaleString() + ' · Siege: ' + (m.put_wall_siege || 0).toFixed(2) + 'x' }},
             {{ p: m.zero_gamma_flip,    c: '#FACC15', d: [4, 4], lw: 1.4, pin: true,  txt: 'GAMMA FLIP (Trục cân đối) $' + Math.round(m.zero_gamma_flip) + ' · [' + (liveFlipVerdict.split(':')[0] || 'KIỂM ĐỊNH') + ']' }},
-            {{ p: m.strike_above,       c: '#FB7185', d: [5, 3], lw: 1.5, pin: true,  txt: 'CẢN TRÊN $' + Math.round(m.strike_above) + ' · Phá BUY >$' + sqTrigPx.toFixed(1) }},
-            {{ p: m.strike_below,       c: '#4ADE80', d: [5, 3], lw: 1.5, pin: true,  txt: 'SÀN DƯỚI $' + Math.round(m.strike_below) + ' · Thủng SELL <$' + bdTrigPx.toFixed(1) }},
-            {{ p: m.next_above,         c: '#FBBF24', d: [2, 4], lw: 1.0, pin: false, txt: 'TRẠM TRÊN $' + Math.round(m.next_above) }},
-            {{ p: m.next_below,         c: '#38BDF8', d: [2, 4], lw: 1.0, pin: false, txt: 'TRẠM DƯỚI $' + Math.round(m.next_below) }},
-            {{ p: m.major_up_wall,      c: '#F97316', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↑ $' + Math.round(m.major_up_wall) }},
-            {{ p: m.major_down_wall,    c: '#2DD4BF', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↓ $' + Math.round(m.major_down_wall) }},
+            {{ p: m.strike_above,       c: '#FB7185', d: saOi.isThin ? [2, 4] : [5, 3], lw: saOi.isThin ? 1.0 : 1.5, pin: true,  txt: 'CẢN TRÊN $' + Math.round(m.strike_above) + ' · ' + saOi.tag + ' · Phá BUY >$' + sqTrigPx.toFixed(1) }},
+            {{ p: m.strike_below,       c: '#4ADE80', d: sbOi.isThin ? [2, 4] : [5, 3], lw: sbOi.isThin ? 1.0 : 1.5, pin: true,  txt: 'SÀN DƯỚI $' + Math.round(m.strike_below) + ' · ' + sbOi.tag + ' · Thủng SELL <$' + bdTrigPx.toFixed(1) }},
+            {{ p: m.next_above,         c: '#FBBF24', d: [2, 4], lw: 1.0, pin: false, txt: 'TRẠM TRÊN $' + Math.round(m.next_above) + ' · ' + naOi.tag }},
+            {{ p: m.next_below,         c: '#38BDF8', d: [2, 4], lw: 1.0, pin: false, txt: 'TRẠM DƯỚI $' + Math.round(m.next_below) + ' · ' + nbOi.tag }},
+            {{ p: m.major_up_wall,      c: '#F97316', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↑ $' + Math.round(m.major_up_wall) + ' · ' + muOi.tag }},
+            {{ p: m.major_down_wall,    c: '#2DD4BF', d: [3, 4], lw: 1.1, pin: false, txt: 'TƯỜNG LỚN ↓ $' + Math.round(m.major_down_wall) + ' · ' + mdOi.tag }},
         ];
 
         // Session Volume Profile Key Levels: POC, VAH, VAL

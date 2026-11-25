@@ -326,3 +326,30 @@ console.log(JSON.stringify({ status: r.status, ok: b.ok, error: b.error }));
     assert "Missing GITHUB_DISPATCH_TOKEN" in res["error"]
 
 
+def test_worker_cors_allows_post_and_authorization_preflight(tmp_path: pathlib.Path):
+    """Ensure CORS headers allow POST and Authorization for browser-supplied PAT on /api/trigger_sync."""
+    harness = """
+const r = await workerEntry.fetch(
+    new Request("https://w.test/api/trigger_sync", {
+        method: "OPTIONS",
+        headers: {
+            "Origin": "https://daninguyen2509.github.io",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type"
+        }
+    }),
+    {}
+);
+console.log(JSON.stringify({
+    status: r.status,
+    methods: r.headers.get("Access-Control-Allow-Methods"),
+    headers: r.headers.get("Access-Control-Allow-Headers")
+}));
+"""
+    res = _run_node_worker_harness(tmp_path, harness, expose_default_entry=True)
+    assert res["status"] == 204
+    assert "POST" in res["methods"]
+    assert "Authorization" in res["headers"]
+
+
+

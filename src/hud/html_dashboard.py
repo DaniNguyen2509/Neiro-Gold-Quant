@@ -149,6 +149,38 @@ def resolve_adaptive_tactical_strikes(
     return strike_above, next_above, strike_below, next_below, step, is_micro_guarded
 
 
+def summarize_strike_oi(df: pd.DataFrame, strike: float, spot: float) -> tuple[int, str, str]:
+    """Classifies total Open Interest at a strike against the active corridor mean (aligned with air-pocket 0.40 ratio)."""
+    if df.empty or "strike" not in df.columns:
+        return 0, "MỎNG", "OI 0 (MỎNG)"
+
+    strikes_arr = pd.to_numeric(df["strike"], errors="coerce").fillna(0.0)
+    c_oi = pd.to_numeric(df.get("callOpenInterest", 0), errors="coerce").fillna(0.0)
+    p_oi = pd.to_numeric(df.get("putOpenInterest", 0), errors="coerce").fillna(0.0)
+    total_series = c_oi + p_oi
+
+    match_mask = (strikes_arr - float(strike)).abs() < 0.05
+    total_oi = int(round(float(total_series[match_mask].sum()))) if match_mask.any() else 0
+
+    pos_mask = total_series > 0
+    corridor_mask = pos_mask & ((strikes_arr - float(spot)).abs() <= 100.0)
+    if int(corridor_mask.sum()) >= 3:
+        mean_oi = float(total_series[corridor_mask].mean())
+    elif pos_mask.any():
+        mean_oi = float(total_series[pos_mask].mean())
+    else:
+        mean_oi = 0.0
+
+    tier = "MỎNG"
+    if total_oi > 0 and mean_oi > 0:
+        if total_oi >= mean_oi * 0.85:
+            tier = "DÀY"
+        elif total_oi >= mean_oi * 0.40:
+            tier = "VỪA"
+
+    return total_oi, tier, f"OI {total_oi:,} ({tier})"
+
+
 def _build_csv_cache_signature(csv_path: Path) -> tuple[Any, ...]:
     """Builds a deterministic filesystem signature (name, mtime_ns, size) for CSV invalidation."""
     if not csv_path.exists():
@@ -1076,11 +1108,14 @@ def build_plotly_figure(df_full: pd.DataFrame, meta: dict[str, Any]) -> go.Figur
     cw_tag = " [BOUNCE PIN]" if call_regime == "BOUNCE_WALL" else (" [MAGNET TRAP]" if call_regime == "MAGNET_WALL" else "")
     pw_tag = " [BOUNCE PIN]" if put_regime == "BOUNCE_WALL" else (" [MAGNET TRAP]" if put_regime == "MAGNET_WALL" else "")
 
+    _, _, above_oi_tag = summarize_strike_oi(df, strike_above, spot_price)
+    _, _, below_oi_tag = summarize_strike_oi(df, strike_below, spot_price)
+
     levels = [
         (call_wall, "#EF4444", f"CALL WALL (${call_wall:.0f}{cw_tag})", "top right", "dash"),
         (put_wall, "#22C55E", f"PUT WALL (${put_wall:.0f}{pw_tag})", "bottom right", "dash"),
-        (strike_above, "#F87171", f"CẢN TRÊN (${strike_above:.0f})", "top right", "dot"),
-        (strike_below, "#4ADE80", f"SÀN DƯỚI (${strike_below:.0f})", "bottom right", "dot"),
+        (strike_above, "#F87171", f"CẢN TRÊN (${strike_above:.0f} · {above_oi_tag})", "top right", "dot"),
+        (strike_below, "#4ADE80", f"SÀN DƯỚI (${strike_below:.0f} · {below_oi_tag})", "bottom right", "dot"),
         (spot_price, "#FACC15", f"CME LIVE (${spot_price:.2f})", "top right", "solid"),
     ]
     zero_gamma = meta.get("zero_gamma_flip")
@@ -2162,6 +2197,11 @@ def generate_html_terminal(
     benchmark_badge_html = ""
     if meta.get("is_benchmark_fallback", False):
         benchmark_badge_html = '<div style="margin-bottom:8px; text-align:center;"><span class="badge" style="background:#7F1D1D; color:#FCA5A5; border:1px solid #EF4444; font-size:11px; padding:3px 10px; border-radius:4px; font-weight:700;">⚠️ CẢNH BÁO: DỮ LIỆU ĐANG DÙNG LÀ BENCHMARK DỰ PHÒNG (KHÔNG PHẢI LIVE REALTIME)</span></div>'
+    _, _below_tier, _below_oi_tag = summarize_strike_oi(df, strike_below, spot)
+    _, _above_tier, _above_oi_tag = summarize_strike_oi(df, strike_above, spot)
+    _below_oi_col = "#64748B" if _below_tier == "MỎNG" else ("#4ADE80" if _below_tier == "DÀY" else "#FACC15")
+    _above_oi_col = "#64748B" if _above_tier == "MỎNG" else ("#F87171" if _above_tier == "DÀY" else "#FACC15")
+
     guard_tag = " (VI MÔ)" if is_micro_guarded else ""
 
     pinning_table_html = build_microstructure_pinning_table_html(df, meta)
@@ -2397,6 +2437,7 @@ def generate_html_terminal(
             <div class="spine-node">
                 <div class="spine-node-title" style="color:#4ADE80;">SÀN DƯỚI</div>
                 <div id="spine-strike-below" class="spine-node-price" style="color:#4ADE80;">${strike_below:,.0f}</div>
+                <div id="spine-below-oi" style="font-size:10px; color:{_below_oi_col};">({_below_oi_tag})</div>
             </div>
             <div style="flex:1; height:2px; background:#FACC15; margin:0 8px; position:relative;">
                 <div id="spine-dist-below" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#FACC15;">
@@ -2415,6 +2456,7 @@ def generate_html_terminal(
             <div class="spine-node">
                 <div id="spine-above-title" class="spine-node-title" style="color:#F87171;">CẢN TRÊN{guard_tag}</div>
                 <div id="spine-strike-above" class="spine-node-price" style="color:#F87171;">${strike_above:,.0f}</div>
+                <div id="spine-above-oi" style="font-size:10px; color:{_above_oi_col};">({_above_oi_tag})</div>
             </div>
             <div style="flex:1; height:2px; background:#1E293B; margin:0 8px; position:relative;">
                 <div id="spine-dist-call" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:10px; color:#64748B;">

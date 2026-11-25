@@ -38,8 +38,8 @@ function corsHeaders(env, originHeader = null) {
     const allowOrigin = configured === "*" ? "*" : (originHeader && configured.split(",").map(s => s.trim()).includes(originHeader) ? originHeader : configured.split(",")[0].trim());
     return {
         "Access-Control-Allow-Origin": allowOrigin || "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Cache-Control": "no-store, no-cache, must-revalidate",
         "Content-Type": "application/json; charset=utf-8",
     };

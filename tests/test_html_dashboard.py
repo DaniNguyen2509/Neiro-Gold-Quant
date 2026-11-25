@@ -753,5 +753,8 @@ def test_html_terminal_renders_dynamic_rolled_contract_symbol_gcg27() -> None:
     assert "[GC=F / GCG27]" in html
     assert "hotPatchCloudMeta" in html
     assert "rolledContract" in html
+    assert 'id="spine-below-oi"' in html
+    assert 'id="spine-above-oi"' in html
+    assert "OI 2,000 (DÀY)" in html or "OI 0 (MỎNG)" in html
 
 
