@@ -20,7 +20,8 @@
   conversion spot↔futures sẽ sai chiều → sai mức Entry/SL/TP.
 -/
 
-import Mathlib.Algebra.Order.Ring.Lemmas
+import Mathlib.Data.Real.Basic
+import Mathlib.Tactic
 
 -- ============================================================
 -- §1. Định nghĩa Basis Convention
