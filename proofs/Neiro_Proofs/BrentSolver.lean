@@ -105,16 +105,14 @@ theorem brent_root_exists
       right; exact ⟨ha_pos, hb_neg⟩
   rcases hcases with ⟨ha, hb⟩ | ⟨ha, hb⟩
   · have h_ivt := intermediate_value_Ioo (le_of_lt hab) hcont
-    have hrange : (0 : ℝ) ∈ Set.Icc (f a) (f b) := ⟨le_of_lt ha, le_of_lt hb⟩
+    have hrange : (0 : ℝ) ∈ Set.Ioo (f a) (f b) := ⟨ha, hb⟩
     obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
-    exact ⟨c, hc_mem, le_antisymm hc_val.2 hc_val.1⟩
+    exact ⟨c, hc_mem, hc_val⟩
   · have hcont_neg : ContinuousOn (fun x => -f x) (Set.Icc a b) := hcont.neg
     have h_ivt := intermediate_value_Ioo (le_of_lt hab) hcont_neg
-    have hrange : (0 : ℝ) ∈ Set.Icc (-f a) (-f b) := by
-      constructor <;> linarith
+    have hrange : (0 : ℝ) ∈ Set.Ioo (-f a) (-f b) := ⟨by linarith, by linarith⟩
     obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
-    have hfc_zero : -f c = 0 := le_antisymm hc_val.2 hc_val.1
-    have hfc : f c = 0 := by linarith
+    have hfc : f c = 0 := by linarith [hc_val]
     exact ⟨c, hc_mem, hfc⟩
 
 -- ============================================================

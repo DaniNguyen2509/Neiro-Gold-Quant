@@ -64,13 +64,10 @@ theorem zero_gamma_flip_exists
     (ha_neg : net_gex_fn a < 0)
     (hb_pos : 0 < net_gex_fn b) :
     ∃ S_star ∈ Ioo a b, net_gex_fn S_star = 0 := by
-  have h_ivt := intermediate_value_Ioo hab hcont
-  have hrange : (0 : ℝ) ∈ Set.Icc (net_gex_fn a) (net_gex_fn b) := by
-    constructor
-    · exact le_of_lt ha_neg
-    · exact le_of_lt hb_pos
+  have h_ivt := intermediate_value_Ioo (le_of_lt hab) hcont
+  have hrange : (0 : ℝ) ∈ Set.Ioo (net_gex_fn a) (net_gex_fn b) := ⟨ha_neg, hb_pos⟩
   obtain ⟨S_star, hS_mem, hS_val⟩ := h_ivt hrange
-  exact ⟨S_star, hS_mem, le_antisymm hS_val.2 hS_val.1⟩
+  exact ⟨S_star, hS_mem, hS_val⟩
 
 -- ============================================================
 -- §3. Zero Gamma Flip drift theo thời gian

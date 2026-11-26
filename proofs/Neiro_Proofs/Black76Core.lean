@@ -45,11 +45,12 @@ theorem d1_atm_positive (F σ T : ℝ) (hF : 0 < F) (hσ : 0 < σ) (hT : 0 < T) 
     black76_d1 F F σ T = 0.5 * σ * Real.sqrt T := by
   unfold black76_d1
   rw [div_self (ne_of_gt hF), Real.log_one, zero_add]
-  have hsqrt : Real.sqrt T ≠ 0 := ne_of_gt (Real.sqrt_pos.mpr hT)
-  have hσ_ne : σ ≠ 0 := ne_of_gt hσ
-  field_simp [hσ_ne, hsqrt]
-  rw [← Real.sq_sqrt (le_of_lt hT)]
-  ring
+  have hsqrt_pos : 0 < Real.sqrt T := Real.sqrt_pos.mpr hT
+  have hdenom : σ * Real.sqrt T ≠ 0 := mul_ne_zero (ne_of_gt hσ) (ne_of_gt hsqrt_pos)
+  have h_num : 0.5 * σ ^ 2 * T = (0.5 * σ * Real.sqrt T) * (σ * Real.sqrt T) := by
+    rw [← Real.sq_sqrt (le_of_lt hT)]
+    ring
+  rw [h_num, mul_div_cancel_right₀ _ hdenom]
 
 /-- d2 = d1 - σ·√T: quan hệ identity -/
 theorem d2_eq_d1_minus_vol_time (F K σ T : ℝ) :
