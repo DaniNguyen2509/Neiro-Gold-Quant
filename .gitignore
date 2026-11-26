@@ -70,6 +70,16 @@ desktop.ini
 !data/volatility-greeks.csv
 !data/options_prices_GCZ26.csv
 
+# --- Lean 4 build cache (Zero-Waste: chi commit .lean files) ---
+proofs/.lake/
+proofs/lake-manifest.json
+*.olean
+*.ilean
+*.c
+*.o
+# Lean build output
+.elan/
+
 # --- Generated Visualizations & Reports ---
 reports/
 exports/

@@ -1,0 +1,11 @@
+name = "Neiro_Proofs"
+version = "0.1.0"
+defaultTargets = ["Neiro_Proofs"]
+
+[[lean_lib]]
+name = "Neiro_Proofs"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.14.0"
