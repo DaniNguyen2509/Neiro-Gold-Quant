@@ -63,6 +63,7 @@ theorem net_gex_additive
     net_gex c_ois c_gs p_ois p_gs +
     net_gex c_ois' c_gs' p_ois' p_gs' := by
   unfold net_gex
+  dsimp only
   rw [List.zipWith_append hc, List.zipWith_append hp]
   simp only [List.map_append, List.sum_append]
   ring
@@ -91,7 +92,7 @@ theorem siege_ratio_nonneg (volume oi : ℝ) (hvol : 0 ≤ volume) (hoi : 0 < oi
   exact div_nonneg hvol (le_of_lt hoi)
 
 /-- ✅ Siege Ratio bằng 0 khi không có volume (không hoạt động) -/
-theorem siege_ratio_zero_when_no_volume (oi : ℝ) (hoi : 0 < oi) :
+theorem siege_ratio_zero_when_no_volume (oi : ℝ) (_hoi : 0 < oi) :
     wall_siege_ratio 0 oi = 0 := by
   simp [wall_siege_ratio]
 

@@ -27,7 +27,7 @@ noncomputable def black76_gamma (F K σ T r : ℝ) : ℝ :=
 /-- ✅ ĐỊNH LÝ CHÍNH: Gamma ≥ 0 với mọi tham số hợp lệ -/
 theorem gamma_nonneg
     (F K σ T r : ℝ)
-    (hF : 0 < F) (_hK : 0 < K) (hσ : 0 < σ) (hT : 0 < T) (_hr : 0 ≤ r) :
+    (hF : 0 < F) (_hK : 0 < K) (hσ : 0 < σ) (_hT : 0 < T) (_hr : 0 ≤ r) :
     0 ≤ black76_gamma F K σ T r := by
   unfold black76_gamma
   apply div_nonneg
@@ -41,7 +41,7 @@ theorem gamma_nonneg
 /-- Gamma > 0 (strictly) khi mọi tham số strictly positive -/
 theorem gamma_pos
     (F K σ T r : ℝ)
-    (hF : 0 < F) (_hK : 0 < K) (hσ : 0 < σ) (hT : 0 < T) (_hr : 0 ≤ r) :
+    (hF : 0 < F) (_hK : 0 < K) (hσ : 0 < σ) (_hT : 0 < T) (_hr : 0 ≤ r) :
     0 < black76_gamma F K σ T r := by
   unfold black76_gamma
   apply div_pos
