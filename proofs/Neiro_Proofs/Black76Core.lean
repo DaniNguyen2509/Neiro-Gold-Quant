@@ -48,7 +48,7 @@ theorem d1_atm_positive (F σ T : ℝ) (hF : 0 < F) (hσ : 0 < σ) (hT : 0 < T) 
   have hsqrt : Real.sqrt T ≠ 0 := ne_of_gt (Real.sqrt_pos.mpr hT)
   have hσ_ne : σ ≠ 0 := ne_of_gt hσ
   field_simp [hσ_ne, hsqrt]
-  rw [Real.sq_sqrt (le_of_lt hT)]
+  rw [← Real.sq_sqrt (le_of_lt hT)]
   ring
 
 /-- d2 = d1 - σ·√T: quan hệ identity -/
@@ -75,7 +75,9 @@ theorem normalPDF_nonneg (x : ℝ) : 0 ≤ normalPDF x := by
 theorem normalPDF_pos (x : ℝ) : 0 < normalPDF x := by
   unfold normalPDF
   apply mul_pos
-  · positivity
+  · apply div_pos
+    · norm_num
+    · exact Real.sqrt_pos.mpr (by positivity)
   · exact Real.exp_pos _
 
 -- ============================================================

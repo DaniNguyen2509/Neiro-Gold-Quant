@@ -43,29 +43,23 @@ theorem bisection_preserves_bracket
       · left
         exact mul_nonpos_of_nonneg_of_nonpos ha (le_of_lt hneg)
       · right
-        have hb : 0 ≤ f b := by
-          by_contra h
-          push_neg at h
-          have : 0 < f a * f b := mul_pos_of_neg_of_neg ha h
-          linarith
+        have hb : 0 ≤ f b :=
+          le_of_not_lt (fun h => not_le_of_gt (mul_pos_of_neg_of_neg ha h) hbracket)
         exact mul_nonpos_of_nonpos_of_nonneg (le_of_lt hneg) hb
     · -- f(m) > 0
       rcases le_or_lt (f a) 0 with ha | ha
       · left
         exact mul_nonpos_of_nonpos_of_nonneg ha (le_of_lt hpos)
       · right
-        have hb : f b ≤ 0 := by
-          by_contra h
-          push_neg at h
-          have : 0 < f a * f b := mul_pos ha h
-          linarith
+        have hb : f b ≤ 0 :=
+          le_of_not_lt (fun h => not_le_of_gt (mul_pos ha h) hbracket)
         exact mul_nonpos_of_nonneg_of_nonpos (le_of_lt hpos) hb
 
 /-- ✅ Bisection thu hẹp interval: |b_new - a_new| = |b - a| / 2 -/
 theorem bisection_halves_interval (a b : ℝ) :
     |(a + b) / 2 - b| = |b - a| / 2 := by
-  have : (a + b) / 2 - b = -(b - a) / 2 := by ring
-  rw [this, abs_neg, abs_div, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+  have h : (a + b) / 2 - b = - ((b - a) / 2) := by ring
+  rw [h, abs_neg, abs_div, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
 
 -- ============================================================
 -- §2. Interval Shrinkage → Convergence
@@ -81,9 +75,9 @@ theorem bisection_converges (a b : ℝ) :
   unfold bisection_width
   have hgeom : Filter.Tendsto (fun n : ℕ => (1 / 2 : ℝ) ^ n) atTop (nhds 0) :=
     tendsto_pow_atTop_nhds_zero_of_lt_one (by norm_num) (by norm_num)
-  have heq : (fun n : ℕ => |b - a| / (2 : ℝ) ^ n) = fun n : ℕ => |b - a| * (1 / 2 : ℝ) ^ n := by
+  have heq : (fun n : ℕ => |b - a| / (2 : ℝ) ^ n) = (fun n : ℕ => |b - a| * (1 / 2 : ℝ) ^ n) := by
     funext n
-    rw [div_eq_mul_inv, one_div_pow]
+    rw [div_eq_mul_one_div, ← one_div_pow]
   rw [heq]
   have hmul := Filter.Tendsto.const_mul |b - a| hgeom
   simpa using hmul
@@ -102,34 +96,22 @@ theorem brent_root_exists
     ∃ c ∈ Set.Ioo a b, f c = 0 := by
   have hcases : (f a < 0 ∧ 0 < f b) ∨ (0 < f a ∧ f b < 0) := by
     rcases lt_trichotomy (f a) 0 with ha_neg | ha_zero | ha_pos
-    · have hb_pos : 0 < f b := by
-        by_contra hb
-        push_neg at hb
-        rcases eq_or_lt_of_le hb with hb_zero | hb_neg
-        · rw [hb_zero, mul_zero] at hbracket; linarith
-        · have : 0 < f a * f b := mul_pos_of_neg_of_neg ha_neg hb_neg
-          linarith
+    · have hb_pos : 0 < f b :=
+        lt_of_not_ge (fun h => not_lt_of_ge (mul_nonneg_of_nonpos_of_nonpos (le_of_lt ha_neg) h) hbracket)
       left; exact ⟨ha_neg, hb_pos⟩
     · rw [ha_zero, zero_mul] at hbracket; linarith
-    · have hb_neg : f b < 0 := by
-        by_contra hb
-        push_neg at hb
-        rcases eq_or_lt_of_le hb with hb_zero | hb_pos
-        · rw [hb_zero, mul_zero] at hbracket; linarith
-        · have : 0 < f a * f b := mul_pos ha_pos hb_pos
-          linarith
+    · have hb_neg : f b < 0 :=
+        lt_of_not_ge (fun h => not_lt_of_ge (mul_nonneg (le_of_lt ha_pos) h) hbracket)
       right; exact ⟨ha_pos, hb_neg⟩
   rcases hcases with ⟨ha, hb⟩ | ⟨ha, hb⟩
-  · have h_ivt := intermediate_value_Ioo hab hcont
+  · have h_ivt := intermediate_value_Ioo (le_of_lt hab) hcont
     have hrange : (0 : ℝ) ∈ Set.Icc (f a) (f b) := ⟨le_of_lt ha, le_of_lt hb⟩
     obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
     exact ⟨c, hc_mem, le_antisymm hc_val.2 hc_val.1⟩
   · have hcont_neg : ContinuousOn (fun x => -f x) (Set.Icc a b) := hcont.neg
-    have h_ivt := intermediate_value_Ioo hab hcont_neg
+    have h_ivt := intermediate_value_Ioo (le_of_lt hab) hcont_neg
     have hrange : (0 : ℝ) ∈ Set.Icc (-f a) (-f b) := by
-      constructor
-      · linarith
-      · linarith
+      constructor <;> linarith
     obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
     have hfc_zero : -f c = 0 := le_antisymm hc_val.2 hc_val.1
     have hfc : f c = 0 := by linarith
