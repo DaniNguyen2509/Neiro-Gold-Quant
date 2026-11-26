@@ -62,9 +62,11 @@ theorem net_gex_additive
     net_gex (c_ois ++ c_ois') (c_gs ++ c_gs') (p_ois ++ p_ois') (p_gs ++ p_gs') =
     net_gex c_ois c_gs p_ois p_gs +
     net_gex c_ois' c_gs' p_ois' p_gs' := by
+  have h1 := List.zipWith_append (· * ·) c_ois c_ois' c_gs c_gs' hc
+  have h2 := List.zipWith_append (· * ·) p_ois p_ois' p_gs p_gs' hp
   unfold net_gex
   dsimp only
-  rw [List.zipWith_append (· * ·) hc, List.zipWith_append (· * ·) hp]
+  rw [h1, h2]
   simp only [List.map_append, List.sum_append]
   ring
 
