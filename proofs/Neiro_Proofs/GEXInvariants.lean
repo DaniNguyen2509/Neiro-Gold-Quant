@@ -64,7 +64,7 @@ theorem net_gex_additive
     net_gex c_ois' c_gs' p_ois' p_gs' := by
   unfold net_gex
   dsimp only
-  rw [List.zipWith_append hc, List.zipWith_append hp]
+  rw [List.zipWith_append (· * ·) hc, List.zipWith_append (· * ·) hp]
   simp only [List.map_append, List.sum_append]
   ring
 
