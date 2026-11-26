@@ -112,7 +112,8 @@ theorem brent_root_exists
     have h_ivt := intermediate_value_Ioo (le_of_lt hab) hcont_neg
     have hrange : (0 : ℝ) ∈ Set.Ioo (-f a) (-f b) := ⟨by linarith, by linarith⟩
     obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
-    have hfc : f c = 0 := by linarith [hc_val]
+    dsimp at hc_val
+    have hfc : f c = 0 := neg_eq_zero.mp hc_val
     exact ⟨c, hc_mem, hfc⟩
 
 -- ============================================================
