@@ -37,7 +37,7 @@ noncomputable def gex_at_strike (oi : ℝ) (gamma : ℝ) : ℝ :=
 theorem gex_nonneg (oi gamma : ℝ) (hoi : 0 ≤ oi) (hgamma : 0 ≤ gamma) :
     0 ≤ gex_at_strike oi gamma := by
   unfold gex_at_strike CME_GOLD_MULTIPLIER
-  positivity
+  exact mul_nonneg (mul_nonneg hoi hgamma) (by norm_num)
 
 -- ============================================================
 -- §2. Net GEX = Σ Call_GEX - Σ Put_GEX
@@ -56,12 +56,15 @@ noncomputable def net_gex
     Cho phép tính incremental khi thêm/bỏ một strike -/
 theorem net_gex_additive
     (c_ois c_gs p_ois p_gs : List ℝ)
-    (c_ois' c_gs' p_ois' p_gs' : List ℝ) :
+    (c_ois' c_gs' p_ois' p_gs' : List ℝ)
+    (hc : c_ois.length = c_gs.length)
+    (hp : p_ois.length = p_gs.length) :
     net_gex (c_ois ++ c_ois') (c_gs ++ c_gs') (p_ois ++ p_ois') (p_gs ++ p_gs') =
     net_gex c_ois c_gs p_ois p_gs +
     net_gex c_ois' c_gs' p_ois' p_gs' := by
   unfold net_gex
-  simp [List.zipWith_append (by simp), List.map_append, List.sum_append]
+  rw [List.zipWith_append hc, List.zipWith_append hp]
+  simp only [List.map_append, List.sum_append]
   ring
 
 /-- ✅ Net GEX = 0 khi options chain rỗng -/
@@ -98,24 +101,3 @@ theorem siege_ratio_monotone_volume (v1 v2 oi : ℝ)
     wall_siege_ratio v1 oi ≤ wall_siege_ratio v2 oi := by
   unfold wall_siege_ratio
   exact div_le_div_of_nonneg_right hv (le_of_lt hoi)
-
--- ============================================================
--- §4. Zero Gamma Flip - Existence (định tính)
--- ============================================================
-
-/-- Zero Gamma Flip S* là mức giá mà tại đó Net_GEX thay đổi dấu.
-    Định lý này chứng minh: nếu Net_GEX âm ở một mức và dương ở mức khác,
-    thì tồn tại điểm S* nằm giữa (Intermediate Value Theorem).
-    
-    Note: Chứng minh đầy đủ trong ZeroGammaFlip.lean -/
-theorem zero_gamma_flip_exists_informal :
-    ∀ (f : ℝ → ℝ) (a b : ℝ),
-    ContinuousOn f (Set.Icc a b) →
-    f a < 0 → 0 < f b →
-    ∃ s ∈ Set.Ioo a b, f s = 0 := by
-  intro f a b hcont ha hb
-  have := intermediate_value_Ioo (le_of_lt (lt_of_lt_of_le ha (le_of_lt hb) |>.le.lt.le))
-    hcont
-  simp at this
-  obtain ⟨s, hs, hfs⟩ := this ⟨le_of_lt ha, le_of_lt hb⟩
-  exact ⟨s, hs, le_antisymm (le_of_lt (hfs ▸ lt_of_lt_of_le ha (le_of_lt hb).le)) (hfs ▸ le_of_lt hb)⟩

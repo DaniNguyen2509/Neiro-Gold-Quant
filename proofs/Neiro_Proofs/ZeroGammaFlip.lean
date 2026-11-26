@@ -64,15 +64,12 @@ theorem zero_gamma_flip_exists
     (ha_neg : net_gex_fn a < 0)
     (hb_pos : 0 < net_gex_fn b) :
     ∃ S_star ∈ Ioo a b, net_gex_fn S_star = 0 := by
-  -- Áp dụng Intermediate Value Theorem từ Mathlib
   have h_ivt := intermediate_value_Ioo hab hcont
-  -- Tìm 0 trong khoảng (net_gex(a), net_gex(b))
   have hrange : (0 : ℝ) ∈ Set.Icc (net_gex_fn a) (net_gex_fn b) := by
     constructor
     · exact le_of_lt ha_neg
     · exact le_of_lt hb_pos
   obtain ⟨S_star, hS_mem, hS_val⟩ := h_ivt hrange
-  -- hS_val: net_gex_fn S_star ∈ Icc 0 0, tức là = 0
   exact ⟨S_star, hS_mem, le_antisymm hS_val.2 hS_val.1⟩
 
 -- ============================================================
@@ -85,8 +82,8 @@ theorem zero_gamma_flip_exists
     Bất biến cần đảm bảo: S* luôn nằm trong corridor [Put_Wall, Call_Wall] -/
 theorem zero_gamma_bounded_by_walls
     (S_star put_wall call_wall : ℝ)
-    (hpw : 0 < put_wall)
-    (hcw : put_wall < call_wall)
+    (_hpw : 0 < put_wall)
+    (_hcw : put_wall < call_wall)
     (hS : S_star ∈ Set.Ioo put_wall call_wall) :
     put_wall < S_star ∧ S_star < call_wall := by
   exact ⟨hS.1, hS.2⟩
@@ -112,19 +109,19 @@ theorem regime_long_gamma_correct (net_gex eps : ℝ)
     (hgex : 0 < net_gex) (heps : eps ≤ net_gex) :
     classify_regime net_gex eps = GammaRegime.LongGamma := by
   unfold classify_regime
-  simp only [ite_eq_right_iff]
-  constructor
-  · intro h
-    exact absurd h (not_lt.mpr (by linarith [abs_of_pos hgex]))
-  · exact Or.inl hgex
+  split_ifs with h1 h2
+  · have : |net_gex| = net_gex := abs_of_pos hgex
+    linarith
+  · rfl
+  · linarith
 
 /-- ✅ ShortGamma khi Net_GEX < 0 và đủ xa S* -/
 theorem regime_short_gamma_correct (net_gex eps : ℝ)
     (hgex : net_gex < 0) (heps : eps ≤ -net_gex) :
     classify_regime net_gex eps = GammaRegime.ShortGamma := by
   unfold classify_regime
-  simp only
-  rw [if_neg, if_neg]
-  · exact not_lt.mpr (le_of_lt hgex)
-  · rw [abs_of_neg hgex]
-    exact not_lt.mpr (by linarith)
+  split_ifs with h1 h2
+  · have : |net_gex| = -net_gex := abs_of_neg hgex
+    linarith
+  · linarith
+  · rfl

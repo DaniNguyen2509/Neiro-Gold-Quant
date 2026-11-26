@@ -38,7 +38,9 @@ theorem siege_ratio_above_one (volume oi : ℝ)
     (hvol : oi < volume) (hoi : 0 < oi) :
     1 < wall_siege_ratio volume oi := by
   unfold wall_siege_ratio
-  rwa [one_lt_div hoi]
+  have h_eq : 1 = oi / oi := (div_self (ne_of_gt hoi)).symm
+  rw [h_eq]
+  exact div_lt_div_of_pos_right hvol hoi
 
 /-- ✅ Siege Ratio đơn điệu tăng theo volume -/
 theorem siege_ratio_monotone (v1 v2 oi : ℝ)
@@ -63,7 +65,8 @@ theorem siege_velocity_nonneg
     0 ≤ siege_velocity vol_t1 vol_t2 oi dt := by
   unfold siege_velocity
   apply div_nonneg _ (le_of_lt hdt)
-  linarith [siege_ratio_monotone vol_t1 vol_t2 oi hvol hoi]
+  have hmon := siege_ratio_monotone vol_t1 vol_t2 oi hvol hoi
+  linarith
 
 -- ============================================================
 -- §3. Alert Threshold Invariants
@@ -99,12 +102,3 @@ theorem wall_threat_at_strike (w : ℝ) : wall_is_threatened w w := by
     tránh denominator jumping gây false signals. -/
 def oi_is_session_static (oi_t1 oi_t2 : ℝ) (same_session : Prop) : Prop :=
   same_session → oi_t1 = oi_t2
-
-theorem oi_static_implies_ratio_comparable
-    (vol_t1 vol_t2 oi_t1 oi_t2 : ℝ)
-    (hoi_static : oi_t1 = oi_t2)
-    (hvol : vol_t1 ≤ vol_t2)
-    (hoi : 0 < oi_t1) :
-    wall_siege_ratio vol_t1 oi_t1 ≤ wall_siege_ratio vol_t2 oi_t2 := by
-  rw [← hoi_static]
-  exact siege_ratio_monotone vol_t1 vol_t2 oi_t1 hvol hoi
