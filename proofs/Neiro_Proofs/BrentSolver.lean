@@ -35,58 +35,58 @@ theorem bisection_preserves_bracket
     is_bracketed f a m ∨ is_bracketed f m b := by
   unfold is_bracketed at *
   simp only
-  -- Dùng sign analysis: f(a)·f(b) ≤ 0
-  -- Nếu f(m) = 0: cả hai vế đều ≤ 0 ✓
-  -- Nếu f(m) ≠ 0: f(m) cùng dấu với f(a) hoặc f(b), không thể cả hai
   by_cases hm : f ((a + b) / 2) = 0
   · left; rw [hm]; ring_nf; norm_num
   · rcases lt_or_gt_of_ne hm with hneg | hpos
-    · -- f(m) < 0: kiểm tra f(a)·f(m) ≤ 0 hay f(m)·f(b) ≤ 0
+    · -- f(m) < 0
       rcases le_or_lt 0 (f a) with ha | ha
       · left
-        apply mul_nonpos_of_nonneg_of_nonpos ha
-        exact le_of_lt hneg
+        exact mul_nonpos_of_nonneg_of_nonpos ha (le_of_lt hneg)
       · right
-        apply mul_nonpos_of_nonpos_of_nonneg (le_of_lt hneg)
-        have : f a * f b ≤ 0 := hbracket
-        exact nonneg_of_mul_nonpos_left this ha
-    · -- f(m) > 0: tương tự
+        have hb : 0 ≤ f b := by
+          by_contra h
+          push_neg at h
+          have : 0 < f a * f b := mul_pos_of_neg_of_neg ha h
+          linarith
+        exact mul_nonpos_of_nonpos_of_nonneg (le_of_lt hneg) hb
+    · -- f(m) > 0
       rcases le_or_lt (f a) 0 with ha | ha
       · left
-        apply mul_nonpos_of_nonpos_of_nonneg ha
-        exact le_of_lt hpos
+        exact mul_nonpos_of_nonpos_of_nonneg ha (le_of_lt hpos)
       · right
-        apply mul_nonpos_of_nonneg_of_nonpos (le_of_lt hpos)
-        have : f a * f b ≤ 0 := hbracket
-        exact nonpos_of_mul_nonpos_right this ha
+        have hb : f b ≤ 0 := by
+          by_contra h
+          push_neg at h
+          have : 0 < f a * f b := mul_pos ha h
+          linarith
+        exact mul_nonpos_of_nonneg_of_nonpos (le_of_lt hpos) hb
 
 /-- ✅ Bisection thu hẹp interval: |b_new - a_new| = |b - a| / 2 -/
 theorem bisection_halves_interval (a b : ℝ) :
     |(a + b) / 2 - b| = |b - a| / 2 := by
-  rw [abs_sub_comm]
-  ring_nf
-  rw [abs_of_pos (by linarith [abs_nonneg (b - a)] : (0 : ℝ) < 2)] |>.symm
-  simp [abs_div]
-  ring
+  have : (a + b) / 2 - b = -(b - a) / 2 := by ring
+  rw [this, abs_neg, abs_div, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
 
 -- ============================================================
 -- §2. Interval Shrinkage → Convergence
 -- ============================================================
 
 /-- Sequence của độ rộng interval trong Bisection giảm theo lũy thừa 1/2ⁿ -/
-def bisection_width (a b : ℝ) (n : ℕ) : ℝ :=
+noncomputable def bisection_width (a b : ℝ) (n : ℕ) : ℝ :=
   |b - a| / (2 : ℝ) ^ n
 
 /-- ✅ bisection_width → 0 khi n → ∞ -/
 theorem bisection_converges (a b : ℝ) :
     Filter.Tendsto (bisection_width a b) Filter.atTop (nhds 0) := by
   unfold bisection_width
-  have h : Filter.Tendsto (fun n : ℕ => |b - a| / (2 : ℝ) ^ n) atTop (nhds 0) := by
-    rw [show (0 : ℝ) = |b - a| * 0 by ring]
-    apply Filter.Tendsto.const_mul
-    rw [show (0 : ℝ) = 1 / (2 : ℝ) ^ 0 * 0 by simp]
-    sorry -- tendsto (1/2^n) → 0, cần geometric series lemma
-  exact h
+  have hgeom : Filter.Tendsto (fun n : ℕ => (1 / 2 : ℝ) ^ n) atTop (nhds 0) :=
+    tendsto_pow_atTop_nhds_zero_of_lt_one (by norm_num) (by norm_num)
+  have heq : (fun n : ℕ => |b - a| / (2 : ℝ) ^ n) = fun n : ℕ => |b - a| * (1 / 2 : ℝ) ^ n := by
+    funext n
+    rw [div_eq_mul_inv, one_div_pow]
+  rw [heq]
+  have hmul := Filter.Tendsto.const_mul |b - a| hgeom
+  simpa using hmul
 
 -- ============================================================
 -- §3. Root Existence (IVT)
@@ -100,16 +100,40 @@ theorem brent_root_exists
     (hcont : ContinuousOn f (Set.Icc a b))
     (hbracket : f a * f b < 0) :
     ∃ c ∈ Set.Ioo a b, f c = 0 := by
-  -- Từ f(a)·f(b) < 0, suy ra f(a) và f(b) khác dấu
-  rcases neg_or_pos_of_mul_neg hbracket with ⟨ha, hb⟩ | ⟨ha, hb⟩
-  · -- f(a) < 0, f(b) > 0: IVT
-    have := intermediate_value_Ioo hab hcont
-    obtain ⟨c, hc_mem, hfc⟩ := this ⟨le_of_lt ha, le_of_lt hb⟩
-    exact ⟨c, hc_mem, le_antisymm hfc.2 hfc.1⟩
-  · -- f(a) > 0, f(b) < 0: IVT ngược
-    have := intermediate_value_Ioo hab (hcont)
-    obtain ⟨c, hc_mem, hfc⟩ := this ⟨le_of_lt hb, le_of_lt ha⟩
-    exact ⟨c, hc_mem, le_antisymm hfc.2 hfc.1⟩
+  have hcases : (f a < 0 ∧ 0 < f b) ∨ (0 < f a ∧ f b < 0) := by
+    rcases lt_trichotomy (f a) 0 with ha_neg | ha_zero | ha_pos
+    · have hb_pos : 0 < f b := by
+        by_contra hb
+        push_neg at hb
+        rcases eq_or_lt_of_le hb with hb_zero | hb_neg
+        · rw [hb_zero, mul_zero] at hbracket; linarith
+        · have : 0 < f a * f b := mul_pos_of_neg_of_neg ha_neg hb_neg
+          linarith
+      left; exact ⟨ha_neg, hb_pos⟩
+    · rw [ha_zero, zero_mul] at hbracket; linarith
+    · have hb_neg : f b < 0 := by
+        by_contra hb
+        push_neg at hb
+        rcases eq_or_lt_of_le hb with hb_zero | hb_pos
+        · rw [hb_zero, mul_zero] at hbracket; linarith
+        · have : 0 < f a * f b := mul_pos ha_pos hb_pos
+          linarith
+      right; exact ⟨ha_pos, hb_neg⟩
+  rcases hcases with ⟨ha, hb⟩ | ⟨ha, hb⟩
+  · have h_ivt := intermediate_value_Ioo hab hcont
+    have hrange : (0 : ℝ) ∈ Set.Icc (f a) (f b) := ⟨le_of_lt ha, le_of_lt hb⟩
+    obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
+    exact ⟨c, hc_mem, le_antisymm hc_val.2 hc_val.1⟩
+  · have hcont_neg : ContinuousOn (fun x => -f x) (Set.Icc a b) := hcont.neg
+    have h_ivt := intermediate_value_Ioo hab hcont_neg
+    have hrange : (0 : ℝ) ∈ Set.Icc (-f a) (-f b) := by
+      constructor
+      · linarith
+      · linarith
+    obtain ⟨c, hc_mem, hc_val⟩ := h_ivt hrange
+    have hfc_zero : -f c = 0 := le_antisymm hc_val.2 hc_val.1
+    have hfc : f c = 0 := by linarith
+    exact ⟨c, hc_mem, hfc⟩
 
 -- ============================================================
 -- §4. Stopping Criterion
@@ -120,14 +144,15 @@ theorem brent_root_exists
 theorem brent_stopping_criterion
     (f : ℝ → ℝ) (a b c : ℝ)
     (hc : c ∈ Set.Icc a b)
-    (hwidth : |b - a| < 2)  -- xtol = 2 (theo dealer.py: xtol=0.01 cho gold price)
+    (_hwidth : |b - a| < 2)  -- xtol = 2 (theo dealer.py: xtol=0.01 cho gold price)
     (hroot_in : ∃ r ∈ Set.Icc a b, f r = 0) :
     ∃ r : ℝ, f r = 0 ∧ |c - r| ≤ |b - a| := by
   obtain ⟨r, hr_mem, hfr⟩ := hroot_in
-  exact ⟨r, hfr, by
-    have hc' := hc
-    rw [Set.mem_Icc] at hc' hr_mem
-    calc |c - r| ≤ |b - a| := by
-      apply abs_sub_le_of_abs_sub_le_left
-      · linarith [hc'.1, hr_mem.2]
-      · linarith [hc'.2, hr_mem.1]⟩
+  refine ⟨r, hfr, ?_⟩
+  rw [Set.mem_Icc] at hc hr_mem
+  have hpos : 0 ≤ b - a := by linarith [hc.1, hc.2]
+  rw [abs_of_nonneg hpos]
+  rw [abs_le]
+  constructor
+  · linarith [hc.1, hr_mem.2]
+  · linarith [hc.2, hr_mem.1]

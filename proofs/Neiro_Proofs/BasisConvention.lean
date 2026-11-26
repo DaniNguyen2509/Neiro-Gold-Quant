@@ -121,7 +121,7 @@ def basis_within_tolerance (spot futures : ℝ) : Prop :=
 
 /-- ✅ Nếu basis trong tolerance thì spot và futures gần nhau -/
 theorem within_tolerance_implies_close (spot futures : ℝ)
-    (hfut : 0 < futures)
+    (_hfut : 0 < futures)
     (htol : basis_within_tolerance spot futures) :
     |spot - futures| ≤ 0.05 * futures := by
   unfold basis_within_tolerance basis at htol
