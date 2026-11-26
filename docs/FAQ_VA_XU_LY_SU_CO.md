@@ -94,3 +94,13 @@
   1. Mở file [Chay_Live_Terminal.bat](file:///c:/Users/Daniel/Documents/My-Projects/Neiro-Gold-Quant/Chay_Live_Terminal.bat).
   2. Chọn mục **`[4] CAO & DONG BO DU LIEU LEN CLOUD`** hoặc **`[3] CHAY LIVE TERMINAL NOI BO`**. Hệ thống sẽ tự động bật Playwright cào chuỗi Options mới nhất và tự động biên dịch lại giao diện Dashboard.
   3. Sau khi hoàn tất, tải lại trang web (ấn `Ctrl + F5`) để xóa cache, cảnh báo sẽ biến mất hoàn toàn.
+
+---
+
+### 7. Sự cố: Đã bấm `⚡ Sync CME` hoặc thấy `(vừa đồng bộ)` nhưng Options Data trên web vẫn cũ
+* **Nguyên nhân:**
+  1. Dòng chữ `(vừa đồng bộ)` cạnh nút Worker là mốc đồng bộ **luồng nến realtime cTrader** (làm mới mỗi ~3 giây), không phải mốc đồng bộ CME Options Chain.
+  2. Nếu GitHub Actions workflow `.github/workflows/daily_options_sync.yml` gặp lỗi ở bước `Commit and Push Updated Options Data` (ví dụ `git add` đụng wildcard các file sub-chain bị `.gitignore` chặn), nhánh `main` sẽ không nhận được `version.json`, `index.html`, và `data/options_prices_GCZ26.csv` mới dù bước cào đã chạy.
+  3. Ngoài ra, khi gộp nhiều kỳ hạn (`scrape_multi_expiry_and_save`), dùng `max(source_timestamps)` để không bị kéo lùi timestamp theo 1 kỳ hạn sắp đáo hạn dùng cache cũ.
+* **Cách kiểm tra & khắc phục:**
+  * Đảm bảo workflow chỉ stage đúng 4 file tracked (`git add data/options_prices_GCZ26.csv index.html version.json tactical_levels.json`) và `triggerRemoteCmeSync()` chờ tối đa `150s` kết hợp kiểm tra `fetchCloudVersionJson()`.

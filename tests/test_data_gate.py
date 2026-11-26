@@ -352,3 +352,15 @@ def test_d11_pytest_config_has_no_os_hardcoded_basetemp():
         "All tmp_path .as_uri() calls in Playwright E2E tests must call .resolve().as_uri() "
         "so file:// URIs never fail on relative basetemp."
     )
+
+
+def test_d12_ci_commit_step_only_stages_whitelisted_csv():
+    """Commit step must not expand glob data/options_prices_GCZ26*.csv into gitignored sub-chains."""
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    start = text.index("Commit and Push Updated Options Data")
+    step = text[start:]
+    assert "data/options_prices_GCZ26*.csv" not in step, (
+        "Wildcard expands to gitignored sub-chain CSVs on Linux bash and fails git add (exit 1)."
+    )
+    assert "git add data/options_prices_GCZ26.csv index.html version.json tactical_levels.json" in step
+

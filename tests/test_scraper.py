@@ -328,3 +328,54 @@ class TestScraperWorkflow:
         df = parse_barchart_json(bad_payload)
         assert list(df["strike"]) == [4025.0]
 
+    def test_scrape_multi_expiry_uses_latest_timestamp_on_partial_cache(self, tmp_path):
+        """When one expiry falls back to cache and another scrapes fresh, master uses latest timestamp."""
+        from src.collector.scraper import scrape_multi_expiry_and_save
+        from src.quant_engine.synthetic import resolve_active_expirations
+
+        exps = resolve_active_expirations(
+            underlying_futures="GCZ26", weekly_count=1, include_quarterly=True
+        )
+        assert len(exps) >= 2
+        old_ts = "2025-01-01T00:00:00+00:00"
+        cached_rows = [
+            {
+                "strike": float(k),
+                "callMid": 50.0, "callBid": 49.0, "callAsk": 51.0, "callLatest": 50.0,
+                "callVolume": 10, "callOpenInterest": 200, "callGamma": 0.001, "callIV": 0.18,
+                "putMid": 50.0, "putBid": 49.0, "putAsk": 51.0, "putLatest": 50.0,
+                "putVolume": 10, "putOpenInterest": 200, "putGamma": 0.001, "putIV": 0.18,
+                "scraped_at_utc": old_ts,
+            }
+            for k in range(3700, 4301, 25)
+        ]
+        sub_first = tmp_path / f"options_prices_GCZ26_{exps[0]['option_symbol']}.csv"
+        pd.DataFrame(cached_rows).to_csv(sub_first, index=False)
+
+        fresh_payload = {
+            "data": [
+                {"raw": {"strikePrice": str(k), "optionType": t, "bidPrice": "10", "askPrice": "11",
+                         "openInterest": "200", "volume": "5"}}
+                for k in range(3700, 4301, 25) for t in ("Call", "Put")
+            ]
+        }
+        call_idx = {"n": 0}
+
+        async def _fake_fetch(*_args, **_kwargs):
+            call_idx["n"] += 1
+            if call_idx["n"] == 1:
+                raise RuntimeError("Transient first-expiry error")
+            return fresh_payload
+
+        with (
+            mock.patch("src.collector.scraper.fetch_barchart_options_playwright", side_effect=_fake_fetch),
+            mock.patch("src.quant_engine.basis.fetch_live_cme_futures_price", return_value=4000.0),
+        ):
+            scrape_multi_expiry_and_save(
+                output_dir=str(tmp_path), underlying_futures="GCZ26", weekly_count=1
+            )
+
+        df_master = pd.read_csv(tmp_path / "options_prices_GCZ26.csv")
+        assert not str(df_master["scraped_at_utc"].iloc[0]).startswith("2025-01-01")
+
+

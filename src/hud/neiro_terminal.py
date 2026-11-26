@@ -711,7 +711,7 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
         const btn = document.getElementById('btn-sync-cme');
         const wUrl = getCloudFeedWorkerUrl() || 'https://neiro-gold-feed.dani-wind2509.workers.dev';
         const pat = (localStorage.getItem('NEIRO_GITHUB_PAT') || '').trim();
-        if (!confirm('Kích hoạt máy ảo GitHub Actions cào bảng Options COMEX mới nhất từ Barchart ngay bây giờ? (~60 giây)')) {{
+        if (!confirm('Kích hoạt máy ảo GitHub Actions cào bảng Options COMEX mới nhất từ Barchart ngay bây giờ? (~1-2 phút)')) {{
             return;
         }}
 
@@ -789,21 +789,20 @@ def render_neiro_orderflow_component(meta: dict[str, Any], df: pd.DataFrame) -> 
                 return;
             }}
 
-            let countdown = 65;
+            let countdown = 150;
             const startEpoch = Date.now();
-            if (btn) btn.innerText = '⏳ Đang cào (65s)';
+            if (btn) btn.innerText = '⏳ Đang cào (150s)';
 
             const timer = setInterval(async () => {{
                 countdown--;
                 if (btn) btn.innerText = '⏳ Đang cào (' + countdown + 's)';
 
-                if (countdown % 10 === 0 || countdown <= 5) {{
+                if (countdown % 8 === 0 || countdown <= 5) {{
                     try {{
-                        const vRes = await fetch('version.json?t=' + Date.now());
-                        if (vRes.ok) {{
-                            const vData = await vRes.json();
+                        const vData = await fetchCloudVersionJson();
+                        if (vData) {{
                             const vTime = Date.parse(vData.timestamp_utc || vData.scraped_at_utc || 0);
-                            if (vTime > startEpoch) {{
+                            if (vTime > Math.max(startEpoch, lastStaticSnapshotEpochMs)) {{
                                 clearInterval(timer);
                                 isCmeSyncInProgress = false;
                                 if (btn) {{

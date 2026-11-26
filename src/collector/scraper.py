@@ -483,7 +483,7 @@ def scrape_multi_expiry_and_save(
             else:
                 if "scraped_at_utc" not in agg_df.columns:
                     agg_df["scraped_at_utc"] = (
-                        min(source_timestamps)
+                        max(source_timestamps)
                         if source_timestamps
                         else datetime.datetime.now(datetime.timezone.utc).isoformat()
                     )
